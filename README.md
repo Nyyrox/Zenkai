@@ -57,6 +57,20 @@ A modern anime-inspired experience designed to feel alive.
 
 <div align="center">
 
+### 🔐 Security & Virus Scan
+
+The ZENKAI release has been submitted to **VirusTotal** for independent antivirus analysis.
+
+<a href="https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmY2QyYzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==">
+  <img src="https://img.shields.io/badge/VirusTotal-Scan%20Report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white" alt="VirusTotal Scan Report">
+</a>
+
+<br><br>
+
+> **Note:** VirusTotal results can change as antivirus engines update their signatures. The linked report is the source of truth for the scan associated with this release.
+
+<br><br>
+
 ### ✦ WATCH · READ · DISCOVER ✦
 
 ZENKAI brings anime streaming, manga reading, and novel reading together in one modern Android app.
