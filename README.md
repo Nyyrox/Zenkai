@@ -1,79 +1,166 @@
 <div align="center">
 
-<h1>⚡ ZENKAI</h1>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/header-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/header-light.png">
+  <img alt="Zenkai" src="assets/header-dark.png" width="100%">
+</picture>
 
-<p><strong>Watch · Read · Discover</strong></p>
+<br/><br/>
 
-<p>Anime, manga &amp; novels — brought together in one focused Android experience.</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/icon.png">
+  <img alt="Zenkai icon" src="assets/icon.png" width="80" height="80">
+</picture>
 
-[![Latest](https://img.shields.io/github/v/release/Nyyrox/Zenkai?display_name=tag&style=flat-square&label=LATEST&color=F3E6C8&labelColor=1a1a1a)](https://github.com/Nyyrox/Zenkai/releases) [![Downloads](https://img.shields.io/github/downloads/Nyyrox/Zenkai/total?style=flat-square&label=DOWNLOADS&color=F3E6C8&labelColor=1a1a1a)](https://github.com/Nyyrox/Zenkai/releases) [![Stars](https://img.shields.io/github/stars/Nyyrox/Zenkai?style=flat-square&label=STARS&color=F3E6C8&labelColor=1a1a1a)](https://github.com/Nyyrox/Zenkai/stargazers) [![Activity](https://img.shields.io/github/commit-activity/m/Nyyrox/Zenkai?style=flat-square&label=ACTIVITY&color=F3E6C8&labelColor=1a1a1a)](https://github.com/Nyyrox/Zenkai/commits/main)
+### ZENKAI
 
-[**Download**](https://github.com/Nyyrox/Zenkai/releases) · [**Discord**](https://discord.gg/aXTfS6XGg) · [**Telegram**](https://t.me/StreamverseOfc)
+**Anime · Manga · Novels**
+
+*One focused Android experience — watch it, read it, all in one place.*
+
+<br/>
+
+[![GitHub Release](https://img.shields.io/github/v/release/Nyyrox/Zenkai?display_name=tag&style=for-the-badge&logo=github&color=6D28D9&labelColor=09090B&label=Latest)](https://github.com/Nyyrox/Zenkai/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Nyyrox/Zenkai/total?style=for-the-badge&logo=android&logoColor=white&color=6D28D9&labelColor=09090B)](https://github.com/Nyyrox/Zenkai/releases)
+[![Stars](https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&logo=github&color=6D28D9&labelColor=09090B)](https://github.com/Nyyrox/Zenkai/stargazers)
+
+<br/>
+
+[![Discord](https://img.shields.io/badge/Discord-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/aXTfS6XGg)
+[![Telegram](https://img.shields.io/badge/Telegram-Updates-229ED9?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/StreamverseOfc)
+[![Download](https://img.shields.io/badge/Download-APK-6D28D9?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Nyyrox/Zenkai/releases/latest)
 
 </div>
 
 ---
 
-## What is Zenkai?
+## 📱 Screenshots
 
-| 🎬 Anime | 📖 Manga | 📚 Novels |
-|----------|----------|-----------|
-| Stream with a clean player, multiple servers and zero distractions | Read with progress tracking, chapter downloads and a story-first layout | Distraction-free light novel reading, built for focus |
+<div align="center">
+<img src="assets/screenshots/home.png" height="400" alt="Home"/>
+<img src="assets/screenshots/player.png" height="400" alt="Player"/>
+<img src="assets/screenshots/manga.png" height="400" alt="Manga"/>
+<img src="assets/screenshots/library.png" height="400" alt="Library"/>
+</div>
 
 ---
 
-## Features
+## ✨ Features
 
-**Playback**
-- Multiple streaming servers — more options, fewer dead ends
-- Direct server playback for zero-hop streams
-- Picture-in-Picture — watch while you do other things
+<details>
+<summary><b>🎬 Anime</b></summary>
+
+- Multiple streaming servers for more playback options
+- Direct server playback for supported streams
+- Picture-in-Picture while using other apps
 - Caption translation for supported subtitles
 - Offline downloads for episodes
-- Automatic pause on app close or PiP switch
+- Smart auto-pause on app close or PiP switch
+- Optimized playback with smoother animations
 
-**Library**
-- Watchlist — everything you want, one place
+</details>
+
+<details>
+<summary><b>📖 Manga</b></summary>
+
+- Progress tracking with improved synchronization
+- Chapter downloads for offline reading
+- Story-first reading interface
+- Multiple viewer modes and reading directions
+
+</details>
+
+<details>
+<summary><b>📚 Novels</b></summary>
+
+- Distraction-free light novel reader
+- Clean, minimal reading experience
+- Built for focus and long-form reading
+
+</details>
+
+<details>
+<summary><b>🗂️ Library & Account</b></summary>
+
+- Watchlist to keep everything in one place
 - Download manager with episode tracking and storage view
-- Manga progress sync across sessions
 - Login & account support
-- In-app community
-- Customizable theming
+- Customizable theming to make Zenkai feel like yours
+- In-app community built directly into the app
 
-**Connected**
+</details>
+
+<details>
+<summary><b>🔗 Connected</b></summary>
+
 - Discord Rich Presence
-- Community Discord + Telegram
-- VirusTotal-scanned releases for every build
+- Community Discord & Telegram
+- VirusTotal-scanned releases for transparency
+
+</details>
 
 ---
 
-## Latest — v1.5.3
+## 🆕 What's new in v1.5.3
 
-- 🔔 Fixed notification display and interaction
-- ⏸️ Better automatic pause on app close / PiP
-- 🎮 Discord Rich Presence fix
-- 📥 Improved downloads — visibility, list handling
-- 📜 Download page scroll fix
-- ⚡ Stability improvements across playback and downloads
+| | |
+|---|---|
+| 🔔 | Fixed notifications showing and interacting correctly |
+| ⏸️ | Improved automatic pause on app close and PiP |
+| 🎮 | Fixed Discord Rich Presence |
+| 📥 | Better downloads — visibility and list handling fixed |
+| 📜 | Fixed download page scrolling issues |
+| ⚡ | Stability improvements across playback and downloads |
 
-[![View v1.5.3](https://img.shields.io/badge/View_v1.5.3-F3E6C8?style=flat-square&logo=github&logoColor=111111)](https://github.com/Nyyrox/Zenkai/releases/tag/v1.5.3)
+<div align="center">
+
+[![View Release](https://img.shields.io/badge/View%20v1.5.3%20on%20GitHub-09090B?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Nyyrox/Zenkai/releases/tag/v1.5.3)
+
+</div>
 
 ---
 
-## Security
+## 🔐 Security
 
-Every Zenkai release is submitted to **VirusTotal** for independent antivirus scanning before publishing.
+Every Zenkai release is independently scanned by **VirusTotal** before publishing. Results may change as antivirus signatures update — the linked report is the source of truth for each release.
 
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-Scan_Report-394EFF?style=flat-square&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmYQ2YzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==)
+<div align="center">
+
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-Scan%20Report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmYQ2YzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==)
+
+</div>
+
+---
+
+## 👥 Contributors
+
+<div align="center">
+
+<a href="https://github.com/Nyyrox/Zenkai/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Nyyrox/Zenkai" alt="Contributors"/>
+</a>
+
+</div>
+
+---
+
+## ⚠️ Disclaimer
+
+The developer(s) of this application have no affiliation with the content providers available. Zenkai hosts zero content. All legal issues regarding content should be directed at the respective file hosts and providers.
 
 ---
 
 <div align="center">
 
-**One place for what you watch.**
-**One place for what you read.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/icon.png">
+  <img src="assets/icon.png" width="48" height="48" alt="Zenkai"/>
+</picture>
 
-[**Get Zenkai →**](https://github.com/Nyyrox/Zenkai/releases)
+**One place for what you watch. One place for what you read.**
+
+[![Get Zenkai](https://img.shields.io/badge/Get%20Zenkai-6D28D9?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Nyyrox/Zenkai/releases/latest)
 
 *Built with passion by the Zenkai community.*
 
