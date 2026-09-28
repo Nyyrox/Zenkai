@@ -8,27 +8,20 @@ Anime, manga & novels — brought together in one focused Android experience.
 
 <br>
 
-<a href="https://github.com/Nyyrox/Zenkai/releases">
-  <img src="https://img.shields.io/github/v/release/Nyyrox/Zenkai?display_name=tag&style=for-the-badge&label=LATEST&color=white&labelColor=white" alt="Latest Release">
-</a>
-<a href="https://github.com/Nyyrox/Zenkai/releases">
-  <img src="https://img.shields.io/github/downloads/Nyyrox/Zenkai/total?style=for-the-badge&label=DOWNLOADS&color=white&labelColor=white" alt="Downloads">
-</a>
-<a href="https://github.com/Nyyrox/Zenkai">
-  <img src="https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&label=STARS&color=white&labelColor=white" alt="Stars">
-</a>
-<a href="https://github.com/Nyyrox/Zenkai/network/members">
-  <img src="https://img.shields.io/github/forks/Nyyrox/Zenkai?style=for-the-badge&label=FORKS&color=white&labelColor=white" alt="Forks">
-</a>
-<a href="https://github.com/Nyyrox/Zenkai/issues">
-  <img src="https://img.shields.io/github/issues/Nyyrox/Zenkai?style=for-the-badge&label=ISSUES&color=white&labelColor=white" alt="Issues">
-</a>
-<a href="https://github.com/Nyyrox/Zenkai/commits/main">
-  <img src="https://img.shields.io/github/commit-activity/m/Nyyrox/Zenkai?style=for-the-badge&label=ACTIVITY&color=white&labelColor=white" alt="Commit Activity">
-</a>
-<a href="https://github.com/Nyyrox/Zenkai/blob/main/LICENSE">
-  <img src="https://img.shields.io/github/license/Nyyrox/Zenkai?style=for-the-badge&label=LICENSE&color=white&labelColor=white" alt="License">
-</a>
+  <img src="https://img.shields.io/github/v/release/Nyyrox/Zenkai?display_name=tag&style=for-the-badge&label=LATEST&color=F3E6C8&labelColor=F3E6C8" alt="Latest Release">
+
+  <img src="https://img.shields.io/github/downloads/Nyyrox/Zenkai/total?style=for-the-badge&label=DOWNLOADS&color=F3E6C8&labelColor=F3E6C8" alt="Downloads">
+
+  <img src="https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&label=STARS&color=F3E6C8&labelColor=F3E6C8" alt="Stars">
+
+  <img src="https://img.shields.io/github/forks/Nyyrox/Zenkai?style=for-the-badge&label=FORKS&color=F3E6C8&labelColor=F3E6C8" alt="Forks">
+
+  <img src="https://img.shields.io/github/issues/Nyyrox/Zenkai?style=for-the-badge&label=ISSUES&color=F3E6C8&labelColor=F3E6C8" alt="Issues">
+
+  <img src="https://img.shields.io/github/commit-activity/m/Nyyrox/Zenkai?style=for-the-badge&label=ACTIVITY&color=F3E6C8&labelColor=F3E6C8" alt="Commit Activity">
+
+  <img src="https://img.shields.io/github/license/Nyyrox/Zenkai?style=for-the-badge&label=LICENSE&color=F3E6C8&labelColor=F3E6C8" alt="License">
+
 
 <br><br>
 
@@ -118,7 +111,7 @@ Join the community, share feedback, discover what others are watching and stay c
 - ⚡ Improved playback, downloads and overall stability
 
 <a href="https://github.com/Nyyrox/Zenkai/releases/tag/v1.5.3">
-  <img src="https://img.shields.io/badge/VIEW_RELEASE-white?style=for-the-badge&logo=github&logoColor=111111" alt="View v1.5.3 Release">
+  <img src="https://img.shields.io/badge/VIEW_RELEASE-F3E6C8?style=for-the-badge&logo=github&logoColor=111111" alt="View v1.5.3 Release">
 </a>
 
 ---
