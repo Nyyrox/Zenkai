@@ -17,6 +17,18 @@ Anime, manga & novels — brought together in one focused Android experience.
 <a href="https://github.com/Nyyrox/Zenkai">
   <img src="https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&label=STARS&color=111111" alt="Stars">
 </a>
+<a href="https://github.com/Nyyrox/Zenkai/network/members">
+  <img src="https://img.shields.io/github/forks/Nyyrox/Zenkai?style=for-the-badge&label=FORKS&color=111111" alt="Forks">
+</a>
+<a href="https://github.com/Nyyrox/Zenkai/issues">
+  <img src="https://img.shields.io/github/issues/Nyyrox/Zenkai?style=for-the-badge&label=ISSUES&color=111111" alt="Issues">
+</a>
+<a href="https://github.com/Nyyrox/Zenkai/commits/main">
+  <img src="https://img.shields.io/github/commit-activity/m/Nyyrox/Zenkai?style=for-the-badge&label=ACTIVITY&color=111111" alt="Commit Activity">
+</a>
+<a href="https://github.com/Nyyrox/Zenkai/blob/main/LICENSE">
+  <img src="https://img.shields.io/github/license/Nyyrox/Zenkai?style=for-the-badge&label=LICENSE&color=111111" alt="License">
+</a>
 
 <br><br>
 
