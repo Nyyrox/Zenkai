@@ -12,7 +12,7 @@ Anime, manga & novels — one focused Android experience.
 
 <img src="https://img.shields.io/github/v/release/Nyyrox/Zenkai?display_name=tag&style=for-the-badge&label=LATEST&color=F3E6C8&labelColor=F3E6C8" alt="Latest release"/>
 <img src="https://img.shields.io/github/downloads/Nyyrox/Zenkai/total?style=for-the-badge&label=DOWNLOADS&color=F3E6C8&labelColor=F3E6C8" alt="Downloads"/>
-<img src="https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&label=STARS&color=F3E6C8&labelColor=F3E6C8" alt="Stars"/>
+<img src="https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&label=STARS&color=F3E6C8&labelColor=F3E6C8&cacheSeconds=60" alt="Stars"/>
 <img src="https://img.shields.io/github/forks/Nyyrox/Zenkai?style=for-the-badge&label=FORKS&color=F3E6C8&labelColor=F3E6C8" alt="Forks"/>
 
 <br/>
