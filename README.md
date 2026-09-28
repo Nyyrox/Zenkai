@@ -1,9 +1,5 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Nyyrox/Zenkai/main/assets/zenkai-hero.svg" alt="ZENKAI" width="92%">
-
-<br><br>
-
 # Z E N K A I
 
 **Watch · Read · Discover**
@@ -123,7 +119,7 @@ Zenkai releases are submitted to **VirusTotal** for independent antivirus analys
 
 <div align="center">
 
-<a href="https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmY2QyYzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==">
+<a href="https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmYQ2YzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==">
   <img src="https://img.shields.io/badge/VIRUSTOTAL-Scan%20Report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white" alt="VirusTotal Scan Report">
 </a>
 
