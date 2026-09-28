@@ -1,82 +1,153 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Nyyrox/Zenkai/main/assets/zenkai-hero.svg" alt="ZENKAI" width="100%">
+<img src="https://raw.githubusercontent.com/Nyyrox/Zenkai/main/assets/zenkai-hero.svg" alt="ZENKAI" width="92%">
+
+<br><br>
+
+# Z E N K A I
+
+**Watch · Read · Discover**
+
+Anime, manga & novels — brought together in one focused Android experience.
 
 <br>
 
-# ZENKAI
+<a href="https://github.com/Nyyrox/Zenkai/releases">
+  <img src="https://img.shields.io/github/v/release/Nyyrox/Zenkai?display_name=tag&style=for-the-badge&label=LATEST&color=111111" alt="Latest Release">
+</a>
+<a href="https://github.com/Nyyrox/Zenkai/releases">
+  <img src="https://img.shields.io/github/downloads/Nyyrox/Zenkai/total?style=for-the-badge&label=DOWNLOADS&color=111111" alt="Downloads">
+</a>
+<a href="https://github.com/Nyyrox/Zenkai">
+  <img src="https://img.shields.io/github/stars/Nyyrox/Zenkai?style=for-the-badge&label=STARS&color=111111" alt="Stars">
+</a>
 
-### Anime. Manga. Novels. One beautiful place.
+<br><br>
 
-<p>
-  <a href="https://github.com/Nyyrox/Zenkai/releases"><img src="https://img.shields.io/badge/ANDROID-0B0A10?style=for-the-badge&logo=android&logoColor=white" alt="Android"></a>
-  <a href="https://discord.gg/aXTfS6XGg"><img src="https://img.shields.io/badge/DISCORD-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://t.me/StreamverseOfc"><img src="https://img.shields.io/badge/TELEGRAM-229ED9?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"></a>
-</p>
+<a href="https://github.com/Nyyrox/Zenkai/releases">Download</a>
+&nbsp; · &nbsp;
+<a href="https://discord.gg/aXTfS6XGg">Discord</a>
+&nbsp; · &nbsp;
+<a href="https://t.me/StreamverseOfc">Telegram</a>
 
 </div>
 
-<br>
+---
+
+## The Zenkai experience
 
 <table>
 <tr>
-<td width="50%">
+<td width="33%" valign="top">
 
-## 🎌 Anime
+### 🎬 Anime
 
-Watch your favorite anime in a clean, immersive Android experience.
-
-</td>
-<td width="50%">
-
-## 📖 Manga
-
-Read manga comfortably with an interface built around the story.
+Stream anime with a clean player, multiple servers and a focused watching experience.
 
 </td>
-</tr>
-<tr>
-<td width="50%">
+<td width="33%" valign="top">
 
-## 📚 Novels
+### 📖 Manga
 
-Dive into light novels with a focused, distraction-free reader.
+Read manga with progress tracking, downloads and an interface built around the story.
 
 </td>
-<td width="50%">
+<td width="33%" valign="top">
 
-## 🌸 ZENKAI
+### 📚 Novels
 
-A modern anime-inspired experience designed to feel alive.
+A distraction-free reading experience for light novels and more.
 
 </td>
 </tr>
 </table>
 
-<br>
+## ✦ Built for watching
+
+- **Multiple streaming servers** for more playback options
+- **Direct server playback** for supported streams
+- **Picture-in-Picture** for watching while using other apps
+- **Caption translation** for supported subtitles
+- **Anime downloads** for offline viewing
+- **Optimized playback** and smoother app animations
+- **Smart playback state** with automatic pause handling
+
+## ✦ Built for your library
+
+- **Watchlist** to keep everything you want to watch in one place
+- **Download manager** for downloaded episodes and storage
+- **Manga reading progress** with improved synchronization
+- **Login & account support** for your Zenkai experience
+- **Community** built directly into the app
+- **Customization** to make Zenkai feel like yours
+
+## ✦ Connected
+
+**Zenkai isn't just a player.**
+
+Join the community, share feedback, discover what others are watching and stay connected with Zenkai updates.
 
 <div align="center">
 
-### 🔐 Security & Virus Scan
+<a href="https://discord.gg/aXTfS6XGg">
+  <img src="https://img.shields.io/badge/DISCORD-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord">
+</a>
+<a href="https://t.me/StreamverseOfc">
+  <img src="https://img.shields.io/badge/TELEGRAM-Community-229ED9?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram">
+</a>
 
-The ZENKAI release has been submitted to **VirusTotal** for independent antivirus analysis.
+</div>
+
+---
+
+## Latest release · v1.5.3
+
+### What's new
+
+- 🔔 Fixed notifications showing and interacting properly
+- ⏸️ Improved automatic video pause when closing the app or using PiP
+- 🎮 Fixed Discord Rich Presence
+- 📥 Improved downloads, including downloaded episode visibility and list handling
+- 📜 Fixed download-page scrolling issues
+- ⚡ Improved playback, downloads and overall stability
+
+<a href="https://github.com/Nyyrox/Zenkai/releases/tag/v1.5.3">
+  <img src="https://img.shields.io/badge/VIEW_RELEASE-111111?style=for-the-badge&logo=github&logoColor=white" alt="View v1.5.3 Release">
+</a>
+
+---
+
+## 🔐 Security & transparency
+
+Zenkai releases are submitted to **VirusTotal** for independent antivirus analysis.
+
+<div align="center">
 
 <a href="https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmY2QyYzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==">
-  <img src="https://img.shields.io/badge/VirusTotal-Scan%20Report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white" alt="VirusTotal Scan Report">
+  <img src="https://img.shields.io/badge/VIRUSTOTAL-Scan%20Report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white" alt="VirusTotal Scan Report">
 </a>
 
 <br><br>
 
-> **Note:** VirusTotal results can change as antivirus engines update their signatures. The linked report is the source of truth for the scan associated with this release.
+<sub>VirusTotal results can change as antivirus engines update their signatures. The linked report is the source of truth for the scan associated with that release.</sub>
+
+</div>
+
+---
+
+<div align="center">
+
+### ZENKAI
+
+**One place for what you watch.  
+One place for what you read.**
+
+<br>
+
+<a href="https://github.com/Nyyrox/Zenkai/releases"><strong>Get Zenkai →</strong></a>
 
 <br><br>
 
-### ✦ WATCH · READ · DISCOVER ✦
-
-ZENKAI brings anime streaming, manga reading, and novel reading together in one modern Android app.
-
-<br><br>
-
-<a href="https://discord.gg/aXTfS6XGg">💬 Discord Community</a> · <a href="https://t.me/StreamverseOfc">📱 Telegram Community</a>
+<sub>Built with passion by the Zenkai community.</sub>
 
 </div>
