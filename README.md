@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://voxeodunvjrhtbjvbbxt.supabase.co/storage/v1/object/public/Admin%20uploads/IMG_20260928_151609_577.jpg" width="110" alt="Zenkai logo"/>
+<img src="assets/zenkai-logo-transparent.png" width="110" alt="Zenkai logo"/>
 
 # Z E N K A I
 
@@ -116,7 +116,7 @@ Zenkai hosts zero content and has no affiliation with the content providers avai
 
 <div align="center">
 
-<img src="https://voxeodunvjrhtbjvbbxt.supabase.co/storage/v1/object/public/Admin%20uploads/IMG_20260928_151609_577.jpg" width="54" alt="Zenkai"/>
+<img src="assets/zenkai-logo-transparent.png" width="54" alt="Zenkai"/>
 
 ### ZENKAI
 
