@@ -1,29 +1,70 @@
 <svg width="1200" height="620" viewBox="0 0 1200 620" fill="none" xmlns="http://www.w3.org/2000/svg">
 <defs>
- <radialGradient id="g1"><stop stop-color="#B88CFF" stop-opacity=".7"/><stop offset="1" stop-color="#B88CFF" stop-opacity="0"/></radialGradient>
- <radialGradient id="g2"><stop stop-color="#FF6BAA" stop-opacity=".45"/><stop offset="1" stop-color="#FF6BAA" stop-opacity="0"/></radialGradient>
- <linearGradient id="stroke" x1="0" y1="0" x2="1200" y2="620"><stop stop-color="#D9B8FF"/><stop offset=".5" stop-color="#FF7DB5"/><stop offset="1" stop-color="#8DA8FF"/></linearGradient>
- <filter id="blur"><feGaussianBlur stdDeviation="55"/></filter>
- <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
- <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" stroke="white" stroke-opacity=".035"/></pattern>
+  <linearGradient id="logo" x1="360" y1="180" x2="840" y2="270" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FFFFFF"/>
+    <stop offset=".52" stop-color="#D9D4E3"/>
+    <stop offset="1" stop-color="#A79CAF"/>
+  </linearGradient>
+  <linearGradient id="accent" x1="210" y1="410" x2="990" y2="410" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#8B5CF6" stop-opacity="0"/>
+    <stop offset=".5" stop-color="#C084FC"/>
+    <stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="violet" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 150) rotate(35) scale(360 300)">
+    <stop stop-color="#8B5CF6" stop-opacity=".28"/>
+    <stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="blue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(930 470) rotate(-30) scale(330 270)">
+    <stop stop-color="#38BDF8" stop-opacity=".16"/>
+    <stop offset="1" stop-color="#38BDF8" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="blur"><feGaussianBlur stdDeviation="55"/></filter>
+  <filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+  <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse">
+    <path d="M52 0H0V52" stroke="white" stroke-opacity=".025"/>
+  </pattern>
 </defs>
-<rect width="1200" height="620" rx="36" fill="#08070D"/>
+
+<rect width="1200" height="620" rx="36" fill="#07070A"/>
 <rect width="1200" height="620" rx="36" fill="url(#grid)"/>
-<ellipse cx="270" cy="160" rx="300" ry="230" fill="url(#g1)" filter="url(#blur)">
- <animate attributeName="cx" values="270;420;270" dur="9s" repeatCount="indefinite"/>
- <animate attributeName="cy" values="160;280;160" dur="11s" repeatCount="indefinite"/>
+
+<ellipse cx="300" cy="145" rx="310" ry="250" fill="url(#violet)" filter="url(#blur)">
+  <animate attributeName="cx" values="300;410;300" dur="10s" repeatCount="indefinite"/>
 </ellipse>
-<ellipse cx="930" cy="430" rx="280" ry="220" fill="url(#g2)" filter="url(#blur)">
- <animate attributeName="cx" values="930;790;930" dur="10s" repeatCount="indefinite"/>
+<ellipse cx="920" cy="455" rx="330" ry="260" fill="url(#blue)" filter="url(#blur)">
+  <animate attributeName="cy" values="455;390;455" dur="12s" repeatCount="indefinite"/>
 </ellipse>
-<rect x="72" y="72" width="1056" height="476" rx="30" fill="white" fill-opacity=".035" stroke="white" stroke-opacity=".12"/>
-<g opacity=".7"><circle cx="116" cy="112" r="5" fill="#FF6BAA"/><circle cx="136" cy="112" r="5" fill="#B88CFF"/><circle cx="156" cy="112" r="5" fill="#8DA8FF"/></g>
-<text x="600" y="215" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="86" font-weight="800" letter-spacing="16">ZENKAI</text>
-<text x="600" y="267" text-anchor="middle" fill="#B9B2C7" font-family="Arial, Helvetica, sans-serif" font-size="22" letter-spacing="5">ANIME • MANGA • NOVELS</text>
-<g filter="url(#glow)">
- <rect x="245" y="325" width="710" height="104" rx="24" fill="#0E0C16" stroke="url(#stroke)" stroke-opacity=".65"/>
- <text x="600" y="370" text-anchor="middle" fill="#F5F1FA" font-family="Arial, Helvetica, sans-serif" font-size="20">Your stories. One place.</text>
- <text x="600" y="400" text-anchor="middle" fill="#8E879B" font-family="Arial, Helvetica, sans-serif" font-size="15">Watch • Read • Discover</text>
+
+<!-- premium frame -->
+<rect x="42" y="42" width="1116" height="536" rx="34" fill="#FFFFFF" fill-opacity=".018" stroke="white" stroke-opacity=".10"/>
+<rect x="66" y="66" width="1068" height="488" rx="28" stroke="white" stroke-opacity=".045"/>
+
+<!-- top chrome -->
+<circle cx="94" cy="96" r="4" fill="#8B5CF6"/>
+<circle cx="111" cy="96" r="4" fill="#C084FC" fill-opacity=".65"/>
+<circle cx="128" cy="96" r="4" fill="#38BDF8" fill-opacity=".55"/>
+<text x="1060" y="101" text-anchor="end" fill="#77717F" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing="4">WATCH • READ • DISCOVER</text>
+
+<!-- logo -->
+<text x="600" y="235" text-anchor="middle" fill="url(#logo)" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="800" letter-spacing="18">ZENKAI</text>
+<rect x="435" y="258" width="330" height="2" rx="1" fill="url(#accent)"/>
+<text x="600" y="294" text-anchor="middle" fill="#AAA3B4" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" letter-spacing="6">ANIME  •  MANGA  •  NOVELS</text>
+
+<!-- tagline -->
+<g>
+  <rect x="290" y="350" width="620" height="116" rx="28" fill="#0C0C11" fill-opacity=".88" stroke="white" stroke-opacity=".09"/>
+  <text x="600" y="397" text-anchor="middle" fill="#F5F3F7" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600">Your stories. One place.</text>
+  <text x="600" y="429" text-anchor="middle" fill="#817A8C" font-family="Arial, Helvetica, sans-serif" font-size="15" letter-spacing="2">STREAM  ·  READ  ·  SAVE  ·  CONNECT</text>
 </g>
-<g opacity=".8"><circle cx="176" cy="488" r="3" fill="#FF6BAA"><animate attributeName="r" values="3;7;3" dur="2s" repeatCount="indefinite"/></circle><circle cx="1024" cy="155" r="3" fill="#B88CFF"><animate attributeName="r" values="3;7;3" dur="2.7s" repeatCount="indefinite"/></circle></g>
+
+<!-- subtle bottom accent -->
+<rect x="300" y="505" width="600" height="1" fill="url(#accent)"/>
+<text x="600" y="530" text-anchor="middle" fill="#5F5968" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing="4">ZENKAI ANDROID EXPERIENCE</text>
+
+<circle cx="170" cy="485" r="3" fill="#8B5CF6" opacity=".7">
+  <animate attributeName="r" values="3;7;3" dur="2.5s" repeatCount="indefinite"/>
+</circle>
+<circle cx="1030" cy="170" r="3" fill="#38BDF8" opacity=".6">
+  <animate attributeName="r" values="3;6;3" dur="3s" repeatCount="indefinite"/>
+</circle>
 </svg>
