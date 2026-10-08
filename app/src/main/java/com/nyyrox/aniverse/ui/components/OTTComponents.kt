@@ -439,7 +439,7 @@ fun OttSectionHeader(
 @Composable
 fun OttPosterCard(
     anime: Anime,
-    modifier: Modifier = Modifier.width(142.dp),
+    modifier: Modifier = Modifier.width(118.dp),
     onClickWithBounds: ((Rect) -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -475,7 +475,7 @@ fun OttPosterCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(210.dp)
+                .height(172.dp)
                 .onGloballyPositioned { coords ->
                     cardBounds = coords.boundsInWindow()
                 }
@@ -494,11 +494,11 @@ fun OttPosterCard(
                 contentScale = ContentScale.Crop
             )
 
-            // Lightweight bottom gradient inside Card (bottom 95dp only, prevents full-surface overdraw)
+            // Lightweight bottom gradient inside Card (bottom 75dp only, prevents full-surface overdraw)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(95.dp)
+                    .height(75.dp)
                     .align(Alignment.BottomCenter)
                     .background(OttCardBottomGradient)
             )
@@ -507,14 +507,14 @@ fun OttPosterCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(8.dp)
+                    .padding(6.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(Color(0x8A000000))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
                 Text(
                     text = anime.format ?: "HD",
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     softWrap = false,
@@ -527,22 +527,22 @@ fun OttPosterCard(
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(7.dp))
                         .background(Color(0x8A000000))
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.Star,
                         contentDescription = null,
                         tint = OttAccentGold,
-                        modifier = Modifier.size(11.dp)
+                        modifier = Modifier.size(10.dp)
                     )
-                    Spacer(Modifier.width(3.dp))
+                    Spacer(Modifier.width(2.5.dp))
                     Text(
                         text = "${(score / 10f).let { String.format(java.util.Locale.US, "%.1f", it) }}",
-                        fontSize = 10.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         softWrap = false,
@@ -555,11 +555,11 @@ fun OttPosterCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(8.dp)
+                    .padding(6.dp)
             ) {
                 Text(
                     text = anime.displayTitle,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     softWrap = false,
@@ -568,7 +568,7 @@ fun OttPosterCard(
                 )
                 Text(
                     text = anime.episodes?.let { "$it Episodes" } ?: anime.formattedStatus,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = OttTextSecondary,
                     softWrap = false,
                     maxLines = 1,
@@ -586,24 +586,24 @@ fun OttTop10Row(
 ) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(20.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         itemsIndexed(list.take(10), key = { _, anime -> anime.id }) { index, anime ->
             val isTen = index == 9
             Row(
                 modifier = Modifier
-                    .width(if (isTen) 218.dp else 185.dp),
+                    .width(if (isTen) 178.dp else 152.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
                 // Large Stylized Monochrome Rank Number with ample spacing
                 Text(
                     text = "${index + 1}",
-                    fontSize = if (isTen) 76.sp else 82.sp,
+                    fontSize = if (isTen) 68.sp else 74.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0x26FFFFFF),
                     modifier = Modifier
                         .padding(bottom = 6.dp)
-                        .width(if (isTen) 80.dp else 48.dp),
+                        .width(if (isTen) 62.dp else 36.dp),
                     textAlign = TextAlign.Center,
                     softWrap = false,
                     letterSpacing = if (isTen) (-2).sp else 0.sp
@@ -612,7 +612,7 @@ fun OttTop10Row(
                 // Poster
                 OttPosterCard(
                     anime = anime,
-                    modifier = Modifier.width(132.dp),
+                    modifier = Modifier.width(114.dp),
                     onClick = { onAnimeClick(anime.id) }
                 )
             }
@@ -828,7 +828,7 @@ fun OttUnifiedContinueWatchingRow(
 
                 Column(
                     modifier = Modifier
-                        .width(220.dp)
+                        .width(196.dp)
                         .mediaCardPhysics(interactionSource = interactionSource, pressScale = 0.95f, enableTilt = true)
                         .clip(OttCardShape)
                         .background(Color(0x12FFFFFF))
@@ -847,7 +847,7 @@ fun OttUnifiedContinueWatchingRow(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(115.dp)
+                            .height(104.dp)
                     ) {
                         if (!meta.coverUrl.isNullOrBlank()) {
                             AsyncImage(

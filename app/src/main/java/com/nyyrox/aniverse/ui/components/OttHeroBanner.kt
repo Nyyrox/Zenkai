@@ -206,7 +206,7 @@ fun OttHeroBanner(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(500.dp)
+            .height(465.dp)
             .clipToBounds()
             .background(OttBg)
     ) {
@@ -246,7 +246,7 @@ fun OttHeroBanner(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 78.dp),
+                .padding(top = 70.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
@@ -255,12 +255,12 @@ fun OttHeroBanner(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(285.dp),
+                    .height(255.dp),
                 contentAlignment = Alignment.Center
             ) {
                 val screenWidth = maxWidth
-                val cardWidth = 146.dp
-                val cardHeight = 232.dp
+                val cardWidth = 132.dp
+                val cardHeight = 210.dp
 
                 // Symmetrical horizontal padding so active center item is precisely centered
                 val horizontalPadding = ((screenWidth - cardWidth) / 2).coerceAtLeast(0.dp)
@@ -289,7 +289,7 @@ fun OttHeroBanner(
                     val zIndexVal = (10f - absOffset).coerceAtLeast(0f)
 
                     // Pull translation to eliminate excess gaps and create tight stacked fan
-                    val pullTranslationX = pageOffset * 50f * density
+                    val pullTranslationX = pageOffset * 46f * density
 
                     // 3D Arc translation along Y: background cards curve down slightly along depth stage
                     val depthTranslationY = (absOffset * absOffset * 6.5f * density).coerceAtMost(32f * density)
@@ -473,7 +473,7 @@ fun OttHeroBanner(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
+                            .height(44.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (!tmdbArtworks.containsKey(targetAnime.id)) {
@@ -481,7 +481,7 @@ fun OttHeroBanner(
                             ShimmerBox(
                                 modifier = Modifier
                                     .width(180.dp)
-                                    .height(32.dp),
+                                    .height(30.dp),
                                 shape = RoundedCornerShape(8.dp)
                             )
                         } else if (!targetArtwork?.logoUrl.isNullOrBlank()) {
@@ -490,7 +490,7 @@ fun OttHeroBanner(
                                 model = targetArtwork.logoUrl,
                                 contentDescription = targetAnime.displayTitle,
                                 modifier = Modifier
-                                    .heightIn(max = 52.dp)
+                                    .heightIn(max = 44.dp)
                                     .fillMaxWidth(0.70f),
                                 contentScale = ContentScale.Fit,
                                 alignment = Alignment.Center
@@ -499,7 +499,7 @@ fun OttHeroBanner(
                             // Fallback: normal bold title text
                             Text(
                                 text = targetAnime.displayTitle,
-                                fontSize = 20.sp,
+                                fontSize = 19.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Color.White,
                                 maxLines = 2,
@@ -509,7 +509,7 @@ fun OttHeroBanner(
                         }
                     }
 
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
 
                 // Metadata Row: Rating, Year, Format, Primary Genre
                 Row(
@@ -575,110 +575,46 @@ fun OttHeroBanner(
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
-                // ── OTT Actions: Watch Now + My List + Details ──────────────────
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // ── OTT Action: Watch Now (Prominent, cleanly centered CTA) ──────────────────
+                Button(
+                    onClick = { onPlayClick(targetAnime.id) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    shape = OttPillShape,
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .height(40.dp)
+                        .shadow(
+                            elevation = 12.dp,
+                            shape = OttPillShape,
+                            ambientColor = Color(0x60FFFFFF),
+                            spotColor = Color(0x80000000)
+                        )
                 ) {
-                    // Watch Now Button (Most-elevated clay CTA — primary action)
-                    Button(
-                        onClick = { onPlayClick(targetAnime.id) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        ),
-                        shape = OttPillShape,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .height(38.dp)
-                            .shadow(
-                                elevation = 10.dp,
-                                shape = OttPillShape,
-                                ambientColor = Color(0x50FFFFFF),
-                                spotColor = Color(0x70000000)
-                            )
-                    ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(17.dp),
-                            tint = Color.Black
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "Watch Now",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.5.sp,
-                            color = Color.Black,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-
-                    // My List Toggle (Frosted Glass Pill, no border)
-                    Box(
-                        modifier = Modifier
-                            .height(38.dp)
-                            .clip(OttPillShape)
-                            .background(Color(0x22FFFFFF))
-                            .clickable { onToggleWatchlist(targetAnime) }
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Watchlist",
-                                modifier = Modifier.size(16.dp),
-                                tint = if (isBookmarked) OttPrimary else Color.White
-                            )
-                            Spacer(Modifier.width(5.dp))
-                            Text(
-                                text = if (isBookmarked) "In List" else "My List",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = Color.White,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                    }
-
-                    // Details Button (Frosted Glass Pill, no border)
-                    Box(
-                        modifier = Modifier
-                            .height(38.dp)
-                            .clip(OttPillShape)
-                            .background(Color(0x22FFFFFF))
-                            .clickable { onAnimeClick(targetAnime.id) }
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = "Details",
-                                modifier = Modifier.size(15.dp),
-                                tint = Color.White
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = "Details",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = Color.White,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                    }
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(19.dp),
+                        tint = Color.Black
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Watch Now",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp,
+                        color = Color.Black,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
                 // Interactive Morphing Hero Dots
                 Row(

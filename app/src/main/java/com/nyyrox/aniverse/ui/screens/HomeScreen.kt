@@ -697,13 +697,13 @@ private fun HomeMangaRow(
         items(list, key = { "manga_${it.id}" }) { manga ->
             Column(
                 modifier = Modifier
-                    .width(130.dp)
+                    .width(118.dp)
                     .clickable { onMangaClick(manga.id) }
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(185.dp)
+                        .height(172.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(Color(0xFF141822))
                 ) {
@@ -772,13 +772,13 @@ private fun HomeNovelRow(
         items(list, key = { "novel_${it.slug}" }) { novel ->
             Column(
                 modifier = Modifier
-                    .width(130.dp)
+                    .width(118.dp)
                     .clickable { onNovelClick(novel.slug) }
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(185.dp)
+                        .height(172.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(Color(0xFF141822))
                 ) {
