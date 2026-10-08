@@ -73,7 +73,8 @@ fun IframePlayerView(
     onToggleFullscreen: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
     onTimeUpdate: ((currentTime: Double, duration: Double) -> Unit)? = null,
-    onPlayerEvent: ((event: String, currentTime: Double, duration: Double, isPaused: Boolean) -> Unit)? = null
+    onPlayerEvent: ((event: String, currentTime: Double, duration: Double, isPaused: Boolean) -> Unit)? = null,
+    onStreamDetected: ((streamUrl: String, headers: Map<String, String>) -> Unit)? = null
 ) {
     var customView by remember { mutableStateOf<View?>(null) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
@@ -392,7 +393,12 @@ fun IframePlayerView(
 
                                 // 2. Intercept video streams and API fetches to bypass CORS restrictions
                                 val lowUrl = targetUrl.lowercase()
-                                val isStreamOrApi = lowUrl.contains(".m3u8") || lowUrl.contains(".ts") ||
+                                val isMediaStream = (lowUrl.contains(".m3u8") || lowUrl.contains(".mp4") || (lowUrl.contains("playlist") && !lowUrl.contains(".html"))) && !lowUrl.contains(".js") && !lowUrl.contains(".css")
+                                if (isMediaStream) {
+                                    onStreamDetected?.invoke(targetUrl, req.requestHeaders.orEmpty())
+                                }
+
+                                val isStreamOrApi = isMediaStream || lowUrl.contains(".ts") ||
                                         lowUrl.contains(".m4s") || lowUrl.contains("/hls") ||
                                         lowUrl.contains("/api/") || lowUrl.contains("playlist")
                                 if (isStreamOrApi && method != "POST") {

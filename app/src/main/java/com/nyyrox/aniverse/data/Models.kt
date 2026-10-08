@@ -227,12 +227,17 @@ val DEFAULT_STATIC_PROVIDERS = listOf(
     Provider("megaplay-direct-sub", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true),
     Provider("vidstream-direct-sub", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true),
 
-    // === DIRECT DUBBED SERVERS (FlixCloud, MegaPlay, Vidstream) ===
+    // === DIRECT DUBBED SERVERS (FlixCloud, MegaPlay, Vidstream, ACDN) ===
     Provider("flixcloud-dub", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true),
     Provider("megaplay-direct-dub", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true),
     Provider("vidstream-direct-dub", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true),
+    Provider("animesalt-direct-dub", "ACDN Dub", "https://animesalt.cx", "HD", isDirectStream = true),
+
+    // === DIRECT MULTI-AUDIO SERVERS ===
+    Provider("animesalt-direct-multi", "ACDN Multi", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true),
 
     // === EMBED SERVERS (SUB) ===
+    Provider("animesalt-embed-sub", "ACDN Sub", "https://animesalt.cx/episode/{slug}/", "Embed HD", isEmbedOnly = true),
     Provider("zokoanime-sub", "ZokoAnime", "https://zokoanime.video/stream/mal/{mal_id}/{episode}/sub?color=35d5bf", "Embed HD", isEmbedOnly = true),
     Provider("tryembed-sub", "TryEmbed", "https://tryembed.us.cc/embed/anime/mal/{mal_id}/{episode}/sub?skin=silicon&autoSkip=true", "Embed HD", isEmbedOnly = true),
     Provider("megaplay-sub", "Megaplay", "https://megaplay.buzz/stream/mal/{mal_id}/{episode}/sub?autonext=1&autoskip=1", "Embed HD", isEmbedOnly = true),
@@ -248,6 +253,7 @@ val DEFAULT_STATIC_PROVIDERS = listOf(
     Provider("2embed-sub", "2Embed", "https://www.2embed.stream/embed/tv/{tmdb_id}/1/{episode}", "TMDB Embed", isEmbedOnly = true),
 
     // === EMBED SERVERS (DUB) ===
+    Provider("animesalt-embed-dub", "ACDN Dub", "https://animesalt.cx/episode/{slug}/", "Embed HD", isEmbedOnly = true),
     Provider("zokoanime-dub", "ZokoAnime Dub", "https://zokoanime.video/stream/mal/{mal_id}/{episode}/dub?color=35d5bf", "Embed HD", isEmbedOnly = true),
     Provider("tryembed-dub", "TryEmbed Dub", "https://tryembed.us.cc/embed/anime/mal/{mal_id}/{episode}/dub?skin=silicon&autoSkip=true", "Embed HD", isEmbedOnly = true),
     Provider("megaplay-dub", "Megaplay Dub", "https://megaplay.buzz/stream/mal/{mal_id}/{episode}/dub?autonext=1&autoskip=1", "Embed HD", isEmbedOnly = true),
@@ -261,6 +267,7 @@ val DEFAULT_STATIC_PROVIDERS = listOf(
     Provider("2embed-dub", "2Embed Dub", "https://www.2embed.stream/embed/tv/{tmdb_id}/1/{episode}", "TMDB Embed", isEmbedOnly = true),
 
     // === EMBED SERVERS (MULTI-AUDIO) ===
+    Provider("animesalt-embed-multi", "ACDN Multi", "https://animesalt.cx/episode/{slug}/", "Multi-Audio", isEmbedOnly = true, isMultiAudio = true),
     Provider("animesalt-mystream-multi", "HD-1", "https://animesalt.cx/episode/{slug}/?server=mystream", "Multi-Audio", isEmbedOnly = true, isMultiAudio = true),
     // TMDB-based multi-audio embed servers
     Provider("vidzee-multi", "Captain America", "https://player.vidzee.wtf/embed/tv/{tmdb_id}/1/{episode}?lang=en", "TMDB Multi", isEmbedOnly = true, isMultiAudio = true),

@@ -83,7 +83,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -255,6 +257,12 @@ fun PlayerScreen(
         )
     }
     var isServerDropdownExpanded by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var sniffedStreamUrl by remember(currentProvider.id, currentEpisode) { mutableStateOf<String?>(null) }
+    var sniffedStreamHeaders by remember(currentProvider.id, currentEpisode) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var sniffedStreamSubs by remember(currentProvider.id, currentEpisode) { mutableStateOf<List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>>(emptyList()) }
+    var playInZenkaiPlayer by remember(currentProvider.id, currentEpisode) { mutableStateOf(false) }
+    var isSniffingStream by remember(currentProvider.id, currentEpisode) { mutableStateOf(false) }
     var showDownloadSheetEpisode by remember { mutableStateOf<Pair<Int, String?>?>(null) }
     var showDownloadRangeSheet by remember { mutableStateOf<IntRange?>(null) }
 
@@ -816,23 +824,115 @@ fun PlayerScreen(
                             }
                         }
                     }
-                } else if (!isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)) {
-                    com.nyyrox.aniverse.player.IframePlayerView(
-                        embedUrl = activeStreamUrl,
-                        isFullscreen = isFullscreen,
-                        onToggleFullscreen = { toggleFullscreen() },
-                        onNextEpisode = {
-                            if (currentEpisode < maxEpisode) {
-                                currentEpisode += 1
+                } else if (!isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream) && !playInZenkaiPlayer) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        com.nyyrox.aniverse.player.IframePlayerView(
+                            embedUrl = activeStreamUrl,
+                            isFullscreen = isFullscreen,
+                            onToggleFullscreen = { toggleFullscreen() },
+                            onNextEpisode = {
+                                if (currentEpisode < maxEpisode) {
+                                    currentEpisode += 1
+                                }
+                            },
+                            onStreamDetected = { detectedUrl, headers ->
+                                sniffedStreamUrl = detectedUrl
+                                sniffedStreamHeaders = headers
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Floating button to extract and switch to Zenkai native player
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(14.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (!sniffedStreamUrl.isNullOrBlank()) {
+                                        playInZenkaiPlayer = true
+                                    } else {
+                                        coroutineScope.launch {
+                                            isSniffingStream = true
+                                            try {
+                                                val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
+                                                    context = context,
+                                                    embedUrl = activeStreamUrl,
+                                                    timeoutMs = 12000L
+                                                )
+                                                if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
+                                                    sniffedStreamUrl = sniffed.streamUrl
+                                                    sniffedStreamHeaders = sniffed.headers
+                                                    sniffedStreamSubs = sniffed.subtitles
+                                                    playInZenkaiPlayer = true
+                                                } else {
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "Direct stream could not be extracted",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            } catch (_: Exception) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Extraction failed",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            } finally {
+                                                isSniffingStream = false
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !isSniffingStream,
+                                shape = RoundedCornerShape(20.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Black.copy(alpha = 0.82f),
+                                    contentColor = Color.White
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isSniffingStream) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(15.dp),
+                                            strokeWidth = 2.dp,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            "Extracting...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = OttPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            "Play in Zenkai Player",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
                             }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                        }
+                    }
                 } else {
                     val combinedSubtitles = if (isPlayingOffline) {
                         (downloadedEpInfo?.subtitles ?: emptyList()).ifEmpty { externalSubtitles }
                     } else {
-                        (activeDirectSubs + externalSubtitles)
+                        ((if (playInZenkaiPlayer && sniffedStreamSubs.isNotEmpty()) sniffedStreamSubs else activeDirectSubs) + externalSubtitles)
                             .distinctBy { it.url }
                             .sortedWith(
                                 compareByDescending<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> {
@@ -855,10 +955,10 @@ fun PlayerScreen(
                             ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
                             ?: anime.banner?.takeIf { it.isNotBlank() }
                             ?: anime.cover,
-                        streamUrl = adoptUrl.takeIf { adopting } ?: activeStreamUrl,
-                        isDirectStream = isDirectStreamActive,
+                        streamUrl = if (playInZenkaiPlayer && !sniffedStreamUrl.isNullOrBlank()) sniffedStreamUrl!! else (adoptUrl.takeIf { adopting } ?: activeStreamUrl),
+                        isDirectStream = if (playInZenkaiPlayer) true else isDirectStreamActive,
                         isDub = currentProvider.isDub || selectedCategory == "DUB",
-                        headers = activeDirectHeaders,
+                        headers = if (playInZenkaiPlayer && sniffedStreamHeaders.isNotEmpty()) sniffedStreamHeaders else activeDirectHeaders,
                         externalSubtitles = combinedSubtitles,
                         isFullscreen = isFullscreen,
                         onToggleFullscreen = { toggleFullscreen() },
@@ -976,6 +1076,37 @@ fun PlayerScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White.copy(alpha = 0.85f)
                                     )
+                                }
+
+                                if (playInZenkaiPlayer) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(OttPrimary.copy(alpha = 0.22f))
+                                            .border(0.8.dp, OttPrimary.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                            .clickable {
+                                                playInZenkaiPlayer = false
+                                            }
+                                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.OpenInBrowser,
+                                                contentDescription = null,
+                                                tint = OttPrimary,
+                                                modifier = Modifier.size(11.dp)
+                                            )
+                                            Text(
+                                                text = "Extracted (Switch Embed)",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
                                 }
                             }
 

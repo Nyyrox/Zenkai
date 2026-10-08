@@ -163,24 +163,32 @@ object DirectStreamResolver {
                 Provider("megaplay-direct-$audio", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true)
             normalized == "vidstream" || normalized == "hd3" || normalized == "hd-3" ->
                 Provider("vidstream-direct-$audio", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true)
+            normalized.contains("animesalt") || normalized.contains("acdn") || normalized.contains("salt") ->
+                Provider("animesalt-direct-$audio", if (audio == "dub") "ACDN Dub" else "ACDN", "https://animesalt.cx", "HD", isDirectStream = true)
             else -> null
         }
     }
 
     fun getDefaultDirectProviders(audioMode: String): List<Provider> {
         val audio = if (audioMode.equals("dub", ignoreCase = true)) "dub" else "sub"
-        return listOf(
+        val list = mutableListOf(
             Provider("flixcloud-$audio", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true),
             Provider("megaplay-direct-$audio", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true),
             Provider("vidstream-direct-$audio", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true)
         )
+        if (audio == "dub") {
+            list.add(Provider("animesalt-direct-dub", "ACDN Dub", "https://animesalt.cx", "HD", isDirectStream = true))
+        } else if (audioMode.equals("multi", ignoreCase = true)) {
+            list.add(Provider("animesalt-direct-multi", "ACDN Multi", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true))
+        }
+        return list
     }
 
     fun getDefaultDirectProviders(isDub: Boolean): List<Provider> = getDefaultDirectProviders(if (isDub) "dub" else "sub")
 
     /**
      * Resolves a direct playable stream for the given AniList ID, episode, provider ID, and audio category.
-     * Routes directly through client-side FlixCloud, MegaPlay (non-tcdn to bypass ISP blocks), and Vidstream.
+     * Routes directly through client-side FlixCloud, MegaPlay (non-tcdn to bypass ISP blocks), Vidstream, and AnimeSalt (ACDN).
      */
     suspend fun resolveDirectStream(
         anilistId: Int,
@@ -194,11 +202,15 @@ object DirectStreamResolver {
         directStreamCache[cacheKey]?.let { return@withContext it }
 
         val normId = providerId.lowercase()
+        val isAnimeSalt = normId.contains("animesalt") || normId.contains("acdn") || normId.contains("salt")
         val isVidstream = normId.contains("vidstream") || normId.contains("hd-3") || normId.contains("hd3")
         val isMegaPlay = normId.contains("megaplay") || (normId.contains("anikoto") && !normId.contains("vidstream")) || normId.contains("hd-2") || normId.contains("hd2")
         val isFlixCloud = normId.contains("flixcloud") || normId.contains("reanime") || normId.contains("hd-1") || normId.contains("hd1")
 
         val result = when {
+            isAnimeSalt -> {
+                resolveAnimeSaltDirect(anilistId, episode, animeTitle, audio)
+            }
             isVidstream -> {
                 // Vidstream: Anikoto / MegaPlay vidstream server
                 AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "vidstream")
@@ -224,12 +236,14 @@ object DirectStreamResolver {
         }
 
         val targetServerName = when {
+            isAnimeSalt -> if (audio == "dub") "ACDN Dub" else "ACDN"
             isFlixCloud -> "FlixCloud"
             isMegaPlay -> "MegaPlay"
             isVidstream -> "Vidstream"
             else -> result?.serverName ?: "Direct HD"
         }
         val targetServerId = when {
+            isAnimeSalt -> "animesalt-direct-$audio"
             isFlixCloud -> "flixcloud-$audio"
             isMegaPlay -> "megaplay-direct-$audio"
             isVidstream -> "vidstream-direct-$audio"
@@ -251,11 +265,32 @@ object DirectStreamResolver {
     private suspend fun resolveAnimeSaltDirect(
         anilistId: Int,
         episode: Int,
-        animeTitle: String
+        animeTitle: String,
+        audio: String = "dub"
     ): DirectStreamResult? {
         try {
+            // 1. Try MultiAudioExtractor extraction
+            val extracted = MultiAudioExtractor.extractServers(anilistId, episode, animeTitle)
+            if (extracted.isNotEmpty()) {
+                val first = extracted.first()
+                if (first.streamUrl.isNotBlank()) {
+                    return DirectStreamResult(
+                        serverId = "animesalt-direct-$audio",
+                        serverName = if (audio == "dub") "ACDN Dub" else "ACDN",
+                        streamUrl = first.streamUrl,
+                        isHls = first.streamUrl.contains(".m3u8", ignoreCase = true) || !first.streamUrl.contains(".mp4", ignoreCase = true),
+                        audio = audio,
+                        headers = first.headers,
+                        isDirect = true
+                    )
+                }
+            }
+
+            // 2. Try candidate direct URLs
             val candidate = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.resolveCandidate(anilistId, episode, animeTitle)
-            val saltId = candidate.saltId
+            val saltId = candidate.saltId.ifBlank {
+                com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.normalizeAnimeSaltTitle(animeTitle)
+            }
             val season = candidate.season ?: 1
             val finalEp = candidate.finalEp
             val isMovie = candidate.isMovie
@@ -285,11 +320,11 @@ object DirectStreamResolver {
                                 val direct = MultiAudioExtractor.resolveAsCdnDirectM3u8(cdnDomain, hash)
                                 if (direct != null) {
                                     return DirectStreamResult(
-                                        serverId = "hd-1-multi",
-                                        serverName = "HD-1",
+                                        serverId = "animesalt-direct-$audio",
+                                        serverName = if (audio == "dub") "ACDN Dub" else "ACDN",
                                         streamUrl = direct.streamUrl,
                                         isHls = true,
-                                        audio = "multi",
+                                        audio = audio,
                                         headers = direct.headers,
                                         isDirect = true
                                     )
@@ -300,21 +335,25 @@ object DirectStreamResolver {
                 } catch (_: Exception) {}
             }
 
-            val extracted = MultiAudioExtractor.extractServers(anilistId, episode, animeTitle)
-            if (extracted.isNotEmpty()) {
-                val first = extracted.first()
-                return DirectStreamResult(
-                    serverId = "hd-1-multi",
-                    serverName = "HD-1",
-                    streamUrl = first.streamUrl,
-                    isHls = first.streamUrl.contains(".m3u8", ignoreCase = true),
-                    audio = "multi",
-                    headers = first.headers,
-                    isDirect = first.isDirectStream
-                )
+            // 3. Fallback: try AnimeSaltResolver extractServers
+            val slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
+            val servers = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.extractServers(slug, isMovie)
+            val targetIframe = servers.myStreamUrl ?: servers.abyssUrl
+            if (!targetIframe.isNullOrBlank()) {
+                val direct = MultiAudioExtractor.resolveIframeToServer(targetIframe, "https://animesalt.cx/", "animesalt-direct-$audio", if (audio == "dub") "ACDN Dub" else "ACDN")
+                if (direct != null) {
+                    return DirectStreamResult(
+                        serverId = "animesalt-direct-$audio",
+                        serverName = if (audio == "dub") "ACDN Dub" else "ACDN",
+                        streamUrl = direct.streamUrl,
+                        isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
+                        audio = audio,
+                        headers = direct.headers,
+                        isDirect = true
+                    )
+                }
             }
-        } catch (e: Exception) {}
-        return fetchAnivexaProviderStream("kaa", anilistId, episode, "sub")
+        } catch (_: Exception) {}
     }
 
     suspend fun resolveYumeZoneZoko(
