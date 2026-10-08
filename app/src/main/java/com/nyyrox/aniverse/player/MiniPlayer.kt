@@ -5,11 +5,16 @@ import android.view.LayoutInflater
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -48,7 +53,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -64,10 +68,11 @@ import com.nyyrox.aniverse.MainActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private val MiniWidth = 208.dp
-private val MiniHeight = 117.dp
+private val BaseMiniWidth = 208.dp
+private const val ASPECT_RATIO = 16f / 9f
 
 /** Mount once at the app root, above the NavHost. */
 @Composable
@@ -75,16 +80,25 @@ fun MiniPlayerHost() {
     val parked = MiniPlayerManager.parked
     val inPip by MainActivity.isInPipMode
     val density = LocalDensity.current
-    var pos by remember { mutableStateOf<Offset?>(null) }
+    val scope = rememberCoroutineScope()
+
     val t = remember { Animatable(0f) } // 0 = mini window, 1 = video slot of the player page
     val contentAlpha = remember { Animatable(1f) }
+    val dismissOffsetY = remember { Animatable(0f) }
+    val zoomScale = remember { Animatable(1f) } // 1.0 = compact mini, up to 1.55 = max cap
+
+    // Position state: animatables for smooth corner snapping
+    val posX = remember { Animatable(0f) }
+    val posY = remember { Animatable(0f) }
+    var isInitializedPos by remember { mutableStateOf(false) }
+
     var wasFull by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     // Reset alpha whenever a new player is parked (not in handoff)
     LaunchedEffect(parked) {
         if (parked != null && !MiniPlayerManager.isHandingOff) {
             contentAlpha.snapTo(1f)
+            dismissOffsetY.snapTo(0f)
         }
     }
 
@@ -94,25 +108,29 @@ fun MiniPlayerHost() {
             contentAlpha.animateTo(0f, tween(120, easing = FastOutSlowInEasing))
             MiniPlayerManager.finishHandoff()
             contentAlpha.snapTo(1f)
+            dismissOffsetY.snapTo(0f)
             t.snapTo(0f)
         }
     }
 
-    // back from the player page: shrink from its video slot into the mini window
+    // Back from the player page: shrink smoothly from its video slot into the mini window
     LaunchedEffect(MiniPlayerManager.fullScreenOpen) {
         if (MiniPlayerManager.fullScreenOpen) {
             wasFull = true
         } else if (wasFull) {
             wasFull = false
             contentAlpha.snapTo(1f)
+            dismissOffsetY.snapTo(0f)
             t.snapTo(1f)
-            t.animateTo(0f, tween(340, easing = FastOutSlowInEasing))
+            t.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
         }
     }
+
     LaunchedEffect(parked == null) {
         if (parked == null && !MiniPlayerManager.expanding && !MiniPlayerManager.fullScreenOpen) {
             t.snapTo(0f)
             contentAlpha.snapTo(1f)
+            dismissOffsetY.snapTo(0f)
         }
     }
 
@@ -121,28 +139,111 @@ fun MiniPlayerHost() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val screenW = constraints.maxWidth.toFloat()
         val screenH = constraints.maxHeight.toFloat()
-        val wPx = with(density) { MiniWidth.toPx() }
-        val hPx = with(density) { MiniHeight.toPx() }
-        val home = Offset(
-            screenW - wPx - with(density) { 12.dp.toPx() },
-            screenH - hPx - with(density) { 110.dp.toPx() }
-        )
+
+        val scale = zoomScale.value
+        val currentW = BaseMiniWidth * scale
+        val currentH = currentW / ASPECT_RATIO
+        val wPx = with(density) { currentW.toPx() }
+        val hPx = with(density) { currentH.toPx() }
+
+        val horizontalMargin = with(density) { 12.dp.toPx() }
+        val topClearance = with(density) { 48.dp.toPx() }
+        // Crucial clearance: NEVER overlap or go behind the bottom dock (OttBottomDock) or navbar
+        val bottomClearance = with(density) { 110.dp.toPx() }
+
+        val minX = horizontalMargin
+        val maxX = (screenW - wPx - horizontalMargin).coerceAtLeast(minX)
+        val minY = topClearance
+        val maxY = (screenH - hPx - bottomClearance).coerceAtLeast(minY)
+
+        val homeX = maxX
+        val homeY = maxY
+
+        // Initialize resting corner position
+        LaunchedEffect(screenW, screenH) {
+            if (!isInitializedPos) {
+                posX.snapTo(homeX)
+                posY.snapTo(homeY)
+                isInitializedPos = true
+            }
+        }
+
+        // Clamp positions if window dimensions or zoom scale changes
+        LaunchedEffect(scale, screenW, screenH) {
+            if (isInitializedPos) {
+                val clampedX = posX.value.coerceIn(minX, maxX)
+                val clampedY = posY.value.coerceIn(minY, maxY)
+                posX.snapTo(clampedX)
+                posY.snapTo(clampedY)
+            }
+        }
+
         val f = t.value
-        val base = pos ?: home
-        val to = MiniPlayerManager.videoSlot ?: Rect(0f, 0f, screenW, screenW * 9f / 16f)
+        val basePos = Offset(posX.value, posY.value)
+        val to = MiniPlayerManager.videoSlot ?: Rect(0f, 0f, screenW, screenW / ASPECT_RATIO)
+
+        val renderedX = lerp(basePos.x, to.left, f)
+        val renderedY = lerp(basePos.y, to.top, f) + dismissOffsetY.value
+        val renderedW = lerp(wPx, to.width, f)
+        val renderedH = lerp(hPx, to.height, f)
+
+        val totalAlpha = contentAlpha.value * (1f - (dismissOffsetY.value / with(density) { 160.dp.toPx() })).coerceIn(0f, 1f)
+
         MiniPlayerContent(
             p = parked,
             pip = inPip,
             f = f,
-            contentAlpha = contentAlpha.value,
-            x = lerp(base.x, to.left, f), y = lerp(base.y, to.top, f),
-            w = lerp(wPx, to.width, f), h = lerp(hPx, to.height, f),
-            onDrag = { d ->
-                val c = pos ?: home // read fresh per event, a captured value made dragging stick
-                pos = Offset(
-                    (c.x + d.x).coerceIn(0f, (screenW - wPx).coerceAtLeast(0f)),
-                    (c.y + d.y).coerceIn(0f, (screenH - hPx).coerceAtLeast(0f))
-                )
+            contentAlpha = totalAlpha,
+            x = renderedX,
+            y = renderedY,
+            w = renderedW,
+            h = renderedH,
+            onDragDelta = { delta ->
+                scope.launch {
+                    val newX = (posX.value + delta.x).coerceIn(minX, maxX)
+                    val newY = (posY.value + delta.y).coerceIn(minY, maxY)
+                    posX.snapTo(newX)
+                    posY.snapTo(newY)
+
+                    // If user pulls down while already at the bottom limit, accumulate dismiss offset
+                    if (delta.y > 0 && posY.value >= maxY - 4f) {
+                        dismissOffsetY.snapTo((dismissOffsetY.value + delta.y).coerceAtLeast(0f))
+                    }
+                }
+            },
+            onDragEnd = {
+                scope.launch {
+                    val dismissThreshold = with(density) { 60.dp.toPx() }
+                    if (dismissOffsetY.value > dismissThreshold) {
+                        // YouTube-style swipe down to dismiss
+                        dismissOffsetY.animateTo(
+                            screenH - posY.value + 100f,
+                            tween(220, easing = FastOutSlowInEasing)
+                        )
+                        MiniPlayerManager.release()
+                    } else {
+                        // Spring back dismiss offset
+                        dismissOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+
+                        // Corner magnetic snap: snap to closest corner (left or right)
+                        val targetX = if (posX.value + wPx / 2f < screenW / 2f) minX else maxX
+                        val targetY = posY.value.coerceIn(minY, maxY)
+                        launch { posX.animateTo(targetX, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) }
+                        launch { posY.animateTo(targetY, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) }
+                    }
+                }
+            },
+            onPinchZoom = { zoomFactor ->
+                scope.launch {
+                    val newScale = (zoomScale.value * zoomFactor).coerceIn(1.0f, 1.55f)
+                    zoomScale.snapTo(newScale)
+                }
+            },
+            onToggleZoomCap = {
+                scope.launch {
+                    val targetScale = if (zoomScale.value > 1.25f) 1.0f else 1.55f
+                    zoomScale.animateTo(targetScale, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                }
             },
             onExpand = {
                 if (!MiniPlayerManager.expanding) scope.launch {
@@ -151,15 +252,14 @@ fun MiniPlayerHost() {
                     MiniPlayerManager.expanding = true
                     try {
                         MiniPlayerManager.onExpand?.invoke(parked.routeAnimeId, parked.episode, parked.providerId)
-                        // player page reports where its video box is, then we fly there
                         val ok = withTimeoutOrNull(600) { while (MiniPlayerManager.videoSlot == null) delay(16) }
                         if (ok != null) {
-                            t.animateTo(1f, tween(340, easing = FastOutSlowInEasing))
+                            t.animateTo(1f, tween(320, easing = FastOutSlowInEasing))
                         } else {
                             t.snapTo(1f)
                         }
                     } finally {
-                        MiniPlayerManager.expanding = false // page now adopts the same player, no reload
+                        MiniPlayerManager.expanding = false
                     }
                 }
             }
@@ -174,7 +274,10 @@ private fun MiniPlayerContent(
     f: Float,
     contentAlpha: Float,
     x: Float, y: Float, w: Float, h: Float,
-    onDrag: (Offset) -> Unit,
+    onDragDelta: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onPinchZoom: (Float) -> Unit,
+    onToggleZoomCap: () -> Unit,
     onExpand: () -> Unit
 ) {
     val density = LocalDensity.current
@@ -198,7 +301,6 @@ private fun MiniPlayerContent(
 
     DisposableEffect(player) {
         playerView.player = player
-        // re-render the current frame on the new surface when paused
         if (!player.playWhenReady) { try { player.seekTo(player.currentPosition) } catch (_: Exception) {} }
         val l = object : Player.Listener {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { isPlaying = playWhenReady }
@@ -214,7 +316,7 @@ private fun MiniPlayerContent(
         }
     }
 
-    // progress ticker + history saving (PlayerScreen's tick loop is gone while mini)
+    // Progress ticker + history saving
     LaunchedEffect(player) {
         var lastSave = 0L
         while (true) {
@@ -233,7 +335,7 @@ private fun MiniPlayerContent(
 
     LaunchedEffect(showControls, isPlaying) {
         if (showControls && isPlaying) {
-            delay(3000)
+            delay(3500)
             showControls = false
         }
     }
@@ -242,33 +344,60 @@ private fun MiniPlayerContent(
         modifier = (if (pip) Modifier.fillMaxSize() else Modifier
             .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
             .size(with(density) { w.toDp() }, with(density) { h.toDp() })
-            .shadow((10f * (1f - f)).dp, RoundedCornerShape((12f + 2f * f).dp))
-            .clip(RoundedCornerShape((12f + 2f * f).dp)))
+            .shadow((12f * (1f - f)).dp, RoundedCornerShape((14f + 2f * f).dp))
+            .clip(RoundedCornerShape((14f + 2f * f).dp)))
             .alpha(contentAlpha)
             .background(Color.Black)
-            .then(if (mini) Modifier
-                .pointerInput(Unit) { detectDragGestures { change, drag -> change.consume(); onDrag(drag) } }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = { onExpand() },
-                        onTap = { showControls = !showControls }
-                    )
-                }
-            else Modifier)
+            .then(
+                if (mini) {
+                    Modifier
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                if (zoom != 1f) {
+                                    onPinchZoom(zoom)
+                                }
+                                if (pan != Offset.Zero) {
+                                    onDragDelta(pan)
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragEnd = { onDragEnd() },
+                                onDragCancel = { onDragEnd() }
+                            ) { change, dragAmount ->
+                                change.consume()
+                                onDragDelta(dragAmount)
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = { onToggleZoomCap() },
+                                onTap = { showControls = !showControls }
+                            )
+                        }
+                } else Modifier
+            )
     ) {
         AndroidView(factory = { playerView }, modifier = Modifier.fillMaxSize())
 
-        AnimatedVisibility(visible = showControls && mini, modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f))) {
+        AnimatedVisibility(
+            visible = showControls && mini,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(180)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f))) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 8.dp, top = 6.dp, end = 34.dp)
+                        .padding(start = 10.dp, top = 8.dp, end = 36.dp)
                         .clickable { onExpand() }
                 ) {
-                    Text(p.title, color = Color.White, fontSize = 11.sp, maxLines = 1)
-                    Text(p.subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp, maxLines = 1)
+                    Text(p.title, color = Color.White, fontSize = 11.5.sp, maxLines = 1)
+                    Text(p.subtitle, color = Color.White.copy(alpha = 0.72f), fontSize = 9.5.sp, maxLines = 1)
                 }
+
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "Close",
@@ -276,10 +405,11 @@ private fun MiniPlayerContent(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .size(22.dp)
+                        .size(24.dp)
                         .clip(CircleShape)
                         .clickable { MiniPlayerManager.release(context) }
                 )
+
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     verticalAlignment = Alignment.CenterVertically
@@ -292,7 +422,7 @@ private fun MiniPlayerContent(
                             .size(34.dp)
                             .clip(CircleShape)
                             .clickable { onExpand() }
-                            .padding(7.dp)
+                            .padding(6.dp)
                     )
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -311,10 +441,10 @@ private fun MiniPlayerContent(
         }
 
         if (!pip && f == 0f) {
-            // thin progress bar
+            // Thin accent progress bar
             val frac = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp).background(Color.White.copy(alpha = 0.25f)))
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(frac).height(2.dp).background(Color.White))
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.5.dp).background(Color.White.copy(alpha = 0.28f)))
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(frac).height(2.5.dp).background(Color(0xFFE50914)))
         }
     }
 }

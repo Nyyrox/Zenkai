@@ -653,6 +653,7 @@ fun PlayerScreen(
         // ask CinePlayerView to hand its player to the mini player instead of releasing it
         com.nyyrox.aniverse.player.MiniPlayerManager.parkRequest =
             com.nyyrox.aniverse.player.MiniPlayerManager.ParkRequest(animeId, currentEpisode, currentProvider.id)
+        com.nyyrox.aniverse.player.MiniPlayerManager.parkNow?.invoke()
         com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
         onBack()
     }

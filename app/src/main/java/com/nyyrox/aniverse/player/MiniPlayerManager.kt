@@ -55,6 +55,9 @@ object MiniPlayerManager {
 
     var parkRequest: ParkRequest? = null
 
+    /** Synchronous park callback registered by active CinePlayerView to park instantly before navigation pops. */
+    var parkNow: (() -> Unit)? = null
+
     /** Registered by App(): navigate to the player route. */
     var onExpand: ((routeAnimeId: Int, episode: Int, providerId: String?) -> Unit)? = null
 

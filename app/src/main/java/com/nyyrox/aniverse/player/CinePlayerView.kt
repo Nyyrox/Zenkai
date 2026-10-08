@@ -1727,25 +1727,19 @@ fun CinePlayerView(
         }
     }
 
-    // Clean up on dispose & save final timestamp (or hand the player to the mini player)
-    DisposableEffect(streamUrl) {
-        onDispose {
-            val req = MiniPlayerManager.freshRequest()
+    val performPark = remember(anilistId, episode, streamUrl, title, episodeTitle, engineMode) {
+        {
             val p0 = exoPlayer
             val st = sniffedStream
-            val canPark = req != null && req.episode == episode && p0 != null && st != null &&
-                engineMode == PlayerEngineMode.NATIVE_EXO &&
+            val req = MiniPlayerManager.freshRequest() ?: MiniPlayerManager.ParkRequest(anilistId, episode, null)
+            if (p0 != null && st != null && engineMode == PlayerEngineMode.NATIVE_EXO &&
                 (p0.playbackState == Player.STATE_READY || p0.playbackState == Player.STATE_BUFFERING) &&
-                p0.playerError == null
-            exoPlayer = null // late listener callbacks are ignored (see ENDED guard)
-
-            if (canPark && p0 != null && st != null && req != null) {
+                p0.playerError == null) {
                 val pos = p0.currentPosition.coerceAtLeast(0L)
                 val dur = p0.duration.coerceAtLeast(0L)
                 if (pos > 0L) onProgressUpdate(pos, dur)
                 listenerRefs.forEach { p0.removeListener(it) }
                 listenerRefs.clear()
-                // notification keeps following the player, but PlayerScreen skip lambdas are dead now
                 com.nyyrox.aniverse.service.ActivePlayerHolder.updateNavigation(false, false, null, null)
                 try {
                     context.startService(Intent(context, com.nyyrox.aniverse.service.PlayerNotificationService::class.java).apply {
@@ -1767,26 +1761,79 @@ fun CinePlayerView(
                         onProgress = onProgressUpdate
                     )
                 )
-            } else {
-                MiniPlayerManager.parkRequest = null
-                com.nyyrox.aniverse.service.ActivePlayerHolder.detach()
-                val stopIntent = Intent(context, com.nyyrox.aniverse.service.PlayerNotificationService::class.java).apply {
-                    action = com.nyyrox.aniverse.service.PlayerNotificationService.ACTION_DETACH
-                }
-                try { context.startService(stopIntent) } catch (_: Exception) {}
-                // Clear Discord rich presence immediately so subsequent pause/progress events don't resurrect it
-                com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
-                p0?.let { p ->
-                    val pos = p.currentPosition.coerceAtLeast(0L)
-                    val dur = p.duration.coerceAtLeast(0L)
+                exoPlayer = null
+            }
+        }
+    }
+
+    LaunchedEffect(performPark, exoPlayer, sniffedStream, engineMode) {
+        if (exoPlayer != null && sniffedStream != null && engineMode == PlayerEngineMode.NATIVE_EXO) {
+            MiniPlayerManager.parkNow = performPark
+        } else {
+            MiniPlayerManager.parkNow = null
+        }
+    }
+
+    // Clean up on dispose & save final timestamp (or hand the player to the mini player)
+    DisposableEffect(streamUrl) {
+        onDispose {
+            MiniPlayerManager.parkNow = null
+            val p0 = exoPlayer
+            if (p0 != null && MiniPlayerManager.parked?.player !== p0) {
+                val req = MiniPlayerManager.freshRequest()
+                val st = sniffedStream
+                val canPark = req != null && req.episode == episode && st != null &&
+                    engineMode == PlayerEngineMode.NATIVE_EXO &&
+                    (p0.playbackState == Player.STATE_READY || p0.playbackState == Player.STATE_BUFFERING) &&
+                    p0.playerError == null
+                exoPlayer = null
+
+                if (canPark && st != null && req != null) {
+                    val pos = p0.currentPosition.coerceAtLeast(0L)
+                    val dur = p0.duration.coerceAtLeast(0L)
+                    if (pos > 0L) onProgressUpdate(pos, dur)
+                    listenerRefs.forEach { p0.removeListener(it) }
+                    listenerRefs.clear()
+                    com.nyyrox.aniverse.service.ActivePlayerHolder.updateNavigation(false, false, null, null)
+                    try {
+                        context.startService(Intent(context, com.nyyrox.aniverse.service.PlayerNotificationService::class.java).apply {
+                            action = com.nyyrox.aniverse.service.PlayerNotificationService.ACTION_UPDATE
+                        })
+                    } catch (_: Exception) {}
+                    com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
+                    MiniPlayerManager.park(
+                        MiniPlayerManager.Parked(
+                            player = p0,
+                            routeAnimeId = req.routeAnimeId,
+                            anilistId = anilistId,
+                            episode = episode,
+                            providerId = req.providerId,
+                            streamUrl = streamUrl,
+                            sniffed = st,
+                            title = title,
+                            subtitle = "Episode $episode" + (episodeTitle?.let { " - $it" } ?: ""),
+                            onProgress = onProgressUpdate
+                        )
+                    )
+                } else {
+                    MiniPlayerManager.parkRequest = null
+                    com.nyyrox.aniverse.service.ActivePlayerHolder.detach()
+                    val stopIntent = Intent(context, com.nyyrox.aniverse.service.PlayerNotificationService::class.java).apply {
+                        action = com.nyyrox.aniverse.service.PlayerNotificationService.ACTION_DETACH
+                    }
+                    try { context.startService(stopIntent) } catch (_: Exception) {}
+                    com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
+                    val pos = p0.currentPosition.coerceAtLeast(0L)
+                    val dur = p0.duration.coerceAtLeast(0L)
                     if (pos > 0L) {
                         onProgressUpdate(pos, dur)
                     }
-                    // stop() before release(); clearMediaItems() on a READY player emits a fake STATE_ENDED -> auto-next +1
-                    p.stop()
-                    p.release()
+                    try {
+                        p0.stop()
+                        p0.release()
+                    } catch (_: Exception) {}
+                    com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
                 }
-                com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
             }
         }
     }
