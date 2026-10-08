@@ -945,9 +945,14 @@ fun PlayerScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 14.dp, vertical = 2.dp)
-                        ) {
-                            Surface(
-                                onClick = {
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (playInZenkaiPlayer) Color(0xFF161B26) else Color(0xFF121622))
+                                .border(
+                                    1.dp,
+                                    if (playInZenkaiPlayer) OttPrimary.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.18f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
                                     if (playInZenkaiPlayer) {
                                         playInZenkaiPlayer = false
                                     } else {
@@ -986,76 +991,67 @@ fun PlayerScreen(
                                             }
                                         }
                                     }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (playInZenkaiPlayer) Color(0xFF161B26) else Color(0xFF121622),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (playInZenkaiPlayer) OttPrimary.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.18f)
-                                ),
-                                modifier = Modifier.fillMaxWidth()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 11.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 11.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    if (isSniffingStream) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp,
-                                            color = OttPrimary
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Extracting Stream for Zenkai Player...",
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                    } else if (playInZenkaiPlayer) {
-                                        Icon(
-                                            imageVector = Icons.Default.OpenInBrowser,
-                                            contentDescription = null,
-                                            tint = OttPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Switch back to Embed Mode",
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "(Return to Web Player)",
-                                            fontSize = 11.sp,
-                                            color = OttTextMuted
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            tint = OttPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Play in Zenkai Player",
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "(Native Player & Ad-Free)",
-                                            fontSize = 11.sp,
-                                            color = OttTextMuted
-                                        )
-                                    }
+                                if (isSniffingStream) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = OttPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Extracting Stream for Zenkai Player...",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                } else if (playInZenkaiPlayer) {
+                                    Icon(
+                                        imageVector = Icons.Default.OpenInBrowser,
+                                        contentDescription = null,
+                                        tint = OttPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Switch back to Embed Mode",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "(Return to Web Player)",
+                                        fontSize = 11.sp,
+                                        color = OttTextMuted
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = OttPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Play in Zenkai Player",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "(Native Player & Ad-Free)",
+                                        fontSize = 11.sp,
+                                        color = OttTextMuted
+                                    )
                                 }
                             }
                         }

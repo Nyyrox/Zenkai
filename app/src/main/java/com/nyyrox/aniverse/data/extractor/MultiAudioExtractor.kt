@@ -625,14 +625,15 @@ object MultiAudioExtractor {
                 }
             }
 
-            val targetLink = matchedLink
+            val chosenLink: String? = matchedLink
                 ?: if (tempId.contains("dub", ignoreCase = true) || tempName.contains("dub", ignoreCase = true)) {
                     englishLink ?: hindiLink ?: firstLink
                 } else if (tempId.contains("sub", ignoreCase = true) || tempName.contains("sub", ignoreCase = true)) {
                     japaneseLink ?: englishLink ?: firstLink
                 } else {
                     hindiLink ?: englishLink ?: firstLink
-                } ?: return null
+                }
+            val targetLink = chosenLink ?: return null
 
             if (targetLink.contains("abyssplayer.com", ignoreCase = true)) {
                 resolveAbyssDirectStream(targetLink, tempId, tempName)
