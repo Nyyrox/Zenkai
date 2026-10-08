@@ -493,12 +493,23 @@ class AniListRepository {
         }
     }
 
-    suspend fun airing(): List<Airing> {
-        val start = (System.currentTimeMillis() / 1000) - 86400
+    suspend fun airing(
+        startSec: Long? = null,
+        endSec: Long? = null,
+        maxPages: Int = 5
+    ): List<Airing> {
+        val now = System.currentTimeMillis() / 1000
+        val start = startSec ?: (now - (5 * 86400))
+        val end = endSec ?: (now + (8 * 86400))
+
         val query = """
-            query {
-              Page(page:1, perPage:50) {
-                airingSchedules(airingAt_greater:$start, sort:TIME) {
+            query (${'$'}start: Int, ${'$'}end: Int, ${'$'}page: Int) {
+              Page(page: ${'$'}page, perPage: 50) {
+                pageInfo {
+                  hasNextPage
+                  currentPage
+                }
+                airingSchedules(airingAt_greater: ${'$'}start, airingAt_lesser: ${'$'}end, sort: TIME) {
                   episode
                   airingAt
                   media {
@@ -515,7 +526,7 @@ class AniListRepository {
                     seasonYear
                     format
                     duration
-                    studios(isMain:true) { nodes { name } }
+                    studios(isMain: true) { nodes { name } }
                     nextAiringEpisode { episode airingAt }
                   }
                 }
@@ -523,25 +534,40 @@ class AniListRepository {
             }
         """.trimIndent()
 
-        val data = post(query).optJSONObject("data")
-        val pageObj = data?.optJSONObject("Page")
-        val array = pageObj?.optJSONArray("airingSchedules") ?: return emptyList()
+        val allAiring = mutableListOf<Airing>()
+        for (page in 1..maxPages) {
+            try {
+                val vars = JSONObject().apply {
+                    put("start", start)
+                    put("end", end)
+                    put("page", page)
+                }
+                val data = post(query, vars).optJSONObject("data")
+                val pageObj = data?.optJSONObject("Page") ?: break
+                val array = pageObj.optJSONArray("airingSchedules") ?: break
 
-        return buildList {
-            for (i in 0 until array.length()) {
-                val item = array.optJSONObject(i) ?: continue
-                val mediaObj = item.optJSONObject("media") ?: continue
-                try {
-                    add(
-                        Airing(
-                            anime = parseMedia(mediaObj),
-                            episode = item.optInt("episode"),
-                            at = item.optLong("airingAt")
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    val mediaObj = item.optJSONObject("media") ?: continue
+                    try {
+                        allAiring.add(
+                            Airing(
+                                anime = parseMedia(mediaObj),
+                                episode = item.optInt("episode"),
+                                at = item.optLong("airingAt")
+                            )
                         )
-                    )
-                } catch (_: Throwable) {}
+                    } catch (_: Throwable) {}
+                }
+
+                val hasNext = pageObj.optJSONObject("pageInfo")?.optBoolean("hasNextPage", false) ?: false
+                if (!hasNext) break
+            } catch (e: Exception) {
+                if (allAiring.isNotEmpty()) break else throw e
             }
         }
+
+        return allAiring.distinctBy { "${it.anime.id}_${it.episode}_${it.at}" }.sortedBy { it.at }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

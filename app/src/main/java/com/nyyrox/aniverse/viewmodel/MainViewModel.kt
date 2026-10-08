@@ -777,7 +777,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadAiring() = viewModelScope.launch {
+    fun loadAiring(forceRefresh: Boolean = false) = viewModelScope.launch {
+        if (!forceRefresh && airing.isNotEmpty()) return@launch
         airingLoading = true
         airingError = null
         try {
@@ -789,7 +790,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         } catch (e: Exception) {
-            airingError = e.message ?: "Could not load upcoming airing anime."
+            airingError = e.message ?: "Could not load airing anime schedule."
         } finally {
             airingLoading = false
         }

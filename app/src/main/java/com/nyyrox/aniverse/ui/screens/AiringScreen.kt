@@ -47,10 +47,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nyyrox.aniverse.data.Airing
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.IconButton
 import com.nyyrox.aniverse.ui.components.AiringListSkeleton
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
 import com.nyyrox.aniverse.ui.theme.OttPillShape
+import com.nyyrox.aniverse.ui.theme.OttPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
@@ -62,9 +66,13 @@ import java.util.Locale
 
 data class ScheduleDay(
     val dayName: String,
-    val dateFormatted: String,
+    val dateNumber: String,
+    val monthFormatted: String,
+    val fullDateFormatted: String,
+    val displayHeader: String,
     val startOfDaySec: Long,
-    val endOfDaySec: Long
+    val endOfDaySec: Long,
+    val isToday: Boolean
 )
 
 @Composable
@@ -123,7 +131,7 @@ fun AiringScreen(
         return
     }
 
-    // 7 days starting from today
+    // 5 days in the past (e.g. 4th, 5th, 6th, 7th...) + Today (8th) + 8 days upcoming (9th..16th)
     val days = remember {
         val list = mutableListOf<ScheduleDay>()
         val cal = Calendar.getInstance()
@@ -131,32 +139,65 @@ fun AiringScreen(
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
+        val todayStartSec = cal.timeInMillis / 1000
+
+        // Start from 5 days ago
+        cal.add(Calendar.DAY_OF_YEAR, -5)
+
         val dayFormat = SimpleDateFormat("EEE", Locale.US)
-        val dateFormat = SimpleDateFormat("MMM dd", Locale.US)
-        for (i in 0..6) {
+        val numFormat = SimpleDateFormat("dd", Locale.US)
+        val monthFormat = SimpleDateFormat("MMM", Locale.US)
+        val fullDateFormat = SimpleDateFormat("MMM dd", Locale.US)
+        val headerFormat = SimpleDateFormat("EEEE, MMM d", Locale.US)
+
+        for (i in -5..8) {
             val startSec = cal.timeInMillis / 1000
             val dayName = dayFormat.format(cal.time)
-            val dateFormatted = dateFormat.format(cal.time)
+            val dateNumber = numFormat.format(cal.time)
+            val monthFormatted = monthFormat.format(cal.time)
+            val fullDate = fullDateFormat.format(cal.time)
+            val displayHeader = headerFormat.format(cal.time)
+            val isToday = startSec == todayStartSec
+
             cal.add(Calendar.DAY_OF_YEAR, 1)
             val endSec = (cal.timeInMillis / 1000) - 1
-            list.add(ScheduleDay(dayName, dateFormatted, startSec, endSec))
+            list.add(
+                ScheduleDay(
+                    dayName = dayName,
+                    dateNumber = dateNumber,
+                    monthFormatted = monthFormatted,
+                    fullDateFormatted = fullDate,
+                    displayHeader = displayHeader,
+                    startOfDaySec = startSec,
+                    endOfDaySec = endSec,
+                    isToday = isToday
+                )
+            )
         }
         list
     }
 
-    var selectedDayIndex by remember { mutableIntStateOf(0) }
-    val selectedDay = days.getOrNull(selectedDayIndex)
+    val todayIndex = remember(days) {
+        val idx = days.indexOfFirst { it.isToday }
+        if (idx >= 0) idx else 0
+    }
+    var selectedDayIndex by remember(todayIndex) { mutableIntStateOf(todayIndex) }
+    val selectedDay = days.getOrNull(selectedDayIndex) ?: days.getOrNull(todayIndex)
 
-    // Filter airing anime for selected day
+    val rowListState = rememberLazyListState()
+    LaunchedEffect(todayIndex) {
+        if (todayIndex > 0) {
+            // Scroll so today is visible, with previous dates to the left and upcoming dates to the right
+            rowListState.scrollToItem((todayIndex - 1).coerceAtLeast(0))
+        }
+    }
+
+    // Filter airing anime for selected day - never fall back to other days
     val dayAiring = remember(vm.airing, selectedDay) {
-        if (selectedDay == null) vm.airing
+        if (selectedDay == null) emptyList()
         else {
-            val filtered = vm.airing.filter { it.at in selectedDay.startOfDaySec..selectedDay.endOfDaySec }
-            if (filtered.isEmpty()) {
-                vm.airing.sortedBy { it.at }
-            } else {
-                filtered.sortedBy { it.at }
-            }
+            vm.airing.filter { it.at in selectedDay.startOfDaySec..selectedDay.endOfDaySec }
+                .sortedBy { it.at }
         }
     }
 
@@ -174,40 +215,109 @@ fun AiringScreen(
             .background(OttBg)
             .statusBarsPadding()
     ) {
+        // Top Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Airing Schedule",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = selectedDay?.let { "${it.displayHeader} • ${dayAiring.size} anime" } ?: "Broadcasting Anime",
+                    fontSize = 12.sp,
+                    color = OttTextSecondary
+                )
+            }
+            IconButton(
+                onClick = { vm.loadAiring(forceRefresh = true) },
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x18FFFFFF))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
         // Horizontal Day Selector Tabs
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            state = rowListState,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             itemsIndexed(days) { index, day ->
                 val isSelected = index == selectedDayIndex
                 Box(
                     modifier = Modifier
-                        .width(68.dp)
-                        .height(60.dp)
+                        .width(66.dp)
+                        .height(72.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) Color.White else Color(0xFF181A20))
+                        .background(
+                            when {
+                                isSelected -> Color.White
+                                day.isToday -> Color(0xFF23252E)
+                                else -> Color(0xFF16171B)
+                            }
+                        )
+                        .border(
+                            width = if (isSelected) 0.dp else if (day.isToday) 1.5.dp else 1.dp,
+                            color = when {
+                                isSelected -> Color.Transparent
+                                day.isToday -> OttPrimary
+                                else -> Color(0x18FFFFFF)
+                            },
+                            shape = RoundedCornerShape(16.dp)
+                        )
                         .clickable { selectedDayIndex = index }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 6.dp, vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxHeight()
                     ) {
                         Text(
-                            text = day.dayName,
-                            fontSize = 14.sp,
+                            text = day.dayName.uppercase(),
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color(0xFF1E1E1E) else if (day.isToday) OttPrimary else Color(0xFF888B96)
+                        )
+                        Text(
+                            text = day.dateNumber,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
                             color = if (isSelected) Color.Black else Color.White
                         )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = day.dateFormatted,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (isSelected) Color(0xFF444444) else Color(0xFF888B96)
-                        )
+                        if (day.isToday) {
+                            Text(
+                                text = "TODAY",
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (isSelected) Color(0xFF0066FF) else OttAccentGold,
+                                letterSpacing = 0.5.sp
+                            )
+                        } else {
+                            Text(
+                                text = day.monthFormatted.uppercase(),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isSelected) Color(0xFF555555) else Color(0xFF6B6E7B)
+                            )
+                        }
                     }
                 }
             }
@@ -220,11 +330,21 @@ fun AiringScreen(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "No scheduled broadcasts for this day.",
-                    color = OttTextMuted,
-                    fontSize = 14.sp
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "No Scheduled Broadcasts",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OttTextPrimary
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "No anime scheduled to air on ${selectedDay?.displayHeader ?: "this date"}.",
+                        color = OttTextMuted,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         } else {
             // Timeline Content List
