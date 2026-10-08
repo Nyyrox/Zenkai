@@ -627,8 +627,8 @@ private fun HomeMangaRow(
                                 )
                             )
                     )
-                    val chText = manga.latestChapter?.takeIf { it.isNotBlank() } ?: manga.type
-                    if (!chText.isNullOrBlank()) {
+                    val chText: String = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga")
+                    if (chText.isNotBlank()) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
@@ -686,7 +686,7 @@ private fun HomeNovelRow(
                         .background(Color(0xFF141822))
                 ) {
                     AsyncImage(
-                        model = novel.cover ?: novel.poster,
+                        model = novel.cover,
                         contentDescription = novel.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -702,8 +702,8 @@ private fun HomeNovelRow(
                                 )
                             )
                     )
-                    val badge = novel.score?.takeIf { it.isNotBlank() } ?: novel.source
-                    if (!badge.isNullOrBlank()) {
+                    val badge: String = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source)
+                    if (badge.isNotBlank()) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)

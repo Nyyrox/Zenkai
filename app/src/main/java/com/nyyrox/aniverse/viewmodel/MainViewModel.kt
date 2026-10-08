@@ -496,10 +496,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val still = withContext(Dispatchers.IO) {
                     val mapped = com.nyyrox.aniverse.data.tmdb.TmdbRepository.fetchEpisodesMapped(
                         anilistId = anime.id,
-                        title = anime.titleEnglish ?: anime.titleRomaji ?: anime.title,
-                        year = anime.seasonYear,
-                        format = anime.format,
-                        totalEpisodes = anime.totalEpisodes ?: 24
+                        title = anime.title,
+                        romajiTitle = anime.romajiTitle,
+                        season = anime.seasonYear,
+                        totalEpisodes = anime.episodes ?: 24,
+                        format = anime.format
                     )
                     mapped[episodeNumber]?.stillUrl
                 }
