@@ -352,7 +352,7 @@ object MultiAudioExtractor {
     //  Iframe -> Direct Stream Resolver
     // -------------------------------------------------------------------------
 
-    private fun resolveIframeToServer(
+    fun resolveIframeToServer(
         iframeUrl: String,
         referer: String,
         tempId: String,
