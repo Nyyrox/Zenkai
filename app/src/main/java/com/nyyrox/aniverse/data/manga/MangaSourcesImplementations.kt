@@ -65,14 +65,26 @@ class MangaDexRepository(
 
     private fun extractTitle(attributes: JSONObject?): String {
         if (attributes == null) return "Unknown"
-        val titleObj = attributes.optJSONObject("title") ?: return "Unknown"
-        val en = titleObj.optString("en").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        val titleObj = attributes.optJSONObject("title")
+        val en = titleObj?.optString("en")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         if (en != null) return en
-        val keys = titleObj.keys()
-        while (keys.hasNext()) {
-            val k = keys.next()
-            val v = titleObj.optString(k)
-            if (v.isNotBlank() && !v.equals("null", ignoreCase = true)) return v
+
+        val altTitles = attributes.optJSONArray("altTitles")
+        if (altTitles != null) {
+            for (i in 0 until altTitles.length()) {
+                val alt = altTitles.optJSONObject(i) ?: continue
+                val altEn = alt.optString("en").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                if (altEn != null) return altEn
+            }
+        }
+
+        if (titleObj != null) {
+            val keys = titleObj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val v = titleObj.optString(k)
+                if (v.isNotBlank() && !v.equals("null", ignoreCase = true)) return v
+            }
         }
         return "Unknown"
     }
@@ -690,14 +702,17 @@ class AsuraScansRepository(
         val url = "$apiUrl/series/$slug"
         val json = fetchJson(url) ?: return null
 
-        val title = json.optString("title")
-        val desc = json.optString("description").replace(Regex("<[^>]*>"), " ").trim()
-        val cover = json.optString("cover").ifBlank { json.optString("cover_url") }.ifBlank { "https://cdn.asurascans.com/asura-images/covers/$slug.webp" }
-        val status = json.optString("status")
-        val type = json.optString("type").ifBlank { "Manhwa" }
+        val sObj = json.optJSONObject("series") ?: json.optJSONObject("data") ?: json
+        val title = sObj.optString("title")
+        val desc = sObj.optString("description").replace(Regex("<[^>]*>"), " ").trim()
+        val cover = sObj.optString("cover").ifBlank { sObj.optString("cover_url") }.ifBlank { "https://cdn.asurascans.com/asura-images/covers/$slug.webp" }
+        val status = sObj.optString("status")
+        val type = sObj.optString("type").ifBlank { "Manhwa" }
+        val author = sObj.optString("author").takeIf { it.isNotBlank() }
+        val rating = sObj.optDouble("rating", 0.0).takeIf { it > 0 }?.let { String.format(java.util.Locale.US, "%.1f", it) }
 
         val genres = mutableListOf<String>()
-        val gArr = json.optJSONArray("genres")
+        val gArr = sObj.optJSONArray("genres")
         if (gArr != null) {
             for (i in 0 until gArr.length()) {
                 val gName = gArr.optJSONObject(i)?.optString("name")
@@ -712,7 +727,9 @@ class AsuraScansRepository(
             description = desc,
             type = type,
             status = status,
+            rating = rating,
             genres = genres,
+            authors = listOfNotNull(author),
             source = source.id
         )
     }

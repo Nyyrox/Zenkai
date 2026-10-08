@@ -199,20 +199,95 @@ object MangaRepository {
             val info = infoDeferred.await()
             val chapters = chaptersDeferred.await()
 
-            if (info != null && chapters.isNotEmpty()) {
+            if (info != null) {
+                // Enrich with AniList using info.title if not yet queried
+                val effectiveAni = aniData ?: try {
+                    if (info.title.isNotBlank() && info.title != "Unknown") {
+                        aniListRepo.fetchMangaDetails(title = info.title)
+                    } else null
+                } catch (_: Exception) { null }
+
+                val curAniTitle = effectiveAni?.optJSONObject("title")?.let { t ->
+                    val eng = t.optString("english").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    val rom = t.optString("romaji").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    val usr = t.optString("userPreferred").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    eng ?: rom ?: usr
+                } ?: aniTitle
+
+                val curAniCover = effectiveAni?.optJSONObject("coverImage")?.let { c ->
+                    val xl = c.optString("extraLarge").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    val l = c.optString("large").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    xl ?: l
+                } ?: aniCover
+
+                val curAniBanner = effectiveAni?.optString("bannerImage")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    ?: aniBanner
+
+                val curAniDesc = effectiveAni?.optString("description")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    ?.replace(Regex("<[^>]*>"), "")?.trim() ?: aniDesc
+
+                val curAniGenres = buildList {
+                    val arr = effectiveAni?.optJSONArray("genres")
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            val g = arr.optString(i).trim()
+                            if (g.isNotBlank() && !g.equals("null", ignoreCase = true)) add(g)
+                        }
+                    }
+                }.ifEmpty { aniGenres }
+
+                val curAniScore = effectiveAni?.optInt("averageScore")?.takeIf { it > 0 }?.let { "$it%" } ?: aniScore
+                val curAniStatus = effectiveAni?.optString("status")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: aniStatus
+                val curAniFormat = effectiveAni?.optString("format")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: aniFormat
+                val curAniChapters = effectiveAni?.optInt("chapters")?.takeIf { it > 0 } ?: aniChapters
+                val curAniAuthors = buildList {
+                    val edges = effectiveAni?.optJSONObject("staff")?.optJSONArray("edges")
+                    if (edges != null) {
+                        for (i in 0 until edges.length()) {
+                            val name = edges.optJSONObject(i)?.optJSONObject("node")?.optJSONObject("name")?.optString("full")
+                            if (!name.isNullOrBlank()) add(name)
+                        }
+                    }
+                }.ifEmpty { aniAuthors }
+
+                var resolvedChapters = chapters
+                var resolvedId = mangaId
+
+                // If chapters are empty or <= 1 (e.g. MangaDex licensed titles with only external links), search other sources for readable chapters!
+                if (resolvedChapters.size <= 1) {
+                    val searchQuery = curAniTitle ?: info.title
+                    val otherSources = repositories.keys.filter { it != src }
+                    for (otherSrc in otherSources) {
+                        val otherRepo = repositories[otherSrc] ?: continue
+                        try {
+                            val searchResults = otherRepo.search(searchQuery)
+                            if (searchResults.isNotEmpty()) {
+                                val match = searchResults.find { it.title.equals(searchQuery, ignoreCase = true) } ?: searchResults.first()
+                                val altChs = otherRepo.getChapters(match.id)
+                                if (altChs.size > resolvedChapters.size) {
+                                    resolvedChapters = altChs
+                                    resolvedId = match.id
+                                    break
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+
                 val enrichedInfo = info.copy(
-                    poster = info.poster ?: aniCover,
-                    banner = aniBanner ?: info.banner,
-                    description = if (info.description.isBlank()) (aniDesc ?: "") else info.description,
-                    genres = if (info.genres.isEmpty()) aniGenres else info.genres,
-                    rating = info.rating ?: aniScore,
-                    status = info.status ?: aniStatus,
-                    type = info.type ?: aniFormat ?: "Manga",
-                    anilistId = aniId ?: aniData?.optInt("id")?.takeIf { it > 0 },
-                    totalChapters = aniChapters ?: info.totalChapters,
-                    authors = if (info.authors.isEmpty()) aniAuthors else info.authors
+                    title = curAniTitle ?: info.title,
+                    poster = curAniCover ?: info.poster,
+                    banner = curAniBanner ?: info.banner ?: curAniCover ?: info.poster,
+                    description = if (info.description.isBlank()) (curAniDesc ?: "") else info.description,
+                    genres = if (info.genres.isEmpty()) curAniGenres else info.genres,
+                    rating = info.rating ?: curAniScore,
+                    status = info.status ?: curAniStatus,
+                    type = info.type ?: curAniFormat ?: "Manga",
+                    anilistId = aniId ?: effectiveAni?.optInt("id")?.takeIf { it > 0 },
+                    totalChapters = curAniChapters ?: info.totalChapters,
+                    authors = if (info.authors.isEmpty()) curAniAuthors else info.authors
                 )
-                return@withContext Triple(mangaId, enrichedInfo, chapters)
+                return@withContext Triple(resolvedId, enrichedInfo, resolvedChapters)
             }
         }
 
@@ -238,8 +313,8 @@ object MangaRepository {
                             val resolvedInfo = MangaInfo(
                                 id = bestMatch.id,
                                 title = aniTitle ?: rawInfo?.title ?: bestMatch.title,
-                                poster = rawInfo?.poster ?: bestMatch.poster ?: aniCover,
-                                banner = aniBanner ?: rawInfo?.banner,
+                                poster = aniCover ?: rawInfo?.poster ?: bestMatch.poster,
+                                banner = aniBanner ?: rawInfo?.banner ?: aniCover ?: rawInfo?.poster,
                                 description = rawInfo?.description?.takeIf { it.isNotBlank() } ?: (aniDesc ?: ""),
                                 genres = rawInfo?.genres?.takeIf { it.isNotEmpty() } ?: aniGenres,
                                 status = rawInfo?.status ?: aniStatus,

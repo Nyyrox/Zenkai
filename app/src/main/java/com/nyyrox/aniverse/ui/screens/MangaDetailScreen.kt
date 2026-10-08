@@ -64,8 +64,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
+import com.nyyrox.aniverse.data.manga.MangaSource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -113,6 +117,8 @@ fun MangaDetailScreen(
     val context = LocalContext.current
     val coordinator = LocalSharedPosterCoordinator.current
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    var isSwitchingSource by remember { mutableStateOf(false) }
 
     val handleBack: () -> Unit = {
         if (coordinator != null && (coordinator.phase == SharedTransitionPhase.PRESENTED || coordinator.phase == SharedTransitionPhase.FORWARD)) {
@@ -399,6 +405,30 @@ fun MangaDetailScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
+                                    val activeSource = MangaRepository.getSourceForId(currentMangaId)
+                                    val (badgeBg, badgeBorder, badgeText) = when (activeSource) {
+                                        MangaSource.MANGADEX -> Triple(Color(0x25FF6740), Color(0x60FF6740), Color(0xFFFF8A65))
+                                        MangaSource.COMICK -> Triple(Color(0x253B82F6), Color(0x603B82F6), Color(0xFF60A5FA))
+                                        MangaSource.ASURA -> Triple(Color(0x2510B981), Color(0x6010B981), Color(0xFF34D399))
+                                        MangaSource.WEEBCENTRAL -> Triple(Color(0x258B5CF6), Color(0x608B5CF6), Color(0xFFA78BFA))
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(OttPillShape)
+                                            .background(badgeBg)
+                                            .border(0.8.dp, badgeBorder, OttPillShape)
+                                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = activeSource.displayName.uppercase(),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeText,
+                                            softWrap = false,
+                                            maxLines = 1
+                                        )
+                                    }
+
                                     Box(
                                         modifier = Modifier
                                             .clip(OttPillShape)
@@ -414,6 +444,36 @@ fun MangaDetailScreen(
                                             softWrap = false,
                                             maxLines = 1
                                         )
+                                    }
+
+                                    if (!currentInfo.rating.isNullOrBlank()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(OttPillShape)
+                                                .background(Color(0x25F59E0B))
+                                                .border(0.8.dp, Color(0x60F59E0B), OttPillShape)
+                                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Star,
+                                                    contentDescription = null,
+                                                    tint = OttAccentGold,
+                                                    modifier = Modifier.size(10.dp)
+                                                )
+                                                Text(
+                                                    text = currentInfo.rating,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = OttAccentGold,
+                                                    softWrap = false,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
                                     }
 
                                     if (!currentInfo.status.isNullOrBlank()) {
@@ -497,6 +557,74 @@ fun MangaDetailScreen(
                                 fontSize = 14.sp,
                                 color = Color.Black
                             )
+                        }
+
+                        // Interactive Source Switcher Chips Row
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val activeSrc = MangaRepository.getSourceForId(currentMangaId)
+                            MangaSource.entries.forEach { srcOption ->
+                                val isSelected = activeSrc == srcOption
+                                val (activeBg, activeBorder, activeTextColor) = when (srcOption) {
+                                    MangaSource.MANGADEX -> Triple(Color(0x35FF6740), Color(0x90FF6740), Color(0xFFFF8A65))
+                                    MangaSource.COMICK -> Triple(Color(0x353B82F6), Color(0x903B82F6), Color(0xFF60A5FA))
+                                    MangaSource.ASURA -> Triple(Color(0x3510B981), Color(0x9010B981), Color(0xFF34D399))
+                                    MangaSource.WEEBCENTRAL -> Triple(Color(0x358B5CF6), Color(0x908B5CF6), Color(0xFFA78BFA))
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(OttPillShape)
+                                        .background(if (isSelected) activeBg else Color(0x12FFFFFF))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) activeBorder else Color(0x20FFFFFF),
+                                            OttPillShape
+                                        )
+                                        .clickable(enabled = !isSwitchingSource && !isSelected) {
+                                            scope.launch {
+                                                isSwitchingSource = true
+                                                try {
+                                                    val targetRepo = MangaRepository.getRepoForSource(srcOption)
+                                                    val searchResults = targetRepo.search(currentInfo.title)
+                                                    val match = searchResults.find { it.title.equals(currentInfo.title, ignoreCase = true) }
+                                                        ?: searchResults.firstOrNull()
+                                                    if (match != null) {
+                                                        val (resolvedId, newInfo, newChapters) = MangaRepository.resolveMangaDetails(match.id, currentInfo.title)
+                                                        if (newInfo != null) {
+                                                            currentMangaId = resolvedId
+                                                            info = newInfo
+                                                            chapters = newChapters
+                                                            val cacheEntry = MainViewModel.CachedMangaDetail(resolvedId, newInfo, newChapters)
+                                                            vm.mangaDetailCache[resolvedId] = cacheEntry
+                                                            vm.mangaDetailCache[mangaId] = cacheEntry
+                                                        }
+                                                    } else {
+                                                        android.widget.Toast.makeText(context, "No match found on ${srcOption.displayName}", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    android.widget.Toast.makeText(context, "Failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                                } finally {
+                                                    isSwitchingSource = false
+                                                }
+                                            }
+                                        }
+                                        .padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = srcOption.displayName,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) activeTextColor else OttTextMuted,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         }
 
                         // Expandable Synopsis Snippet
@@ -775,17 +903,35 @@ fun MangaDetailScreen(
 
                 if (displayChapters.isEmpty()) {
                     item(key = "manga_no_chapters") {
+                        val activeSrc = MangaRepository.getSourceForId(currentMangaId)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 40.dp),
+                                .padding(horizontal = 16.dp, vertical = 32.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0x10FFFFFF))
+                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
+                                .padding(20.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (chapterSearch.isNotBlank()) "No chapters matching '$chapterSearch'" else "No chapters found",
-                                color = OttTextMuted,
-                                fontSize = 13.sp
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (chapterSearch.isNotBlank()) "No chapters matching '$chapterSearch'" else "No readable chapters on ${activeSrc.displayName}",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (chapterSearch.isBlank()) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        text = "Some titles are restricted or licensed here. Tap another source chip above (ComicK, WeebCentral, or Asura Scans) to load chapters.",
+                                        color = OttTextMuted,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
                 } else {
@@ -1097,6 +1243,97 @@ fun MangaDetailScreen(
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (currentInfo.authors.isNotEmpty()) {
+                    item(key = "manga_authors_card") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "AUTHORS & ARTISTS",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = OttSecondary
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                currentInfo.authors.forEach { author ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(OttPillShape)
+                                            .background(Color(0x18FFFFFF))
+                                            .border(1.dp, Color(0x28FFFFFF), OttPillShape)
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    ) {
+                                        Text(
+                                            text = author,
+                                            fontSize = 11.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item(key = "manga_source_card") {
+                    val activeSrc = MangaRepository.getSourceForId(currentMangaId)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0x10FFFFFF))
+                            .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
+                            .padding(16.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "METADATA & SOURCE",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = OttSecondary
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Current Source", fontSize = 12.sp, color = OttTextMuted)
+                                Text(activeSrc.displayName, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            if (currentInfo.anilistId != null) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("AniList Mapping", fontSize = 12.sp, color = OttTextMuted)
+                                    Text("#${currentInfo.anilistId} (Mapped)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+                                }
+                            }
+                            if (!currentInfo.rating.isNullOrBlank()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Community Rating", fontSize = 12.sp, color = OttTextMuted)
+                                    Text(currentInfo.rating, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OttAccentGold)
                                 }
                             }
                         }
