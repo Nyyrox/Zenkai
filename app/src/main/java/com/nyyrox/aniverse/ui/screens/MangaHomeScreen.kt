@@ -238,17 +238,23 @@ private fun MangaHeaderSearch(
         ) {
             items(com.nyyrox.aniverse.data.manga.MangaSource.entries.toTypedArray()) { src ->
                 val isSelected = src == activeSource
+                val (activeBg, activeBorder, activeText) = when (src) {
+                    com.nyyrox.aniverse.data.manga.MangaSource.MANGADEX -> Triple(Color(0xFFFF6740), Color(0xFFFF8A65), Color.Black)
+                    com.nyyrox.aniverse.data.manga.MangaSource.COMICK -> Triple(Color(0xFF3B82F6), Color(0xFF60A5FA), Color.White)
+                    com.nyyrox.aniverse.data.manga.MangaSource.ASURA -> Triple(Color(0xFF10B981), Color(0xFF34D399), Color.Black)
+                    com.nyyrox.aniverse.data.manga.MangaSource.WEEBCENTRAL -> Triple(Color(0xFF8B5CF6), Color(0xFFA78BFA), Color.White)
+                }
                 Box(
                     modifier = Modifier
                         .clip(OttPillShape)
-                        .background(if (isSelected) OttPrimary else Color(0x16FFFFFF))
+                        .background(if (isSelected) activeBg else Color(0x14FFFFFF))
                         .border(
                             width = 1.dp,
-                            color = if (isSelected) OttPrimary else Color(0x28FFFFFF),
+                            color = if (isSelected) activeBorder else Color(0x22FFFFFF),
                             shape = OttPillShape
                         )
                         .clickable { onSourceSelect(src) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -257,16 +263,16 @@ private fun MangaHeaderSearch(
                     ) {
                         Text(
                             text = src.displayName,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                            color = if (isSelected) Color.Black else Color.White
+                            color = if (isSelected) activeText else Color.White
                         )
                         if (src.badge != null) {
                             Text(
                                 text = "• ${src.badge}",
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Normal,
-                                color = if (isSelected) Color(0xCC000000) else Color(0xAAFFFFFF)
+                                color = if (isSelected) activeText.copy(alpha = 0.8f) else Color(0xAAFFFFFF)
                             )
                         }
                     }
@@ -849,6 +855,61 @@ private fun MangaCardView(
                     }
             )
 
+            // Bottom gradient vignette
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0x20000000), Color(0x80000000)),
+                            startY = 100f
+                        )
+                    )
+            )
+
+            // Top Type Pill (MANHWA, MANGA, MANHUA)
+            if (!card.type.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(5.dp)
+                        .clip(OttPillShape)
+                        .background(Color(0xD0000000))
+                        .border(0.5.dp, Color(0x35FFFFFF), OttPillShape)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = card.type.uppercase(),
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when (card.type.lowercase()) {
+                            "manhwa" -> Color(0xFF6EE7B7)
+                            "manhua" -> Color(0xFF93C5FD)
+                            else -> Color(0xFFFCA5A5)
+                        }
+                    )
+                }
+            }
+
+            // Bottom Chapter Badge
+            if (!card.chapter.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(5.dp)
+                        .clip(OttPillShape)
+                        .background(Color(0xD0000000))
+                        .border(0.5.dp, Color(0x35FFFFFF), OttPillShape)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (card.chapter.startsWith("Ch", ignoreCase = true)) card.chapter else "Ch. ${card.chapter}",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -920,6 +981,40 @@ private fun MangaGridItem(
                     }
             )
 
+            // Bottom gradient vignette
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0x20000000), Color(0x80000000)),
+                            startY = 90f
+                        )
+                    )
+            )
+
+            if (!card.type.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(5.dp)
+                        .clip(OttPillShape)
+                        .background(Color(0xD0000000))
+                        .border(0.5.dp, Color(0x35FFFFFF), OttPillShape)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = card.type.uppercase(),
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when (card.type.lowercase()) {
+                            "manhwa" -> Color(0xFF6EE7B7)
+                            "manhua" -> Color(0xFF93C5FD)
+                            else -> Color(0xFFFCA5A5)
+                        }
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(5.dp))

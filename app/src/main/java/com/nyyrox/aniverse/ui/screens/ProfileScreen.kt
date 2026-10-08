@@ -2175,9 +2175,51 @@ fun ProfileScreen(
                     color = Color(0xFF94A3B8)
                 )
 
+                val currentPhysicalHz = remember(themeSettings.preferredRefreshRate) {
+                    DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x18FFFFFF))
+                        .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Live Hardware Display Rate",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981))
+                            )
+                            Text(
+                                text = "${currentPhysicalHz.roundToInt()}Hz Active",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF34D399)
+                            )
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(4.dp))
 
-                val availableRates = if (supportedRates.isNotEmpty()) supportedRates else listOf(60, 90, 120)
+                val availableRates = remember(supportedRates) {
+                    val base = mutableSetOf(60, 90, 120, 144)
+                    base.addAll(supportedRates)
+                    base.sorted()
+                }
                 availableRates.forEach { hz ->
                     val isSelected = themeSettings.preferredRefreshRate == hz
                     Row(
@@ -2192,6 +2234,9 @@ fun ProfileScreen(
                             )
                             .clickable {
                                 vm.setPreferredRefreshRate(hz)
+                                activity?.let { act ->
+                                    DisplayRefreshRateManager.applyRefreshRate(act, hz, false)
+                                }
                                 showRefreshRateSheet = false
                             }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -2199,18 +2244,36 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text(
-                                text = "${hz}Hz",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "${hz}Hz",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                if (currentPhysicalHz.roundToInt() == hz) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(OttPillShape)
+                                            .background(Color(0x2510B981))
+                                            .border(0.8.dp, Color(0x5010B981), OttPillShape)
+                                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = "CURRENT",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF6EE7B7)
+                                        )
+                                    }
+                                }
+                            }
                             Text(
                                 text = when (hz) {
-                                    60 -> "Standard (lowest battery use)"
+                                    60 -> "Standard (lowest battery use, locked)"
                                     90 -> "Smooth & balanced (recommended)"
-                                    120 -> "Ultra fluid (maximum smoothness)"
-                                    144 -> "Extreme high-frame rate"
+                                    120 -> "Ultra fluid (high refresh rate)"
+                                    144 -> "Extreme 144Hz (maximum frame rate)"
                                     else -> "${hz} frames per second"
                                 },
                                 color = Color(0xFF94A3B8),

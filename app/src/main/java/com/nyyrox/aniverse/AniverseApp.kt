@@ -102,6 +102,26 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
         }
     }
 
+    val activity = remember(context) {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) return@remember ctx
+            ctx = ctx.baseContext
+        }
+        null
+    }
+
+    // Reactively enforce refresh rate across the entire app
+    LaunchedEffect(vm.themeSettings.preferredRefreshRate, vm.themeSettings.isPowerSavingEnabled) {
+        activity?.let { act ->
+            com.nyyrox.aniverse.util.DisplayRefreshRateManager.applyRefreshRate(
+                act,
+                vm.themeSettings.preferredRefreshRate,
+                vm.themeSettings.isPowerSavingEnabled
+            )
+        }
+    }
+
     var navStack by remember { mutableStateOf(listOf("splash")) }
     val currentRoute = navStack.last()
     var isDrawerOpen by remember { mutableStateOf(false) }
