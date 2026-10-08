@@ -1,0 +1,149 @@
+package com.nyyrox.aniverse.data.download
+
+enum class DownloadType {
+    ANIME,
+    NOVEL,
+    MANGA
+}
+
+enum class DownloadStatus {
+    IDLE,
+    QUEUED,
+    DOWNLOADING,
+    COMPLETED,
+    FAILED
+}
+
+data class AnimeDownloadTask(
+    val animeId: Int,
+    val animeTitle: String,
+    val animeCover: String,
+    val episode: Int,
+    val episodeTitle: String? = null,
+    val providerId: String,
+    val providerName: String,
+    val quality: String = "Auto HD",
+    val audio: String = "SUB",
+    val totalSegments: Int = 0,
+    val downloadedSegments: Int = 0,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
+    val speedFormatted: String = "",
+    val status: DownloadStatus = DownloadStatus.IDLE,
+    val progress: Float = 0f,
+    val error: String? = null,
+    val localFilePath: String? = null
+)
+
+data class NovelDownloadTask(
+    val novelSlug: String,
+    val novelTitle: String,
+    val novelCover: String,
+    val chapterSlug: String,
+    val chapterTitle: String,
+    val chapterNumber: String? = null,
+    val source: String = "novelfire",
+    val status: DownloadStatus = DownloadStatus.IDLE,
+    val progress: Float = 0f,
+    val error: String? = null
+)
+
+data class MangaDownloadTask(
+    val mangaId: String,
+    val mangaTitle: String,
+    val mangaPoster: String? = null,
+    val chapterId: String,
+    val chapterNumber: String,
+    val chapterTitle: String? = null,
+    val totalPages: Int = 0,
+    val downloadedPages: Int = 0,
+    val status: DownloadStatus = DownloadStatus.IDLE,
+    val progress: Float = 0f,
+    val error: String? = null
+)
+
+data class DownloadedAnime(
+    val animeId: Int,
+    val title: String,
+    val cover: String,
+    val episodesCount: Int = 0,
+    val totalSizeBytes: Long = 0L,
+    val lastDownloadedAt: Long = System.currentTimeMillis()
+)
+
+data class DownloadedAnimeEpisode(
+    val animeId: Int,
+    val episode: Int,
+    val episodeTitle: String? = null,
+    val animeTitle: String = "",
+    val animeCover: String = "",
+    val providerId: String = "",
+    val providerName: String = "",
+    val filePath: String,
+    val localUri: String = filePath,
+    val sizeBytes: Long = 0L,
+    val downloadedAt: Long = System.currentTimeMillis(),
+    val subtitles: List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> = emptyList()
+)
+
+data class DownloadedNovel(
+    val novelSlug: String,
+    val title: String,
+    val cover: String,
+    val source: String = "novelfire",
+    val chaptersCount: Int = 0,
+    val totalSizeBytes: Long = 0L,
+    val lastDownloadedAt: Long = System.currentTimeMillis()
+)
+
+data class DownloadedNovelChapter(
+    val novelSlug: String,
+    val chapterSlug: String,
+    val title: String,
+    val number: String? = null,
+    val downloadedAt: Long = System.currentTimeMillis(),
+    val sizeBytes: Long = 0L
+)
+
+data class DownloadedManga(
+    val mangaId: String,
+    val title: String,
+    val poster: String? = null,
+    val chaptersCount: Int = 0,
+    val totalSizeBytes: Long = 0L,
+    val lastDownloadedAt: Long = System.currentTimeMillis()
+)
+
+data class DownloadedMangaChapter(
+    val mangaId: String,
+    val chapterId: String,
+    val chapterNumber: String,
+    val chapterTitle: String? = null,
+    val pageCount: Int = 0,
+    val downloadedAt: Long = System.currentTimeMillis(),
+    val sizeBytes: Long = 0L
+)
+
+data class DownloadTaskInfo(
+    val type: DownloadType,
+    val itemId: String,
+    val chapterId: String,
+    val title: String,
+    val itemTitle: String = "",
+    val cover: String? = null,
+    val status: DownloadStatus,
+    val progress: Float,
+    val downloadedCount: Int = 0,
+    val totalCount: Int = 0,
+    val speed: String = "",
+    val error: String? = null,
+    val providerId: String? = null,
+    val providerName: String? = null,
+    val audio: String? = null,
+    val quality: String? = null,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L
+) {
+    val percentage: Int
+        get() = (progress.coerceIn(0f, 1f) * 100).toInt()
+}

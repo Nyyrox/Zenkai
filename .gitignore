@@ -1,0 +1,17 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+build/
+app/build/
+release/
+app/release/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+build-output/
+.kotlin/
+zenkai-web/

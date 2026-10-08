@@ -1,0 +1,61 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Dark glass background -->
+    <path android:pathData="M8,2 C4.686,2 2,4.686 2,8 L2,40 C2,43.314 4.686,46 8,46 L40,46 C43.314,46 46,43.314 46,40 L46,8 C46,4.686 43.314,2 40,2 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="2" android:startY="2" android:endX="46" android:endY="46">
+                <item android:offset="0" android:color="#FF1E1E32"/>
+                <item android:offset="1" android:color="#FF0C0C1A"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle border -->
+    <path android:pathData="M8,2 C4.686,2 2,4.686 2,8 L2,40 C2,43.314 4.686,46 8,46 L40,46 C43.314,46 46,43.314 46,40 L46,8 C46,4.686 43.314,2 40,2 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#3500E5FF"
+        android:strokeWidth="1.2"/>
+
+    <!-- Z top bar cyan gradient -->
+    <path android:pathData="M11,13 L37,13 L37,18 L11,18 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="11" android:startY="13" android:endX="37" android:endY="13">
+                <item android:offset="0" android:color="#FF00E5FF"/>
+                <item android:offset="1" android:color="#FF7B6FFF"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Z diagonal bar violet gradient (parallelogram) -->
+    <path android:pathData="M38.5,20.8 L35.5,15.2 L9.5,27.2 L12.5,32.8 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="38" android:startY="15" android:endX="10" android:endY="33">
+                <item android:offset="0" android:color="#FF7B6FFF"/>
+                <item android:offset="1" android:color="#FFC084FC"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Z bottom bar lavender gradient -->
+    <path android:pathData="M11,30 L37,30 L37,35 L11,35 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="11" android:startY="30" android:endX="37" android:endY="30">
+                <item android:offset="0" android:color="#FFC084FC"/>
+                <item android:offset="1" android:color="#FFFF6FD8"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Corner accent dots -->
+    <path android:pathData="M11,15.5 m-1.8,0 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0"
+        android:fillColor="#6600E5FF"/>
+    <path android:pathData="M37,32.5 m-1.8,0 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0"
+        android:fillColor="#66FF6FD8"/>
+
+</vector>

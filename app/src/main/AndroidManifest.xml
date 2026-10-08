@@ -1,0 +1,85 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Saving manga pages to device gallery -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <application
+        android:largeHeap="true"
+        android:theme="@style/Theme.Aniverse" 
+        android:label="Zenkai" 
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="true" 
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:hardwareAccelerated="true">
+        <activity 
+            android:name=".MainActivity" 
+            android:screenOrientation="portrait" 
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+            android:supportsPictureInPicture="true"
+            android:launchMode="singleTop"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Custom URI Scheme: zenkai://, aniverse://anime/{id}, aniverse://manga/{id} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="zenkai" />
+                <data android:scheme="aniverse" />
+            </intent-filter>
+
+            <!-- Supabase Auth Deep Link Redirect -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="aniverse" android:host="login-callback" />
+                <data android:scheme="zenkai" android:host="login-callback" />
+            </intent-filter>
+
+            <!-- Discord OAuth2 Deep Link Redirect -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="zenkai" android:host="discord" />
+                <data android:scheme="aniverse" android:host="discord" />
+            </intent-filter>
+
+            <!-- Universal App Opener Links: https://aniverse-kt.vercel.app, https://aniverse.app -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="aniverse-kt.vercel.app" />
+                <data android:scheme="https" android:host="aniverse.app" />
+                <data android:scheme="https" android:host="aniversee.vercel.app" />
+                <data android:scheme="https" android:host="zenkai-auth-worker.ammhfoo.workers.dev" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".notifications.DirectReplyReceiver"
+            android:exported="false" />
+        <service
+            android:name=".service.PlayerNotificationService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Aniverse" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Anivexa API</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0c0c0f;
+      --border:   #1e1e26;
+      --text:     #e6e6f0;
+      --muted:    #5a5a6e;
+      --accent:   #818cf8;
+      --purple:   #c084fc;
+      --surface:  rgba(255,255,255,.04);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      cursor: none;
+    }
+
+    a, button, [role="button"] { cursor: none; }
+
+    .cursor-dot,
+    .cursor-ring {
+      position: fixed;
+      top: 0; left: 0;
+      pointer-events: none;
+      z-index: 99999;
+      will-change: transform;
+      border-radius: 50%;
+    }
+
+    .cursor-dot {
+      width: 6px; height: 6px;
+      background: #818cf8;
+      margin: -3px 0 0 -3px;
+      box-shadow: 0 0 10px rgba(129,140,248,.8);
+      transition: opacity .2s;
+    }
+
+    .cursor-ring {
+      width: 36px; height: 36px;
+      border: 1.5px solid rgba(129,140,248,.45);
+      margin: -18px 0 0 -18px;
+      transition: width .25s cubic-bezier(.22,1,.36,1),
+                  height .25s cubic-bezier(.22,1,.36,1),
+                  margin .25s cubic-bezier(.22,1,.36,1),
+                  border-color .25s, background .25s, opacity .2s;
+    }
+
+    .cursor-ring.is-hovering {
+      width: 52px; height: 52px;
+      margin: -26px 0 0 -26px;
+      border-color: rgba(129,140,248,.7);
+      background: rgba(129,140,248,.06);
+    }
+
+    .cursor-dot.is-hovering  { opacity: 0; }
+    .cursor-dot.is-hidden,
+    .cursor-ring.is-hidden   { opacity: 0; }
+
+    .cursor-ring.is-clicking {
+      width: 28px; height: 28px;
+      margin: -14px 0 0 -14px;
+      border-color: rgba(129,140,248,.9);
+      background: rgba(129,140,248,.12);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cursor-dot, .cursor-ring { display: none; }
+      body { cursor: auto; }
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glow {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(129,140,248,.08) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      pointer-events: none;
+    }
+
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 520px;
+      width: 100%;
+      z-index: 1;
+    }
+
+    .logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 28px;
+      filter: drop-shadow(0 0 28px rgba(129,140,248,.35));
+    }
+
+    h1 {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1.2px;
+      line-height: 1;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #e6e6f0 30%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 20px;
+      opacity: .8;
+    }
+
+    .desc {
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--muted);
+      max-width: 400px;
+      margin-bottom: 36px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 26px;
+      background: var(--text);
+      color: var(--bg);
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: opacity .15s, transform .15s;
+      letter-spacing: -.1px;
+    }
+
+    .btn-primary:hover {
+      opacity: .88;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary svg {
+      flex-shrink: 0;
+    }
+
+    .icon-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      background: transparent;
+      text-decoration: none;
+      transition: color .15s, border-color .15s, background .15s, transform .15s;
+    }
+
+    .btn-icon:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,.15);
+      background: var(--surface);
+      transform: translateY(-1px);
+    }
+
+    .badge-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 40px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .05em;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      font-size: 12.5px;
+      color: var(--muted);
+      opacity: .5;
+      transition: opacity .2s;
+    }
+
+    footer:hover { opacity: 1; }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 32px; }
+      .logo { width: 64px; height: 64px; }
+      .desc { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="cursor-dot"  id="cursorDot"  aria-hidden="true"></div>
+<div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+<div class="glow"></div>
+
+<div class="card">
+  <img src="logo.svg" alt="Anivexa" class="logo"/>
+
+  <h1>Anivexa</h1>
+  <p class="tagline">Streaming Aggregator API</p>
+
+  <p class="desc">
+    A unified API for anime stream sources. Resolve episodes and watch links across 14 providers using a single AniList ID — exact-match identity, no guessing.
+  </p>
+
+  <div class="actions">
+    <a href="/docs" class="btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      Get Started
+    </a>
+
+    <div class="icon-group">
+      <a href="https://github.com/walterwhite-69/Anivexa-API/" target="_blank" rel="noopener noreferrer" class="btn-icon" aria-label="GitHub">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+      </a>
+
+      <a href="https://discord.com/invite/MARQ9z9QSX" target="_blank" rel="noopener noreferrer" class="btn-icon" aria-label="Discord">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2498-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8745-.6177-1.2498a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <div class="badge-row">
+    <span class="badge">14 Providers</span>
+    <span class="badge">AniList ID</span>
+    <span class="badge">No Auth</span>
+    <span class="badge">CORS Enabled</span>
+  </div>
+</div>
+
+<footer>© 2026 Anivexa. All rights reserved.</footer>
+
+<script>
+  (function () {
+    const dot  = document.getElementById('cursorDot');
+    const ring = document.getElementById('cursorRing');
+    if (!dot || !ring) return;
+
+    let mx = -200, my = -200, rx = -200, ry = -200, visible = false;
+    const LERP = 0.22;
+    const INTERACTIVES = 'a, button, [role="button"]';
+
+    (function tick() {
+      rx += (mx - rx) * LERP;
+      ry += (my - ry) * LERP;
+      dot.style.transform  = `translate(${mx}px,${my}px)`;
+      ring.style.transform = `translate(${Math.round(rx * 10) / 10}px,${Math.round(ry * 10) / 10}px)`;
+      requestAnimationFrame(tick);
+    })();
+
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      if (!visible) { visible = true; rx = mx; ry = my; dot.classList.remove('is-hidden'); ring.classList.remove('is-hidden'); }
+    }, { passive: true });
+
+    document.addEventListener('mouseleave', () => { dot.classList.add('is-hidden');    ring.classList.add('is-hidden');    visible = false; }, { passive: true });
+    document.addEventListener('mouseenter', () => { dot.classList.remove('is-hidden'); ring.classList.remove('is-hidden'); visible = true;  }, { passive: true });
+    document.addEventListener('mousedown',  () => { ring.classList.add('is-clicking');    ring.classList.remove('is-hovering'); }, { passive: true });
+    document.addEventListener('mouseup',    () => { ring.classList.remove('is-clicking'); }, { passive: true });
+    document.addEventListener('mouseover',  e => { if (e.target.closest(INTERACTIVES)) { dot.classList.add('is-hovering');    ring.classList.add('is-hovering');    } }, { passive: true });
+    document.addEventListener('mouseout',   e => { if (e.target.closest(INTERACTIVES)) { dot.classList.remove('is-hovering'); ring.classList.remove('is-hovering'); } }, { passive: true });
+
+    window.addEventListener('touchstart', () => { dot.style.display = 'none'; ring.style.display = 'none'; document.body.style.cursor = ''; }, { once: true, passive: true });
+  })();
+</script>
+</body>
+</html>
