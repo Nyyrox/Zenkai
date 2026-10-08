@@ -1,5 +1,24 @@
 package com.nyyrox.aniverse.data.manga
- 
+
+enum class MangaSource(
+    val id: String,
+    val displayName: String,
+    val baseUrl: String,
+    val badge: String? = null
+) {
+    MANGADEX("mangadex", "MangaDex", "https://mangadex.org", "Multilingual"),
+    COMICK("comick", "ComicK", "https://comick.art", "Manhwa & Manga"),
+    ASURA("asura", "Asura Scans", "https://asuracomic.net", "Action / Regression"),
+    WEEBCENTRAL("weebcentral", "WeebCentral", "https://weebcentral.com", "Classic");
+
+    companion object {
+        fun fromId(id: String?): MangaSource {
+            if (id.isNullOrBlank()) return MANGADEX
+            return entries.find { it.id.equals(id, ignoreCase = true) } ?: MANGADEX
+        }
+    }
+}
+
 data class MangaCard(
     val id: String,
     val title: String,

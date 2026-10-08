@@ -421,11 +421,18 @@ object StreamProxyServer {
             val isKey = low.endsWith(".bin") || low.endsWith(".key") || low.contains("key.bin") || low.contains("k=1")
             val isSubtitle = low.endsWith(".vtt") || low.endsWith(".srt") || low.contains("/subtitles/") || low.contains("type=vtt")
             val isMp4 = low.contains(".mp4") || low.contains(".m4s") || low.contains(".m4v")
+            val isImage = (upstreamType.startsWith("image/") ||
+                    low.contains("/covers/") || low.contains("/chapters/") ||
+                    low.contains("comick") || low.contains("asurascans") ||
+                    low.contains("mangadex") || low.contains("weebcentral") ||
+                    low.endsWith(".png") || low.endsWith(".webp") || low.endsWith(".avif")) &&
+                    !low.contains(".ts") && !low.contains(".m3u8")
 
             val finalContentType = when {
                 isKey -> "application/octet-stream"
                 isSubtitle -> "text/vtt"
                 isMp4 -> "video/mp4"
+                isImage -> if (upstreamType.startsWith("image/")) upstreamType else if (low.endsWith(".png")) "image/png" else if (low.endsWith(".webp")) "image/webp" else "image/jpeg"
                 upstreamType.contains("mp4") -> "video/mp4"
                 upstreamType.contains("webm") -> "video/webm"
                 // Crucial fix: Upstream CDNs (MegaPlay, Vidstream, TikTokCDN, etc.) disguise video TS chunks with

@@ -206,6 +206,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun closeNovelDetail() { activeDetailNovelSlug = null }
 
     // Manga Data
+    var activeMangaSource by mutableStateOf(com.nyyrox.aniverse.data.manga.MangaSource.MANGADEX); private set
     var mangaHome by mutableStateOf(MangaHome()); private set
     var mangaHomeLoading by mutableStateOf(false); private set
     var mangaHomeError by mutableStateOf<String?>(null); private set
@@ -369,6 +370,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (activeNovelSource != savedSource) {
                     activeNovelSource = savedSource
                     novelRepo.setSource(savedSource)
+                }
+            } catch (_: Exception) {}
+        }
+        viewModelScope.launch {
+            try {
+                val savedMangaSourceId = com.nyyrox.aniverse.util.UserPreferences.getActiveMangaSource(application.applicationContext).first()
+                val savedMangaSource = com.nyyrox.aniverse.data.manga.MangaSource.fromId(savedMangaSourceId)
+                if (activeMangaSource != savedMangaSource) {
+                    activeMangaSource = savedMangaSource
+                    com.nyyrox.aniverse.data.manga.MangaRepository.setSource(savedMangaSource)
                 }
             } catch (_: Exception) {}
         }
@@ -1260,6 +1271,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Manga actions
+    fun setMangaSource(source: com.nyyrox.aniverse.data.manga.MangaSource) {
+        if (activeMangaSource == source) return
+        activeMangaSource = source
+        com.nyyrox.aniverse.data.manga.MangaRepository.setSource(source)
+        viewModelScope.launch {
+            com.nyyrox.aniverse.util.UserPreferences.saveActiveMangaSource(getApplication(), source.id)
+        }
+        mangaHome = com.nyyrox.aniverse.data.manga.MangaHome()
+        loadMangaHome(forceRefresh = true)
+    }
+
     fun loadMangaHome(forceRefresh: Boolean = false) = viewModelScope.launch {
         if (!forceRefresh && (mangaHome.trending.isNotEmpty() || mangaHome.latest.isNotEmpty())) return@launch
         mangaHomeLoading = true

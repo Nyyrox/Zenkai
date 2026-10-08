@@ -132,10 +132,16 @@ fun MangaReaderScreen(
     onSelectChapter: (newChapterId: String) -> Unit
 ) {
     val context = LocalContext.current
-    val mangaNetworkHeaders = remember {
-        NetworkHeaders.Builder()
+    fun getMangaHeadersForUrl(url: String): NetworkHeaders {
+        val referer = when {
+            url.contains("comick") -> "https://comick.art/"
+            url.contains("asura") -> "https://asuracomic.net/"
+            url.contains("mangadex") -> "https://mangadex.org/"
+            else -> "https://weebcentral.com/"
+        }
+        return NetworkHeaders.Builder()
             .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            .set("Referer", "https://weebcentral.com/")
+            .set("Referer", referer)
             .build()
     }
 
@@ -747,7 +753,7 @@ fun MangaReaderScreen(
                                         val builder = ImageRequest.Builder(context)
                                         if (url.startsWith("http://") || url.startsWith("https://")) {
                                             builder.data(url)
-                                            builder.httpHeaders(mangaNetworkHeaders)
+                                            builder.httpHeaders(getMangaHeadersForUrl(url))
                                         } else {
                                             val cleanPath = url.removePrefix("file://")
                                             builder.data(java.io.File(cleanPath))
@@ -841,7 +847,7 @@ fun MangaReaderScreen(
                                     val builder = ImageRequest.Builder(context)
                                     if (url.startsWith("http://") || url.startsWith("https://")) {
                                         builder.data(url)
-                                        builder.httpHeaders(mangaNetworkHeaders)
+                                        builder.httpHeaders(getMangaHeadersForUrl(url))
                                     } else {
                                         val cleanPath = url.removePrefix("file://")
                                         builder.data(java.io.File(cleanPath))

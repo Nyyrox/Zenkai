@@ -170,4 +170,16 @@ object UserPreferences {
 
     fun getActiveNovelSource(context: Context): Flow<String> =
         context.userPrefsDataStore.data.map { prefs -> prefs[ACTIVE_NOVEL_SOURCE] ?: "novelfull" }
+
+    // --- Active Manga Source ---
+    private val ACTIVE_MANGA_SOURCE = stringPreferencesKey("active_manga_source")
+
+    suspend fun saveActiveMangaSource(context: Context, sourceId: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[ACTIVE_MANGA_SOURCE] = sourceId
+        }
+    }
+
+    fun getActiveMangaSource(context: Context): Flow<String> =
+        context.userPrefsDataStore.data.map { prefs -> prefs[ACTIVE_MANGA_SOURCE] ?: "mangadex" }
 }

@@ -112,12 +112,16 @@ fun MangaHomeScreen(
                 .statusBarsPadding()
                 .padding(top = 58.dp)
         ) {
-            // Header: Clean Search Bar right below navbar
+            // Header: Clean Search Bar right below navbar with source selector chips
             MangaHeaderSearch(
                 query = searchQuery,
                 onQueryChange = {
                     searchQuery = it
                     vm.searchManga(it)
+                },
+                activeSource = vm.activeMangaSource,
+                onSourceSelect = { src ->
+                    vm.setMangaSource(src)
                 },
                 onDownloadsClick = onDownloadsClick
             )
@@ -146,76 +150,127 @@ fun MangaHomeScreen(
 private fun MangaHeaderSearch(
     query: String,
     onQueryChange: (String) -> Unit,
+    activeSource: com.nyyrox.aniverse.data.manga.MangaSource,
+    onSourceSelect: (com.nyyrox.aniverse.data.manga.MangaSource) -> Unit,
     onDownloadsClick: (() -> Unit)? = null
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .staggeredEntrance(index = 0)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            placeholder = {
-                Text(
-                    text = "Search manga, manhwa, manhua...",
-                    color = Color.Gray,
-                    fontSize = 13.sp
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = null,
-                    tint = OttPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = "Clear",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = {
+                    Text(
+                        text = "Search ${activeSource.displayName}...",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = OttPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = OttSurfaceElevated,
+                    unfocusedContainerColor = OttSurface,
+                    focusedBorderColor = OttPrimary,
+                    unfocusedBorderColor = Color(0x1EFFFFFF),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
+                singleLine = true
+            )
+
+            if (onDownloadsClick != null) {
+                IconButton(
+                    onClick = onDownloadsClick,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x22FFFFFF))
+                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                ) {
+                    Icon(
+                        Icons.Default.DownloadDone,
+                        contentDescription = "Downloads",
+                        tint = OttAccentGold,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Manga Sources Chip Row (MangaDex, ComicK, Asura Scans, WeebCentral)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp)
+        ) {
+            items(com.nyyrox.aniverse.data.manga.MangaSource.entries.toTypedArray()) { src ->
+                val isSelected = src == activeSource
+                Box(
+                    modifier = Modifier
+                        .clip(OttPillShape)
+                        .background(if (isSelected) OttPrimary else Color(0x16FFFFFF))
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) OttPrimary else Color(0x28FFFFFF),
+                            shape = OttPillShape
                         )
+                        .clickable { onSourceSelect(src) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            text = src.displayName,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                            color = if (isSelected) Color.Black else Color.White
+                        )
+                        if (src.badge != null) {
+                            Text(
+                                text = "• ${src.badge}",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = if (isSelected) Color(0xCC000000) else Color(0xAAFFFFFF)
+                            )
+                        }
                     }
                 }
-            },
-            modifier = Modifier
-                .weight(1f)
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = OttSurfaceElevated,
-                unfocusedContainerColor = OttSurface,
-                focusedBorderColor = OttPrimary,
-                unfocusedBorderColor = Color(0x1EFFFFFF),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
-            singleLine = true
-        )
-
-        if (onDownloadsClick != null) {
-            IconButton(
-                onClick = onDownloadsClick,
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x22FFFFFF))
-                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
-            ) {
-                Icon(
-                    Icons.Default.DownloadDone,
-                    contentDescription = "Downloads",
-                    tint = OttAccentGold,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
     }
