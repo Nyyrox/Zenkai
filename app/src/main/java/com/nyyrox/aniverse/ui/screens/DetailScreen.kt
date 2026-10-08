@@ -5,9 +5,17 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.geometry.Offset
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -178,149 +186,155 @@ fun DetailScreen(
         handleBack()
     }
 
+    val cachedPoster = remember(animeId) {
+        if (coordinator?.activeAnimeId == animeId) coordinator.activePosterUrl
+        else vm.findKnownAnime(animeId)?.cover
+    }
+
+    var tmdbEpisodes by remember(animeId) { mutableStateOf<Map<Int, TmdbEpisodeStill>>(emptyMap()) }
+    var tmdbDetails by remember(animeId) { mutableStateOf<TmdbDetails?>(null) }
+    var isTmdbSettled by remember(animeId) { mutableStateOf(false) }
+
     LaunchedEffect(animeId) {
         if (vm.selected?.id != animeId) {
             vm.openDetail(animeId)
         }
     }
 
-    val anime = vm.selected?.takeIf { it.id == animeId }
+    // Connect TMDB data with timeout (3.5s). If TMDB takes too long or fails, fall back immediately to AniList details
+    LaunchedEffect(animeId) {
+        isTmdbSettled = false
+        try {
+            com.nyyrox.aniverse.data.mapping.AniBridgeResolver.syncLatestMappings(context)
+        } catch (_: Exception) {}
 
-    if (vm.detailLoading || anime == null) {
-        if (vm.detailError != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                IconButton(
-                    onClick = handleBack,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(top = 8.dp)
-                        .size(44.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+        val known = vm.findKnownAnime(animeId)
+        val initialTitle = known?.title ?: vm.selected?.takeIf { it.id == animeId }?.title
+
+        try {
+            withTimeoutOrNull(3500L) {
+                var titleToQuery = initialTitle
+                var currentAnime = known ?: vm.selected?.takeIf { it.id == animeId }
+                if (titleToQuery.isNullOrBlank()) {
+                    while (titleToQuery.isNullOrBlank() && (vm.detailLoading || vm.selected?.id != animeId)) {
+                        delay(50L)
+                        currentAnime = vm.selected?.takeIf { it.id == animeId }
+                        titleToQuery = currentAnime?.title
+                    }
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Unable to load details",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = vm.detailError ?: "Error occurred",
-                        fontSize = 13.sp,
-                        color = OttTextSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = { vm.openDetail(animeId) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                        shape = OttPillShape
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
+                if (!titleToQuery.isNullOrBlank()) {
+                    val year = currentAnime?.seasonYear
+                    val format = currentAnime?.displayFormat
+                    val romaji = currentAnime?.romajiTitle
+                    val totalEps = currentAnime?.episodes ?: currentAnime?.nextEpisode
+
+                    coroutineScope {
+                        val detailsJob = async(Dispatchers.IO) {
+                            try {
+                                TmdbRepository.getDetails(animeId, titleToQuery, year, format)
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                        val epsJob = async(Dispatchers.IO) {
+                            try {
+                                val season = com.nyyrox.aniverse.data.mapping.AnimeSeasonMapper.resolveSeason(titleToQuery, romaji)
+                                TmdbRepository.fetchEpisodesMapped(
+                                    anilistId = animeId,
+                                    title = titleToQuery,
+                                    romajiTitle = romaji,
+                                    season = season,
+                                    totalEpisodes = totalEps,
+                                    format = format
+                                )
+                            } catch (_: Exception) {
+                                emptyMap()
+                            }
+                        }
+
+                        val fetchedDetails = detailsJob.await()
+                        val fetchedEps = epsJob.await()
+
+                        if (fetchedDetails != null) {
+                            tmdbDetails = fetchedDetails
+                        }
+                        if (fetchedEps.isNotEmpty()) {
+                            tmdbEpisodes = fetchedEps
+                        }
                     }
                 }
             }
-            return
+        } catch (_: Exception) {
+            // TMDB timed out or encountered an issue: seamlessly proceed with AniList details only
+        } finally {
+            isTmdbSettled = true
         }
+    }
 
-        val cachedPoster = if (coordinator?.activeAnimeId == animeId) coordinator.activePosterUrl else null
+    val anime = vm.selected?.takeIf { it.id == animeId }
 
+    if (vm.detailError != null && anime == null) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(OttBg)
-                .then(
-                    if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
-                        Modifier.graphicsLayer { alpha = coordinator.progress.value }
-                    } else Modifier
-                )
+                .statusBarsPadding()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
         ) {
-            if (!cachedPoster.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(390.dp)
-                        .onGloballyPositioned { coords ->
-                            coordinator?.updateTargetBounds(coords.boundsInWindow())
-                        }
-                ) {
-                    AsyncImage(
-                        model = cachedPoster,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                alpha = if (coordinator?.phase == SharedTransitionPhase.FORWARD) 0f else 1f
-                            },
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(OttHeroGradient)
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(42.dp)
-                        )
-                        Text(
-                            text = "Loading anime details...",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = OttTextMuted
-                        )
-                    }
-                }
+            IconButton(
+                onClick = handleBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 8.dp)
+                    .size(44.dp)
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
-            // Bare Back button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = handleBack,
-                    modifier = Modifier.size(44.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Unable to load details",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OttTextPrimary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = vm.detailError ?: "Error occurred",
+                    fontSize = 13.sp,
+                    color = OttTextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { vm.openDetail(animeId) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                    shape = OttPillShape
                 ) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
         }
+        return
+    }
+
+    val isAniListReady = anime != null && !vm.detailLoading
+    val isReady = isAniListReady && isTmdbSettled
+
+    if (!isReady || anime == null) {
+        DetailWaveOscillatingSkeleton(
+            cachedPoster = cachedPoster,
+            onBack = handleBack,
+            coordinator = coordinator
+        )
         return
     }
 
@@ -379,46 +393,36 @@ fun DetailScreen(
     var showDownloadSheetEpisode by remember { mutableStateOf<Pair<Int, String?>?>(null) }
     var showDownloadRangeSheet by remember { mutableStateOf<IntRange?>(null) }
 
-    var tmdbEpisodes by remember(anime.id) { mutableStateOf<Map<Int, TmdbEpisodeStill>>(emptyMap()) }
-    LaunchedEffect(anime.id, anime.title) {
-        try {
-            val season = com.nyyrox.aniverse.data.mapping.AnimeSeasonMapper.resolveSeason(anime.title, anime.romajiTitle)
-            val eps = TmdbRepository.fetchEpisodesMapped(
-                anilistId = anime.id,
-                title = anime.title,
-                romajiTitle = anime.romajiTitle,
-                season = season,
-                totalEpisodes = anime.episodes ?: anime.nextEpisode,
-                format = anime.displayFormat
-            )
-            if (eps.isNotEmpty()) {
-                tmdbEpisodes = eps
-            }
-        } catch (_: Exception) {}
-    }
-
-    var tmdbDetails by remember(anime.id) { mutableStateOf<TmdbDetails?>(null) }
-    LaunchedEffect(anime.id) {
-        try {
-            com.nyyrox.aniverse.data.mapping.AniBridgeResolver.syncLatestMappings(context)
-        } catch (_: Exception) {}
-        val tmdb = try {
-            TmdbRepository.getDetails(anime.id, anime.title, anime.seasonYear, anime.displayFormat)
-        } catch (_: Exception) {
-            null
-        }
-        tmdbDetails = tmdb
-    }
-
     var isSynopsisExpanded by remember { mutableStateOf(false) }
     var showWatchlistStatusDialog by remember { mutableStateOf(false) }
 
-    // Hero image: stable fallback between TMDB backdrop, banner, and cover
-    val heroImageUrl = remember(anime.id, tmdbDetails?.backdropUrl, anime.banner, anime.cover) {
-        tmdbDetails?.backdropUrl?.takeIf { it.isNotBlank() }
-            ?: anime.banner?.takeIf { it.isNotBlank() }
-            ?: tmdbDetails?.backdrops?.firstOrNull { it.isNotBlank() }
-            ?: anime.cover
+    // Hero backdrops collection: all TMDB backdrops + banner + cover
+    val heroImages = remember(anime.id, tmdbDetails?.backdropUrl, tmdbDetails?.backdrops, anime.banner, anime.cover) {
+        val list = mutableListOf<String>()
+        tmdbDetails?.backdropUrl?.takeIf { it.isNotBlank() }?.let { list.add(it) }
+        tmdbDetails?.backdrops?.filter { it.isNotBlank() && !list.contains(it) }?.let { list.addAll(it) }
+        anime.banner?.takeIf { it.isNotBlank() && !list.contains(it) }?.let { list.add(it) }
+        if (list.isEmpty()) {
+            anime.cover?.takeIf { it.isNotBlank() }?.let { list.add(it) }
+        }
+        list.distinct()
+    }
+
+    var currentHeroIndex by remember(anime.id) { mutableIntStateOf(0) }
+
+    // Auto loop change thumbnail every 5 seconds, fading to next. If only 1 available, does not loop.
+    LaunchedEffect(anime.id, heroImages) {
+        if (heroImages.size > 1) {
+            while (isActive) {
+                delay(5000L)
+                currentHeroIndex = (currentHeroIndex + 1) % heroImages.size
+            }
+        }
+    }
+
+    val heroImageUrl = remember(heroImages, currentHeroIndex) {
+        if (heroImages.isEmpty()) null
+        else heroImages[currentHeroIndex % heroImages.size]
     }
 
     // Continuous subtle time-based Ken Burns zoom animation
@@ -473,15 +477,20 @@ fun DetailScreen(
         activeAnimeTasks.values.firstOrNull { it.animeId == anime.id && it.status == com.nyyrox.aniverse.data.download.DownloadStatus.FAILED }
     }
 
+    val revealAlpha by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "detailRevealAlpha"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(OttBg)
-            .then(
-                if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
-                    Modifier.graphicsLayer { alpha = coordinator.progress.value }
-                } else Modifier
-            )
+            .graphicsLayer {
+                alpha = revealAlpha * (if (coordinator?.phase == SharedTransitionPhase.BACKWARD) coordinator.progress.value else 1f)
+                translationY = (1f - revealAlpha) * 16f
+            }
     ) {
         // === 1. HERO IMAGE AT BG IN ITS PLACE (PARALLAX + TIME-BASED KEN BURNS) ===
         Box(
@@ -497,17 +506,24 @@ fun DetailScreen(
                     coordinator?.updateTargetBounds(coords.boundsInWindow())
                 }
         ) {
-            AsyncImage(
-                model = heroImageUrl,
-                contentDescription = anime.title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = heroTimeScale
-                        scaleY = heroTimeScale
-                    },
-                contentScale = ContentScale.Crop
-            )
+            Crossfade(
+                targetState = heroImageUrl,
+                animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                label = "heroThumbnailCrossfade",
+                modifier = Modifier.fillMaxSize()
+            ) { imgUrl ->
+                AsyncImage(
+                    model = imgUrl,
+                    contentDescription = anime.title,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = heroTimeScale
+                            scaleY = heroTimeScale
+                        },
+                    contentScale = ContentScale.Crop
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -2514,3 +2530,267 @@ private fun RecommendationPosterItem(
         )
     }
 }
+
+/**
+ * Oscillating wave skeleton placeholder for the Detail screen media card.
+ * Slowly oscillates like a wave with gentle scale/breathing animations while AniList & TMDB data load.
+ */
+@Composable
+private fun DetailWaveOscillatingSkeleton(
+    cachedPoster: String?,
+    onBack: () -> Unit,
+    coordinator: com.nyyrox.aniverse.ui.animation.SharedTransitionCoordinator?
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "detailWaveTransition")
+
+    // Slow wave phase translation across the media card
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wavePhase"
+    )
+
+    // Gentle wave breathing / alpha oscillation
+    val waveBreathe by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.82f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "waveBreathe"
+    )
+
+    // Subtle fluid wave scale oscillation
+    val waveScale by infiniteTransition.animateFloat(
+        initialValue = 0.990f,
+        targetValue = 1.010f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "waveScale"
+    )
+
+    val waveBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF131722).copy(alpha = 0.65f),
+            Color(0xFF1E2638).copy(alpha = 0.85f),
+            Color(0xFF323F58).copy(alpha = 0.95f),
+            Color(0xFF1E2638).copy(alpha = 0.85f),
+            Color(0xFF131722).copy(alpha = 0.65f),
+        ),
+        start = Offset((wavePhase * 1600f) - 600f, (wavePhase * 600f) - 200f),
+        end = Offset((wavePhase * 1600f) + 400f, (wavePhase * 600f) + 400f)
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(OttBg)
+            .then(
+                if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
+                    Modifier.graphicsLayer { alpha = coordinator.progress.value }
+                } else Modifier
+            )
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = false,
+            contentPadding = PaddingValues(bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. Hero Media Card oscillating like a wave
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(410.dp)
+                        .graphicsLayer {
+                            scaleX = waveScale
+                            scaleY = waveScale
+                        }
+                        .onGloballyPositioned { coords ->
+                            coordinator?.updateTargetBounds(coords.boundsInWindow())
+                        }
+                ) {
+                    if (!cachedPoster.isNullOrBlank()) {
+                        AsyncImage(
+                            model = cachedPoster,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    alpha = if (coordinator?.phase == SharedTransitionPhase.FORWARD) 0f else 1f
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(OttHeroGradient)
+                        )
+                        // Translucent oscillating wave overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = waveBreathe * 0.45f }
+                                .background(waveBrush)
+                        )
+                    } else {
+                        // Media card silhouette with wave brush
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(waveBrush)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(OttHeroGradient)
+                        )
+                    }
+
+                    // Bottom overlays of Hero Card: Title skeleton, subtitle, and Play button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomStart)
+                            .padding(horizontal = 18.dp, vertical = 14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.72f)
+                                        .height(26.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(waveBrush)
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.45f)
+                                        .height(14.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(waveBrush)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(waveBrush)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 2. Metadata Chips Row
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.size(56.dp, 24.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(68.dp, 24.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(60.dp, 24.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(52.dp, 24.dp).clip(OttPillShape).background(waveBrush))
+                }
+            }
+
+            // 3. Action Buttons Row
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f).height(46.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(waveBrush))
+                    Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(waveBrush))
+                    Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(waveBrush))
+                }
+            }
+
+            // 4. Synopsis Skeleton Lines
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                    Box(modifier = Modifier.fillMaxWidth(0.88f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                    Box(modifier = Modifier.fillMaxWidth(0.60f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                }
+            }
+
+            // 5. Episode Tabs & Preview Cards
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(modifier = Modifier.size(80.dp, 28.dp).clip(OttPillShape).background(waveBrush))
+                        Box(modifier = Modifier.size(80.dp, 28.dp).clip(OttPillShape).background(waveBrush))
+                        Box(modifier = Modifier.size(80.dp, 28.dp).clip(OttPillShape).background(waveBrush))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.size(120.dp, 68.dp).clip(OttCardShape).background(waveBrush))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                            Box(modifier = Modifier.fillMaxWidth(0.9f).height(12.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Top Back Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+

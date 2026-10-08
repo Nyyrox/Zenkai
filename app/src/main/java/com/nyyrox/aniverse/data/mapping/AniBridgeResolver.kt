@@ -317,6 +317,7 @@ object AniBridgeResolver {
 
     /**
      * Resolves AniList series metadata to cross-database IDs (TMDB, TVDB, MAL, IMDb).
+     * Retries mapping bridge once before concluding no data or reporting an issue.
      */
     suspend fun resolve(anilistId: Int): AniBridgeResult? = withContext(Dispatchers.IO) {
         if (anilistId <= 0) return@withContext null
@@ -324,7 +325,22 @@ object AniBridgeResolver {
 
         ensureLoaded()
 
-        val entry = anilistIndex[anilistId]
+        var entry = anilistIndex[anilistId]
+
+        // Retry mapping bridge once before declaring no data
+        if (entry == null) {
+            Log.w(TAG, "[ANIBRIDGE] AniList ID $anilistId not found in initial index. Retrying mapping bridge once...")
+            val ctx = appContext
+            if (ctx != null) {
+                try {
+                    reloadSync(ctx)
+                    entry = anilistIndex[anilistId]
+                } catch (e: Exception) {
+                    Log.w(TAG, "[ANIBRIDGE] Mapping retry failed: ${e.message}")
+                }
+            }
+        }
+
         if (entry != null) {
             val isMovie = entry.tmdbMovieId != null
             val tmdbId = entry.tmdbMovieId ?: entry.tmdbShowTargets.firstOrNull()?.id
@@ -363,7 +379,19 @@ object AniBridgeResolver {
 
         ensureLoaded()
 
-        val entry = anilistIndex[anilistId]
+        var entry = anilistIndex[anilistId]
+
+        // Retry mapping bridge once before falling back
+        if (entry == null) {
+            val ctx = appContext
+            if (ctx != null) {
+                try {
+                    reloadSync(ctx)
+                    entry = anilistIndex[anilistId]
+                } catch (_: Exception) {}
+            }
+        }
+
         if (entry != null) {
             // 1. Movie handling
             if (entry.tmdbMovieId != null) {
@@ -445,11 +473,41 @@ object AniBridgeResolver {
         }
     }
 
-    private fun logEpisode(res: ResolvedEpisodeMapping) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, """
-                [EPISODE MAP] AniList ID: ${res.anilistId}, Ep: ${res.anilistEpisode} -> TMDB ID: ${res.tmdbId}, Season: ${res.tmdbSeason}, Episode: ${res.tmdbEpisode} (Source: ${res.mappingSource})
-            """.trimIndent())
+    private fun reloadSync(context: Context) {
+        val cacheDir = File(context.filesDir, "anibridge")
+        val cacheFile = File(cacheDir, CACHE_FILE_NAME)
+
+        // 1. Check disk cache
+        if (cacheFile.exists() && cacheFile.length() > 500_000) {
+            try {
+                cacheFile.inputStream().use { stream ->
+                    val parsed = parseStream(stream)
+                    if (parsed.isNotEmpty()) {
+                        anilistIndex.putAll(parsed)
+                        currentSource = "anibridge_cache"
+                        isLoaded = true
+                        Log.d(TAG, "[ANIBRIDGE] Mapping retry reloaded ${parsed.size} entries from cache")
+                        return
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "[ANIBRIDGE] Disk cache retry failed: ${e.message}")
+            }
+        }
+
+        // 2. Bundled asset
+        try {
+            context.assets.open(ASSET_PATH).use { stream ->
+                val parsed = parseStream(stream)
+                if (parsed.isNotEmpty()) {
+                    anilistIndex.putAll(parsed)
+                    currentSource = "anibridge_bundled"
+                    isLoaded = true
+                    Log.d(TAG, "[ANIBRIDGE] Mapping retry reloaded ${parsed.size} entries from bundled asset")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[ANIBRIDGE] Bundled asset retry failed: ${e.message}")
         }
     }
 }

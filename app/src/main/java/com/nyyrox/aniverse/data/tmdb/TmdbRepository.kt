@@ -117,9 +117,12 @@ object TmdbRepository {
         val cacheKey = "$anilistId::${title.lowercase(Locale.US)}::$year"
         if (idCache.containsKey(cacheKey)) return@withContext idCache[cacheKey]
 
-        // 1. Try AniBridge first for deterministic ID matching
+        // 1. Try AniBridge first for deterministic ID matching (with single retry)
         if (anilistId > 0) {
-            val aniBridge = AniBridgeResolver.resolve(anilistId)
+            var aniBridge = AniBridgeResolver.resolve(anilistId)
+            if (aniBridge == null || aniBridge.tmdbId == null || aniBridge.tmdbId <= 0) {
+                aniBridge = AniBridgeResolver.resolve(anilistId)
+            }
             if (aniBridge?.tmdbId != null && aniBridge.tmdbId > 0) {
                 val type = aniBridge.tmdbType ?: if (format.equals("MOVIE", ignoreCase = true)) "movie" else "tv"
                 val res = TmdbSearchResult(aniBridge.tmdbId, type)
@@ -625,8 +628,11 @@ object TmdbRepository {
         }
 
         try {
-            // 1. First check AniBridge mapping for authoritative TMDB ID and Season Targets
-            val aniBridge = if (anilistId > 0) AniBridgeResolver.resolve(anilistId) else null
+            // 1. First check AniBridge mapping for authoritative TMDB ID and Season Targets (with retry)
+            var aniBridge = if (anilistId > 0) AniBridgeResolver.resolve(anilistId) else null
+            if (anilistId > 0 && (aniBridge == null || aniBridge.tmdbId == null || aniBridge.tmdbId <= 0)) {
+                aniBridge = AniBridgeResolver.resolve(anilistId)
+            }
 
             val resolved = if (aniBridge?.tmdbId != null && aniBridge.tmdbId > 0) {
                 val type = aniBridge.tmdbType ?: if (format.equals("MOVIE", ignoreCase = true)) "movie" else "tv"
