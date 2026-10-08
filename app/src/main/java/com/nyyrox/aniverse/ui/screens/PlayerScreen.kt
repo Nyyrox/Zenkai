@@ -841,92 +841,6 @@ fun PlayerScreen(
                             },
                             modifier = Modifier.fillMaxSize()
                         )
-
-                        // Floating button to extract and switch to Zenkai native player
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(14.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    if (!sniffedStreamUrl.isNullOrBlank()) {
-                                        playInZenkaiPlayer = true
-                                    } else {
-                                        coroutineScope.launch {
-                                            isSniffingStream = true
-                                            try {
-                                                val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
-                                                    context = context,
-                                                    embedUrl = activeStreamUrl,
-                                                    timeoutMs = 12000L
-                                                )
-                                                if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
-                                                    sniffedStreamUrl = sniffed.streamUrl
-                                                    sniffedStreamHeaders = sniffed.headers
-                                                    sniffedStreamSubs = sniffed.subtitles
-                                                    playInZenkaiPlayer = true
-                                                } else {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "Direct stream could not be extracted",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }
-                                            } catch (_: Exception) {
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "Extraction failed",
-                                                    android.widget.Toast.LENGTH_SHORT
-                                                ).show()
-                                            } finally {
-                                                isSniffingStream = false
-                                            }
-                                        }
-                                    }
-                                },
-                                enabled = !isSniffingStream,
-                                shape = RoundedCornerShape(20.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Black.copy(alpha = 0.82f),
-                                    contentColor = Color.White
-                                ),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    if (isSniffingStream) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(15.dp),
-                                            strokeWidth = 2.dp,
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            "Extracting...",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            tint = OttPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Text(
-                                            "Play in Zenkai Player",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     }
                 } else {
                     val combinedSubtitles = if (isPlayingOffline) {
@@ -1023,6 +937,131 @@ fun PlayerScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Zenkai Player / Embed Mode Toggle Bar (Option down below the player with proper spacing)
+                val isEmbedModeActive = !isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
+                if (isEmbedModeActive || playInZenkaiPlayer) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 2.dp)
+                        ) {
+                            Surface(
+                                onClick = {
+                                    if (playInZenkaiPlayer) {
+                                        playInZenkaiPlayer = false
+                                    } else {
+                                        if (!sniffedStreamUrl.isNullOrBlank()) {
+                                            playInZenkaiPlayer = true
+                                        } else {
+                                            coroutineScope.launch {
+                                                isSniffingStream = true
+                                                try {
+                                                    val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
+                                                        context = context,
+                                                        embedUrl = activeStreamUrl,
+                                                        timeoutMs = 12000L
+                                                    )
+                                                    if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
+                                                        sniffedStreamUrl = sniffed.streamUrl
+                                                        sniffedStreamHeaders = sniffed.headers
+                                                        sniffedStreamSubs = sniffed.subtitles
+                                                        playInZenkaiPlayer = true
+                                                    } else {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "Direct stream could not be extracted",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                } catch (_: Exception) {
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "Extraction failed",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
+                                                } finally {
+                                                    isSniffingStream = false
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (playInZenkaiPlayer) Color(0xFF161B26) else Color(0xFF121622),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (playInZenkaiPlayer) OttPrimary.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.18f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    if (isSniffingStream) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            color = OttPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Extracting Stream for Zenkai Player...",
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                    } else if (playInZenkaiPlayer) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInBrowser,
+                                            contentDescription = null,
+                                            tint = OttPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Switch back to Embed Mode",
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "(Return to Web Player)",
+                                            fontSize = 11.sp,
+                                            color = OttTextMuted
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = OttPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Play in Zenkai Player",
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "(Native Player & Ad-Free)",
+                                            fontSize = 11.sp,
+                                            color = OttTextMuted
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 0. Active Episode Details & Header (Spacious, modern OTT design)
                 item {
                     val currentEpInfo = tmdbEpisodes[currentEpisode]
@@ -1076,37 +1115,6 @@ fun PlayerScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White.copy(alpha = 0.85f)
                                     )
-                                }
-
-                                if (playInZenkaiPlayer) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(OttPrimary.copy(alpha = 0.22f))
-                                            .border(0.8.dp, OttPrimary.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                                            .clickable {
-                                                playInZenkaiPlayer = false
-                                            }
-                                            .padding(horizontal = 7.dp, vertical = 3.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.OpenInBrowser,
-                                                contentDescription = null,
-                                                tint = OttPrimary,
-                                                modifier = Modifier.size(11.dp)
-                                            )
-                                            Text(
-                                                text = "Extracted (Switch Embed)",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.White
-                                            )
-                                        }
-                                    }
                                 }
                             }
 

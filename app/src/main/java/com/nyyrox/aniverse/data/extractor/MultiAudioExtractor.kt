@@ -306,15 +306,21 @@ object MultiAudioExtractor {
             try {
                 val html = httpGet("$mirror$pathSlug", "$mirror/") ?: continue
 
-                // Check options-0 iframe (primary player)
+                // Check options-0 iframe (primary player: ravok.buzz or as-cdn)
                 extractOptionIframe(html, "options-0", mirror)?.let { url ->
                     val server = resolveIframeToServer(url, "$mirror/", "multi-hd-1", "HD-1")
-                    if (server != null) return@withContext server
+                    if (server != null && server.isDirectStream) return@withContext server
+                }
+
+                // Check options-1 iframe (multi-language player: Abyss / player.php)
+                extractOptionIframe(html, "options-1", mirror)?.let { url ->
+                    val server = resolveIframeToServer(url, "$mirror/", "multi-hd-1", "HD-1")
+                    if (server != null && server.isDirectStream) return@withContext server
                 }
 
                 // Check loadMi buttons
                 val fromLoadMi = parseLoadMiButtons(html, mirror)
-                if (fromLoadMi != null) return@withContext fromLoadMi
+                if (fromLoadMi != null && fromLoadMi.isDirectStream) return@withContext fromLoadMi
             } catch (_: Exception) {}
         }
         null
@@ -356,7 +362,8 @@ object MultiAudioExtractor {
         iframeUrl: String,
         referer: String,
         tempId: String,
-        tempName: String
+        tempName: String,
+        preferredLanguage: String = ""
     ): MultiAudioServer? {
         if (iframeUrl.isBlank() || iframeUrl.equals("about:blank", ignoreCase = true)) return null
 
@@ -366,16 +373,16 @@ object MultiAudioExtractor {
             if (direct != null) return direct
         }
 
-        // 2. Direct as-cdn player URL (e.g. https://as-cdn26.top/video/<hash>)
-        val asCdnMatch = Regex("""https?://(as-cdn\d*\.top)/video/([a-zA-Z0-9_-]+)""", RegexOption.IGNORE_CASE).find(iframeUrl)
+        // 2. Direct as-cdn / ravok / any video CDN player URL (e.g. https://ravok.buzz/video/<hash> or https://as-cdn26.top/video/<hash>)
+        val asCdnMatch = Regex("""https?://([a-zA-Z0-9_.-]+)/video/([a-zA-Z0-9_-]+)""", RegexOption.IGNORE_CASE).find(iframeUrl)
         if (asCdnMatch != null) {
             val direct = resolveAsCdnDirectM3u8(asCdnMatch.groupValues[1], asCdnMatch.groupValues[2])
             if (direct != null) return direct.copy(id = tempId, name = tempName)
         }
 
-        // 3. Multi-lang-plyr clone
-        if (iframeUrl.contains("multi-lang-plyr.php", ignoreCase = true)) {
-            val fromMultiLang = resolveMultiLangPlyr(iframeUrl, tempId, tempName)
+        // 3. Multi-lang-plyr / player.php (base64 JSON array of language links)
+        if (iframeUrl.contains("player.php", ignoreCase = true) || iframeUrl.contains("multi-lang-plyr.php", ignoreCase = true)) {
+            val fromMultiLang = resolveMultiLangPlyr(iframeUrl, tempId, tempName, preferredLanguage)
             if (fromMultiLang != null) return fromMultiLang
         }
 
@@ -514,7 +521,8 @@ object MultiAudioExtractor {
                         isDirectStream = true,
                         badge = "Multi-Audio",
                         headers = mapOf(
-                            "Referer" to "https://playhydrax.com/",
+                            "Referer" to "https://abyssplayer.com/",
+                            "Origin" to "https://abyssplayer.com",
                             "User-Agent" to USER_AGENT
                         )
                     )
@@ -533,7 +541,7 @@ object MultiAudioExtractor {
         return try {
             val formBody = FormBody.Builder()
                 .add("hash", hash)
-                .add("r", "https://$cdnDomain/")
+                .add("r", "https://animesalt.cx/")
                 .build()
 
             val req = Request.Builder()
@@ -547,7 +555,9 @@ object MultiAudioExtractor {
 
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
-                val json = JSONObject(resp.body?.string() ?: return null)
+                val bodyStr = resp.body?.string().orEmpty().trim()
+                if (!bodyStr.startsWith("{")) return null
+                val json = JSONObject(bodyStr)
                 val m3u8 = json.optString("videoSource").takeIf { it.isNotBlank() }
                     ?: json.optString("securedLink").takeIf { it.isNotBlank() }
                     ?: json.optString("hls").takeIf { it.isNotBlank() }
@@ -572,11 +582,24 @@ object MultiAudioExtractor {
         }
     }
 
-    private fun resolveMultiLangPlyr(url: String, tempId: String, tempName: String): MultiAudioServer? {
+    private fun resolveMultiLangPlyr(
+        url: String,
+        tempId: String,
+        tempName: String,
+        preferredLanguage: String = ""
+    ): MultiAudioServer? {
         return try {
-            val b64 = Regex("""data=([a-zA-Z0-9+/=_-]+)""").find(url)?.groupValues?.get(1) ?: return null
-            val decoded = String(Base64.decode(b64, Base64.DEFAULT), Charsets.UTF_8)
+            val rawB64 = Regex("""data=([a-zA-Z0-9%+/=_-]+)""").find(url)?.groupValues?.get(1) ?: return null
+            val decodedB64 = try {
+                java.net.URLDecoder.decode(rawB64, "UTF-8")
+            } catch (_: Exception) {
+                rawB64
+            }
+            val decoded = String(Base64.decode(decodedB64, Base64.DEFAULT), Charsets.UTF_8)
             val jsonArray = org.json.JSONArray(decoded)
+            var matchedLink: String? = null
+            var englishLink: String? = null
+            var japaneseLink: String? = null
             var hindiLink: String? = null
             var firstLink: String? = null
 
@@ -586,18 +609,35 @@ object MultiAudioExtractor {
                 val link = item.optString("link", "").replace("\\/", "/")
                 if (link.isNotBlank()) {
                     if (firstLink == null) firstLink = link
+                    if (preferredLanguage.isNotBlank() && lang.contains(preferredLanguage, ignoreCase = true)) {
+                        matchedLink = link
+                        break
+                    }
+                    if (lang.contains("English", ignoreCase = true) || lang.contains("Dub", ignoreCase = true)) {
+                        englishLink = link
+                    }
+                    if (lang.contains("Japanese", ignoreCase = true) || lang.contains("Sub", ignoreCase = true)) {
+                        japaneseLink = link
+                    }
                     if (lang.contains("Hindi", ignoreCase = true)) {
                         hindiLink = link
-                        break
                     }
                 }
             }
 
-            val targetLink = hindiLink ?: firstLink ?: return null
+            val targetLink = matchedLink
+                ?: if (tempId.contains("dub", ignoreCase = true) || tempName.contains("dub", ignoreCase = true)) {
+                    englishLink ?: hindiLink ?: firstLink
+                } else if (tempId.contains("sub", ignoreCase = true) || tempName.contains("sub", ignoreCase = true)) {
+                    japaneseLink ?: englishLink ?: firstLink
+                } else {
+                    hindiLink ?: englishLink ?: firstLink
+                } ?: return null
+
             if (targetLink.contains("abyssplayer.com", ignoreCase = true)) {
                 resolveAbyssDirectStream(targetLink, tempId, tempName)
-            } else if (targetLink.contains("as-cdn", ignoreCase = true)) {
-                val m = Regex("""https?://(as-cdn\d*\.top)/video/([a-zA-Z0-9_-]+)""").find(targetLink)
+            } else if (targetLink.contains("/video/")) {
+                val m = Regex("""https?://([a-zA-Z0-9_.-]+)/video/([a-zA-Z0-9_-]+)""").find(targetLink)
                 if (m != null) {
                     resolveAsCdnDirectM3u8(m.groupValues[1], m.groupValues[2])?.copy(id = tempId, name = tempName)
                 } else null
