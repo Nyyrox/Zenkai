@@ -2175,6 +2175,7 @@ fun DetailScreen(
             episode = ep,
             episodeTitle = epTitle,
             initialProvider = selectedProvider,
+            availableDirectServers = availableDirectServers,
             onDismiss = { showDownloadSheetEpisode = null },
             onStartDownload = { prov, quality, audio ->
                 vm.downloadAnimeEpisode(
@@ -2195,6 +2196,7 @@ fun DetailScreen(
             anime = anime,
             episodesRange = range,
             initialProvider = selectedProvider,
+            availableDirectServers = availableDirectServers,
             onDismiss = { showDownloadRangeSheet = null },
             onStartBatchDownload = { eps, prov, quality, audio ->
                 vm.downloadAnimeEpisodes(

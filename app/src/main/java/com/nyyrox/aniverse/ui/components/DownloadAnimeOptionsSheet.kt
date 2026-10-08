@@ -86,6 +86,7 @@ fun DownloadAnimeOptionsSheet(
     episodeTitle: String? = null,
     episodesRange: IntRange? = null,
     initialProvider: Provider? = null,
+    availableDirectServers: List<Provider>? = null,
     onDismiss: () -> Unit,
     onStartDownload: (provider: Provider, quality: String, audio: String) -> Unit = { _, _, _ -> },
     onStartBatchDownload: ((episodes: List<Int>, provider: Provider, quality: String, audio: String) -> Unit)? = null
@@ -98,49 +99,63 @@ fun DownloadAnimeOptionsSheet(
     val savedQuality = remember { storage.getLastDownloadQuality() }
     val savedServerId = remember { storage.getLastDownloadServerId() }
 
-    var selectedAudio by remember {
+    val initialAudioMode = if (initialProvider?.isDub == true) "DUB"
+        else if (initialProvider?.isMulti == true) "MULTI"
+        else if (initialProvider != null) "SUB"
+        else null
+
+    var selectedAudio by remember(initialProvider) {
         mutableStateOf(
-            savedAudio
-                ?: if (initialProvider?.isDub == true) "DUB"
-                else if (initialProvider?.isMulti == true) "MULTI"
-                else "SUB"
+            initialAudioMode ?: savedAudio ?: "SUB"
         )
     }
     var selectedQuality by remember {
         mutableStateOf(savedQuality ?: "720p")
     }
 
-    val autoProvider = remember(selectedAudio) {
-        Provider(
-            id = "auto-all-${selectedAudio.lowercase()}",
-            name = "Auto (Try All Servers: Direct HD → Embeds)",
-            pattern = "",
-            serverBadge = "Auto",
-            isDirectStream = false
-        )
+    val availableProviders = remember(selectedAudio, availableDirectServers) {
+        val isDubSelected = selectedAudio.equals("dub", ignoreCase = true)
+        val isMultiSelected = selectedAudio.equals("multi", ignoreCase = true)
+
+        val directList = if (!availableDirectServers.isNullOrEmpty()) {
+            val matching = when {
+                isDubSelected -> availableDirectServers.filter { it.isDub || it.isMulti }
+                isMultiSelected -> availableDirectServers.filter { it.isMulti }
+                else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
+            }
+            if (matching.isNotEmpty()) matching else {
+                com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio)
+            }
+        } else {
+            com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio)
+        }
+        // Strictly filter to ONLY available direct servers - zero embed servers
+        directList.filter { it.isDirectStream && !it.isEmbedOnly }.distinctBy { it.id }
     }
 
-    val availableProviders = remember(selectedAudio) {
-        val providers = when (selectedAudio) {
-            "DUB" -> ALL_PROVIDERS.filter { it.isDub }
-            "MULTI" -> ALL_PROVIDERS.filter { it.isMulti }
-            else -> ALL_PROVIDERS.filter { !it.isDub && !it.isMulti }
-        }
-        val directServers = providers.filter { !it.isEmbedOnly }
-        val embedServers = providers.filter { it.isEmbedOnly }
-        // Rule: Direct HD servers first, then Auto, then Embed servers
-        directServers + listOf(autoProvider) + embedServers
-    }
-
-    var selectedProvider by remember(selectedAudio, initialProvider) {
-        val matchingSaved = savedServerId?.let { sId ->
-            availableProviders.firstOrNull { it.id == sId }
-        }
+    var selectedProvider by remember(selectedAudio, initialProvider, availableProviders) {
+        // Priority 1: Match the current active provider by exact ID
         val matchingInit = initialProvider?.let { init ->
             availableProviders.firstOrNull { it.id == init.id }
         }
+        // Priority 2: Match current active provider by name (e.g. if audio was switched from SUB to DUB)
+        val matchingInitByName = initialProvider?.let { init ->
+            availableProviders.firstOrNull { it.name.equals(init.name, ignoreCase = true) }
+        }
+        // Priority 3: Previously saved server from storage, if it exists in available direct servers
+        val matchingSaved = savedServerId?.let { sId ->
+            availableProviders.firstOrNull { it.id == sId }
+        }
+        // Priority 4: First available direct server
         val firstDirect = availableProviders.firstOrNull { it.isDirectStream }
-        mutableStateOf(matchingSaved ?: matchingInit ?: firstDirect ?: autoProvider)
+        mutableStateOf(
+            matchingInit
+                ?: matchingInitByName
+                ?: matchingSaved
+                ?: firstDirect
+                ?: availableProviders.firstOrNull()
+                ?: Provider("flixcloud-sub", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true)
+        )
     }
 
     ModalBottomSheet(
@@ -333,8 +348,7 @@ fun DownloadAnimeOptionsSheet(
             ) {
                 availableProviders.forEach { prov ->
                     val isSelected = selectedProvider.id == prov.id
-                    val isAuto = prov.id.startsWith("auto-all")
-                    val isEmbed = prov.isEmbedOnly
+                    val isMulti = prov.isMultiAudio || prov.isMulti
 
                     Row(
                         modifier = Modifier
@@ -364,51 +378,25 @@ fun DownloadAnimeOptionsSheet(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            if (isAuto) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OttPillShape)
-                                        .background(Color(0x22F59E0B))
-                                        .border(0.8.dp, Color(0xFFF59E0B), OttPillShape)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "RECOMMENDED",
-                                        color = Color(0xFFF59E0B),
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            } else if (isEmbed) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OttPillShape)
-                                        .background(Color(0x22A855F7))
-                                        .border(0.8.dp, Color(0xFFA855F7), OttPillShape)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "EMBED SNIFFER",
-                                        color = Color(0xFFA855F7),
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OttPillShape)
-                                        .background(Color(0x2210B981))
-                                        .border(0.8.dp, Color(0xFF10B981), OttPillShape)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "DIRECT HD",
-                                        color = Color(0xFF10B981),
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                            val badgeText = when {
+                                isMulti -> "MULTI-AUDIO"
+                                prov.serverBadge.isNotBlank() -> prov.serverBadge.uppercase()
+                                else -> "DIRECT HD"
+                            }
+                            val badgeColor = if (isMulti) Color(0xFF38BDF8) else Color(0xFF10B981)
+                            Box(
+                                modifier = Modifier
+                                    .clip(OttPillShape)
+                                    .background(badgeColor.copy(alpha = 0.15f))
+                                    .border(0.8.dp, badgeColor.copy(alpha = 0.8f), OttPillShape)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = badgeText,
+                                    color = badgeColor,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
 

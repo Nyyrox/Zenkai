@@ -1800,7 +1800,8 @@ fun PlayerScreen(
                                         }
                                     } else {
                                         val filteredDirectServers = when (selectedCategory) {
-                                            "DUB" -> availableDirectServers.filter { it.isDub }
+                                            "DUB" -> availableDirectServers.filter { it.isDub || it.isMulti }
+                                            "MULTI" -> availableDirectServers.filter { it.isMulti }
                                             else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
                                         }.ifEmpty { availableDirectServers }
                                         filteredDirectServers.forEach { prov ->
@@ -2280,6 +2281,7 @@ fun PlayerScreen(
             episode = ep,
             episodeTitle = epTitle,
             initialProvider = currentProvider,
+            availableDirectServers = availableDirectServers,
             onDismiss = { showDownloadSheetEpisode = null },
             onStartDownload = { prov, quality, audio ->
                 vm.downloadAnimeEpisode(
@@ -2300,6 +2302,7 @@ fun PlayerScreen(
             anime = anime,
             episodesRange = range,
             initialProvider = currentProvider,
+            availableDirectServers = availableDirectServers,
             onDismiss = { showDownloadRangeSheet = null },
             onStartBatchDownload = { eps, prov, quality, audio ->
                 vm.downloadAnimeEpisodes(

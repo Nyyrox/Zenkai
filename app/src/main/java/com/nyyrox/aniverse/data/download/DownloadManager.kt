@@ -10,7 +10,6 @@ import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.data.novel.INovelSourceRepository
 import com.nyyrox.aniverse.data.novel.NovelChapter
 import com.nyyrox.aniverse.data.novel.NovelChapterContent
-import com.nyyrox.aniverse.player.StreamSniffer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -360,10 +359,11 @@ class DownloadManager(private val context: Context) {
             animeDownloadSemaphore.withPermit {
                 if (cancelToken.get()) return@withPermit
 
-                val targetProvider = if (provider.id.startsWith("auto-all")) {
-                    val isDub = audio.contains("DUB", ignoreCase = true)
-                    val isMulti = audio.contains("MULTI", ignoreCase = true)
-                    val audioMode = if (isDub) "dub" else "sub"
+                val isDub = audio.contains("DUB", ignoreCase = true)
+                val isMulti = audio.contains("MULTI", ignoreCase = true)
+                val audioMode = if (isDub) "dub" else "sub"
+
+                val targetProvider = if (provider.id.startsWith("auto-all") || !provider.isDirectStream || provider.isEmbedOnly) {
                     val directProviders = DirectStreamResolver.getAvailableDirectProviders(anime.id, audioMode, episode)
                     var resolvedProv: Provider? = null
                     for (dp in directProviders) {
@@ -383,7 +383,7 @@ class DownloadManager(private val context: Context) {
                     }
                     resolvedProv
                         ?: directProviders.firstOrNull()
-                        ?: com.nyyrox.aniverse.data.ALL_PROVIDERS.firstOrNull { if (isDub) it.isDub else if (isMulti) it.isMulti else (!it.isDub && !it.isMulti) }
+                        ?: DirectStreamResolver.getDefaultDirectProviders(audioMode).firstOrNull()
                         ?: provider
                 } else {
                     provider
@@ -442,33 +442,9 @@ class DownloadManager(private val context: Context) {
                             streamSubtitles = directResolved.subtitles
                         }
                     } else {
-                        // Embed server: sniff stream
-                        val resolved = try {
-                            com.nyyrox.aniverse.data.mapping.AniBridgeResolver.resolve(anime.id)
-                        } catch (_: Exception) { null }
-                        val malId = anime.idMal?.takeIf { it > 0 }
-                            ?: resolved?.malId?.takeIf { it > 0 }
-                        val tmdbId = resolved?.tmdbId?.takeIf { it > 0 }
-
-                        val targetEmbedUrl = targetProvider.url(
-                            anilistId = anime.id,
-                            episode = episode,
-                            malId = malId,
-                            tmdbId = tmdbId
-                        )
-
-                        _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
-                            providerId = targetProvider.id,
-                            providerName = targetProvider.name,
-                            speedFormatted = "Connecting to ${targetProvider.name}...",
-                            status = DownloadStatus.DOWNLOADING
-                        ))
-
-                        val sniffed = StreamSniffer.sniff(context, targetEmbedUrl, timeoutMs = 12000L)
-                        if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
-                            streamUrl = sniffed.streamUrl
-                            streamHeaders = sniffed.headers
-                        }
+                        // Embed server downloads via stream sniffer are disabled. Only direct streams supported.
+                        lastFailureReason = "Embed server downloads are disabled. Please use Direct HD servers."
+                        break
                     }
 
                     if (streamUrl.isNullOrBlank()) {

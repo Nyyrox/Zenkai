@@ -227,10 +227,11 @@ val DEFAULT_STATIC_PROVIDERS = listOf(
     Provider("megaplay-direct-sub", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true),
     Provider("vidstream-direct-sub", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true),
 
-    // === DIRECT DUBBED SERVERS (FlixCloud, MegaPlay, Vidstream) ===
+    // === DIRECT DUBBED SERVERS (FlixCloud, MegaPlay, Vidstream, ACDN) ===
     Provider("flixcloud-dub", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true),
     Provider("megaplay-direct-dub", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true),
     Provider("vidstream-direct-dub", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true),
+    Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true),
 
     // === EMBED SERVERS (SUB) ===
     Provider("animesalt-embed-sub", "ACDN Sub", "https://animesalt.cx/episode/{slug}/", "Embed HD", isEmbedOnly = true),
