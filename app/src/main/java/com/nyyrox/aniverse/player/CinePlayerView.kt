@@ -1350,7 +1350,7 @@ fun CinePlayerView(
             val isHlsStream = !isLocalFile && (stream.isHls || playUrl.contains(".m3u8", ignoreCase = true))
             if (playUrl.endsWith(".ts", ignoreCase = true)) {
                 mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
-            } else if (playUrl.endsWith(".mp4", ignoreCase = true) || playUrl.contains("/sora/") || playUrl.contains("sssrr.org")) {
+            } else if (playUrl.endsWith(".mp4", ignoreCase = true)) {
                 mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP4)
             } else if (isHlsStream) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)

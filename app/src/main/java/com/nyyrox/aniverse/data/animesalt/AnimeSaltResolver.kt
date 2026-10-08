@@ -224,15 +224,6 @@ object AnimeSaltResolver {
      * 2. If absent: AniList Title -> TMDB Mapped Title -> AnimeSalt Series Match -> Read ALL Seasons/Episodes -> Deterministic episodeMap.
      * AniList remains the episode-order authority.
      */
-    suspend fun resolveSeries(
-        anilistId: Int,
-        title: String,
-        romajiTitle: String? = null,
-        tmdbTitle: String? = null,
-        format: String? = null,
-        totalEpisodes: Int = 1
-    ): AnimeSaltSeriesRelationship? = getOrBuildRelationship(anilistId, title, romajiTitle, tmdbTitle, format, totalEpisodes)
-
     suspend fun getOrBuildRelationship(
         anilistId: Int,
         title: String,
@@ -728,9 +719,9 @@ object AnimeSaltResolver {
         val slug = resolveSlug(relationship, title, romajiTitle, format, episode, anilistId)
         val servers = extractServers(slug, isMovie)
         return if (isAbyss) {
-            servers.abyssUrl ?: servers.myStreamUrl.orEmpty()
+            servers.abyssUrl ?: ""
         } else {
-            servers.myStreamUrl ?: servers.abyssUrl.orEmpty()
+            servers.myStreamUrl ?: ""
         }
     }
 
@@ -769,9 +760,9 @@ object AnimeSaltResolver {
         val slug = resolveSlug(relationship, title, romajiTitle, format, episode, anilistId)
         val cached = serversCache[slug]
         return if (isAbyss) {
-            cached?.abyssUrl ?: cached?.myStreamUrl.orEmpty()
+            cached?.abyssUrl ?: ""
         } else {
-            cached?.myStreamUrl ?: cached?.abyssUrl.orEmpty()
+            cached?.myStreamUrl ?: ""
         }
     }
 

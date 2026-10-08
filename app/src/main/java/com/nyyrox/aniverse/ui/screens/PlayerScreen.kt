@@ -388,7 +388,7 @@ fun PlayerScreen(
         if (currentProvider.id.startsWith("animesalt") && !currentProvider.isDirectStream) {
             animeSaltStreamUrl = null
             animeSaltStreamResolved = false
-            val isAbyssServer = currentProvider.id.contains("abyss", ignoreCase = true)
+            val isAbyssServer = currentProvider.id.contains("dub", ignoreCase = true) || currentProvider.id.contains("abyss", ignoreCase = true)
             val resUrl = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.resolveEpisodeStreamUrl(
                 relationship = animeSaltRel,
                 title = anime.title,
