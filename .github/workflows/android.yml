@@ -38,18 +38,6 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-      - name: Build Debug APK
-        run: gradle --no-daemon :app:assembleDebug
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: zenkai-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
-          overwrite: true
-
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -57,4 +45,3 @@ jobs:
         with:
           files: |
             app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk

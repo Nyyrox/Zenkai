@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -162,7 +163,6 @@ fun HomeScreen(
 
         val lazyListState = vm.homeLazyListState
         val exploreList = vm.homeExplore.ifEmpty { vm.popular }
-        val chunkedExplore = remember(exploreList) { exploreList.chunked(3) }
 
         val shouldLoadMore by remember {
             derivedStateOf {
@@ -248,6 +248,31 @@ fun HomeScreen(
                         onRemoveNovel = { vm.removeNovelHistory(it) }
                     )
                 }
+            }
+        }
+
+        // Featured Trending & Top Watched YouTube-style Episode Feed
+        val trendingTopEpisodes = remember(vm.trending, vm.popular) {
+            (vm.trending.ifEmpty { vm.popular }).take(2)
+        }
+        if (trendingTopEpisodes.isNotEmpty()) {
+            item(key = "home_trending_episodes_header") {
+                Column(modifier = Modifier.staggeredEntrance(index = 2)) {
+                    OttSectionHeader(
+                        title = "Trending Top Watched",
+                        subtitle = "Popular episodes streaming right now"
+                    )
+                }
+            }
+            itemsIndexed(trendingTopEpisodes, key = { idx, a -> "trending_ep_${a.id}_$idx" }) { idx, anime ->
+                YouTubeStyleEpisodeCard(
+                    anime = anime,
+                    episodeNumber = 1,
+                    badgeText = if (idx == 0) "🔥 #1 TOP WATCHED" else "TRENDING NOW",
+                    onAnimeClick = onAnimeClick,
+                    onPlayClick = onPlayClick,
+                    modifier = Modifier.staggeredEntrance(index = 2 + idx)
+                )
             }
         }
 
@@ -395,40 +420,81 @@ fun HomeScreen(
             }
         }
 
-        // ── 7. Infinite Scroll: Discover Endless Titles ───────────────────────
+        // ── 7. Dynamic YouTube-Style Feed: Top Episodes + Random Genre Shelves with Media Cards ───
         if (exploreList.isNotEmpty()) {
             item(key = "home_explore_header") {
                 Column(modifier = Modifier.padding(top = 10.dp).staggeredEntrance(index = 11)) {
                     OttSectionHeader(
-                        title = "Discover & Explore",
-                        subtitle = "Infinite catalog continuously updating for you"
+                        title = "Top Episodes & Discover",
+                        subtitle = "Stream top episodes and explore genres"
                     )
                 }
             }
 
+            val genreShelves = remember(
+                vm.actionAnime,
+                vm.fantasyAnime,
+                vm.topRated,
+                vm.scifiAnime,
+                vm.romanceAnime,
+                vm.newReleases,
+                vm.upcomingAnime,
+                vm.popular
+            ) {
+                listOfNotNull(
+                    if (vm.actionAnime.isNotEmpty()) ("💥 Action & Adrenaline" to vm.actionAnime) else null,
+                    if (vm.fantasyAnime.isNotEmpty()) ("✨ Fantasy & Magic" to vm.fantasyAnime) else null,
+                    if (vm.topRated.isNotEmpty()) ("🌟 Masterpieces & Critically Acclaimed" to vm.topRated) else null,
+                    if (vm.scifiAnime.isNotEmpty()) ("🚀 Sci-Fi & Cyberpunk" to vm.scifiAnime) else null,
+                    if (vm.romanceAnime.isNotEmpty()) ("💖 Romance & Slice of Life" to vm.romanceAnime) else null,
+                    if (vm.newReleases.isNotEmpty()) ("⚡ Fresh Broadcast Hits" to vm.newReleases) else null,
+                    if (vm.upcomingAnime.isNotEmpty()) ("🔮 Highly Anticipated" to vm.upcomingAnime) else null,
+                    if (vm.popular.isNotEmpty()) ("🔥 Fan Favorite Hits" to vm.popular) else null
+                ).shuffled()
+            }
+
             itemsIndexed(
-                items = chunkedExplore,
-                key = { _, chunk -> chunk.firstOrNull()?.id ?: chunk.hashCode() }
-            ) { chunkIndex, chunk ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // animate=false: rows appear during scroll, must be instantly visible
-                        .staggeredEntrance(index = (12 + chunkIndex).coerceAtMost(20), animate = false)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    chunk.forEach { anime ->
-                        Box(modifier = Modifier.weight(1f)) {
-                            OttPosterCard(
-                                anime = anime,
-                                onClick = { onAnimeClick(anime.id) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                items = exploreList,
+                key = { idx, anime -> "explore_yt_feed_${anime.id}_$idx" }
+            ) { index, anime ->
+                val epNum = remember(anime.id) { ((anime.id % 12) + 1).coerceAtLeast(1) }
+                val badge = remember(index) {
+                    when (index % 5) {
+                        0 -> "🔥 TOP EPISODE"
+                        1 -> "TOP WATCHED"
+                        2 -> "TRENDING NOW"
+                        3 -> "POPULAR PICK"
+                        else -> "MUST WATCH"
                     }
-                    repeat(3 - chunk.size) {
-                        Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // YouTube-style episode card
+                YouTubeStyleEpisodeCard(
+                    anime = anime,
+                    episodeNumber = epNum,
+                    badgeText = badge,
+                    onAnimeClick = onAnimeClick,
+                    onPlayClick = onPlayClick
+                )
+
+                // Interleave random genre shelf with media cards every 2 episode cards
+                if (genreShelves.isNotEmpty() && (index % 2 == 1)) {
+                    val shelfIdx = (index / 2) % genreShelves.size
+                    val (genreTitle, genreList) = genreShelves[shelfIdx]
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                    ) {
+                        OttSectionHeader(
+                            title = genreTitle,
+                            subtitle = "Top recommended titles in this genre"
+                        )
+                        OttHorizontalMediaRow(
+                            list = genreList,
+                            onAnimeClick = onAnimeClick
+                        )
+                        Spacer(Modifier.height(10.dp))
                     }
                 }
             }
@@ -471,3 +537,217 @@ private fun OttHorizontalMediaRow(
         }
     }
 }
+
+/**
+ * YouTube-style episode feed card with 16:9 thumbnail, duration and episode badge,
+ * circular channel avatar, title, genres, and quick play action.
+ */
+@Composable
+fun YouTubeStyleEpisodeCard(
+    anime: Anime,
+    episodeNumber: Int = 1,
+    badgeText: String? = null,
+    onAnimeClick: (Int) -> Unit,
+    onPlayClick: (animeId: Int, episode: Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val durationText = remember(anime.duration) {
+        val mins = anime.duration ?: 24
+        "${mins}:00"
+    }
+
+    val displayTitle = anime.displayTitle
+    val episodeTitle = "Episode $episodeNumber"
+
+    val thumbnailImage = remember(anime.banner, anime.cover) {
+        anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onAnimeClick(anime.id) }
+            .padding(bottom = 18.dp)
+    ) {
+        // 1. YouTube 16:9 Thumbnail Box
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF141822))
+                .clickable { onPlayClick(anime.id, episodeNumber) }
+        ) {
+            AsyncImage(
+                model = thumbnailImage,
+                contentDescription = displayTitle,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // Gradient darkening
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0x35000000),
+                                Color.Transparent,
+                                Color(0xA6000000)
+                            )
+                        )
+                    )
+            )
+
+            // Top-Left Badge (e.g. "🔥 TOP WATCHED" or "TRENDING")
+            if (!badgeText.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xD90F141E))
+                        .border(0.8.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            // Center Circular Play Button
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xCC000000))
+                    .border(1.dp, Color(0x80FFFFFF), CircleShape)
+                    .align(Alignment.Center),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            // Bottom-Left Episode Badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "EP $episodeNumber",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OttAccentGold
+                )
+            }
+
+            // Bottom-Right Duration Badge (YouTube style)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = durationText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // 2. Video Info Row (Avatar on Left, Title + Subtitle in Middle, Play button on Right)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Anime Avatar (YouTube Channel style)
+            AsyncImage(
+                model = anime.cover,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                    .clickable { onAnimeClick(anime.id) },
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            // Title + Metadata Column
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onAnimeClick(anime.id) }
+            ) {
+                Text(
+                    text = "$displayTitle • $episodeTitle",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    lineHeight = 18.sp,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(3.dp))
+
+                val genreText = anime.genres.take(2).joinToString(" • ")
+                val scoreText = anime.score?.let { "★ $it%" } ?: "Trending"
+                val formatText = anime.displayFormat ?: "TV"
+
+                Text(
+                    text = listOfNotNull(genreText.ifBlank { null }, formatText, scoreText).joinToString(" • "),
+                    fontSize = 12.sp,
+                    color = OttTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            // Play Icon Button
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x22FFFFFF))
+                    .clickable { onPlayClick(anime.id, episodeNumber) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
