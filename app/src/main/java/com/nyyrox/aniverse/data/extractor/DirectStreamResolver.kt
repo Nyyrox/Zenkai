@@ -276,14 +276,20 @@ object DirectStreamResolver {
         audio: String = "dub"
     ): DirectStreamResult? {
         try {
-            val candidate = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.resolveCandidate(anilistId, episode, animeTitle)
-            val saltId = candidate.saltId.ifBlank {
-                com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.normalizeAnimeSaltTitle(animeTitle)
-            }
-            val season = candidate.season ?: 1
-            val finalEp = candidate.finalEp
-            val isMovie = candidate.isMovie
-            val slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
+            val isMovieCandidate = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.resolveCandidate(anilistId, episode, animeTitle)
+            val isMovie = isMovieCandidate.isMovie
+            val seriesRel = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.resolveSeries(
+                anilistId = anilistId,
+                title = animeTitle,
+                format = if (isMovie) "MOVIE" else null
+            )
+            val slug = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.resolveSlug(
+                relationship = seriesRel,
+                title = animeTitle,
+                format = if (isMovie) "MOVIE" else null,
+                episode = episode,
+                anilistId = anilistId
+            )
 
             val serverTag = if (audio == "dub") "ACDN Dub" else "ACDN"
             val serverId = "animesalt-direct-$audio"
@@ -291,99 +297,60 @@ object DirectStreamResolver {
             // 1. AnimeSaltResolver.extractServers (options-0 / options-1)
             val extractedServers = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.extractServers(slug, isMovie)
 
-            if (audio == "dub") {
-                // For DUB: try options-1 (Abyss player multi-lang) first for native English dub track
-                val abyssIframe = extractedServers.abyssUrl
-                if (!abyssIframe.isNullOrBlank()) {
-                    val direct = MultiAudioExtractor.resolveIframeToServer(
-                        abyssIframe,
-                        "https://animesalt.cx/",
-                        serverId,
-                        serverTag,
-                        preferredLanguage = "English"
+            // 1. Prioritize options-0 (AnimeSalt master HLS multi-audio stream, identical to embed server)
+            val myStreamIframe = extractedServers.myStreamUrl
+            if (!myStreamIframe.isNullOrBlank()) {
+                val direct = MultiAudioExtractor.resolveIframeToServer(
+                    myStreamIframe,
+                    "https://animesalt.cx/",
+                    serverId,
+                    serverTag
+                )
+                if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
+                    val proxiedUrl = buildProxiedStreamUrl(direct.streamUrl, "https://ravok.buzz/")
+                    return DirectStreamResult(
+                        serverId = serverId,
+                        serverName = serverTag,
+                        streamUrl = proxiedUrl,
+                        isHls = true,
+                        audio = audio,
+                        headers = direct.headers,
+                        isDirect = true
                     )
-                    if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
-                        return DirectStreamResult(
-                            serverId = serverId,
-                            serverName = serverTag,
-                            streamUrl = direct.streamUrl,
-                            isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
-                            audio = audio,
-                            headers = direct.headers,
-                            isDirect = true
-                        )
-                    }
                 }
+            }
 
-                // Fallback for DUB: options-0 (ravok.buzz / as-cdn) which contains multi-audio master HLS (including English)
-                val myStreamIframe = extractedServers.myStreamUrl
-                if (!myStreamIframe.isNullOrBlank()) {
-                    val direct = MultiAudioExtractor.resolveIframeToServer(
-                        myStreamIframe,
-                        "https://animesalt.cx/",
-                        serverId,
-                        serverTag
+            // 2. Fallback to options-1 (Abyss player multi-lang) if options-0 is unavailable
+            val abyssIframe = extractedServers.abyssUrl
+            if (!abyssIframe.isNullOrBlank()) {
+                val preferredLang = if (audio == "dub") "English" else "Japanese"
+                val direct = MultiAudioExtractor.resolveIframeToServer(
+                    abyssIframe,
+                    "https://animesalt.cx/",
+                    serverId,
+                    serverTag,
+                    preferredLanguage = preferredLang
+                )
+                if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
+                    val proxiedUrl = buildProxiedStreamUrl(direct.streamUrl, "https://player.abyssplayer.com/")
+                    return DirectStreamResult(
+                        serverId = serverId,
+                        serverName = serverTag,
+                        streamUrl = proxiedUrl,
+                        isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
+                        audio = audio,
+                        headers = direct.headers,
+                        isDirect = true
                     )
-                    if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
-                        return DirectStreamResult(
-                            serverId = serverId,
-                            serverName = serverTag,
-                            streamUrl = direct.streamUrl,
-                            isHls = true,
-                            audio = audio,
-                            headers = direct.headers,
-                            isDirect = true
-                        )
-                    }
-                }
-            } else {
-                // For SUB: try options-0 (ravok.buzz / as-cdn) master HLS first
-                val myStreamIframe = extractedServers.myStreamUrl
-                if (!myStreamIframe.isNullOrBlank()) {
-                    val direct = MultiAudioExtractor.resolveIframeToServer(
-                        myStreamIframe,
-                        "https://animesalt.cx/",
-                        serverId,
-                        serverTag
-                    )
-                    if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
-                        return DirectStreamResult(
-                            serverId = serverId,
-                            serverName = serverTag,
-                            streamUrl = direct.streamUrl,
-                            isHls = true,
-                            audio = audio,
-                            headers = direct.headers,
-                            isDirect = true
-                        )
-                    }
-                }
-
-                // Fallback for SUB: options-1 (Abyss player multi-lang) with Japanese audio
-                val abyssIframe = extractedServers.abyssUrl
-                if (!abyssIframe.isNullOrBlank()) {
-                    val direct = MultiAudioExtractor.resolveIframeToServer(
-                        abyssIframe,
-                        "https://animesalt.cx/",
-                        serverId,
-                        serverTag,
-                        preferredLanguage = "Japanese"
-                    )
-                    if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
-                        return DirectStreamResult(
-                            serverId = serverId,
-                            serverName = serverTag,
-                            streamUrl = direct.streamUrl,
-                            isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
-                            audio = audio,
-                            headers = direct.headers,
-                            isDirect = true
-                        )
-                    }
                 }
             }
 
             // 2. Candidate episode HTML mirrors fallback
+            val saltId = isMovieCandidate.saltId.ifBlank {
+                com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.normalizeAnimeSaltTitle(animeTitle)
+            }
+            val season = isMovieCandidate.season ?: 1
+            val finalEp = isMovieCandidate.finalEp
             val path = if (isMovie) "/movies/$saltId/" else "/episode/$saltId-${season}x$finalEp/"
             val candidateUrls = listOf(
                 "https://animesalt.cx$path",
@@ -403,40 +370,18 @@ object DirectStreamResolver {
                         if (resp.isSuccessful) {
                             val html = resp.body.string()
 
-                            // If dub, check options-1 first
-                            if (audio == "dub") {
-                                val opt1Match = Regex("""<div[^>]+id=["']options-1["'][^>]*>[\s\S]*?<iframe[^>]+(?:data-src|src)=["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(html)
-                                    ?: Regex("""(?:data-src|src)=["']([^"']*player\.php[^"']*)["']""", RegexOption.IGNORE_CASE).find(html)
-                                if (opt1Match != null) {
-                                    val opt1Url = opt1Match.groupValues[1].let { if (it.startsWith("/")) "https://animesalt.cx$it" else it }
-                                    val direct = MultiAudioExtractor.resolveIframeToServer(
-                                        opt1Url, "https://animesalt.cx/", serverId, serverTag, preferredLanguage = "English"
-                                    )
-                                    if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
-                                        return DirectStreamResult(
-                                            serverId = serverId,
-                                            serverName = serverTag,
-                                            streamUrl = direct.streamUrl,
-                                            isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
-                                            audio = audio,
-                                            headers = direct.headers,
-                                            isDirect = true
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Match any CDN video iframe (ravok.buzz, as-cdn, etc.)
+                            // 1. Match any CDN video iframe (ravok.buzz, as-cdn, etc.) first for native multi-audio
                             val cdnMatch = Regex("""(?:https?:)?//([a-zA-Z0-9_.-]+)/video/([a-f0-9]+)""", RegexOption.IGNORE_CASE).find(html)
                             if (cdnMatch != null) {
                                 val cdnDomain = cdnMatch.groupValues[1]
                                 val hash = cdnMatch.groupValues[2]
                                 val direct = MultiAudioExtractor.resolveAsCdnDirectM3u8(cdnDomain, hash)
                                 if (direct != null && direct.streamUrl.isNotBlank()) {
+                                    val proxiedUrl = buildProxiedStreamUrl(direct.streamUrl, "https://$cdnDomain/")
                                     return DirectStreamResult(
                                         serverId = serverId,
                                         serverName = serverTag,
-                                        streamUrl = direct.streamUrl,
+                                        streamUrl = proxiedUrl,
                                         isHls = true,
                                         audio = audio,
                                         headers = direct.headers,
@@ -445,19 +390,21 @@ object DirectStreamResolver {
                                 }
                             }
 
-                            // If sub, check options-1 as fallback
+                            // 2. Fallback to options-1 (Abyss player multi-lang)
                             val opt1Match = Regex("""<div[^>]+id=["']options-1["'][^>]*>[\s\S]*?<iframe[^>]+(?:data-src|src)=["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(html)
                                 ?: Regex("""(?:data-src|src)=["']([^"']*player\.php[^"']*)["']""", RegexOption.IGNORE_CASE).find(html)
                             if (opt1Match != null) {
                                 val opt1Url = opt1Match.groupValues[1].let { if (it.startsWith("/")) "https://animesalt.cx$it" else it }
+                                val preferredLang = if (audio == "dub") "English" else "Japanese"
                                 val direct = MultiAudioExtractor.resolveIframeToServer(
-                                    opt1Url, "https://animesalt.cx/", serverId, serverTag, preferredLanguage = "Japanese"
+                                    opt1Url, "https://animesalt.cx/", serverId, serverTag, preferredLanguage = preferredLang
                                 )
                                 if (direct != null && direct.isDirectStream && direct.streamUrl.isNotBlank()) {
+                                    val proxiedUrl = buildProxiedStreamUrl(direct.streamUrl, "https://player.abyssplayer.com/")
                                     return DirectStreamResult(
                                         serverId = serverId,
                                         serverName = serverTag,
-                                        streamUrl = direct.streamUrl,
+                                        streamUrl = proxiedUrl,
                                         isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
                                         audio = audio,
                                         headers = direct.headers,

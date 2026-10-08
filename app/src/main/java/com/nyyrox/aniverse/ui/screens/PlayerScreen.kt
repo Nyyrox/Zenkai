@@ -388,7 +388,7 @@ fun PlayerScreen(
         if (currentProvider.id.startsWith("animesalt") && !currentProvider.isDirectStream) {
             animeSaltStreamUrl = null
             animeSaltStreamResolved = false
-            val isAbyssServer = currentProvider.id.contains("dub", ignoreCase = true) || currentProvider.id.contains("abyss", ignoreCase = true)
+            val isAbyssServer = currentProvider.id.contains("abyss", ignoreCase = true)
             val resUrl = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.resolveEpisodeStreamUrl(
                 relationship = animeSaltRel,
                 title = anime.title,
@@ -953,6 +953,7 @@ fun PlayerScreen(
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
+                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                     if (playInZenkaiPlayer) {
                                         playInZenkaiPlayer = false
                                     } else {
@@ -1121,6 +1122,7 @@ fun PlayerScreen(
                                     .background(if (vm.isPlayEmbed) Color.White.copy(alpha = 0.2f) else Color(0x18FFFFFF))
                                     .border(1.dp, if (vm.isPlayEmbed) Color.White else Color(0x28FFFFFF), OttPillShape)
                                     .clickable {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                         val targetEmbed = !vm.isPlayEmbed
                                         vm.setPlayEmbed(targetEmbed)
                                         if (targetEmbed) {
@@ -1599,6 +1601,7 @@ fun PlayerScreen(
                                             .clip(OttPillShape)
                                             .background(if (isModeSelected) Color.White else Color.Transparent)
                                             .clickable {
+                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                 if (selectedSourceMode != modeKey) {
                                                     selectedSourceMode = modeKey
                                                     if (modeKey == "DIRECT") {
@@ -1668,6 +1671,7 @@ fun PlayerScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isCatSelected) Color.White else Color.Transparent)
                                         .clickable {
+                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                             if (selectedCategory != catKey) {
                                                 selectedCategory = catKey
                                                 if (selectedSourceMode == "DIRECT") {
@@ -1841,6 +1845,7 @@ fun PlayerScreen(
                                                     }
                                                 },
                                                 onClick = {
+                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                     currentProvider = prov
                                                     vm.setPreferredServer(prov.id)
                                                     isServerDropdownExpanded = false
@@ -1907,6 +1912,7 @@ fun PlayerScreen(
                                                 }
                                             },
                                             onClick = {
+                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                 currentProvider = prov
                                                 vm.setPreferredServer(prov.id)
                                                 isServerDropdownExpanded = false
@@ -2207,6 +2213,7 @@ fun PlayerScreen(
                                                         RoundedCornerShape(10.dp)
                                                     )
                                                     .clickable {
+                                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                         currentEpisode = epNum
                                                     },
                                                 contentAlignment = Alignment.Center
@@ -2256,6 +2263,7 @@ fun PlayerScreen(
                                     }
                                 },
                                 onClick = {
+                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                     currentEpisode = epNum
                                 }
                             )

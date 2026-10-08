@@ -1,4 +1,4 @@
-﻿package com.nyyrox.aniverse.ui.components
+package com.nyyrox.aniverse.ui.components
 
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -33,8 +33,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.nyyrox.aniverse.ui.theme.OttBloodPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
+import com.nyyrox.aniverse.util.AppHaptics
 
 /**
  * Unified 40dp glass icon button — the ONE component used by TopBar, DetailScreen
@@ -56,6 +58,7 @@ fun GlassIconButton(
     backgroundTint: Color = Color(0x1EFFFFFF),
     borderColor: Color = Color(0x33FFFFFF)
 ) {
+    val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -84,7 +87,10 @@ fun GlassIconButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = {
+                    AppHaptics.tick(context)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -114,6 +120,7 @@ fun MetadataChip(
     textColor: Color = Color.White,
     onClick: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val base = modifier
         .height(28.dp)
         .clip(RoundedCornerShape(8.dp))
@@ -130,7 +137,10 @@ fun MetadataChip(
             RoundedCornerShape(8.dp)
         )
         .then(
-            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+            if (onClick != null) Modifier.clickable {
+                AppHaptics.tick(context)
+                onClick()
+            } else Modifier
         )
 
     Row(
@@ -168,6 +178,7 @@ fun OttPillToggle(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Row(
         modifier = modifier
             .clip(OttPillShape)
@@ -182,7 +193,12 @@ fun OttPillToggle(
                 modifier = Modifier
                     .clip(OttPillShape)
                     .background(if (isSelected) Color.White else Color.Transparent)
-                    .clickable { if (selected != key) onSelect(key) }
+                    .clickable {
+                        if (selected != key) {
+                            AppHaptics.tick(context)
+                            onSelect(key)
+                        }
+                    }
                     .padding(horizontal = 10.dp, vertical = 5.dp),
                 contentAlignment = Alignment.Center
             ) {

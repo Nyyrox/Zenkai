@@ -719,9 +719,9 @@ object AnimeSaltResolver {
         val slug = resolveSlug(relationship, title, romajiTitle, format, episode, anilistId)
         val servers = extractServers(slug, isMovie)
         return if (isAbyss) {
-            servers.abyssUrl ?: ""
+            servers.abyssUrl ?: servers.myStreamUrl.orEmpty()
         } else {
-            servers.myStreamUrl ?: ""
+            servers.myStreamUrl ?: servers.abyssUrl.orEmpty()
         }
     }
 
@@ -760,9 +760,9 @@ object AnimeSaltResolver {
         val slug = resolveSlug(relationship, title, romajiTitle, format, episode, anilistId)
         val cached = serversCache[slug]
         return if (isAbyss) {
-            cached?.abyssUrl ?: ""
+            cached?.abyssUrl ?: cached?.myStreamUrl.orEmpty()
         } else {
-            cached?.myStreamUrl ?: ""
+            cached?.myStreamUrl ?: cached?.abyssUrl.orEmpty()
         }
     }
 

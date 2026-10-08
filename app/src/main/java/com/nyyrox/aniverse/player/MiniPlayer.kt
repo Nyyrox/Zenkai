@@ -80,6 +80,7 @@ fun MiniPlayerHost() {
     val parked = MiniPlayerManager.parked
     val inPip by MainActivity.isInPipMode
     val density = LocalDensity.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     val t = remember { Animatable(0f) } // 0 = mini window, 1 = video slot of the player page
@@ -432,7 +433,7 @@ private fun MiniPlayerContent(
                             .padding(horizontal = 14.dp)
                             .size(44.dp)
                             .clip(CircleShape)
-                            .clickable { PlayerPlaybackPlugin.togglePlayPause(player) }
+                            .clickable { PlayerPlaybackPlugin.togglePlayPause(player, context) }
                             .padding(6.dp)
                     )
                     Box(Modifier.size(34.dp))

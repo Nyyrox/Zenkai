@@ -1759,7 +1759,8 @@ fun CinePlayerView(
                         title = title,
                         subtitle = "Episode $episode" + (episodeTitle?.let { " - $it" } ?: ""),
                         onProgress = onProgressUpdate
-                    )
+                    ),
+                    context
                 )
                 exoPlayer = null
             }
@@ -1813,7 +1814,8 @@ fun CinePlayerView(
                             title = title,
                             subtitle = "Episode $episode" + (episodeTitle?.let { " - $it" } ?: ""),
                             onProgress = onProgressUpdate
-                        )
+                        ),
+                        context
                     )
                 } else {
                     MiniPlayerManager.parkRequest = null
@@ -1982,7 +1984,11 @@ fun CinePlayerView(
                                                     isSwipeSeeking = false
                                                     isInteractingVolume = true
                                                     val dragFraction = deltaY / (size.height * 0.6f)
+                                                    val prevVol = currentVolumeFraction
                                                     val newVol = (startVol + dragFraction).coerceIn(0f, 1f)
+                                                    if ((prevVol < 1f && newVol >= 1f) || (prevVol > 0f && newVol <= 0f)) {
+                                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                    }
                                                     PlayerGesturePlugin.setVolumeFraction(context, newVol)
                                                     currentVolumeFraction = newVol
                                                     showVolumeHud = true
@@ -3048,7 +3054,7 @@ fun CinePlayerView(
                                 GlassIconButton(
                                     onClick = {
                                         controlsTimeoutKey++
-                                        PlayerPlaybackPlugin.togglePlayPause(exoPlayer)
+                                        PlayerPlaybackPlugin.togglePlayPause(exoPlayer, context)
                                     },
                                     isHero = true,
                                     size = if (glassCompact) 44.dp else 56.dp,

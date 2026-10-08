@@ -1315,12 +1315,21 @@ fun GlassIconButton(
     isHero: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val src = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .size(size + 12.dp)
             .alpha(if (enabled) 1f else 0.4f)
-            .clickable(interactionSource = src, indication = null, enabled = enabled, onClick = onClick),
+            .clickable(
+                interactionSource = src,
+                indication = null,
+                enabled = enabled,
+                onClick = {
+                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                    onClick()
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         CineButtonContainer(isHero = isHero, interactionSource = src, modifier = Modifier.size(size), content = content)
@@ -1337,6 +1346,7 @@ fun GlassPillIcon(
     tint: Color = Color(0xE6FFFFFF),
     iconSize: Dp = 17.dp
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val compact = LocalGlassCompact.current
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
@@ -1351,7 +1361,10 @@ fun GlassPillIcon(
             .size(if (compact) 27.dp else 32.dp)
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .scale(s)
-            .clickable(interactionSource = src, indication = null) { onClick(bounds) },
+            .clickable(interactionSource = src, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick(bounds)
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(imageVector = icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(if (compact) iconSize * 0.88f else iconSize))

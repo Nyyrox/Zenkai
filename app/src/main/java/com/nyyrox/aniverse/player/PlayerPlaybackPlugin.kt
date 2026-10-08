@@ -15,9 +15,10 @@ object PlayerPlaybackPlugin {
      * If the video has ended, restarts from 0.
      * Toggles playWhenReady directly so UI updates reliably even during buffering.
      */
-    fun togglePlayPause(player: ExoPlayer?) {
+    fun togglePlayPause(player: ExoPlayer?, context: android.content.Context? = null) {
         try {
             val p = player ?: return
+            context?.let { com.nyyrox.aniverse.util.AppHaptics.tick(it) }
             if (p.playbackState == Player.STATE_ENDED) {
                 p.seekTo(0L)
                 p.playWhenReady = true

@@ -143,6 +143,7 @@ import com.nyyrox.aniverse.ui.components.AvatarCropDialog
 import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
+import com.nyyrox.aniverse.util.AppHaptics
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -2348,11 +2349,15 @@ private fun ProfileSettingRow(
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+                if (onClick != null) Modifier.clickable {
+                    AppHaptics.tick(context)
+                    onClick()
+                } else Modifier
             )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -2438,10 +2443,14 @@ private fun ProfileMangaCard(
     item: MangaBookmarkItem,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .width(115.dp)
-            .clickable(onClick = onClick)
+            .clickable {
+                AppHaptics.tick(context)
+                onClick()
+            }
     ) {
         Box(
             modifier = Modifier

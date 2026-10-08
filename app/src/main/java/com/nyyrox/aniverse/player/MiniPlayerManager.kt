@@ -64,11 +64,12 @@ object MiniPlayerManager {
     fun freshRequest(): ParkRequest? =
         parkRequest?.takeIf { SystemClock.elapsedRealtime() - it.at < 2000L }
 
-    fun park(p: Parked) {
+    fun park(p: Parked, context: Context? = null) {
         parked?.let { if (it.player !== p.player) destroy(it) }
         parkRequest = null
         isHandingOff = false
         parked = p
+        context?.let { com.nyyrox.aniverse.util.AppHaptics.tick(it) }
     }
 
     private fun matches(p: Parked, anilistId: Int, episode: Int, streamUrl: String) =

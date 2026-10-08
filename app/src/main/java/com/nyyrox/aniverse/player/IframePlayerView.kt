@@ -43,19 +43,21 @@ class WebAppInterface(
     private val onTimeUpdate: ((currentTime: Double, duration: Double) -> Unit)? = null,
     private val onPlayerEvent: ((event: String, currentTime: Double, duration: Double, isPaused: Boolean) -> Unit)? = null
 ) {
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     @android.webkit.JavascriptInterface
     fun onNextEpisode() {
-        onNextEpisode?.invoke()
+        mainHandler.post { onNextEpisode?.invoke() }
     }
 
     @android.webkit.JavascriptInterface
     fun onTimeUpdate(currentTime: Double, duration: Double) {
-        onTimeUpdate?.invoke(currentTime, duration)
+        mainHandler.post { onTimeUpdate?.invoke(currentTime, duration) }
     }
 
     @android.webkit.JavascriptInterface
     fun onPlayerEvent(event: String, currentTime: Double, duration: Double, isPaused: Boolean) {
-        onPlayerEvent?.invoke(event, currentTime, duration, isPaused)
+        mainHandler.post { onPlayerEvent?.invoke(event, currentTime, duration, isPaused) }
     }
 }
 
@@ -148,6 +150,10 @@ fun IframePlayerView(
     }
 
     fun loadEmbedUrl(wv: WebView, url: String) {
+        if (url.isBlank()) {
+            wv.loadUrl("about:blank")
+            return
+        }
         wv.tag = url
         val embedUri = try { Uri.parse(url) } catch (_: Exception) { null }
         val host = embedUri?.host.orEmpty()
@@ -158,6 +164,11 @@ fun IframePlayerView(
             host.contains("zokoanime") -> "https://zokoanime.video/"
             host.contains("4animo") || host.contains("recloud") -> "https://cdn.4animo.xyz/"
             host.contains("yumezone") -> "https://yumezone.qzz.io/"
+            host.contains("vidzee") -> "https://player.vidzee.wtf/"
+            host.contains("vidlove") -> "https://player.vidlove.cc/"
+            host.contains("cinemaos") -> "https://cinemaos.tech/"
+            host.contains("1embed") -> "https://1embed.cc/"
+            host.contains("2embed") -> "https://www.2embed.stream/"
             host.contains("streamwish") || host.contains("filemoon") || host.contains("dood") -> "https://$host/"
             host.isNotBlank() -> "https://$host/"
             else -> "https://megaplay.buzz/"
@@ -363,6 +374,14 @@ fun IframePlayerView(
                                 view?.evaluateJavascript(autoPlayRecoveryJs, null)
                             }
 
+                            override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                                try {
+                                    (view?.parent as? ViewGroup)?.removeView(view)
+                                    view?.destroy()
+                                } catch (_: Throwable) {}
+                                return true
+                            }
+
                             // Capacitor HTTP style CORS bypass: intercept OPTIONS preflight & cross-origin stream/API requests
                             override fun shouldInterceptRequest(
                                 view: WebView?,
@@ -395,7 +414,10 @@ fun IframePlayerView(
                                 val lowUrl = targetUrl.lowercase()
                                 val isMediaStream = (lowUrl.contains(".m3u8") || lowUrl.contains(".mp4") || (lowUrl.contains("playlist") && !lowUrl.contains(".html"))) && !lowUrl.contains(".js") && !lowUrl.contains(".css")
                                 if (isMediaStream) {
-                                    onStreamDetected?.invoke(targetUrl, req.requestHeaders.orEmpty())
+                                    val headersCopy = req.requestHeaders.orEmpty()
+                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                        onStreamDetected?.invoke(targetUrl, headersCopy)
+                                    }
                                 }
 
                                 val isStreamOrApi = isMediaStream || lowUrl.contains(".ts") ||
@@ -420,6 +442,13 @@ fun IframePlayerView(
                                         val defaultReferer = when {
                                             embedHost.contains("megacloud") || embedHost.contains("megaplay") || embedHost.contains("vidstream") || embedHost.contains("rapid-cloud") -> "https://megaplay.buzz/"
                                             embedHost.contains("vidnest") -> "https://vidnest.fun/"
+                                            embedHost.contains("tryembed") -> "https://tryembed.us.cc/"
+                                            embedHost.contains("zokoanime") -> "https://zokoanime.video/"
+                                            embedHost.contains("vidzee") -> "https://player.vidzee.wtf/"
+                                            embedHost.contains("vidlove") -> "https://player.vidlove.cc/"
+                                            embedHost.contains("cinemaos") -> "https://cinemaos.tech/"
+                                            embedHost.contains("1embed") -> "https://1embed.cc/"
+                                            embedHost.contains("2embed") -> "https://www.2embed.stream/"
                                             embedHost.isNotBlank() -> "https://$embedHost/"
                                             else -> "https://megaplay.buzz/"
                                         }
@@ -434,6 +463,8 @@ fun IframePlayerView(
                                         if ((code == 403 || code == 404 || code == 401 || code == 503) &&
                                             (lowUrl.contains("megaplay") || lowUrl.contains("vidnest") ||
                                              lowUrl.contains("megacloud") || lowUrl.contains("vidstream") ||
+                                             lowUrl.contains("tryembed") || lowUrl.contains("zoko") ||
+                                             lowUrl.contains("vidzee") || lowUrl.contains("cinemaos") ||
                                              defaultReferer.isNotBlank())
                                         ) {
                                             conn.disconnect()
@@ -441,6 +472,10 @@ fun IframePlayerView(
                                             val retryStrategies = listOf(
                                                 "https://megaplay.buzz/" to "https://megaplay.buzz",
                                                 "https://vidnest.fun/" to "https://vidnest.fun",
+                                                "https://tryembed.us.cc/" to "https://tryembed.us.cc",
+                                                "https://zokoanime.video/" to "https://zokoanime.video",
+                                                "https://player.vidzee.wtf/" to "https://player.vidzee.wtf",
+                                                "https://cinemaos.tech/" to "https://cinemaos.tech",
                                                 "https://$host/" to "https://$host",
                                                 null to null
                                             )
@@ -470,7 +505,15 @@ fun IframePlayerView(
                                             }
                                         }
 
-                                        val statusMsg = conn.responseMessage ?: "OK"
+                                        // Android WebResourceResponse explicitly throws IllegalArgumentException for status codes in 300..399 or not in 100..599!
+                                        if (code in 300..399 || code !in 100..599) {
+                                            try { conn.disconnect() } catch (_: Throwable) {}
+                                            return null
+                                        }
+
+                                        val cleanStatusMsg = (conn.responseMessage ?: "OK")
+                                            .filter { it.code in 32..126 }
+                                            .ifBlank { "OK" }
                                         val mimeType = conn.contentType?.split(";")?.firstOrNull()?.trim()
                                             ?: when {
                                                 lowUrl.contains(".m3u8") -> "application/vnd.apple.mpegurl"
@@ -506,7 +549,11 @@ fun IframePlayerView(
 
                                         val rawStream = if (code in 200..299 || code == 206) conn.inputStream else (conn.errorStream ?: ByteArrayInputStream(ByteArray(0)))
                                         val isStream = java.io.BufferedInputStream(rawStream, 65536)
-                                        return WebResourceResponse(mimeType, encoding, code, statusMsg, resHeaders, isStream)
+                                        return try {
+                                            WebResourceResponse(mimeType, encoding, code, cleanStatusMsg, resHeaders, isStream)
+                                        } catch (_: Throwable) {
+                                            null
+                                        }
                                     } catch (_: Exception) {
                                         // Fallback to standard webview pipeline
                                     }
@@ -533,9 +580,14 @@ fun IframePlayerView(
                     }
                 },
                 onRelease = { wv ->
-                    wv.stopLoading()
-                    wv.loadUrl("about:blank")
-                    wv.destroy()
+                    try {
+                        (wv.parent as? ViewGroup)?.removeView(wv)
+                        wv.stopLoading()
+                        wv.loadUrl("about:blank")
+                        wv.clearHistory()
+                        wv.webChromeClient = null
+                        wv.destroy()
+                    } catch (_: Throwable) {}
                 }
             )
         }

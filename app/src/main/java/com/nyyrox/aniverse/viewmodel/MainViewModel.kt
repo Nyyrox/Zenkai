@@ -184,11 +184,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     var pendingMangaTitleHint: String? = null
     fun openAnimeDetail(id: Int) {
+        com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
         activeDetailAnimeId = id
         openDetail(id)
     }
     fun closeAnimeDetail() { activeDetailAnimeId = null }
     fun openMangaDetail(id: String, titleHint: String? = null) {
+        com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
         pendingMangaTitleHint = titleHint
         activeDetailMangaId = id
     }
@@ -197,6 +199,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activeDetailMangaId = null
     }
     fun openNovelDetail(slug: String) {
+        com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
         activeDetailNovelSlug = slug
         loadNovelDetail(slug)
     }
