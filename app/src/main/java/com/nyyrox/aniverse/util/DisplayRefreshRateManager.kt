@@ -149,15 +149,15 @@ object DisplayRefreshRateManager {
             // Explicitly set preferredRefreshRate (API 23+)
             params.preferredRefreshRate = effectiveHz.toFloat()
 
-            // In Android 11+ (API 30+), clamp the variable refresh rate range
+            // In Android 11+ (API 30+), clamp the variable refresh rate range safely via reflection
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (effectiveHz == 60) {
-                    params.preferredMinDisplayRefreshRate = 60f
-                    params.preferredMaxDisplayRefreshRate = 60f
-                } else {
-                    params.preferredMinDisplayRefreshRate = effectiveHz.toFloat()
-                    params.preferredMaxDisplayRefreshRate = effectiveHz.toFloat()
-                }
+                try {
+                    val minField = params.javaClass.getField("preferredMinDisplayRefreshRate")
+                    val maxField = params.javaClass.getField("preferredMaxDisplayRefreshRate")
+                    val rate = effectiveHz.toFloat()
+                    minField.setFloat(params, rate)
+                    maxField.setFloat(params, rate)
+                } catch (_: Throwable) {}
             }
 
             // Find matching hardware display mode ID
@@ -178,13 +178,15 @@ object DisplayRefreshRateManager {
 
             window.attributes = params
 
-            // On Android 12+ (API 31+), set the decorView frame rate for Choreographer / SurfaceFlinger
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // On Android 11+ (API 30+), safely set frame rate on root surface control via reflection
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 try {
-                    window.decorView.setFrameRate(
-                        effectiveHz.toFloat(),
-                        android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT
-                    )
+                    val decor = window.decorView
+                    val root = decor.javaClass.getMethod("getRootSurfaceControl").invoke(decor)
+                    if (root != null) {
+                        root.javaClass.getMethod("setFrameRate", Float::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                            .invoke(root, effectiveHz.toFloat(), 0)
+                    }
                 } catch (_: Throwable) {}
             }
         } catch (_: Throwable) {}

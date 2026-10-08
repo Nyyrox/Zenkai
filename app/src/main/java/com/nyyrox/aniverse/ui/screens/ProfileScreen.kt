@@ -2204,7 +2204,7 @@ fun ProfileScreen(
                                     .background(Color(0xFF10B981))
                             )
                             Text(
-                                text = "${currentPhysicalHz.roundToInt()}Hz Active",
+                                text = "${(currentPhysicalHz + 0.5f).toInt()}Hz Active",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF34D399)
@@ -2251,7 +2251,7 @@ fun ProfileScreen(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
-                                if (currentPhysicalHz.roundToInt() == hz) {
+                                if ((currentPhysicalHz + 0.5f).toInt() == hz) {
                                     Box(
                                         modifier = Modifier
                                             .clip(OttPillShape)
