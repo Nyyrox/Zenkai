@@ -278,7 +278,7 @@ object DirectStreamResolver {
         try {
             val isMovieCandidate = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.resolveCandidate(anilistId, episode, animeTitle)
             val isMovie = isMovieCandidate.isMovie
-            val seriesRel = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.resolveSeries(
+            val seriesRel = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.getOrBuildRelationship(
                 anilistId = anilistId,
                 title = animeTitle,
                 format = if (isMovie) "MOVIE" else null

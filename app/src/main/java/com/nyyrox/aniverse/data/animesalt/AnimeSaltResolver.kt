@@ -224,6 +224,15 @@ object AnimeSaltResolver {
      * 2. If absent: AniList Title -> TMDB Mapped Title -> AnimeSalt Series Match -> Read ALL Seasons/Episodes -> Deterministic episodeMap.
      * AniList remains the episode-order authority.
      */
+    suspend fun resolveSeries(
+        anilistId: Int,
+        title: String,
+        romajiTitle: String? = null,
+        tmdbTitle: String? = null,
+        format: String? = null,
+        totalEpisodes: Int = 1
+    ): AnimeSaltSeriesRelationship? = getOrBuildRelationship(anilistId, title, romajiTitle, tmdbTitle, format, totalEpisodes)
+
     suspend fun getOrBuildRelationship(
         anilistId: Int,
         title: String,
