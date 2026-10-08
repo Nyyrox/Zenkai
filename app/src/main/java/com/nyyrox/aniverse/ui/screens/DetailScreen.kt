@@ -142,6 +142,7 @@ import com.nyyrox.aniverse.data.tmdb.TmdbEpisodeStill
 import com.nyyrox.aniverse.data.tmdb.TmdbRepository
 import com.nyyrox.aniverse.data.tmdb.TmdbVideo
 import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
+import com.nyyrox.aniverse.ui.animation.SharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedTransitionPhase
 import com.nyyrox.aniverse.ui.components.DetailScreenSkeleton
 import com.nyyrox.aniverse.ui.components.OttPosterCard
@@ -2539,7 +2540,7 @@ private fun RecommendationPosterItem(
 private fun DetailWaveOscillatingSkeleton(
     cachedPoster: String?,
     onBack: () -> Unit,
-    coordinator: com.nyyrox.aniverse.ui.animation.SharedTransitionCoordinator?
+    coordinator: SharedPosterCoordinator?
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "detailWaveTransition")
 

@@ -473,6 +473,14 @@ object AniBridgeResolver {
         }
     }
 
+    private fun logEpisode(res: ResolvedEpisodeMapping) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, """
+                [EPISODE MAP] AniList ID: ${res.anilistId}, Ep: ${res.anilistEpisode} -> TMDB ID: ${res.tmdbId}, Season: ${res.tmdbSeason}, Episode: ${res.tmdbEpisode} (Source: ${res.mappingSource})
+            """.trimIndent())
+        }
+    }
+
     private fun reloadSync(context: Context) {
         val cacheDir = File(context.filesDir, "anibridge")
         val cacheFile = File(cacheDir, CACHE_FILE_NAME)
