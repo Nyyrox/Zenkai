@@ -164,6 +164,32 @@ fun HomeScreen(
         val lazyListState = vm.homeLazyListState
         val exploreList = vm.homeExplore.ifEmpty { vm.popular }
 
+        val trendingTopEpisodes = remember(vm.trending, vm.popular) {
+            (vm.trending.ifEmpty { vm.popular }).take(2)
+        }
+
+        val genreShelves = remember(
+            vm.actionAnime,
+            vm.fantasyAnime,
+            vm.topRated,
+            vm.scifiAnime,
+            vm.romanceAnime,
+            vm.newReleases,
+            vm.upcomingAnime,
+            vm.popular
+        ) {
+            listOfNotNull(
+                if (vm.actionAnime.isNotEmpty()) ("💥 Action & Adrenaline" to vm.actionAnime) else null,
+                if (vm.fantasyAnime.isNotEmpty()) ("✨ Fantasy & Magic" to vm.fantasyAnime) else null,
+                if (vm.topRated.isNotEmpty()) ("🌟 Masterpieces & Critically Acclaimed" to vm.topRated) else null,
+                if (vm.scifiAnime.isNotEmpty()) ("🚀 Sci-Fi & Cyberpunk" to vm.scifiAnime) else null,
+                if (vm.romanceAnime.isNotEmpty()) ("💖 Romance & Slice of Life" to vm.romanceAnime) else null,
+                if (vm.newReleases.isNotEmpty()) ("⚡ Fresh Broadcast Hits" to vm.newReleases) else null,
+                if (vm.upcomingAnime.isNotEmpty()) ("🔮 Highly Anticipated" to vm.upcomingAnime) else null,
+                if (vm.popular.isNotEmpty()) ("🔥 Fan Favorite Hits" to vm.popular) else null
+            ).shuffled()
+        }
+
         val shouldLoadMore by remember {
             derivedStateOf {
                 val layoutInfo = lazyListState.layoutInfo
@@ -252,9 +278,6 @@ fun HomeScreen(
         }
 
         // Featured Trending & Top Watched YouTube-style Episode Feed
-        val trendingTopEpisodes = remember(vm.trending, vm.popular) {
-            (vm.trending.ifEmpty { vm.popular }).take(2)
-        }
         if (trendingTopEpisodes.isNotEmpty()) {
             item(key = "home_trending_episodes_header") {
                 Column(modifier = Modifier.staggeredEntrance(index = 2)) {
@@ -429,28 +452,6 @@ fun HomeScreen(
                         subtitle = "Stream top episodes and explore genres"
                     )
                 }
-            }
-
-            val genreShelves = remember(
-                vm.actionAnime,
-                vm.fantasyAnime,
-                vm.topRated,
-                vm.scifiAnime,
-                vm.romanceAnime,
-                vm.newReleases,
-                vm.upcomingAnime,
-                vm.popular
-            ) {
-                listOfNotNull(
-                    if (vm.actionAnime.isNotEmpty()) ("💥 Action & Adrenaline" to vm.actionAnime) else null,
-                    if (vm.fantasyAnime.isNotEmpty()) ("✨ Fantasy & Magic" to vm.fantasyAnime) else null,
-                    if (vm.topRated.isNotEmpty()) ("🌟 Masterpieces & Critically Acclaimed" to vm.topRated) else null,
-                    if (vm.scifiAnime.isNotEmpty()) ("🚀 Sci-Fi & Cyberpunk" to vm.scifiAnime) else null,
-                    if (vm.romanceAnime.isNotEmpty()) ("💖 Romance & Slice of Life" to vm.romanceAnime) else null,
-                    if (vm.newReleases.isNotEmpty()) ("⚡ Fresh Broadcast Hits" to vm.newReleases) else null,
-                    if (vm.upcomingAnime.isNotEmpty()) ("🔮 Highly Anticipated" to vm.upcomingAnime) else null,
-                    if (vm.popular.isNotEmpty()) ("🔥 Fan Favorite Hits" to vm.popular) else null
-                ).shuffled()
             }
 
             itemsIndexed(
