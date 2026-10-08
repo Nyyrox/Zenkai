@@ -215,109 +215,41 @@ fun AiringScreen(
             .background(OttBg)
             .statusBarsPadding()
     ) {
-        // Top Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Airing Schedule",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = selectedDay?.let { "${it.displayHeader} • ${dayAiring.size} anime" } ?: "Broadcasting Anime",
-                    fontSize = 12.sp,
-                    color = OttTextSecondary
-                )
-            }
-            IconButton(
-                onClick = { vm.loadAiring(forceRefresh = true) },
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x18FFFFFF))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-
         // Horizontal Day Selector Tabs
         LazyRow(
             state = rowListState,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             itemsIndexed(days) { index, day ->
                 val isSelected = index == selectedDayIndex
                 Box(
                     modifier = Modifier
-                        .width(66.dp)
-                        .height(72.dp)
+                        .width(68.dp)
+                        .height(60.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            when {
-                                isSelected -> Color.White
-                                day.isToday -> Color(0xFF23252E)
-                                else -> Color(0xFF16171B)
-                            }
-                        )
-                        .border(
-                            width = if (isSelected) 0.dp else if (day.isToday) 1.5.dp else 1.dp,
-                            color = when {
-                                isSelected -> Color.Transparent
-                                day.isToday -> OttPrimary
-                                else -> Color(0x18FFFFFF)
-                            },
-                            shape = RoundedCornerShape(16.dp)
-                        )
+                        .background(if (isSelected) Color.White else Color(0xFF181A20))
                         .clickable { selectedDayIndex = index }
-                        .padding(horizontal = 6.dp, vertical = 7.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxHeight()
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = day.dayName.uppercase(),
-                            fontSize = 11.5.sp,
+                            text = day.dayName,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color(0xFF1E1E1E) else if (day.isToday) OttPrimary else Color(0xFF888B96)
-                        )
-                        Text(
-                            text = day.dateNumber,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
                             color = if (isSelected) Color.Black else Color.White
                         )
-                        if (day.isToday) {
-                            Text(
-                                text = "TODAY",
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (isSelected) Color(0xFF0066FF) else OttAccentGold,
-                                letterSpacing = 0.5.sp
-                            )
-                        } else {
-                            Text(
-                                text = day.monthFormatted.uppercase(),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isSelected) Color(0xFF555555) else Color(0xFF6B6E7B)
-                            )
-                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = day.fullDateFormatted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isSelected) Color(0xFF444444) else Color(0xFF888B96)
+                        )
                     }
                 }
             }
