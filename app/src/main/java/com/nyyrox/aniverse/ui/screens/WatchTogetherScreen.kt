@@ -1764,7 +1764,10 @@ private fun HostPlaybackControlsTab(
                     anime = dummyAnime,
                     episode = epNum,
                     isSelected = epNum == currentEpisode,
-                    episodeStill = epStillInfo?.stillUrl,
+                    episodeStill = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                        ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                        ?: dummyAnime.banner?.takeIf { it.isNotBlank() }
+                        ?: dummyAnime.cover,
                     episodeTitle = epStillInfo?.name,
                     isDownloaded = false,
                     isDownloading = false,

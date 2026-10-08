@@ -494,19 +494,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val still = withContext(Dispatchers.IO) {
+                    val season = com.nyyrox.aniverse.data.mapping.AnimeSeasonMapper.resolveSeason(anime.title, anime.romajiTitle)
                     val mapped = com.nyyrox.aniverse.data.tmdb.TmdbRepository.fetchEpisodesMapped(
                         anilistId = anime.id,
                         title = anime.title,
                         romajiTitle = anime.romajiTitle,
-                        season = anime.seasonYear,
+                        season = season,
                         totalEpisodes = anime.episodes ?: 24,
                         format = anime.format
                     )
-                    mapped[episodeNumber]?.stillUrl
+                    mapped[episodeNumber]?.stillUrl?.takeIf { it.isNotBlank() }
+                        ?: mapped[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                        ?: tmdbArtworks[anime.id]?.backdropUrl?.takeIf { it.isNotBlank() }
+                        ?: anime.banner?.takeIf { it.isNotBlank() }
+                        ?: anime.cover
                 }
-                tmdbEpisodeStills = tmdbEpisodeStills + (key to still)
+                val finalStill = still?.takeIf { it.isNotBlank() }
+                    ?: anime.banner?.takeIf { it.isNotBlank() }
+                    ?: anime.cover
+                tmdbEpisodeStills = tmdbEpisodeStills + (key to finalStill)
             } catch (_: Exception) {
-                tmdbEpisodeStills = tmdbEpisodeStills + (key to null)
+                tmdbEpisodeStills = tmdbEpisodeStills + (key to (anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover))
             }
         }
     }

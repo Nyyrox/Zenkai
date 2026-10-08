@@ -19,7 +19,8 @@ data class TmdbArtwork(
     val tmdbId: Int,
     val tmdbType: String,
     val backdropUrl: String?,
-    val logoUrl: String?
+    val logoUrl: String?,
+    val title: String? = null
 )
 
 data class TmdbCastMember(
@@ -263,12 +264,14 @@ object TmdbRepository {
                 }
 
                 val logoUrl = selectedLogoPath?.let { "$TMDB_IMAGE_BASE/w500$it" }
+                val tmdbTitle = json.optString("name").ifBlank { json.optString("title") }.takeIf { it.isNotBlank() }
 
                 val artwork = TmdbArtwork(
                     tmdbId = resolved.id,
                     tmdbType = resolved.type,
                     backdropUrl = backdropUrl,
-                    logoUrl = logoUrl
+                    logoUrl = logoUrl,
+                    title = tmdbTitle
                 )
 
                 artworkCache[cacheKey] = artwork
@@ -811,12 +814,14 @@ object TmdbRepository {
                         overview = ep.overview
                     )
                     resultMap[absEp] = mappedStill
-                    resultMap[seasonEp] = TmdbEpisodeStill(
-                        episodeNumber = seasonEp,
-                        name = ep.name,
-                        stillUrl = ep.stillUrl,
-                        overview = ep.overview
-                    )
+                    if (sInfo.seasonNumber == 1 || !resultMap.containsKey(seasonEp)) {
+                        resultMap[seasonEp] = TmdbEpisodeStill(
+                            episodeNumber = seasonEp,
+                            name = ep.name,
+                            stillUrl = ep.stillUrl,
+                            overview = ep.overview
+                        )
+                    }
                 }
                 cumulativeOffset += if (epList.isNotEmpty()) epList.size else sInfo.episodeCount
             }

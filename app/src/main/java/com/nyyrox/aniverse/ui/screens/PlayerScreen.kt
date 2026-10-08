@@ -851,7 +851,10 @@ fun PlayerScreen(
                         episode = playingEpisode,
                         episodeTitle = tmdbEpisodes[playingEpisode]?.name,
                         nextEpisodeTitle = tmdbEpisodes[playingEpisode + 1]?.name,
-                        nextEpisodeImage = tmdbEpisodes[playingEpisode + 1]?.stillUrl ?: anime.banner ?: anime.cover,
+                        nextEpisodeImage = tmdbEpisodes[playingEpisode + 1]?.stillUrl?.takeIf { it.isNotBlank() }
+                            ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                            ?: anime.banner?.takeIf { it.isNotBlank() }
+                            ?: anime.cover,
                         streamUrl = adoptUrl.takeIf { adopting } ?: activeStreamUrl,
                         isDirectStream = isDirectStreamActive,
                         isDub = currentProvider.isDub || selectedCategory == "DUB",
@@ -1074,7 +1077,10 @@ fun PlayerScreen(
                                     .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(10.dp))
                             ) {
                                 AsyncImage(
-                                    model = currentEpInfo?.stillUrl ?: anime.banner ?: anime.cover,
+                                    model = currentEpInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                                        ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                                        ?: anime.banner?.takeIf { it.isNotBlank() }
+                                        ?: anime.cover,
                                     contentDescription = "Episode $currentEpisode",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
@@ -2099,7 +2105,10 @@ fun PlayerScreen(
                                 anime = anime,
                                 episode = epNum,
                                 isSelected = epNum == currentEpisode,
-                                episodeStill = epStillInfo?.stillUrl,
+                                episodeStill = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                                    ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                                    ?: anime.banner?.takeIf { it.isNotBlank() }
+                                    ?: anime.cover,
                                 episodeTitle = epStillInfo?.name,
                                 isDownloaded = isEpDl,
                                 isDownloading = isEpDling,

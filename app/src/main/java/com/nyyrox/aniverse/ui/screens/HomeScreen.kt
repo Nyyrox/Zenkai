@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
+import com.nyyrox.aniverse.ui.components.ShimmerBox
 import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.ui.components.ContinueWatchingSkeleton
 import com.nyyrox.aniverse.ui.components.HeroBannerSkeleton
@@ -298,12 +300,16 @@ fun HomeScreen(
             }
             itemsIndexed(trendingTopEpisodes, key = { idx, a -> "trending_ep_${a.id}_$idx" }) { idx, anime ->
                 val epStill = vm.tmdbEpisodeStills["${anime.id}_1"]
+                val artwork = vm.tmdbArtworks[anime.id]
                 YouTubeStyleEpisodeCard(
                     anime = anime,
                     episodeNumber = 1,
-                    badgeText = if (idx == 0) "TOP WATCHED" else "TRENDING NOW",
+                    badgeText = if (idx == 0) "MUST WATCH" else "TRENDING NOW",
                     episodeStill = epStill,
+                    logoUrl = artwork?.logoUrl,
+                    tmdbTitle = artwork?.title,
                     onLoadStill = { vm.loadTmdbEpisodeStill(anime, 1) },
+                    onLoadArtwork = { vm.loadTmdbArtwork(anime) },
                     onAnimeClick = onAnimeClick,
                     onPlayClick = onPlayClick,
                     modifier = Modifier.staggeredEntrance(index = 2 + idx)
@@ -343,6 +349,33 @@ fun HomeScreen(
             }
         }
 
+        // ── Must Watch Spotlight 1 (In Between Popular Series and Critically Acclaimed) ──
+        val spotlight1 = vm.popular.getOrNull(1) ?: vm.trending.getOrNull(2)
+        if (spotlight1 != null) {
+            item(key = "spotlight_popular_${spotlight1.id}") {
+                val artwork = vm.tmdbArtworks[spotlight1.id]
+                val epStill = vm.tmdbEpisodeStills["${spotlight1.id}_1"]
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 4)) {
+                    OttSectionHeader(
+                        title = "Must Watch Spotlight",
+                        subtitle = "Trending worldwide on Zenkai"
+                    )
+                    YouTubeStyleEpisodeCard(
+                        anime = spotlight1,
+                        episodeNumber = 1,
+                        badgeText = "MUST WATCH",
+                        episodeStill = epStill,
+                        logoUrl = artwork?.logoUrl,
+                        tmdbTitle = artwork?.title,
+                        onLoadStill = { vm.loadTmdbEpisodeStill(spotlight1, 1) },
+                        onLoadArtwork = { vm.loadTmdbArtwork(spotlight1) },
+                        onAnimeClick = onAnimeClick,
+                        onPlayClick = onPlayClick
+                    )
+                }
+            }
+        }
+
         // Top Rated Masterpieces
         if (vm.topRated.isNotEmpty()) {
             item(key = "home_top_rated") {
@@ -370,6 +403,33 @@ fun HomeScreen(
                     OttHorizontalMediaRow(
                         list = vm.actionAnime,
                         onAnimeClick = onAnimeClick
+                    )
+                }
+            }
+        }
+
+        // ── Action Spotlight 2 (In Between Action & Fantasy) ──
+        val actionSpotlight = vm.actionAnime.firstOrNull()
+        if (actionSpotlight != null && actionSpotlight.id != spotlight1?.id) {
+            item(key = "spotlight_action_${actionSpotlight.id}") {
+                val artwork = vm.tmdbArtworks[actionSpotlight.id]
+                val epStill = vm.tmdbEpisodeStills["${actionSpotlight.id}_1"]
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 6)) {
+                    OttSectionHeader(
+                        title = "Action Spotlight",
+                        subtitle = "High octane showdowns and epic fights"
+                    )
+                    YouTubeStyleEpisodeCard(
+                        anime = actionSpotlight,
+                        episodeNumber = 1,
+                        badgeText = "MUST WATCH • ACTION",
+                        episodeStill = epStill,
+                        logoUrl = artwork?.logoUrl,
+                        tmdbTitle = artwork?.title,
+                        onLoadStill = { vm.loadTmdbEpisodeStill(actionSpotlight, 1) },
+                        onLoadArtwork = { vm.loadTmdbArtwork(actionSpotlight) },
+                        onAnimeClick = onAnimeClick,
+                        onPlayClick = onPlayClick
                     )
                 }
             }
@@ -489,6 +549,33 @@ fun HomeScreen(
             }
         }
 
+        // ── Featured Spotlight 3 (In Between Novels and Explore Feed) ──
+        val featureSpotlight = vm.scifiAnime.firstOrNull() ?: vm.fantasyAnime.firstOrNull()
+        if (featureSpotlight != null && featureSpotlight.id != spotlight1?.id && featureSpotlight.id != actionSpotlight?.id) {
+            item(key = "spotlight_feature_${featureSpotlight.id}") {
+                val artwork = vm.tmdbArtworks[featureSpotlight.id]
+                val epStill = vm.tmdbEpisodeStills["${featureSpotlight.id}_1"]
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 11)) {
+                    OttSectionHeader(
+                        title = "Featured Spotlight",
+                        subtitle = "Handpicked masterpiece with full episodes"
+                    )
+                    YouTubeStyleEpisodeCard(
+                        anime = featureSpotlight,
+                        episodeNumber = 1,
+                        badgeText = "MUST WATCH",
+                        episodeStill = epStill,
+                        logoUrl = artwork?.logoUrl,
+                        tmdbTitle = artwork?.title,
+                        onLoadStill = { vm.loadTmdbEpisodeStill(featureSpotlight, 1) },
+                        onLoadArtwork = { vm.loadTmdbArtwork(featureSpotlight) },
+                        onAnimeClick = onAnimeClick,
+                        onPlayClick = onPlayClick
+                    )
+                }
+            }
+        }
+
         // ── 7. Dynamic YouTube-Style Feed: Top Episodes + Random Genre Shelves with Media Cards ───
         if (exploreList.isNotEmpty()) {
             item(key = "home_explore_header") {
@@ -504,17 +591,24 @@ fun HomeScreen(
                 items = exploreList,
                 key = { idx, anime -> "explore_yt_feed_${anime.id}_$idx" }
             ) { index, anime ->
-                val epNum = remember(anime.id) { ((anime.id % 12) + 1).coerceAtLeast(1) }
+                val epNum = remember(anime.id, anime.episodes, anime.isMovie) {
+                    if (anime.isMovie || anime.episodes == 1) 1
+                    else {
+                        val maxEp = (anime.episodes ?: 12).coerceAtLeast(1)
+                        ((anime.id % maxEp) + 1).coerceIn(1, maxEp)
+                    }
+                }
                 val badge = remember(index) {
                     when (index % 5) {
-                        0 -> "TOP EPISODE"
-                        1 -> "TOP WATCHED"
-                        2 -> "TRENDING NOW"
-                        3 -> "POPULAR PICK"
-                        else -> "MUST WATCH"
+                        0 -> "MUST WATCH"
+                        1 -> "TOP EPISODE"
+                        2 -> "TOP WATCHED"
+                        3 -> "TRENDING NOW"
+                        else -> "POPULAR PICK"
                     }
                 }
                 val epStill = vm.tmdbEpisodeStills["${anime.id}_$epNum"]
+                val artwork = vm.tmdbArtworks[anime.id]
 
                 // YouTube-style episode card
                 YouTubeStyleEpisodeCard(
@@ -522,7 +616,10 @@ fun HomeScreen(
                     episodeNumber = epNum,
                     badgeText = badge,
                     episodeStill = epStill,
+                    logoUrl = artwork?.logoUrl,
+                    tmdbTitle = artwork?.title,
                     onLoadStill = { vm.loadTmdbEpisodeStill(anime, epNum) },
+                    onLoadArtwork = { vm.loadTmdbArtwork(anime) },
                     onAnimeClick = onAnimeClick,
                     onPlayClick = onPlayClick
                 )
@@ -750,13 +847,17 @@ fun YouTubeStyleEpisodeCard(
     episodeNumber: Int = 1,
     badgeText: String? = null,
     episodeStill: String? = null,
+    logoUrl: String? = null,
+    tmdbTitle: String? = null,
     onLoadStill: (() -> Unit)? = null,
+    onLoadArtwork: (() -> Unit)? = null,
     onAnimeClick: (Int) -> Unit,
     onPlayClick: (animeId: Int, episode: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(anime.id, episodeNumber) {
         onLoadStill?.invoke()
+        onLoadArtwork?.invoke()
     }
 
     val durationText = remember(anime.duration) {
@@ -765,10 +866,13 @@ fun YouTubeStyleEpisodeCard(
     }
 
     val displayTitle = anime.displayTitle
-    val episodeTitle = "Episode $episodeNumber"
+    val preferredTitle = tmdbTitle?.takeIf { it.isNotBlank() } ?: displayTitle
+    val episodeTitle = if (anime.isMovie) "Full Movie" else "Episode $episodeNumber"
 
     val thumbnailImage = remember(episodeStill, anime.banner, anime.cover) {
-        episodeStill ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover
+        episodeStill?.takeIf { it.isNotBlank() }
+            ?: anime.banner?.takeIf { it.isNotBlank() }
+            ?: anime.cover
     }
 
     Column(
@@ -787,36 +891,51 @@ fun YouTubeStyleEpisodeCard(
                 .background(Color(0xFF131722))
                 .clickable { onPlayClick(anime.id, episodeNumber) }
         ) {
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = thumbnailImage,
-                contentDescription = displayTitle,
+                contentDescription = preferredTitle,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                loading = {
+                    ShimmerBox(
+                        modifier = Modifier.fillMaxSize(),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                },
+                error = {
+                    AsyncImage(
+                        model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
+                        contentDescription = preferredTitle,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             )
 
-            // Gradient darkening
+            // Gradient darkening (top, center, and deep bottom for text and logo readability)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x30000000),
-                                Color.Transparent,
-                                Color(0x95000000)
+                                Color(0x60000000),
+                                Color(0x10000000),
+                                Color(0x9A000000)
                             )
                         )
                     )
             )
 
-            // Top-Left Badge (e.g. "TOP WATCHED" or "TRENDING") - Subtle frosted glass (no border)
+            // Top-Left Badge (e.g. "MUST WATCH", "TOP WATCHED", "TRENDING") - Subtle frosted glass (no border)
             if (!badgeText.isNullOrBlank()) {
+                val isMustWatch = badgeText.contains("MUST WATCH", ignoreCase = true)
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(10.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0x850E131E))
+                        .background(if (isMustWatch) Color(0x95E50914) else Color(0x850E131E))
                         .padding(horizontal = 9.dp, vertical = 4.dp)
                 ) {
                     Text(
@@ -827,6 +946,21 @@ fun YouTubeStyleEpisodeCard(
                         letterSpacing = 0.5.sp
                     )
                 }
+            }
+
+            // TMDB Title Logo PNG Overlay (Overlaid inside thumbnail above bottom badges)
+            if (!logoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = logoUrl,
+                    contentDescription = preferredTitle,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 12.dp, bottom = 36.dp)
+                        .heightIn(max = 42.dp)
+                        .fillMaxWidth(0.55f),
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.BottomStart
+                )
             }
 
             // Center Circular Play Button - Frosted Glass Circle (no border)
@@ -856,7 +990,7 @@ fun YouTubeStyleEpisodeCard(
                     .padding(horizontal = 7.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = "EP $episodeNumber",
+                    text = if (anime.isMovie) "MOVIE" else "EP $episodeNumber",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = OttAccentGold
@@ -895,7 +1029,7 @@ fun YouTubeStyleEpisodeCard(
                 model = anime.cover,
                 contentDescription = null,
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(42.dp)
                     .clip(CircleShape)
                     .clickable { onAnimeClick(anime.id) },
                 contentScale = ContentScale.Crop
@@ -909,8 +1043,9 @@ fun YouTubeStyleEpisodeCard(
                     .weight(1f)
                     .clickable { onAnimeClick(anime.id) }
             ) {
+                val headerTitle = if (anime.isMovie) preferredTitle else "$preferredTitle • $episodeTitle"
                 Text(
-                    text = "$displayTitle • $episodeTitle",
+                    text = headerTitle,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -922,7 +1057,7 @@ fun YouTubeStyleEpisodeCard(
                 Spacer(Modifier.height(3.dp))
 
                 val genreText = anime.genres.take(2).joinToString(" • ")
-                val scoreText = anime.score?.let { "$it%" } ?: "Trending"
+                val scoreText = anime.score?.let { "$it% Match" } ?: "Trending"
                 val formatText = anime.displayFormat ?: "TV"
 
                 Text(

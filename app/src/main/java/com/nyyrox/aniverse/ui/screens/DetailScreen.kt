@@ -1246,8 +1246,15 @@ fun DetailScreen(
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(Color(0xFF141722))
                                         ) {
+                                            val epThumbnail = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                                                ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                                                ?: tmdbDetails?.backdropUrl?.takeIf { it.isNotBlank() }
+                                                ?: heroImageUrl?.takeIf { it.isNotBlank() }
+                                                ?: anime.banner?.takeIf { it.isNotBlank() }
+                                                ?: anime.cover
+
                                             SubcomposeAsyncImage(
-                                                model = epStillInfo?.stillUrl ?: heroImageUrl,
+                                                model = epThumbnail,
                                                 contentDescription = epStillInfo?.name ?: "Episode $epNum",
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentScale = ContentScale.Crop,
@@ -1255,6 +1262,14 @@ fun DetailScreen(
                                                     ShimmerBox(
                                                         modifier = Modifier.fillMaxSize(),
                                                         shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                },
+                                                error = {
+                                                    AsyncImage(
+                                                        model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
+                                                        contentDescription = epStillInfo?.name ?: "Episode $epNum",
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
                                                     )
                                                 }
                                             )

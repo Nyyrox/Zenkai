@@ -1122,7 +1122,7 @@ fun OttEpisodeCardItem(
                 )
         ) {
             AsyncImage(
-                model = episodeStill ?: anime.banner ?: anime.cover,
+                model = episodeStill?.takeIf { it.isNotBlank() } ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
                 contentDescription = "Episode $episode",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
