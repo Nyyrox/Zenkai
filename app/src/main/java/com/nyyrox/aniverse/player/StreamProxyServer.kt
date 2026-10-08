@@ -420,7 +420,7 @@ object StreamProxyServer {
             val low = targetUrl.lowercase()
             val isKey = low.endsWith(".bin") || low.endsWith(".key") || low.contains("key.bin") || low.contains("k=1")
             val isSubtitle = low.endsWith(".vtt") || low.endsWith(".srt") || low.contains("/subtitles/") || low.contains("type=vtt")
-            val isMp4 = low.contains(".mp4") || low.contains(".m4s") || low.contains(".m4v")
+            val isMp4 = low.contains(".mp4") || low.contains(".m4s") || low.contains(".m4v") || low.contains("/sora/") || low.contains("sssrr.org")
 
             val finalContentType = when {
                 isKey -> "application/octet-stream"
@@ -513,8 +513,25 @@ object StreamProxyServer {
 
             val host = urlObj.host
             val isAsCdn = host.contains("as-cdn") || currentUrl.contains("as-cdn")
-            val effReferer = if (isAsCdn) "https://$host/" else headers["Referer"]
-            val effOrigin = if (isAsCdn) "https://$host" else headers["Origin"]
+            val isAbyss = host.contains("sssrr.org") || currentUrl.contains("/sora/") ||
+                    host.contains("abyss") || (headers["Referer"] ?: "").contains("abyss")
+            val isAnimeSaltHost = host.contains("animesalt") || (headers["Referer"] ?: "").contains("animesalt")
+            val isRavok = host.contains("ravok.buzz") || (headers["Referer"] ?: "").contains("ravok")
+
+            val effReferer = when {
+                isAbyss -> headers["Referer"]?.takeIf { it.contains("abyss") } ?: "https://player.abyssplayer.com/"
+                isAsCdn -> "https://$host/"
+                isRavok -> headers["Referer"] ?: "https://ravok.buzz/"
+                isAnimeSaltHost -> headers["Referer"] ?: "https://animesalt.cx/"
+                else -> headers["Referer"]
+            }
+            val effOrigin = when {
+                isAbyss -> null // Crucial fix: Upstream Abyss/Hydrax CDN (sssrr.org) rejects ANY Origin header with HTTP 404!
+                isAsCdn -> "https://$host"
+                isRavok -> headers["Origin"] ?: "https://ravok.buzz"
+                isAnimeSaltHost -> headers["Origin"] ?: "https://animesalt.cx"
+                else -> headers["Origin"]
+            }
 
             // Attach Referer and Origin
             effReferer?.let { conn.setRequestProperty("Referer", it) }
@@ -550,17 +567,19 @@ object StreamProxyServer {
                  currentUrl.contains("4animo") || currentUrl.contains("recloud") ||
                  currentUrl.contains("yumezone") || currentUrl.contains("megacloud") ||
                  currentUrl.contains("vidstream") || currentUrl.contains("eclipseharbor") ||
-                  currentUrl.contains("nexabloom") || currentUrl.contains("akirax") ||
-                  currentUrl.contains("stellarfrontier") ||
-                  currentUrl.contains("flixcloud") || currentUrl.contains("rundowncdn"))
+                 currentUrl.contains("nexabloom") || currentUrl.contains("akirax") ||
+                 currentUrl.contains("stellarfrontier") ||
+                 currentUrl.contains("sssrr.org") || currentUrl.contains("/sora/") ||
+                 currentUrl.contains("abyss") || currentUrl.contains("animesalt") ||
+                 currentUrl.contains("ravok.buzz") || currentUrl.contains("as-cdn") ||
+                 currentUrl.contains("flixcloud") || currentUrl.contains("rundowncdn"))
             ) {
                 conn.disconnect()
                 val host = URL(currentUrl).host
                 val isMegaplay = currentUrl.contains("megaplay") || currentUrl.contains("megacloud") ||
                         currentUrl.contains("vidstream") || currentUrl.contains("rapid-cloud") ||
                         currentUrl.contains("eclipseharbor") || currentUrl.contains("nexabloom") ||
-                  currentUrl.contains("nexabloom") || currentUrl.contains("akirax") ||
-                  currentUrl.contains("stellarfrontier") ||
+                  currentUrl.contains("akirax") || currentUrl.contains("stellarfrontier") ||
                         (headers["Referer"] ?: "").contains("megaplay")
                 val isVidnest = currentUrl.contains("vidnest") || (headers["Referer"] ?: "").contains("vidnest")
                 val isTryEmbed = currentUrl.contains("tryembed") || (headers["Referer"] ?: "").contains("tryembed")
@@ -568,7 +587,10 @@ object StreamProxyServer {
                 val isReCloud = currentUrl.contains("4animo") || currentUrl.contains("recloud") || (headers["Referer"] ?: "").contains("4animo")
                 val isYumeZone = currentUrl.contains("yumezone") || currentUrl.contains("yumizone") || (headers["Referer"] ?: "").contains("yumezone")
                 val isAnimeSalt = currentUrl.contains("animesalt") || currentUrl.contains("as-cdn") ||
-                        (headers["Referer"] ?: "").contains("animesalt")
+                        currentUrl.contains("ravok.buzz") || (headers["Referer"] ?: "").contains("animesalt") ||
+                        (headers["Referer"] ?: "").contains("ravok")
+                val isAbyssStream = currentUrl.contains("sssrr.org") || currentUrl.contains("/sora/") ||
+                        currentUrl.contains("abyss") || (headers["Referer"] ?: "").contains("abyss")
                 val isFlixCloud = currentUrl.contains("flixcloud") || currentUrl.contains("rundowncdn") ||
                         (headers["Referer"] ?: "").contains("flixcloud")
 
@@ -594,8 +616,16 @@ object StreamProxyServer {
                 if (isYumeZone) {
                     retryStrategies.add("https://yumezone.qzz.io/" to "https://yumezone.qzz.io")
                 }
+                if (isAbyssStream) {
+                    retryStrategies.add("https://player.abyssplayer.com/" to null)
+                    retryStrategies.add("https://abyssplayer.com/" to null)
+                    retryStrategies.add("https://playhydrax.com/" to null)
+                }
                 if (isAnimeSalt) {
-                    retryStrategies.add("https://animesalt.cc/" to "https://animesalt.cc")
+                    retryStrategies.add("https://animesalt.cx/" to "https://animesalt.cx")
+                    retryStrategies.add("https://ravok.buzz/" to "https://ravok.buzz")
+                    retryStrategies.add("https://$host/" to "https://$host")
+                    retryStrategies.add("https://$host/" to null)
                 }
                 if (isFlixCloud) {
                     retryStrategies.add("https://flixcloud.cc/" to "https://flixcloud.cc")

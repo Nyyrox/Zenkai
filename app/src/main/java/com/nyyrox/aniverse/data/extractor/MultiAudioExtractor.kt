@@ -521,8 +521,7 @@ object MultiAudioExtractor {
                         isDirectStream = true,
                         badge = "Multi-Audio",
                         headers = mapOf(
-                            "Referer" to "https://abyssplayer.com/",
-                            "Origin" to "https://abyssplayer.com",
+                            "Referer" to "https://player.abyssplayer.com/",
                             "User-Agent" to USER_AGENT
                         )
                     )

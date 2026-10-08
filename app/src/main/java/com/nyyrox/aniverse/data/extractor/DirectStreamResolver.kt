@@ -199,11 +199,16 @@ object DirectStreamResolver {
         isDub: Boolean,
         animeTitle: String = ""
     ): DirectStreamResult? = withContext(Dispatchers.IO) {
-        val audio = if (isDub) "dub" else "sub"
+        val normId = providerId.lowercase()
+        val audio = when {
+            normId.contains("dub") -> "dub"
+            normId.contains("sub") -> "sub"
+            isDub -> "dub"
+            else -> "sub"
+        }
         val cacheKey = "$providerId:$anilistId:$episode:$audio"
         directStreamCache[cacheKey]?.let { return@withContext it }
 
-        val normId = providerId.lowercase()
         val isAnimeSalt = normId.contains("animesalt") || normId.contains("acdn") || normId.contains("salt")
         val isVidstream = normId.contains("vidstream") || normId.contains("hd-3") || normId.contains("hd3")
         val isMegaPlay = normId.contains("megaplay") || (normId.contains("anikoto") && !normId.contains("vidstream")) || normId.contains("hd-2") || normId.contains("hd2")
