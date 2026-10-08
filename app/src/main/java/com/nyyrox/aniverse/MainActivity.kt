@@ -150,7 +150,21 @@ class MainActivity : ComponentActivity() {
                     val requestBuilder = request.newBuilder()
                         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
                     if (request.header("Referer") == null) {
-                        requestBuilder.header("Referer", "https://weebcentral.com/")
+                        val host = request.url.host.lowercase()
+                        when {
+                            host.contains("mangadex") -> {
+                                requestBuilder.header("Referer", "https://mangadex.org/")
+                            }
+                            host.contains("comick") -> {
+                                requestBuilder.header("Referer", "https://comick.art/")
+                            }
+                            host.contains("asura") -> {
+                                requestBuilder.header("Referer", "https://asuracomic.net/")
+                            }
+                            host.contains("weebcentral") || host.contains("compsci88") -> {
+                                requestBuilder.header("Referer", "https://weebcentral.com/")
+                            }
+                        }
                     }
                     chain.proceed(requestBuilder.build())
                 }

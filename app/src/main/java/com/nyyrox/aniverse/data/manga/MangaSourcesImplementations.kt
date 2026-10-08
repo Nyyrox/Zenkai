@@ -48,7 +48,7 @@ class MangaDexRepository(
         }
     }
 
-    private fun extractCover(item: JSONObject): String? {
+    private fun extractCover(item: JSONObject, highRes: Boolean = false): String? {
         val id = item.optString("id")
         val rels = item.optJSONArray("relationships") ?: return null
         for (i in 0 until rels.length()) {
@@ -56,7 +56,7 @@ class MangaDexRepository(
             if (r.optString("type") == "cover_art") {
                 val fileName = r.optJSONObject("attributes")?.optString("fileName").orEmpty()
                 if (fileName.isNotBlank()) {
-                    return "$uploadsBase/covers/$id/$fileName.256.jpg"
+                    return if (highRes) "$uploadsBase/covers/$id/$fileName.512.jpg" else "$uploadsBase/covers/$id/$fileName.256.jpg"
                 }
             }
         }
@@ -146,7 +146,7 @@ class MangaDexRepository(
         val attrs = data.optJSONObject("attributes") ?: return null
 
         val title = extractTitle(attrs)
-        val cover = extractCover(data)
+        val cover = extractCover(data, highRes = true)
         val descObj = attrs.optJSONObject("description")
         val desc = descObj?.optString("en") ?: descObj?.optString("ko") ?: descObj?.optString("ja") ?: ""
 
@@ -184,25 +184,56 @@ class MangaDexRepository(
         )
     }
 
-    override suspend fun getChapters(mangaId: String): List<MangaChapter> {
+    override suspend fun getChapters(mangaId: String): List<MangaChapter> = coroutineScope {
         val cleanId = mangaId.removePrefix("md_")
-        // Try English chapters first
-        var feedUrl = "$apiBase/manga/$cleanId/feed?translatedLanguage[]=en&order[chapter]=desc&limit=100&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica"
-        var json = fetchJson(feedUrl)
-        var dataArr = json?.optJSONArray("data")
+        val limit = 500
+        val baseFeed = "$apiBase/manga/$cleanId/feed?contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&order[chapter]=asc&limit=$limit"
 
-        // If English feed is empty, fallback to all languages
-        if (dataArr == null || dataArr.length() == 0) {
-            feedUrl = "$apiBase/manga/$cleanId/feed?order[chapter]=desc&limit=100&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica"
-            json = fetchJson(feedUrl)
-            dataArr = json?.optJSONArray("data")
+        // Try English first
+        var firstJson = fetchJson("$baseFeed&translatedLanguage[]=en&offset=0")
+        var isEn = true
+        var total = firstJson?.optInt("total", 0) ?: 0
+        var allData = firstJson?.optJSONArray("data")
+
+        if (allData == null || allData.length() == 0) {
+            firstJson = fetchJson("$baseFeed&offset=0")
+            isEn = false
+            total = firstJson?.optInt("total", 0) ?: 0
+            allData = firstJson?.optJSONArray("data")
         }
 
-        if (dataArr == null) return emptyList()
+        if (allData == null || allData.length() == 0) return@coroutineScope emptyList()
+
+        val rawItems = mutableListOf<JSONObject>()
+        for (i in 0 until allData.length()) {
+            allData.optJSONObject(i)?.let { rawItems.add(it) }
+        }
+
+        // Fetch remaining pages concurrently if total > limit (up to 1500 chapters)
+        if (total > limit) {
+            val offsets = generateSequence(limit) { it + limit }
+                .takeWhile { it < total && it < 1500 }
+                .toList()
+
+            val deferredPages = offsets.map { off ->
+                async {
+                    val langParam = if (isEn) "&translatedLanguage[]=en" else ""
+                    val pageJson = fetchJson("$baseFeed$langParam&offset=$off")
+                    pageJson?.optJSONArray("data")
+                }
+            }
+
+            for (def in deferredPages) {
+                val pageData = def.await() ?: continue
+                for (i in 0 until pageData.length()) {
+                    pageData.optJSONObject(i)?.let { rawItems.add(it) }
+                }
+            }
+        }
 
         val chapters = mutableListOf<MangaChapter>()
-        for (i in 0 until dataArr.length()) {
-            val item = dataArr.optJSONObject(i) ?: continue
+        for (i in 0 until rawItems.size) {
+            val item = rawItems[i]
             val chId = item.optString("id")
             val attrs = item.optJSONObject("attributes") ?: continue
 
@@ -211,7 +242,7 @@ class MangaDexRepository(
             val pages = attrs.optInt("pages", 0)
             if (externalUrl != null || (attrs.has("pages") && pages == 0)) continue
 
-            val chNum = attrs.optString("chapter").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: "${dataArr.length() - i}"
+            val chNum = attrs.optString("chapter").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: "${i + 1}"
             val chTitle = attrs.optString("title").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
             val vol = attrs.optString("volume").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }?.let { "Vol. $it" }
             val publish = attrs.optString("publishAt").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
@@ -228,7 +259,12 @@ class MangaDexRepository(
                 )
             )
         }
-        return chapters
+
+        // Deduplicate: If multiple groups translated the same chapter number, keep 1 distinct entry
+        val distinctChapters = chapters.distinctBy { it.number }
+
+        // Sort ascending by chapter number so Chapter 1 comes first
+        distinctChapters.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
@@ -304,14 +340,24 @@ class ComicKRepository(
     }
 
     private fun resolveComicKCover(obj: JSONObject): String? {
+        val defThumb = obj.optString("default_thumbnail").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?: obj.optJSONObject("md_comics")?.optString("default_thumbnail")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        if (defThumb != null) return defThumb
+
         val coverUrl = obj.optString("cover_url").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         if (coverUrl != null) return coverUrl
+
         val thumb = obj.optString("thumbnail").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         if (thumb != null) return thumb
+
         val b2key = obj.optJSONObject("md_covers")?.optString("b2key")
             ?: obj.optJSONArray("md_covers")?.optJSONObject(0)?.optString("b2key")
         if (!b2key.isNullOrBlank()) {
             return "https://meo.comick.pictures/$b2key"
+        }
+        val slug = obj.optString("slug").takeIf { it.isNotBlank() }
+        if (slug != null) {
+            return "https://cdn1.comicknew.pictures/$slug/covers/101b409e.webp"
         }
         return null
     }
@@ -350,7 +396,7 @@ class ComicKRepository(
 
     override suspend fun getHome(): MangaHome = coroutineScope {
         val trendingDeferred = async {
-            val json = fetchJson("$baseUrl/api/comics/top?days=7&type=follow")
+            val json = fetchJson("$baseUrl/api/search?order_by=user_follow_count&order_direction=desc&type=comic&limit=24")
             parseComics(json?.optJSONArray("data"))
         }
         val latestDeferred = async {
@@ -358,7 +404,7 @@ class ComicKRepository(
             parseComics(json?.optJSONArray("data"))
         }
         val newDeferred = async {
-            val json = fetchJson("$baseUrl/api/comics/top?days=30&type=most_follow_new")
+            val json = fetchJson("$baseUrl/api/search?order_by=created_at&order_direction=desc&type=comic&limit=24")
             parseComics(json?.optJSONArray("data"))
         }
 
@@ -433,25 +479,55 @@ class ComicKRepository(
         return null
     }
 
-    override suspend fun getChapters(mangaId: String): List<MangaChapter> {
+    override suspend fun getChapters(mangaId: String): List<MangaChapter> = coroutineScope {
         val slug = mangaId.removePrefix("ck_")
-        val url = "$baseUrl/api/comics/$slug/chapter-list?lang=en"
-        var json = fetchJson(url)
-        var dataArr = json?.optJSONArray("data")
+        val url = "$baseUrl/api/comics/$slug/chapter-list?lang=en&page=1"
+        var firstJson = fetchJson(url)
+        var isEn = true
+        var dataArr = firstJson?.optJSONArray("data")
 
         if (dataArr == null || dataArr.length() == 0) {
-            val allUrl = "$baseUrl/api/comics/$slug/chapter-list"
-            json = fetchJson(allUrl)
-            dataArr = json?.optJSONArray("data")
+            val allUrl = "$baseUrl/api/comics/$slug/chapter-list?page=1"
+            firstJson = fetchJson(allUrl)
+            isEn = false
+            dataArr = firstJson?.optJSONArray("data")
         }
 
-        if (dataArr == null) return emptyList()
+        if (dataArr == null || dataArr.length() == 0) return@coroutineScope emptyList()
+
+        val allItems = mutableListOf<JSONObject>()
+        for (i in 0 until dataArr.length()) {
+            dataArr.optJSONObject(i)?.let { allItems.add(it) }
+        }
+
+        val pagination = firstJson?.optJSONObject("pagination")
+        val lastPage = pagination?.optInt("last_page", 1) ?: 1
+
+        // Concurrently fetch remaining pages (up to 15 pages = 900 chapters)
+        if (lastPage > 1) {
+            val pagesToFetch = (2..minOf(lastPage, 15)).toList()
+            val deferredPages = pagesToFetch.map { p ->
+                async {
+                    val pUrl = if (isEn) "$baseUrl/api/comics/$slug/chapter-list?lang=en&page=$p"
+                    else "$baseUrl/api/comics/$slug/chapter-list?page=$p"
+                    val pageJson = fetchJson(pUrl)
+                    pageJson?.optJSONArray("data")
+                }
+            }
+
+            for (def in deferredPages) {
+                val pageData = def.await() ?: continue
+                for (i in 0 until pageData.length()) {
+                    pageData.optJSONObject(i)?.let { allItems.add(it) }
+                }
+            }
+        }
 
         val chapters = mutableListOf<MangaChapter>()
-        for (i in 0 until dataArr.length()) {
-            val item = dataArr.optJSONObject(i) ?: continue
+        for (i in 0 until allItems.size) {
+            val item = allItems[i]
             val hid = item.optString("hid")
-            val chap = item.optString("chap")
+            val chap = item.optString("chap").ifBlank { "${i + 1}" }
             val lang = item.optString("lang", "en")
             val vol = item.optString("vol").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }?.let { "Vol. $it" }
             val title = item.optString("title").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
@@ -469,7 +545,12 @@ class ComicKRepository(
                 )
             )
         }
-        return chapters
+
+        // Deduplicate: If multiple scanlation groups uploaded the same chapter number, keep 1 distinct entry
+        val distinctChapters = chapters.distinctBy { it.number }
+
+        // Sort ascending by chapter number so Chapter 1 comes first
+        distinctChapters.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
@@ -560,7 +641,7 @@ class AsuraScansRepository(
             val title = item.optString("title")
             if (slug.isBlank() || title.isBlank()) continue
 
-            val cover = item.optString("cover_url").ifBlank { "https://cdn.asurascans.com/asura-images/covers/$slug.webp" }
+            val cover = item.optString("cover").ifBlank { item.optString("cover_url") }.ifBlank { "https://cdn.asurascans.com/asura-images/covers/$slug.webp" }
             val type = item.optString("type").takeIf { it.isNotBlank() } ?: "Manhwa"
 
             list.add(
@@ -611,7 +692,7 @@ class AsuraScansRepository(
 
         val title = json.optString("title")
         val desc = json.optString("description").replace(Regex("<[^>]*>"), " ").trim()
-        val cover = json.optString("cover_url").ifBlank { "https://cdn.asurascans.com/asura-images/covers/$slug.webp" }
+        val cover = json.optString("cover").ifBlank { json.optString("cover_url") }.ifBlank { "https://cdn.asurascans.com/asura-images/covers/$slug.webp" }
         val status = json.optString("status")
         val type = json.optString("type").ifBlank { "Manhwa" }
 
@@ -660,7 +741,9 @@ class AsuraScansRepository(
                 )
             )
         }
-        return chapters
+
+        val distinctChapters = chapters.distinctBy { it.number }
+        return distinctChapters.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
