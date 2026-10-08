@@ -292,6 +292,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // TMDB Artwork Cache (Backdrops & Title Logo PNGs)
     var tmdbArtworks by mutableStateOf<Map<Int, com.nyyrox.aniverse.data.tmdb.TmdbArtwork>>(emptyMap()); private set
+    var tmdbEpisodeStills by mutableStateOf<Map<String, String?>>(emptyMap()); private set
 
     // Temporary memory cache for Manga details & chapters
     data class CachedMangaDetail(
@@ -487,6 +488,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadTmdbEpisodeStill(anime: Anime, episodeNumber: Int) {
+        val key = "${anime.id}_$episodeNumber"
+        if (tmdbEpisodeStills.containsKey(key)) return
+        viewModelScope.launch {
+            try {
+                val still = withContext(Dispatchers.IO) {
+                    val mapped = com.nyyrox.aniverse.data.tmdb.TmdbRepository.fetchEpisodesMapped(
+                        anilistId = anime.id,
+                        title = anime.titleEnglish ?: anime.titleRomaji ?: anime.title,
+                        year = anime.seasonYear,
+                        format = anime.format,
+                        totalEpisodes = anime.totalEpisodes ?: 24
+                    )
+                    mapped[episodeNumber]?.stillUrl
+                }
+                tmdbEpisodeStills = tmdbEpisodeStills + (key to still)
+            } catch (_: Exception) {
+                tmdbEpisodeStills = tmdbEpisodeStills + (key to null)
+            }
+        }
+    }
+
     suspend fun getMultiAudioServers(anilistId: Int, episode: Int, title: String): List<com.nyyrox.aniverse.data.extractor.MultiAudioServer> {
         return com.nyyrox.aniverse.data.extractor.MultiAudioExtractor.extractServers(anilistId, episode, title)
     }
@@ -624,6 +647,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             trending.take(6).forEach { loadTmdbArtwork(it) }
+            if (mangaHome.trending.isEmpty() && mangaHome.latest.isEmpty()) {
+                loadMangaHome()
+            }
+            if (novelPopular.isEmpty() && novelRankings.isEmpty()) {
+                loadNovelHome()
+            }
         } catch (e: Exception) {
             if (trending.isEmpty()) {
                 homeError = e.message?.take(120)

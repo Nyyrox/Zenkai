@@ -206,7 +206,7 @@ fun OttHeroBanner(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(480.dp)
+            .height(500.dp)
             .clipToBounds()
             .background(OttBg)
     ) {
@@ -420,9 +420,8 @@ fun OttHeroBanner(
                                             .align(Alignment.TopEnd)
                                             .padding(8.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xCC000000))
-                                            .border(0.5.dp, Color(0x40FFFFFF), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            .background(Color(0x8A000000))
+                                            .padding(horizontal = 7.dp, vertical = 3.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
@@ -522,9 +521,8 @@ fun OttHeroBanner(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x1AFFFFFF))
-                                .border(0.5.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .background(Color(0x28FFFFFF))
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Icon(
                                 Icons.Default.Star,
@@ -577,7 +575,7 @@ fun OttHeroBanner(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
                 // ── OTT Actions: Watch Now + My List + Details ──────────────────
                 Row(
@@ -592,14 +590,14 @@ fun OttHeroBanner(
                             contentColor = Color.Black
                         ),
                         shape = OttPillShape,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                         modifier = Modifier
                             .height(38.dp)
                             .shadow(
-                                elevation = 12.dp,
+                                elevation = 10.dp,
                                 shape = OttPillShape,
-                                ambientColor = Color(0x60FFFFFF),
-                                spotColor = Color(0x80000000)
+                                ambientColor = Color(0x50FFFFFF),
+                                spotColor = Color(0x70000000)
                             )
                     ) {
                         Icon(
@@ -619,7 +617,63 @@ fun OttHeroBanner(
                         )
                     }
 
+                    // My List Toggle (Frosted Glass Pill, no border)
+                    Box(
+                        modifier = Modifier
+                            .height(38.dp)
+                            .clip(OttPillShape)
+                            .background(Color(0x22FFFFFF))
+                            .clickable { onToggleWatchlist(targetAnime) }
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = "Watchlist",
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isBookmarked) OttPrimary else Color.White
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                text = if (isBookmarked) "In List" else "My List",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = Color.White,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
 
+                    // Details Button (Frosted Glass Pill, no border)
+                    Box(
+                        modifier = Modifier
+                            .height(38.dp)
+                            .clip(OttPillShape)
+                            .background(Color(0x22FFFFFF))
+                            .clickable { onAnimeClick(targetAnime.id) }
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Details",
+                                modifier = Modifier.size(15.dp),
+                                tint = Color.White
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Details",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = Color.White,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
                 }
             }
         }

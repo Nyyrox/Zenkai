@@ -497,6 +497,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         vm = vm,
                                         onAnimeClick = { vm.openAnimeDetail(it) },
                                         onPlayClick = { id, ep -> push("player:$id:$ep:") },
+                                        onMangaClick = { vm.openMangaDetail(it) },
                                         onMangaReadClick = { mId, chId ->
                                             val cm = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(mId)
                                             val cc = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chId)

@@ -509,8 +509,7 @@ fun OttPosterCard(
                     .align(Alignment.TopStart)
                     .padding(8.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xB3000000))
-                    .border(0.5.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
+                    .background(Color(0x8A000000))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
@@ -523,25 +522,14 @@ fun OttPosterCard(
                 )
             }
 
-            // Score Pill (Top Right) — glass pill with blur-style bg
+            // Score Pill (Top Right) — glass pill with frosted bg
             anime.score?.let { score ->
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0x40000000), Color(0x28000000))
-                            )
-                        )
-                        .border(
-                            1.dp,
-                            Brush.verticalGradient(
-                                listOf(Color(0x50FFFFFF), Color(0x1AFFFFFF))
-                            ),
-                            RoundedCornerShape(8.dp)
-                        )
+                        .background(Color(0x8A000000))
                         .padding(horizontal = 6.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -700,8 +688,7 @@ fun OttContinueWatchingRow(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xCC000000))
-                                .border(1.dp, Color(0x40FFFFFF), CircleShape)
+                                .background(Color(0x8A000000))
                                 .align(Alignment.Center),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1024,12 +1011,7 @@ fun OttGenrePill(
     Box(
         modifier = Modifier
             .clip(OttPillShape)
-            .background(if (isSelected) Color.White else Color(0x14FFFFFF))
-            .border(
-                1.dp,
-                if (isSelected) Color.White else Color(0x25FFFFFF),
-                OttPillShape
-            )
+            .background(if (isSelected) Color.White else Color(0x18FFFFFF))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
