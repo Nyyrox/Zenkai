@@ -30,6 +30,22 @@
           }
         },
         {
+          "client_id": "291033138118-e94j50dgntsoc8h1c0j18d5kqk0u2ujt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nyyrox.aniverse",
+            "certificate_hash": "8fd9ff81ed26c24223fff89823133251cf095ef6"
+          }
+        },
+        {
+          "client_id": "291033138118-uagmcfp2rql0rt5shdddu7vlg6c9m3n7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nyyrox.aniverse",
+            "certificate_hash": "b41020f44c3b9708079cd8c308860b193a264ed2"
+          }
+        },
+        {
           "client_id": "291033138118-1dr4uup46fgud663iqs23lnh4oiaaa2h.apps.googleusercontent.com",
           "client_type": 3
         }
