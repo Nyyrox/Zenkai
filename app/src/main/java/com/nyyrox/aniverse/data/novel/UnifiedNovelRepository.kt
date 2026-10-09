@@ -7,12 +7,16 @@ import kotlinx.coroutines.flow.asStateFlow
 class UnifiedNovelRepository(
     val novelFull: NovelFullRepository = NovelFullRepository(),
     val novelFire: NovelFireRepository = NovelFireRepository(),
-    val webNovel: WebNovelRepository = WebNovelRepository()
+    val royalRoad: RoyalRoadRepository = RoyalRoadRepository(),
+    val wuxiaWorld: WuxiaWorldRepository = WuxiaWorldRepository(),
+    val webNovel: WebNovelRepository = WebNovelRepository(royalRoad)
 ) : INovelSourceRepository {
 
     private val repositories = mapOf<NovelSource, INovelSourceRepository>(
         NovelSource.NOVEL_FULL to novelFull,
         NovelSource.NOVEL_FIRE to novelFire,
+        NovelSource.ROYAL_ROAD to royalRoad,
+        NovelSource.WUXIA_WORLD to wuxiaWorld,
         NovelSource.WEB_NOVEL to webNovel
     )
 

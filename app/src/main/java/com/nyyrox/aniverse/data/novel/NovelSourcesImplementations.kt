@@ -229,17 +229,221 @@ class NovelFullRepository(
 }
 
 // ============================================================================
-// 3. WEBNOVEL REPOSITORY (WebNovel & Mirror Integration)
+// 3. ROYAL ROAD REPOSITORY (#1 English Web Novel, LitRPG & Progression Fantasy)
 // ============================================================================
-class WebNovelRepository(
+class RoyalRoadRepository(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
 ) : INovelSourceRepository {
-    override val source: NovelSource = NovelSource.WEB_NOVEL
-    private val baseUrl = "https://novelfire.net"
+    override val source: NovelSource = NovelSource.ROYAL_ROAD
+    private val baseUrl = "https://www.royalroad.com"
+    private val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+    private suspend fun fetchHtml(url: String): Document = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", userAgent)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Referer", baseUrl)
+            .build()
+        val response = client.newCall(request).execute()
+        val body = response.body.string()
+        Jsoup.parse(body, url)
+    }
+
+    private fun parseFictionList(doc: Document): List<NovelItem> {
+        val list = mutableListOf<NovelItem>()
+        val items = doc.select(".fiction-list-item, div:has(h2.fiction-title)")
+        for (item in items) {
+            val a = item.selectFirst("h2.fiction-title a, .fiction-title a, a[href*='/fiction/']") ?: continue
+            val href = a.attr("href")
+            val slug = href.removePrefix("/fiction/").trim('/')
+            if (slug.isBlank() || list.any { it.slug == slug }) continue
+
+            val title = a.text().trim()
+            if (title.isBlank()) continue
+
+            val img = item.selectFirst("img")
+            var cover = img?.attr("src")?.ifBlank { img.attr("data-src") }.orEmpty()
+            if (cover.isNotBlank() && !cover.startsWith("http")) {
+                cover = baseUrl + (if (cover.startsWith("/")) "" else "/") + cover
+            }
+
+            val author = item.selectFirst("a[href*='/profile/'], .author a, span:contains(by)")?.text()?.trim()
+            val stats = author?.let { if (it.startsWith("by", ignoreCase = true)) it else "By $it" }
+
+            val rating = item.selectFirst(".star[title], [aria-label*='stars'], .fiction-rating span")?.let {
+                it.attr("title").ifBlank { it.text() }.trim()
+            }
+
+            list.add(
+                NovelItem(
+                    slug = slug,
+                    title = title,
+                    cover = cover,
+                    stats = stats,
+                    rating = rating?.take(4),
+                    source = source.id
+                )
+            )
+        }
+        return list
+    }
+
+    override suspend fun getHome(page: Int): NovelHomeData = withContext(Dispatchers.IO) {
+        val popular = try { getPopular(page) } catch (_: Exception) { emptyList() }
+        val latest = try { getLatest(page) } catch (_: Exception) { emptyList() }
+        val lightNovels = try { getLightNovels(page) } catch (_: Exception) { emptyList() }
+        val rankings = try { getRankings(page).take(15) } catch (_: Exception) { popular.take(15) }
+        NovelHomeData(rankings, popular, latest, lightNovels)
+    }
+
+    override suspend fun getRankings(page: Int): List<NovelItem> {
+        val url = if (page <= 1) "$baseUrl/fictions/best-rated" else "$baseUrl/fictions/best-rated?page=$page"
+        return parseFictionList(fetchHtml(url))
+    }
+
+    override suspend fun getPopular(page: Int): List<NovelItem> {
+        val url = if (page <= 1) "$baseUrl/fictions/weekly-popular" else "$baseUrl/fictions/weekly-popular?page=$page"
+        val list = parseFictionList(fetchHtml(url))
+        return if (list.isNotEmpty()) list else getRankings(page)
+    }
+
+    override suspend fun getLatest(page: Int): List<NovelItem> {
+        val url = if (page <= 1) "$baseUrl/fictions/latest-updates" else "$baseUrl/fictions/latest-updates?page=$page"
+        return parseFictionList(fetchHtml(url))
+    }
+
+    override suspend fun getLightNovels(page: Int): List<NovelItem> {
+        val url = if (page <= 1) "$baseUrl/fictions/active-popular" else "$baseUrl/fictions/active-popular?page=$page"
+        val list = parseFictionList(fetchHtml(url))
+        return if (list.isNotEmpty()) list else getPopular(page)
+    }
+
+    override suspend fun search(query: String, page: Int): List<NovelItem> {
+        val enc = URLEncoder.encode(query, "UTF-8")
+        val url = if (page <= 1) "$baseUrl/fictions/search?title=$enc" else "$baseUrl/fictions/search?title=$enc&page=$page"
+        return parseFictionList(fetchHtml(url))
+    }
+
+    override suspend fun getDetail(slug: String): NovelDetail? {
+        val cleanSlug = slug.removePrefix("/").removePrefix("fiction/").trim('/')
+        val url = if (cleanSlug.startsWith("http")) cleanSlug else "$baseUrl/fiction/$cleanSlug"
+        val doc = fetchHtml(url)
+
+        val title = doc.selectFirst("h1.font-white, h1, .fiction-title")?.text()?.trim() ?: return null
+        val img = doc.selectFirst("img.thumbnail, img[src*='covers-full'], .fiction-info img")
+        var cover = img?.attr("src")?.ifBlank { img.attr("data-src") }.orEmpty()
+        if (cover.isNotBlank() && !cover.startsWith("http")) {
+            cover = baseUrl + (if (cover.startsWith("/")) "" else "/") + cover
+        }
+
+        val author = doc.selectFirst("h4.font-white a, .author a, a[href*='/profile/']")?.text()?.trim()
+        val rating = doc.selectFirst(".star[title], [aria-label*='stars']")?.attr("title")?.take(4)
+        val status = doc.select(".label-sm, .fiction-info span.badge").firstOrNull {
+            it.text().contains("ONGOING", ignoreCase = true) || it.text().contains("COMPLETED", ignoreCase = true) || it.text().contains("HIATUS", ignoreCase = true)
+        }?.text()?.trim() ?: "Ongoing"
+
+        val chaptersCount = doc.select("#chapters tbody tr").size.takeIf { it > 0 }?.let { "$it Chapters" }
+        val views = doc.select(".list-unstyled li:contains(Views)").firstOrNull()?.text()?.substringAfter("Views")?.trim()
+
+        val genres = doc.select(".tags a.label, .tags span.label, a.fiction-tag").map { it.text().trim() }.filter { it.isNotBlank() }
+        val desc = doc.select(".description p").joinToString("\n\n") { it.text().trim() }.ifBlank {
+            doc.select(".description").text().trim()
+        }
+
+        val firstChLink = doc.selectFirst("#chapters tbody tr a[href*='/chapter/']")?.attr("href")
+        val firstChapterSlug = firstChLink?.removePrefix("/")?.substringBefore("?")
+
+        return NovelDetail(
+            slug = cleanSlug,
+            title = title,
+            cover = cover,
+            author = author,
+            rating = rating,
+            status = status,
+            chaptersCount = chaptersCount,
+            views = views,
+            genres = genres,
+            synopsis = desc,
+            firstChapterSlug = firstChapterSlug,
+            source = source.id
+        )
+    }
+
+    override suspend fun getChapters(slug: String, page: Int): Pair<List<NovelChapter>, Int> {
+        val cleanSlug = slug.removePrefix("/").removePrefix("fiction/").trim('/')
+        val url = if (cleanSlug.startsWith("http")) cleanSlug else "$baseUrl/fiction/$cleanSlug"
+        val doc = fetchHtml(url)
+
+        val list = mutableListOf<NovelChapter>()
+        val rows = doc.select("#chapters tbody tr, tr:has(a[href*='/chapter/'])")
+        for ((idx, row) in rows.withIndex()) {
+            val a = row.selectFirst("a[href*='/chapter/']") ?: continue
+            val href = a.attr("href")
+            val chSlug = href.removePrefix("/").substringBefore("?").trim()
+            if (chSlug.isBlank() || list.any { it.slug == chSlug }) continue
+
+            val name = a.text().trim().ifBlank { "Chapter ${idx + 1}" }
+            val time = row.selectFirst("time")?.let { it.attr("title").ifBlank { it.text() }.trim() }
+
+            list.add(
+                NovelChapter(
+                    slug = chSlug,
+                    title = name,
+                    number = "${idx + 1}",
+                    releaseTime = time
+                )
+            )
+        }
+        return Pair(list, 1)
+    }
+
+    override suspend fun getChapterContent(novelSlug: String, chapterSlug: String): NovelChapterContent? {
+        val url = if (chapterSlug.startsWith("http")) chapterSlug
+                  else if (chapterSlug.startsWith("/")) "$baseUrl$chapterSlug"
+                  else "$baseUrl/$chapterSlug"
+        val doc = fetchHtml(url)
+
+        val title = doc.selectFirst("h1.font-white, h1, .chapter-title")?.text()?.trim() ?: chapterSlug
+        val contentEl = doc.selectFirst(".chapter-content, .chapter-inner, .content") ?: return null
+        contentEl.select("script, style, iframe, .ads, .ad, .author-note-portlet, hr").remove()
+
+        val paragraphs = contentEl.select("p").map { it.text().trim() }.filter { it.isNotBlank() }
+        val finalParas = if (paragraphs.isNotEmpty()) paragraphs else contentEl.wholeText().lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        val prevA = doc.selectFirst("a[href*='/chapter/']:contains(Previous), .nav-buttons a:contains(Previous), a:contains(Previous Chapter)")
+        val nextA = doc.selectFirst("a[href*='/chapter/']:contains(Next), .nav-buttons a:contains(Next), a:contains(Next Chapter)")
+
+        val prevSlug = prevA?.attr("href")?.removePrefix("/")?.substringBefore("?")?.takeIf { it.isNotBlank() && !it.contains("javascript") }
+        val nextSlug = nextA?.attr("href")?.removePrefix("/")?.substringBefore("?")?.takeIf { it.isNotBlank() && !it.contains("javascript") }
+
+        return NovelChapterContent(
+            novelSlug = novelSlug,
+            chapterSlug = chapterSlug,
+            title = title,
+            paragraphs = finalParas,
+            prevChapterSlug = prevSlug,
+            nextChapterSlug = nextSlug
+        )
+    }
+}
+
+// ============================================================================
+// 4. WUXIAWORLD REPOSITORY (Premier Asian Web Novel, Cultivation & Xianxia)
+// ============================================================================
+class WuxiaWorldRepository(
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .build()
+) : INovelSourceRepository {
+    override val source: NovelSource = NovelSource.WUXIA_WORLD
+    private val baseUrl = "https://wuxiaworld.site"
     private val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     private suspend fun fetchHtml(url: String): Document = withContext(Dispatchers.IO) {
@@ -256,28 +460,28 @@ class WebNovelRepository(
 
     private fun parseNovelList(doc: Document): List<NovelItem> {
         val list = mutableListOf<NovelItem>()
-        val items = doc.select(".novel-item, .item, .col-truyen-main .row, .row:has(a[href*='/book/']), li:has(a[href*='/book/'])")
+        val items = doc.select(".c-tabs-item__content, .page-item-detail, .col-6, div:has(.post-title)")
         for (item in items) {
-            val a = item.selectFirst("a[href*='/book/']") ?: continue
+            val a = item.selectFirst(".post-title a, h3.h5 a, a[href*='/novel/']") ?: continue
             val href = a.attr("href")
-            val slug = href.substringAfter("/book/").substringBefore("?").substringBefore("#").trim('/')
-            if (slug.isBlank() || slug.contains("chapters") || list.any { it.slug == slug }) continue
+            val slug = href.substringAfter("/novel/").trim('/')
+            if (slug.isBlank() || list.any { it.slug == slug }) continue
 
-            val titleEl = item.selectFirst(".novel-title, .title, h3, h4") ?: a
-            val title = titleEl.text().trim()
+            val title = a.text().trim()
             if (title.isBlank()) continue
 
             val img = item.selectFirst("img")
-            var cover = img?.attr("src")?.ifBlank { img.attr("data-src") }.orEmpty()
-            if (cover.isBlank() || cover.contains("base64") || cover.endsWith(".svg")) {
-                cover = "$baseUrl/server-1/$slug.jpg"
-            } else if (!cover.startsWith("http")) {
-                if (cover.startsWith("//")) cover = "https:$cover"
-                else cover = "$baseUrl/$cover"
+            var cover = img?.attr("data-src")?.ifBlank { img.attr("src") }.orEmpty()
+            if (cover.contains("dflazy.jpg") || cover.isBlank()) {
+                cover = img?.attr("srcset")?.split(",")?.lastOrNull()?.trim()?.substringBefore(" ") ?: cover
+            }
+            if (cover.isNotBlank() && !cover.startsWith("http")) {
+                cover = baseUrl + (if (cover.startsWith("/")) "" else "/") + cover
             }
 
-            val author = item.selectFirst(".author, .g_author, .book-author")?.text()?.trim()
+            val author = item.selectFirst(".mg_author a, .author a, .post-author")?.text()?.trim()
             val stats = author?.let { "By $it" }
+            val rating = item.selectFirst(".score, .post-total-rating")?.text()?.trim()
 
             list.add(
                 NovelItem(
@@ -285,7 +489,7 @@ class WebNovelRepository(
                     title = title,
                     cover = cover,
                     stats = stats,
-                    rating = null,
+                    rating = rating,
                     source = source.id
                 )
             )
@@ -297,118 +501,106 @@ class WebNovelRepository(
         val popular = try { getPopular(page) } catch (_: Exception) { emptyList() }
         val latest = try { getLatest(page) } catch (_: Exception) { emptyList() }
         val lightNovels = try { getLightNovels(page) } catch (_: Exception) { emptyList() }
-        val rankings = popular.take(15)
+        val rankings = try { getRankings(page).take(15) } catch (_: Exception) { popular.take(15) }
         NovelHomeData(rankings, popular, latest, lightNovels)
     }
 
     override suspend fun getRankings(page: Int): List<NovelItem> {
-        val url = if (page <= 1) "$baseUrl/sort/top-rated-novel" else "$baseUrl/sort/top-rated-novel?page=$page"
-        val doc = fetchHtml(url)
-        val parsed = parseNovelList(doc)
-        return if (parsed.isNotEmpty()) parsed else getPopular(page)
+        val url = if (page <= 1) "$baseUrl/novel/?m_orderby=rating" else "$baseUrl/novel/?m_orderby=rating&paged=$page"
+        return parseNovelList(fetchHtml(url))
     }
 
     override suspend fun getPopular(page: Int): List<NovelItem> {
-        val url = if (page <= 1) "$baseUrl/sort/popular-novel" else "$baseUrl/sort/popular-novel?page=$page"
-        val doc = fetchHtml(url)
-        val parsed = parseNovelList(doc)
-        return if (parsed.isNotEmpty()) parsed else parseNovelList(fetchHtml("$baseUrl/sort/most-viewed-novel"))
+        val url = if (page <= 1) "$baseUrl/novel/?m_orderby=views" else "$baseUrl/novel/?m_orderby=views&paged=$page"
+        return parseNovelList(fetchHtml(url))
     }
 
     override suspend fun getLatest(page: Int): List<NovelItem> {
-        val url = if (page <= 1) "$baseUrl/sort/latest-novel" else "$baseUrl/sort/latest-novel?page=$page"
+        val url = if (page <= 1) "$baseUrl/novel/?m_orderby=latest" else "$baseUrl/novel/?m_orderby=latest&paged=$page"
         return parseNovelList(fetchHtml(url))
     }
 
     override suspend fun getLightNovels(page: Int): List<NovelItem> {
-        val url = if (page <= 1) "$baseUrl/genre/light-novel-16" else "$baseUrl/genre/light-novel-16?page=$page"
-        val doc = fetchHtml(url)
-        val parsed = parseNovelList(doc)
-        return if (parsed.isNotEmpty()) parsed else getPopular(page)
+        val url = if (page <= 1) "$baseUrl/novel-genre/light-novel/" else "$baseUrl/novel-genre/light-novel/?paged=$page"
+        val list = parseNovelList(fetchHtml(url))
+        return if (list.isNotEmpty()) list else getPopular(page)
     }
 
     override suspend fun search(query: String, page: Int): List<NovelItem> {
         val enc = URLEncoder.encode(query, "UTF-8")
-        val url = "$baseUrl/search?keyword=$enc"
-        val doc = fetchHtml(url)
-        val parsed = parseNovelList(doc)
-        if (parsed.isNotEmpty()) return parsed
-
-        // Fallback: parse raw links if container class was different
-        val list = mutableListOf<NovelItem>()
-        val aLinks = doc.select("a[href*='/book/']")
-        for (a in aLinks) {
-            val href = a.attr("href")
-            val slug = href.substringAfter("/book/").substringBefore("?").trim('/')
-            if (slug.isBlank() || slug.contains("chapters") || list.any { it.slug == slug }) continue
-            val title = a.text().trim()
-            if (title.isBlank() || title.length < 3) continue
-            val cover = "$baseUrl/server-1/$slug.jpg"
-            list.add(NovelItem(slug = slug, title = title, cover = cover, source = source.id))
-        }
-        return list
+        val url = if (page <= 1) "$baseUrl/?s=$enc&post_type=wp-manga" else "$baseUrl/?s=$enc&post_type=wp-manga&paged=$page"
+        return parseNovelList(fetchHtml(url))
     }
 
     override suspend fun getDetail(slug: String): NovelDetail? {
-        val cleanSlug = slug.substringAfter("/book/").substringBefore("?").trim('/')
-        val url = "$baseUrl/book/$cleanSlug"
+        val cleanSlug = slug.substringAfter("/novel/").trim('/')
+        val url = "$baseUrl/novel/$cleanSlug/"
         val doc = fetchHtml(url)
 
-        val title = doc.selectFirst(".novel-title, h1")?.text()?.trim()
-            ?: cleanSlug.replace("-", " ").replaceFirstChar { it.uppercase() }
-
-        var cover = doc.selectFirst("figure.cover img, img[src*='cover'], img[src*='uploads']")?.attr("src")?.ifBlank {
-            doc.selectFirst("img[data-src]")?.attr("data-src")
-        }.orEmpty()
-        if (cover.isBlank() || cover.contains("base64") || cover.endsWith(".svg")) {
-            cover = "$baseUrl/server-1/$cleanSlug.jpg"
-        } else if (!cover.startsWith("http")) {
-            if (cover.startsWith("//")) cover = "https:$cover"
-            else cover = "$baseUrl/$cover"
+        val title = doc.selectFirst(".post-title h1, h1")?.text()?.trim() ?: cleanSlug.replace("-", " ")
+        val img = doc.selectFirst(".summary_image img")
+        var cover = img?.attr("data-src")?.ifBlank { img.attr("src") }.orEmpty()
+        if (cover.contains("dflazy.jpg") || cover.isBlank()) {
+            cover = img?.attr("srcset")?.split(",")?.lastOrNull()?.trim()?.substringBefore(" ") ?: cover
+        }
+        if (cover.isNotBlank() && !cover.startsWith("http")) {
+            cover = baseUrl + (if (cover.startsWith("/")) "" else "/") + cover
         }
 
-        val author = doc.selectFirst("a[href*='/author/'], .author")?.text()?.trim()
-        val genres = doc.select("a[href*='/genre/'], .genre a").map { it.text().trim() }.filter { it.isNotBlank() }
-        val status = doc.selectFirst(".status, .novel-status")?.text()?.trim() ?: "Ongoing"
-        val desc = doc.select(".description, .summary, .content").joinToString("\n\n") { it.text().trim() }.ifBlank {
-            doc.select("p").take(3).joinToString("\n\n") { it.text().trim() }
+        val author = doc.select(".author-content a").text().trim().ifBlank { null }
+        val rating = doc.selectFirst(".score, .post-total-rating")?.text()?.trim()
+        val status = doc.select(".post-status .summary-content").text().trim().ifBlank { null }
+        val genres = doc.select(".genres-content a").map { it.text().trim() }.filter { it.isNotBlank() }
+
+        val desc = doc.select(".description-summary .summary__content p, .description-summary p").joinToString("\n\n") { it.text().trim() }.ifBlank {
+            doc.select(".description-summary").text().trim()
         }
+
+        val firstChLink = doc.selectFirst("a[href*='/chapter-1/'], a:contains(Read First)")?.attr("href")
+        val firstChapterSlug = firstChLink?.substringAfter("/novel/$cleanSlug/")?.trim('/')
 
         return NovelDetail(
             slug = cleanSlug,
             title = title,
             cover = cover,
             author = author,
-            rating = null,
+            rating = rating,
             status = status,
             chaptersCount = null,
             views = null,
             genres = genres,
             synopsis = desc,
+            firstChapterSlug = firstChapterSlug,
             source = source.id
         )
     }
 
     override suspend fun getChapters(slug: String, page: Int): Pair<List<NovelChapter>, Int> {
-        val cleanSlug = slug.substringAfter("/book/").substringBefore("?").trim('/')
-        val url = "$baseUrl/book/$cleanSlug/chapters"
-        val doc = fetchHtml(url)
-
+        val cleanSlug = slug.substringAfter("/novel/").trim('/')
         val list = mutableListOf<NovelChapter>()
-        val chLinks = doc.select("a[href*='/chapter-'], a[href*='/book/']")
-        for ((idx, a) in chLinks.withIndex()) {
+
+        var chLinks = org.jsoup.select.Elements()
+        try {
+            val ajaxDoc = fetchHtml("$baseUrl/novel/$cleanSlug/ajax/chapters/")
+            chLinks = ajaxDoc.select(".wp-manga-chapter a, li.wp-manga-chapter a, a[href*='chapter']")
+        } catch (_: Exception) {}
+
+        if (chLinks.isEmpty()) {
+            try {
+                val detailUrl = "$baseUrl/novel/$cleanSlug/"
+                val doc = fetchHtml(detailUrl)
+                chLinks = doc.select(".wp-manga-chapter a, li.wp-manga-chapter a, a[href*='/novel/$cleanSlug/chapter-'], a[href*='chapter']")
+            } catch (_: Exception) {}
+        }
+
+        // Madara theme lists chapters newest-first, reverse to read chronologically
+        val orderedLinks = chLinks.reversed()
+        for ((idx, a) in orderedLinks.withIndex()) {
             val href = a.attr("href")
-            val chSlug = if (href.contains("/book/")) {
-                href.substringAfter("/book/").substringBefore("?").trim('/')
-            } else {
-                href.substringAfter("/chapter-").substringBefore("?").trim('/')
-            }
+            val chSlug = href.substringAfter("/novel/$cleanSlug/").trim('/')
             if (chSlug.isBlank() || list.any { it.slug == chSlug }) continue
 
-            var name = a.text().trim()
-            name = Jsoup.parse(name).text().trim()
-            if (name.isBlank()) name = "Chapter ${idx + 1}"
-
+            val name = a.text().trim().ifBlank { "Chapter ${idx + 1}" }
             list.add(
                 NovelChapter(
                     slug = chSlug,
@@ -417,46 +609,27 @@ class WebNovelRepository(
                 )
             )
         }
-
-        if (list.isEmpty()) {
-            // Fallback: fetch main detail page for chapter links
-            val dDoc = fetchHtml("$baseUrl/book/$cleanSlug")
-            val dLinks = dDoc.select("a[href*='/chapter-']")
-            for ((idx, a) in dLinks.withIndex()) {
-                val href = a.attr("href")
-                val chSlug = href.substringAfter("/book/").substringBefore("?").trim('/')
-                if (chSlug.isBlank() || list.any { it.slug == chSlug }) continue
-                list.add(NovelChapter(slug = chSlug, title = a.text().trim().ifBlank { "Chapter ${idx + 1}" }, number = "${idx + 1}"))
-            }
-        }
-
         return Pair(list, 1)
     }
 
     override suspend fun getChapterContent(novelSlug: String, chapterSlug: String): NovelChapterContent? {
-        val cleanNovel = novelSlug.substringAfter("/book/").substringBefore("?").trim('/')
-        val cleanChapter = chapterSlug.substringAfter("/book/").substringBefore("?").trim('/')
-        val url = if (cleanChapter.contains("/")) "$baseUrl/book/$cleanChapter" else "$baseUrl/book/$cleanNovel/$cleanChapter"
+        val cleanNovel = novelSlug.substringAfter("/novel/").trim('/')
+        val cleanChapter = chapterSlug.substringAfter("/novel/$cleanNovel/").trim('/')
+        val url = "$baseUrl/novel/$cleanNovel/$cleanChapter/"
         val doc = fetchHtml(url)
 
-        val title = doc.selectFirst("h2, h1, .chapter-title")?.text()?.trim() ?: cleanChapter.replace("-", " ")
-        val contentEl = doc.selectFirst(".content, #chapter-content, .chapter-content, .desc") ?: doc.body()
-        contentEl.select("script, style, iframe, .ads, .pirate-wrapper, .icon-megaphone").remove()
+        val title = doc.selectFirst("h1#chapter-heading, h1, .breadcrumb li.active")?.text()?.trim() ?: cleanChapter.replace("-", " ")
+        val contentEl = doc.selectFirst(".reading-content .text-left, .reading-content, .entry-content") ?: return null
+        contentEl.select("script, style, iframe, .ads, .ad, .social-share").remove()
 
-        val paragraphs = contentEl.select("p").map { it.text().trim() }
-            .filter { it.isNotBlank() && !it.startsWith("To comply with copyright", ignoreCase = true) }
+        val paragraphs = contentEl.select("p").map { it.text().trim() }.filter { it.isNotBlank() }
+        val finalParas = if (paragraphs.isNotEmpty()) paragraphs else contentEl.wholeText().lines().map { it.trim() }.filter { it.isNotBlank() }
 
-        val finalParas = if (paragraphs.isNotEmpty()) {
-            paragraphs
-        } else {
-            contentEl.wholeText().lines().map { it.trim() }.filter { it.isNotBlank() && !it.startsWith("To comply with copyright", ignoreCase = true) }
-        }
+        val prevA = doc.selectFirst(".nav-previous a, a.prev_page")
+        val nextA = doc.selectFirst(".nav-next a, a.next_page")
 
-        val prevA = doc.selectFirst("a[href*='/chapter-']:has(.icon-left-open), a:contains(Prev), a.prev-btn")
-        val nextA = doc.selectFirst("a[href*='/chapter-']:has(.icon-right-open), a:contains(Next), a.next-btn")
-
-        val prevSlug = prevA?.attr("href")?.substringAfter("/book/")?.substringBefore("?")?.trim('/')
-        val nextSlug = nextA?.attr("href")?.substringAfter("/book/")?.substringBefore("?")?.trim('/')
+        val prevSlug = prevA?.attr("href")?.substringAfter("/novel/$cleanNovel/")?.trim('/')
+        val nextSlug = nextA?.attr("href")?.substringAfter("/novel/$cleanNovel/")?.trim('/')
 
         return NovelChapterContent(
             novelSlug = cleanNovel,
@@ -467,4 +640,13 @@ class WebNovelRepository(
             nextChapterSlug = nextSlug
         )
     }
+}
+
+// ============================================================================
+// 5. WEBNOVEL REPOSITORY (Alias mapping to Royal Road for backward compatibility)
+// ============================================================================
+class WebNovelRepository(
+    private val delegate: RoyalRoadRepository = RoyalRoadRepository()
+) : INovelSourceRepository by delegate {
+    override val source: NovelSource = NovelSource.WEB_NOVEL
 }

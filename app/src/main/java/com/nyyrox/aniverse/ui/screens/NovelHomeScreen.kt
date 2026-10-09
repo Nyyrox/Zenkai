@@ -169,7 +169,7 @@ fun NovelHomeScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Connection Issue", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
                             Spacer(Modifier.height(6.dp))
-                            Text(vm.novelHomeError ?: "Unable to fetch novels from NovelFire", fontSize = 12.sp, color = OttTextSecondary, textAlign = TextAlign.Center)
+                            Text(vm.novelHomeError ?: "Unable to fetch novels from ${vm.activeNovelSource.displayName}", fontSize = 12.sp, color = OttTextSecondary, textAlign = TextAlign.Center)
                             Spacer(Modifier.height(14.dp))
                             Button(
                                 onClick = { vm.loadNovelHome() },
@@ -350,19 +350,37 @@ private fun NovelSearchHeader(
         Spacer(Modifier.height(8.dp))
 
         // Novel Sources Chip Row
+        val displaySources = remember {
+            NovelSource.entries.filter { it != NovelSource.WEB_NOVEL }
+        }
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(horizontal = 2.dp)
         ) {
-            items(NovelSource.entries.toTypedArray()) { src ->
+            items(displaySources) { src ->
                 val isSelected = src == activeSource
+                val sourceAccent = when (src) {
+                    NovelSource.NOVEL_FULL -> Color(0xFFFF7A45)
+                    NovelSource.NOVEL_FIRE -> Color(0xFFE50914)
+                    NovelSource.ROYAL_ROAD -> Color(0xFF3B82F6)
+                    NovelSource.WUXIA_WORLD -> Color(0xFF10B981)
+                    else -> OttPrimary
+                }
+                val icon = when (src) {
+                    NovelSource.NOVEL_FULL -> Icons.Default.MenuBook
+                    NovelSource.NOVEL_FIRE -> Icons.Default.Whatshot
+                    NovelSource.ROYAL_ROAD -> Icons.Default.Star
+                    NovelSource.WUXIA_WORLD -> Icons.Default.AutoStories
+                    else -> Icons.Default.MenuBook
+                }
+
                 Box(
                     modifier = Modifier
                         .clip(OttPillShape)
-                        .background(if (isSelected) OttPrimary else Color(0x16FFFFFF))
+                        .background(if (isSelected) sourceAccent else Color(0x16FFFFFF))
                         .border(
                             width = 1.dp,
-                            color = if (isSelected) OttPrimary else Color(0x28FFFFFF),
+                            color = if (isSelected) sourceAccent else Color(0x28FFFFFF),
                             shape = OttPillShape
                         )
                         .clickable { onSourceSelect(src) }
@@ -371,22 +389,35 @@ private fun NovelSearchHeader(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (src.isLightNovelFocused) {
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = null,
-                                tint = if (isSelected) Color.Black else OttAccentGold,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = if (isSelected) Color.Black else sourceAccent,
+                            modifier = Modifier.size(13.dp)
+                        )
                         Text(
                             text = src.displayName,
                             fontSize = 11.5.sp,
                             fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
                             color = if (isSelected) Color.Black else Color.White
                         )
+                        if (src.badge != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) Color(0x30000000) else Color(0x22FFFFFF))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = src.badge,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color(0xCC000000) else Color(0xB3FFFFFF)
+                                )
+                            }
+                        }
                     }
                 }
             }
