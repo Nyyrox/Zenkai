@@ -623,6 +623,7 @@ fun OttTop10Row(
 @Composable
 fun OttContinueWatchingRow(
     history: List<WatchHistoryItem>,
+    tmdbEpisodeStills: Map<String, String?> = emptyMap(),
     onPlay: (animeId: Int, episode: Int) -> Unit,
     onRemove: (Int) -> Unit
 ) {
@@ -672,8 +673,13 @@ fun OttContinueWatchingRow(
                             .fillMaxWidth()
                             .height(115.dp)
                     ) {
+                        val epStill = item.episodeStill?.takeIf { it.isNotBlank() }
+                            ?: tmdbEpisodeStills["${item.animeId}_${item.lastEpisode}"]?.takeIf { it.isNotBlank() }
+                        val displayCover = epStill
+                            ?: item.banner?.takeIf { it.isNotBlank() }
+                            ?: item.cover
                         AsyncImage(
-                            model = item.banner ?: item.cover,
+                            model = displayCover,
                             contentDescription = item.title,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
@@ -761,6 +767,8 @@ fun OttUnifiedContinueWatchingRow(
     animeHistory: List<WatchHistoryItem>,
     mangaHistory: List<MangaHistoryItem>,
     novelHistory: List<NovelHistoryItem>,
+    tmdbEpisodeStills: Map<String, String?> = emptyMap(),
+    onLoadEpisodeStill: ((animeId: Int, episode: Int) -> Unit)? = null,
     onPlayAnime: (animeId: Int, episode: Int) -> Unit,
     onReadManga: (mangaId: String, chapterId: String) -> Unit,
     onReadNovel: (novelSlug: String, chapterSlug: String) -> Unit,
@@ -788,6 +796,11 @@ fun OttUnifiedContinueWatchingRow(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             items(combined, key = { it.key }) { entry ->
+                if (entry is UnifiedHistoryEntry.Anime && entry.data.episodeStill.isNullOrBlank()) {
+                    LaunchedEffect(entry.data.animeId, entry.data.lastEpisode) {
+                        onLoadEpisodeStill?.invoke(entry.data.animeId, entry.data.lastEpisode)
+                    }
+                }
                 val interactionSource = remember { MutableInteractionSource() }
                 val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -808,7 +821,12 @@ fun OttUnifiedContinueWatchingRow(
                         } else {
                             "Episode ${item.lastEpisode}" + (item.totalEpisodes?.let { " of $it" } ?: "")
                         }
-                        HistoryDisplayMeta(item.title, sub, item.banner ?: item.cover, "ANIME", Color(0xCCE50914), prog)
+                        val epStill = item.episodeStill?.takeIf { it.isNotBlank() }
+                            ?: tmdbEpisodeStills["${item.animeId}_${item.lastEpisode}"]?.takeIf { it.isNotBlank() }
+                        val displayCover = epStill
+                            ?: item.banner?.takeIf { it.isNotBlank() }
+                            ?: item.cover
+                        HistoryDisplayMeta(item.title, sub, displayCover, "ANIME", Color(0xCCE50914), prog)
                     }
                     is UnifiedHistoryEntry.Manga -> {
                         val item = entry.data

@@ -334,6 +334,7 @@ class StorageManager(context: Context) {
                             title = obj.getString("title"),
                             cover = obj.getString("cover"),
                             banner = obj.optString("banner").takeIf { it.isNotBlank() },
+                            episodeStill = obj.optString("episodeStill").takeIf { it.isNotBlank() },
                             lastEpisode = obj.getInt("lastEpisode"),
                             totalEpisodes = if (obj.isNull("totalEpisodes")) null else obj.getInt("totalEpisodes"),
                             timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
@@ -375,10 +376,22 @@ class StorageManager(context: Context) {
             .apply()
     }
 
-    fun recordProgress(anime: Anime, episode: Int, positionMs: Long = 0L, durationMs: Long = 0L) {
+    fun recordProgress(
+        anime: Anime,
+        episode: Int,
+        positionMs: Long = 0L,
+        durationMs: Long = 0L,
+        episodeStill: String? = null
+    ) {
         val history = getHistory().toMutableList()
         val existingIndex = history.indexOfFirst { it.animeId == anime.id }
+        val existingItem = if (existingIndex >= 0) history[existingIndex] else null
         val savedPos = if (positionMs > 0L) positionMs else getEpisodePosition(anime.id, episode)
+
+        // Resolve final episode still: explicit parameter > existing if same episode > null
+        val finalStill = episodeStill?.takeIf { it.isNotBlank() }
+            ?: if (existingItem != null && existingItem.lastEpisode == episode) existingItem.episodeStill else null
+
         if (existingIndex >= 0) {
             history.removeAt(existingIndex)
         }
@@ -389,6 +402,7 @@ class StorageManager(context: Context) {
                 title = anime.title,
                 cover = anime.cover,
                 banner = anime.banner,
+                episodeStill = finalStill,
                 lastEpisode = episode,
                 totalEpisodes = anime.episodes ?: anime.nextEpisode,
                 timestamp = System.currentTimeMillis(),
@@ -398,13 +412,36 @@ class StorageManager(context: Context) {
         )
         // Keep up to 30 recent items
         val capped = history.take(30)
+        saveHistoryList(capped)
+        if (positionMs > 0L) {
+            saveEpisodePosition(anime.id, episode, positionMs, durationMs)
+        }
+        updateWatchlistProgress(anime.id, episode, anime.episodes ?: anime.nextEpisode)
+        unmarkHistoryDeleted(anime.id)
+    }
+
+    fun updateHistoryEpisodeStill(animeId: Int, episode: Int, stillUrl: String) {
+        if (stillUrl.isBlank()) return
+        val history = getHistory().toMutableList()
+        val index = history.indexOfFirst { it.animeId == animeId }
+        if (index >= 0) {
+            val item = history[index]
+            if (item.lastEpisode == episode && item.episodeStill != stillUrl) {
+                history[index] = item.copy(episodeStill = stillUrl)
+                saveHistoryList(history)
+            }
+        }
+    }
+
+    fun saveHistoryList(history: List<WatchHistoryItem>) {
         val array = JSONArray()
-        for (item in capped) {
+        for (item in history) {
             val obj = JSONObject().apply {
                 put("animeId", item.animeId)
                 put("title", item.title)
                 put("cover", item.cover)
                 put("banner", item.banner ?: JSONObject.NULL)
+                put("episodeStill", item.episodeStill ?: JSONObject.NULL)
                 put("lastEpisode", item.lastEpisode)
                 put("totalEpisodes", item.totalEpisodes ?: JSONObject.NULL)
                 put("timestamp", item.timestamp)
@@ -414,11 +451,6 @@ class StorageManager(context: Context) {
             array.put(obj)
         }
         prefs.edit().putString(KEY_HISTORY, array.toString()).apply()
-        if (positionMs > 0L) {
-            saveEpisodePosition(anime.id, episode, positionMs, durationMs)
-        }
-        updateWatchlistProgress(anime.id, episode, anime.episodes ?: anime.nextEpisode)
-        unmarkHistoryDeleted(anime.id)
     }
 
     fun isHistoryDeleted(animeId: Int): Boolean {
@@ -509,16 +541,21 @@ class StorageManager(context: Context) {
         lastEpisode: Int,
         totalEpisodes: Int?,
         positionMs: Long,
-        durationMs: Long
+        durationMs: Long,
+        episodeStill: String? = null
     ) {
         if (isHistoryDeleted(animeId)) return
         val history = getHistory().toMutableList()
         val index = history.indexOfFirst { it.animeId == animeId }
+        val existingItem = if (index >= 0) history[index] else null
+        val finalStill = episodeStill?.takeIf { it.isNotBlank() }
+            ?: if (existingItem != null && existingItem.lastEpisode == lastEpisode) existingItem.episodeStill else null
         val item = WatchHistoryItem(
             animeId = animeId,
             title = title,
             cover = cover,
             banner = banner,
+            episodeStill = finalStill,
             lastEpisode = lastEpisode,
             totalEpisodes = totalEpisodes,
             timestamp = System.currentTimeMillis(),
@@ -530,22 +567,7 @@ class StorageManager(context: Context) {
         } else {
             history.add(0, item)
         }
-        val array = JSONArray()
-        for (h in history) {
-            val obj = JSONObject().apply {
-                put("animeId", h.animeId)
-                put("title", h.title)
-                put("cover", h.cover)
-                put("banner", h.banner ?: JSONObject.NULL)
-                put("lastEpisode", h.lastEpisode)
-                put("totalEpisodes", h.totalEpisodes ?: JSONObject.NULL)
-                put("timestamp", h.timestamp)
-                put("positionMs", h.positionMs)
-                put("durationMs", h.durationMs)
-            }
-            array.put(obj)
-        }
-        prefs.edit().putString(KEY_HISTORY, array.toString()).apply()
+        saveHistoryList(history.take(30))
         if (positionMs > 0L) {
             saveEpisodePosition(animeId, lastEpisode, positionMs, durationMs)
         }

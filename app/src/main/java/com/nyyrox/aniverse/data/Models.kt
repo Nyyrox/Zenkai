@@ -339,6 +339,7 @@ data class WatchHistoryItem(
     val title: String,
     val cover: String,
     val banner: String? = null,
+    val episodeStill: String? = null,
     val lastEpisode: Int,
     val totalEpisodes: Int? = null,
     val timestamp: Long = System.currentTimeMillis(),

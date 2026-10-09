@@ -277,6 +277,8 @@ fun HomeScreen(
                         animeHistory = vm.history,
                         mangaHistory = vm.mangaHistory,
                         novelHistory = vm.novelHistoryList,
+                        tmdbEpisodeStills = vm.tmdbEpisodeStills,
+                        onLoadEpisodeStill = { id, ep -> vm.loadHistoryEpisodeStill(id, ep) },
                         onPlayAnime = onPlayClick,
                         onReadManga = onMangaReadClick,
                         onReadNovel = onNovelReadClick,

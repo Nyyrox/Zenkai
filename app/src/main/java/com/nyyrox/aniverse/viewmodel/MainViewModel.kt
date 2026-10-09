@@ -527,10 +527,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ?: anime.banner?.takeIf { it.isNotBlank() }
                     ?: anime.cover
                 tmdbEpisodeStills = tmdbEpisodeStills + (key to finalStill)
+                if (!finalStill.isNullOrBlank()) {
+                    updateHistoryEpisodeStill(anime.id, episodeNumber, finalStill)
+                }
             } catch (_: Exception) {
-                tmdbEpisodeStills = tmdbEpisodeStills + (key to (anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover))
+                val fallbackStill = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover
+                tmdbEpisodeStills = tmdbEpisodeStills + (key to fallbackStill)
             }
         }
+    }
+
+    fun loadHistoryEpisodeStill(animeId: Int, episode: Int) {
+        val key = "${animeId}_$episode"
+        if (tmdbEpisodeStills.containsKey(key)) return
+        val known = findKnownAnime(animeId) ?: return
+        loadTmdbEpisodeStill(known, episode)
+    }
+
+    fun updateHistoryEpisodeStill(animeId: Int, episode: Int, stillUrl: String) {
+        if (stillUrl.isBlank()) return
+        storage.updateHistoryEpisodeStill(animeId, episode, stillUrl)
+        history = storage.getHistory()
     }
 
     suspend fun getMultiAudioServers(anilistId: Int, episode: Int, title: String): List<com.nyyrox.aniverse.data.extractor.MultiAudioServer> {
@@ -1024,8 +1041,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // History actions
-    fun recordHistory(anime: Anime, episode: Int, positionMs: Long = 0L, durationMs: Long = 0L) {
-        storage.recordProgress(anime, episode, positionMs, durationMs)
+    fun recordHistory(
+        anime: Anime,
+        episode: Int,
+        positionMs: Long = 0L,
+        durationMs: Long = 0L,
+        episodeStill: String? = null
+    ) {
+        val resolvedStill = episodeStill?.takeIf { it.isNotBlank() }
+            ?: tmdbEpisodeStills["${anime.id}_$episode"]?.takeIf { it.isNotBlank() }
+        storage.recordProgress(anime, episode, positionMs, durationMs, resolvedStill)
         history = storage.getHistory()
         watchlist = storage.getWatchlist()
         syncHistoryItemToCloud(anime.id)

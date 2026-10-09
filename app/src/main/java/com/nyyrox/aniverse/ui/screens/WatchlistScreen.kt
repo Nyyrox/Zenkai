@@ -1492,7 +1492,7 @@ private fun HistoryListItem(
                 .clip(RoundedCornerShape(8.dp))
         ) {
             AsyncImage(
-                model = item.banner ?: item.cover,
+                model = item.episodeStill?.takeIf { it.isNotBlank() } ?: item.banner ?: item.cover,
                 contentDescription = item.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

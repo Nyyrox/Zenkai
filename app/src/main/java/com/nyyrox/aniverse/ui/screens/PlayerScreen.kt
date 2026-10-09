@@ -344,6 +344,10 @@ fun PlayerScreen(
         )
         if (eps.isNotEmpty()) {
             tmdbEpisodes = eps
+            val currentStill = eps[currentEpisode]?.stillUrl
+            if (!currentStill.isNullOrBlank()) {
+                vm.updateHistoryEpisodeStill(anime.id, currentEpisode, currentStill)
+            }
         }
     }
 
@@ -619,9 +623,11 @@ fun PlayerScreen(
         }
     }
 
-    // Record watch history automatically on load
-    LaunchedEffect(currentEpisode) {
-        vm.recordHistory(anime, currentEpisode)
+    // Record watch history automatically on load with episode still
+    val currentStillUrl = tmdbEpisodes[currentEpisode]?.stillUrl
+        ?: vm.tmdbEpisodeStills["${anime.id}_$currentEpisode"]
+    LaunchedEffect(currentEpisode, currentStillUrl) {
+        vm.recordHistory(anime, currentEpisode, episodeStill = currentStillUrl)
     }
 
     var isScreenExiting by remember { mutableStateOf(false) }
@@ -903,7 +909,9 @@ fun PlayerScreen(
                         isAutoSkipIntroOutro = false,
                         onToggleAutoSkipIntroOutro = { /* manual click on floating button */ },
                         onProgressUpdate = { pos, dur ->
-                            vm.recordHistory(anime, playingEpisode, pos, dur)
+                            val epStill = tmdbEpisodes[playingEpisode]?.stillUrl
+                                ?: vm.tmdbEpisodeStills["${anime.id}_$playingEpisode"]
+                            vm.recordHistory(anime, playingEpisode, pos, dur, episodeStill = epStill)
                             if (!isScreenExiting) {
                                 val coverUrl = anime.cover.takeIf { it.isNotBlank() } ?: anime.banner
                                 com.nyyrox.aniverse.data.discord.DiscordRpcService.updatePresence(
