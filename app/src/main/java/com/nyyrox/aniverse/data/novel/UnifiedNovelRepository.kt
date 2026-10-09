@@ -47,7 +47,23 @@ class UnifiedNovelRepository(
 
     override suspend fun getLightNovels(page: Int): List<NovelItem> = currentRepo.getLightNovels(page)
 
-    override suspend fun search(query: String, page: Int): List<NovelItem> = currentRepo.search(query, page)
+    override suspend fun search(query: String, page: Int): List<NovelItem> {
+        val primary = try { currentRepo.search(query, page) } catch (_: Exception) { emptyList() }
+        if (primary.isNotEmpty()) return primary
+
+        // Fallback: If active source has no results, search other available sources
+        for ((s, repo) in repositories) {
+            if (s != _activeSource.value && s != NovelSource.WEB_NOVEL) {
+                try {
+                    val fallbackResults = repo.search(query, page)
+                    if (fallbackResults.isNotEmpty()) {
+                        return fallbackResults
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return emptyList()
+    }
 
     override suspend fun getDetail(slug: String): NovelDetail? {
         try {

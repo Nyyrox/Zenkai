@@ -63,6 +63,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -71,6 +72,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.nyyrox.aniverse.data.novel.NovelHistoryItem
 import com.nyyrox.aniverse.data.novel.NovelItem
 import com.nyyrox.aniverse.data.novel.NovelSource
@@ -85,6 +90,35 @@ import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+
+@Composable
+fun rememberNovelImageRequest(url: String?): Any? {
+    val context = LocalContext.current
+    return remember(url) {
+        if (url.isNullOrBlank()) null
+        else {
+            val ref = when {
+                url.contains("royalroad") || url.contains("royalroadcdn") -> "https://www.royalroad.com/"
+                url.contains("wuxiaworld") -> "https://wuxiaworld.site/"
+                url.contains("novelfire") -> "https://novelfire.net/"
+                url.contains("novelfull") -> "https://novelfull.com/"
+                else -> null
+            }
+            val builder = ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+
+            val headers = NetworkHeaders.Builder()
+                .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                .set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+            if (ref != null) {
+                headers.set("Referer", ref)
+                headers.set("Origin", ref.removeSuffix("/"))
+            }
+            builder.httpHeaders(headers.build()).build()
+        }
+    }
+}
 
 @Composable
 fun NovelHomeScreen(
@@ -128,6 +162,9 @@ fun NovelHomeScreen(
                 activeSource = vm.activeNovelSource,
                 onSourceSelect = { src ->
                     vm.setNovelSource(src)
+                    if (searchQuery.isNotBlank()) {
+                        vm.searchNovels(searchQuery)
+                    }
                 },
                 onDownloadsClick = onDownloadsClick
             )
@@ -348,75 +385,94 @@ private fun NovelSearchHeader(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // Novel Sources Chip Row
+        // Redesigned Novel Sources Floating Glass Segmented Dock Bar
         val displaySources = remember {
             NovelSource.entries.filter { it != NovelSource.WEB_NOVEL }
         }
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0x18FFFFFF))
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
+                .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
-            items(displaySources) { src ->
-                val isSelected = src == activeSource
-                val sourceAccent = when (src) {
-                    NovelSource.NOVEL_FULL -> Color(0xFFFF7A45)
-                    NovelSource.NOVEL_FIRE -> Color(0xFFE50914)
-                    NovelSource.ROYAL_ROAD -> Color(0xFF3B82F6)
-                    NovelSource.WUXIA_WORLD -> Color(0xFF10B981)
-                    else -> OttPrimary
-                }
-                val icon = when (src) {
-                    NovelSource.NOVEL_FULL -> Icons.Default.MenuBook
-                    NovelSource.NOVEL_FIRE -> Icons.Default.Whatshot
-                    NovelSource.ROYAL_ROAD -> Icons.Default.Star
-                    NovelSource.WUXIA_WORLD -> Icons.Default.AutoStories
-                    else -> Icons.Default.MenuBook
-                }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) {
+                items(displaySources) { src ->
+                    val isSelected = src == activeSource
+                    val sourceGradient = when (src) {
+                        NovelSource.NOVEL_FULL -> Brush.horizontalGradient(listOf(Color(0xFFFF7A45), Color(0xFFFF5722)))
+                        NovelSource.NOVEL_FIRE -> Brush.horizontalGradient(listOf(Color(0xFFE50914), Color(0xFFB71C1C)))
+                        NovelSource.ROYAL_ROAD -> Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF1D4ED8)))
+                        NovelSource.WUXIA_WORLD -> Brush.horizontalGradient(listOf(Color(0xFF059669), Color(0xFF047857)))
+                        else -> Brush.horizontalGradient(listOf(OttPrimary, OttPrimary))
+                    }
+                    val iconColor = when (src) {
+                        NovelSource.NOVEL_FULL -> Color(0xFFFF7A45)
+                        NovelSource.NOVEL_FIRE -> Color(0xFFE50914)
+                        NovelSource.ROYAL_ROAD -> Color(0xFF3B82F6)
+                        NovelSource.WUXIA_WORLD -> Color(0xFF10B981)
+                        else -> OttPrimary
+                    }
+                    val icon = when (src) {
+                        NovelSource.NOVEL_FULL -> Icons.Default.MenuBook
+                        NovelSource.NOVEL_FIRE -> Icons.Default.Whatshot
+                        NovelSource.ROYAL_ROAD -> Icons.Default.Star
+                        NovelSource.WUXIA_WORLD -> Icons.Default.AutoStories
+                        else -> Icons.Default.MenuBook
+                    }
 
-                Box(
-                    modifier = Modifier
-                        .clip(OttPillShape)
-                        .background(if (isSelected) sourceAccent else Color(0x16FFFFFF))
-                        .border(
-                            width = 1.dp,
-                            color = if (isSelected) sourceAccent else Color(0x28FFFFFF),
-                            shape = OttPillShape
-                        )
-                        .clickable { onSourceSelect(src) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .then(
+                                if (isSelected) Modifier.background(sourceGradient)
+                                else Modifier.background(Color(0x10FFFFFF))
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) Color(0x60FFFFFF) else Color(0x18FFFFFF),
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .clickable { onSourceSelect(src) }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = if (isSelected) Color.Black else sourceAccent,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = src.displayName,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                            color = if (isSelected) Color.Black else Color.White
-                        )
-                        if (src.badge != null) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (isSelected) Color(0x30000000) else Color(0x22FFFFFF))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = src.badge,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color(0xCC000000) else Color(0xB3FFFFFF)
-                                )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = if (isSelected) Color.White else iconColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = src.displayName,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                            if (src.badge != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(if (isSelected) Color(0x35000000) else Color(0x20FFFFFF))
+                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = src.badge,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else Color(0xB3FFFFFF)
+                                    )
+                                }
                             }
                         }
                     }
@@ -441,7 +497,7 @@ private fun NovelHeroCard(
             .clickable(onClick = onClick)
     ) {
         AsyncImage(
-            model = novel.cover,
+            model = rememberNovelImageRequest(novel.cover),
             contentDescription = novel.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -631,7 +687,7 @@ private fun NovelCard(
                 .border(1.dp, Color(0x22FFFFFF), OttCardShape)
         ) {
             AsyncImage(
-                model = novel.cover,
+                model = rememberNovelImageRequest(novel.cover),
                 contentDescription = novel.title,
                 modifier = Modifier
                     .fillMaxSize()
@@ -730,7 +786,7 @@ private fun NovelGridCard(
                 .border(1.dp, Color(0x22FFFFFF), OttCardShape)
         ) {
             AsyncImage(
-                model = novel.cover,
+                model = rememberNovelImageRequest(novel.cover),
                 contentDescription = novel.title,
                 modifier = Modifier
                     .fillMaxSize()
@@ -847,7 +903,7 @@ private fun NovelContinueReadingRow(
                     ) {
                         if (item.cover.isNotBlank()) {
                             AsyncImage(
-                                model = item.cover,
+                                model = rememberNovelImageRequest(item.cover),
                                 contentDescription = item.title,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop

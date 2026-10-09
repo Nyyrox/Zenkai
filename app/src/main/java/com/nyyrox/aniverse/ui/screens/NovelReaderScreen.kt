@@ -33,6 +33,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -535,17 +537,30 @@ fun NovelReaderScreen(
                             }
                         }
 
-                        // Paragraphs
+                        // Paragraphs or inline chapter illustrations
                         items(content.paragraphs) { paragraph ->
-                            val textToDisplay = if (settings.indentParagraphs) "    $paragraph" else paragraph
-                            Text(
-                                text = textToDisplay,
-                                fontSize = settings.fontSize.sp,
-                                fontFamily = settings.fontFamily.fontFamily,
-                                lineHeight = (settings.fontSize * settings.lineHeight).sp,
-                                color = effectiveTextColor,
-                                textAlign = TextAlign.Start
-                            )
+                            if (paragraph.startsWith("[img]") && paragraph.endsWith("[/img]")) {
+                                val imgUrl = paragraph.removeSurrounding("[img]", "[/img]")
+                                AsyncImage(
+                                    model = rememberNovelImageRequest(imgUrl),
+                                    contentDescription = "Chapter illustration",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp)
+                                        .clip(RoundedCornerShape(10.dp)),
+                                    contentScale = ContentScale.FillWidth
+                                )
+                            } else {
+                                val textToDisplay = if (settings.indentParagraphs) "    $paragraph" else paragraph
+                                Text(
+                                    text = textToDisplay,
+                                    fontSize = settings.fontSize.sp,
+                                    fontFamily = settings.fontFamily.fontFamily,
+                                    lineHeight = (settings.fontSize * settings.lineHeight).sp,
+                                    color = effectiveTextColor,
+                                    textAlign = TextAlign.Start
+                                )
+                            }
                         }
 
                         // Bottom Navigation Footer
@@ -608,13 +623,26 @@ fun NovelReaderScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (settings.indentParagraphs) "    $para" else para,
-                                fontSize = (settings.fontSize * 1.1f).sp,
-                                fontFamily = settings.fontFamily.fontFamily,
-                                lineHeight = (settings.fontSize * settings.lineHeight * 1.15f).sp,
-                                color = effectiveTextColor
-                            )
+                            if (para.startsWith("[img]") && para.endsWith("[/img]")) {
+                                val imgUrl = para.removeSurrounding("[img]", "[/img]")
+                                AsyncImage(
+                                    model = rememberNovelImageRequest(imgUrl),
+                                    contentDescription = "Chapter illustration",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(10.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                Text(
+                                    text = if (settings.indentParagraphs) "    $para" else para,
+                                    fontSize = (settings.fontSize * 1.1f).sp,
+                                    fontFamily = settings.fontFamily.fontFamily,
+                                    lineHeight = (settings.fontSize * settings.lineHeight * 1.15f).sp,
+                                    color = effectiveTextColor
+                                )
+                            }
                         }
                     }
                 }

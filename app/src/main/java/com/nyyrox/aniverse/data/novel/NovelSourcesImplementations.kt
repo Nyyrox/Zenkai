@@ -380,14 +380,14 @@ class RoyalRoadRepository(
         val doc = fetchHtml(url)
 
         val list = mutableListOf<NovelChapter>()
-        val rows = doc.select("#chapters tbody tr, tr:has(a[href*='/chapter/'])")
+        val rows = doc.select("#chapters tbody tr, tr.chapter-row, tr:has(a[href*='/chapter/']), tr[data-url*='/chapter/']")
         for ((idx, row) in rows.withIndex()) {
-            val a = row.selectFirst("a[href*='/chapter/']") ?: continue
-            val href = a.attr("href")
+            val a = row.selectFirst("td:first-child a, .chapter-row td a, a[href*='/chapter/']")
+            val href = a?.attr("href")?.ifBlank { row.attr("data-url") } ?: row.attr("data-url")
             val chSlug = href.removePrefix("/").substringBefore("?").trim()
             if (chSlug.isBlank() || list.any { it.slug == chSlug }) continue
 
-            val name = a.text().trim().ifBlank { "Chapter ${idx + 1}" }
+            val name = a?.text()?.trim()?.ifBlank { "Chapter ${idx + 1}" } ?: "Chapter ${idx + 1}"
             val time = row.selectFirst("time")?.let { it.attr("title").ifBlank { it.text() }.trim() }
 
             list.add(
@@ -412,7 +412,24 @@ class RoyalRoadRepository(
         val contentEl = doc.selectFirst(".chapter-content, .chapter-inner, .content") ?: return null
         contentEl.select("script, style, iframe, .ads, .ad, .author-note-portlet, hr").remove()
 
-        val paragraphs = contentEl.select("p").map { it.text().trim() }.filter { it.isNotBlank() }
+        val paragraphs = mutableListOf<String>()
+        val elements = contentEl.children()
+        if (elements.isNotEmpty()) {
+            for (el in elements) {
+                val img = if (el.tagName() == "img") el else el.selectFirst("img")
+                if (img != null) {
+                    var src = img.attr("src").ifBlank { img.attr("data-src") }.trim()
+                    if (src.isNotBlank()) {
+                        if (!src.startsWith("http")) src = if (src.startsWith("/")) "$baseUrl$src" else "$baseUrl/$src"
+                        paragraphs.add("[img]$src[/img]")
+                    }
+                }
+                val txt = el.text().trim()
+                if (txt.isNotBlank()) {
+                    paragraphs.add(txt)
+                }
+            }
+        }
         val finalParas = if (paragraphs.isNotEmpty()) paragraphs else contentEl.wholeText().lines().map { it.trim() }.filter { it.isNotBlank() }
 
         val prevA = doc.selectFirst("a[href*='/chapter/']:contains(Previous), .nav-buttons a:contains(Previous), a:contains(Previous Chapter)")
@@ -458,13 +475,27 @@ class WuxiaWorldRepository(
         Jsoup.parse(body, url)
     }
 
+    private suspend fun fetchHtmlPost(url: String): Document = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .post(okhttp3.RequestBody.create(null, ByteArray(0)))
+            .header("User-Agent", userAgent)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Referer", baseUrl)
+            .build()
+        val response = client.newCall(request).execute()
+        val body = response.body.string()
+        Jsoup.parse(body, url)
+    }
+
     private fun parseNovelList(doc: Document): List<NovelItem> {
         val list = mutableListOf<NovelItem>()
         val items = doc.select(".c-tabs-item__content, .page-item-detail, .col-6, div:has(.post-title)")
         for (item in items) {
-            val a = item.selectFirst(".post-title a, h3.h5 a, a[href*='/novel/']") ?: continue
+            val a = item.selectFirst(".post-title a, h3.h5 a, a[href*='/novel/']:not([href*='/chapter'])")
+                ?: item.selectFirst("a[href*='/novel/']") ?: continue
             val href = a.attr("href")
-            val slug = href.substringAfter("/novel/").trim('/')
+            val slug = href.substringAfter("/novel/").substringBefore("/chapter").substringBefore("?").trim('/')
             if (slug.isBlank() || list.any { it.slug == slug }) continue
 
             val title = a.text().trim()
@@ -576,14 +607,21 @@ class WuxiaWorldRepository(
     }
 
     override suspend fun getChapters(slug: String, page: Int): Pair<List<NovelChapter>, Int> {
-        val cleanSlug = slug.substringAfter("/novel/").trim('/')
+        val cleanSlug = slug.substringAfter("/novel/").substringBefore("/chapter").trim('/')
         val list = mutableListOf<NovelChapter>()
 
         var chLinks = org.jsoup.select.Elements()
         try {
-            val ajaxDoc = fetchHtml("$baseUrl/novel/$cleanSlug/ajax/chapters/")
+            val ajaxDoc = fetchHtmlPost("$baseUrl/novel/$cleanSlug/ajax/chapters/")
             chLinks = ajaxDoc.select(".wp-manga-chapter a, li.wp-manga-chapter a, a[href*='chapter']")
         } catch (_: Exception) {}
+
+        if (chLinks.isEmpty()) {
+            try {
+                val ajaxDoc = fetchHtml("$baseUrl/novel/$cleanSlug/ajax/chapters/")
+                chLinks = ajaxDoc.select(".wp-manga-chapter a, li.wp-manga-chapter a, a[href*='chapter']")
+            } catch (_: Exception) {}
+        }
 
         if (chLinks.isEmpty()) {
             try {
@@ -613,7 +651,7 @@ class WuxiaWorldRepository(
     }
 
     override suspend fun getChapterContent(novelSlug: String, chapterSlug: String): NovelChapterContent? {
-        val cleanNovel = novelSlug.substringAfter("/novel/").trim('/')
+        val cleanNovel = novelSlug.substringAfter("/novel/").substringBefore("/chapter").trim('/')
         val cleanChapter = chapterSlug.substringAfter("/novel/$cleanNovel/").trim('/')
         val url = "$baseUrl/novel/$cleanNovel/$cleanChapter/"
         val doc = fetchHtml(url)
@@ -622,7 +660,24 @@ class WuxiaWorldRepository(
         val contentEl = doc.selectFirst(".reading-content .text-left, .reading-content, .entry-content") ?: return null
         contentEl.select("script, style, iframe, .ads, .ad, .social-share").remove()
 
-        val paragraphs = contentEl.select("p").map { it.text().trim() }.filter { it.isNotBlank() }
+        val paragraphs = mutableListOf<String>()
+        val elements = contentEl.children()
+        if (elements.isNotEmpty()) {
+            for (el in elements) {
+                val img = if (el.tagName() == "img") el else el.selectFirst("img")
+                if (img != null) {
+                    var src = img.attr("data-src").ifBlank { img.attr("src") }.trim()
+                    if (src.isNotBlank()) {
+                        if (!src.startsWith("http")) src = if (src.startsWith("/")) "$baseUrl$src" else "$baseUrl/$src"
+                        paragraphs.add("[img]$src[/img]")
+                    }
+                }
+                val txt = el.text().trim()
+                if (txt.isNotBlank()) {
+                    paragraphs.add(txt)
+                }
+            }
+        }
         val finalParas = if (paragraphs.isNotEmpty()) paragraphs else contentEl.wholeText().lines().map { it.trim() }.filter { it.isNotBlank() }
 
         val prevA = doc.selectFirst(".nav-previous a, a.prev_page")

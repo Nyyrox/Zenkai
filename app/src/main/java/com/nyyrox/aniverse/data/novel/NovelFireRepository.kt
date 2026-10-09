@@ -32,6 +32,18 @@ class NovelFireRepository(
         Jsoup.parse(body, url)
     }
 
+    private suspend fun fetchString(url: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", userAgent)
+            .header("Accept", "application/json, text/javascript, */*; q=0.01")
+            .header("Referer", baseUrl)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .build()
+        val response = client.newCall(request).execute()
+        response.body.string()
+    }
+
     private fun parseNovelList(doc: Document): List<NovelItem> {
         val list = mutableListOf<NovelItem>()
         val cards = doc.select(".novel-item, li.item, .list-novel .row, .book-item")
@@ -112,8 +124,51 @@ class NovelFireRepository(
 
     override suspend fun search(query: String, page: Int): List<NovelItem> {
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val url = "$baseUrl/search?keyword=$encoded&page=$page"
-        return parseNovelList(fetchHtml(url))
+        val liveResults = mutableListOf<NovelItem>()
+        if (page <= 1) {
+            try {
+                val liveUrl = "$baseUrl/ajax/searchLive?keyword=$encoded&type=title"
+                val jsonStr = fetchString(liveUrl)
+                val json = org.json.JSONObject(jsonStr)
+                val arr = json.optJSONArray("data")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        val title = obj.optString("title")
+                        val slug = obj.optString("slug")
+                        val img = obj.optString("image")
+                        val rank = obj.optInt("rank", 0)
+                        val totalChapters = obj.optInt("total_chapter", 0)
+                        val cover = if (img.startsWith("http")) img else "$baseUrl/$img"
+                        val stats = if (totalChapters > 0) "$totalChapters Chapters" else if (rank > 0) "Rank #$rank" else null
+                        if (slug.isNotBlank() && title.isNotBlank()) {
+                            liveResults.add(
+                                NovelItem(
+                                    slug = slug,
+                                    title = title,
+                                    cover = cover,
+                                    stats = stats,
+                                    rating = null,
+                                    source = source.id
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        val url = "$baseUrl/search?keyword=$encoded&type=title&page=$page"
+        val htmlList = try { parseNovelList(fetchHtml(url)) } catch (_: Exception) { emptyList() }
+
+        val combined = mutableListOf<NovelItem>()
+        combined.addAll(liveResults)
+        for (item in htmlList) {
+            if (combined.none { it.slug == item.slug }) {
+                combined.add(item)
+            }
+        }
+        return combined
     }
 
     override suspend fun getDetail(slug: String): NovelDetail? {

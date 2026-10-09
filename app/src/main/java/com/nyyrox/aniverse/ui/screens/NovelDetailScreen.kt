@@ -222,7 +222,7 @@ fun NovelDetailScreen(
                     ) {
                         // Ambient Backdrop Cover with Vignette
                         AsyncImage(
-                            model = novel.cover,
+                            model = rememberNovelImageRequest(novel.cover),
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -269,7 +269,7 @@ fun NovelDetailScreen(
                                         .shadow(12.dp, OttCardShape)
                                 ) {
                                     AsyncImage(
-                                        model = novel.cover,
+                                        model = rememberNovelImageRequest(novel.cover),
                                         contentDescription = novel.title,
                                         modifier = Modifier
                                             .fillMaxSize()
