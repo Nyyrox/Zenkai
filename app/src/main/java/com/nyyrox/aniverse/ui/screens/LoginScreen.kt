@@ -113,8 +113,14 @@ fun LoginScreen(
 
     val context = LocalContext.current
     val googleSignInClient = remember(context) {
+        val serverClientId = try {
+            val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+            if (resId != 0) context.getString(resId) else "291033138118-1dr4uup46fgud663iqs23lnh4oiaaa2h.apps.googleusercontent.com"
+        } catch (_: Exception) {
+            "291033138118-1dr4uup46fgud663iqs23lnh4oiaaa2h.apps.googleusercontent.com"
+        }
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("291033138118-1dr4uup46fgud663iqs23lnh4oiaaa2h.apps.googleusercontent.com")
+            .requestIdToken(serverClientId)
             .requestEmail()
             .requestProfile()
             .build()
