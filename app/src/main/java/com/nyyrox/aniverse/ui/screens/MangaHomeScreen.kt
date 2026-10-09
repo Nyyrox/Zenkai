@@ -95,6 +95,15 @@ fun MangaHomeScreen(
     onDownloadsClick: (() -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("All") }
+
+    LaunchedEffect(vm.activeMangaSource) {
+        if (vm.activeMangaSource == com.nyyrox.aniverse.data.manga.MangaSource.MANHUA) {
+            selectedCategory = "Manhua"
+        } else if (selectedCategory == "Manhua") {
+            selectedCategory = "All"
+        }
+    }
 
     LaunchedEffect(Unit) {
         vm.loadMangaHome()
@@ -112,7 +121,7 @@ fun MangaHomeScreen(
                 .statusBarsPadding()
                 .padding(top = 58.dp)
         ) {
-            // Header: Clean Search Bar right below navbar with source selector chips
+            // Header: Clean Search Bar right below navbar with source selector chips & category pills
             MangaHeaderSearch(
                 query = searchQuery,
                 onQueryChange = {
@@ -123,6 +132,13 @@ fun MangaHomeScreen(
                 onSourceSelect = { src ->
                     vm.setMangaSource(src)
                 },
+                selectedCategory = selectedCategory,
+                onCategorySelect = { cat ->
+                    selectedCategory = cat
+                    if (cat == "Manhua" && vm.activeMangaSource != com.nyyrox.aniverse.data.manga.MangaSource.MANHUA) {
+                        vm.setMangaSource(com.nyyrox.aniverse.data.manga.MangaSource.MANHUA)
+                    }
+                },
                 onDownloadsClick = onDownloadsClick
             )
 
@@ -132,12 +148,14 @@ fun MangaHomeScreen(
                 MangaSearchResults(
                     isLoading = vm.mangaSearchLoading,
                     results = vm.mangaSearchResults,
+                    selectedCategory = selectedCategory,
                     onCardClick = onMangaClick
                 )
             } else {
                 // Home Feed
                 MangaHomeFeed(
                     vm = vm,
+                    selectedCategory = selectedCategory,
                     onMangaClick = onMangaClick,
                     onReadClick = onReadClick
                 )
@@ -152,6 +170,8 @@ private fun MangaHeaderSearch(
     onQueryChange: (String) -> Unit,
     activeSource: com.nyyrox.aniverse.data.manga.MangaSource,
     onSourceSelect: (com.nyyrox.aniverse.data.manga.MangaSource) -> Unit,
+    selectedCategory: String = "All",
+    onCategorySelect: (String) -> Unit = {},
     onDownloadsClick: (() -> Unit)? = null
 ) {
     Column(
@@ -231,7 +251,7 @@ private fun MangaHeaderSearch(
 
         Spacer(Modifier.height(8.dp))
 
-        // Manga Sources Chip Row (MangaDex, ComicK, Asura Scans, WeebCentral)
+        // Manga Sources Chip Row (MangaDex, ComicK, Manhua, Asura Scans, WeebCentral)
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(horizontal = 2.dp)
@@ -241,6 +261,7 @@ private fun MangaHeaderSearch(
                 val (activeBg, activeBorder, activeText) = when (src) {
                     com.nyyrox.aniverse.data.manga.MangaSource.MANGADEX -> Triple(Color(0xFFFF6740), Color(0xFFFF8A65), Color.Black)
                     com.nyyrox.aniverse.data.manga.MangaSource.COMICK -> Triple(Color(0xFF3B82F6), Color(0xFF60A5FA), Color.White)
+                    com.nyyrox.aniverse.data.manga.MangaSource.MANHUA -> Triple(Color(0xFFEAB308), Color(0xFFFACC15), Color.Black)
                     com.nyyrox.aniverse.data.manga.MangaSource.ASURA -> Triple(Color(0xFF10B981), Color(0xFF34D399), Color.Black)
                     com.nyyrox.aniverse.data.manga.MangaSource.WEEBCENTRAL -> Triple(Color(0xFF8B5CF6), Color(0xFFA78BFA), Color.White)
                 }
@@ -279,6 +300,56 @@ private fun MangaHeaderSearch(
                 }
             }
         }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Comic Category Filter Chips: [ All ] [ Manga 🇯🇵 ] [ Manhwa 🇰🇷 ] [ Manhua 🇨🇳 ]
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val categories = listOf(
+                "All" to "All",
+                "Manga" to "Manga 🇯🇵",
+                "Manhwa" to "Manhwa 🇰🇷",
+                "Manhua" to "Manhua 🇨🇳"
+            )
+            categories.forEach { (catKey, catLabel) ->
+                val isCatSelected = selectedCategory == catKey
+                val catBg = if (isCatSelected) {
+                    when (catKey) {
+                        "Manhua" -> Color(0xFFEAB308)
+                        "Manhwa" -> Color(0xFF10B981)
+                        "Manga" -> Color(0xFFEF4444)
+                        else -> OttPrimary
+                    }
+                } else Color(0x12FFFFFF)
+                val catTextColor = if (isCatSelected) {
+                    if (catKey == "Manhua") Color.Black else Color.White
+                } else Color(0xCCFFFFFF)
+
+                Box(
+                    modifier = Modifier
+                        .clip(OttPillShape)
+                        .background(catBg)
+                        .border(
+                            width = 0.8.dp,
+                            color = if (isCatSelected) catBg else Color(0x20FFFFFF),
+                            shape = OttPillShape
+                        )
+                        .clickable { onCategorySelect(catKey) }
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = catLabel,
+                        fontSize = 11.sp,
+                        fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = catTextColor
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -286,8 +357,14 @@ private fun MangaHeaderSearch(
 private fun MangaSearchResults(
     isLoading: Boolean,
     results: List<MangaCard>,
+    selectedCategory: String = "All",
     onCardClick: (String) -> Unit
 ) {
+    val displayResults = remember(results, selectedCategory) {
+        if (selectedCategory == "All") results
+        else results.filter { it.type.equals(selectedCategory, ignoreCase = true) }
+    }
+
     if (isLoading) {
         Box(
             modifier = Modifier
@@ -297,7 +374,7 @@ private fun MangaSearchResults(
         ) {
             CircularProgressIndicator(color = OttPrimary, strokeWidth = 3.dp)
         }
-    } else if (results.isEmpty()) {
+    } else if (displayResults.isEmpty()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -305,7 +382,7 @@ private fun MangaSearchResults(
             contentAlignment = Alignment.TopCenter
         ) {
             Text(
-                text = "No manga found matching your query",
+                text = if (selectedCategory == "All") "No manga found matching your query" else "No $selectedCategory found matching your query",
                 color = OttSecondary,
                 fontSize = 14.sp
             )
@@ -318,7 +395,7 @@ private fun MangaSearchResults(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(results, key = { it.id }) { card ->
+            items(displayResults, key = { it.id }) { card ->
                 MangaGridItem(card = card, onClick = { onCardClick(card.id) })
             }
         }
@@ -328,6 +405,7 @@ private fun MangaSearchResults(
 @Composable
 private fun MangaHomeFeed(
     vm: MainViewModel,
+    selectedCategory: String = "All",
     onMangaClick: (String) -> Unit,
     onReadClick: (mangaId: String, chapterId: String) -> Unit
 ) {
@@ -351,6 +429,37 @@ private fun MangaHomeFeed(
             }
         }
         return
+    }
+
+    val isManhuaActive = vm.activeMangaSource == com.nyyrox.aniverse.data.manga.MangaSource.MANHUA || selectedCategory.equals("Manhua", ignoreCase = true)
+    val isManhwaActive = selectedCategory.equals("Manhwa", ignoreCase = true)
+    val trendingTitle = when {
+        isManhuaActive -> "Trending Manhua 🇨🇳"
+        isManhwaActive -> "Trending Manhwa 🇰🇷"
+        else -> "Trending Manga"
+    }
+    val latestTitle = when {
+        isManhuaActive -> "Latest Cultivation & Updates"
+        isManhwaActive -> "Latest Manhwa Updates"
+        else -> "Latest Updates"
+    }
+    val newReleaseTitle = when {
+        isManhuaActive -> "New Manhua Releases"
+        isManhwaActive -> "New Manhwa Releases"
+        else -> "New Releases"
+    }
+
+    val filterCard: (MangaCard) -> Boolean = { card ->
+        selectedCategory == "All" || card.type.equals(selectedCategory, ignoreCase = true)
+    }
+    val filteredTrending = remember(vm.mangaHome.trending, selectedCategory) {
+        vm.mangaHome.trending.filter(filterCard)
+    }
+    val filteredLatest = remember(vm.mangaHome.latest, selectedCategory) {
+        vm.mangaHome.latest.filter(filterCard)
+    }
+    val filteredNewRelease = remember(vm.mangaHome.newRelease, selectedCategory) {
+        vm.mangaHome.newRelease.filter(filterCard)
     }
 
     LazyColumn(
@@ -384,25 +493,25 @@ private fun MangaHomeFeed(
         }
 
         // 3. Featured Hero Carousel (Top Trending)
-        if (vm.mangaHome.trending.isNotEmpty()) {
+        if (filteredTrending.isNotEmpty()) {
             item {
                 Box(modifier = Modifier.staggeredEntrance(index = 3)) {
                     MangaHeroBanner(
-                        featured = vm.mangaHome.trending.first(),
-                        onClick = { onMangaClick(vm.mangaHome.trending.first().id) }
+                        featured = filteredTrending.first(),
+                        onClick = { onMangaClick(filteredTrending.first().id) }
                     )
                 }
             }
         }
 
         // 4. Trending Rail
-        if (vm.mangaHome.trending.isNotEmpty()) {
+        if (filteredTrending.isNotEmpty()) {
             item {
                 Box(modifier = Modifier.staggeredEntrance(index = 4)) {
                     MangaHorizontalRail(
-                        title = "Trending Manga",
+                        title = trendingTitle,
                         icon = Icons.Default.TrendingUp,
-                        cards = vm.mangaHome.trending.drop(1),
+                        cards = filteredTrending.drop(1),
                         onCardClick = onMangaClick
                     )
                 }
@@ -410,13 +519,13 @@ private fun MangaHomeFeed(
         }
 
         // 5. Latest Releases Rail
-        if (vm.mangaHome.latest.isNotEmpty()) {
+        if (filteredLatest.isNotEmpty()) {
             item {
                 Box(modifier = Modifier.staggeredEntrance(index = 5)) {
                     MangaHorizontalRail(
-                        title = "Latest Updates",
+                        title = latestTitle,
                         icon = Icons.Default.AutoStories,
-                        cards = vm.mangaHome.latest,
+                        cards = filteredLatest,
                         onCardClick = onMangaClick
                     )
                 }
@@ -424,15 +533,56 @@ private fun MangaHomeFeed(
         }
 
         // 6. New Releases Rail
-        if (vm.mangaHome.newRelease.isNotEmpty()) {
+        if (filteredNewRelease.isNotEmpty()) {
             item {
                 Box(modifier = Modifier.staggeredEntrance(index = 6)) {
                     MangaHorizontalRail(
-                        title = "New Releases",
+                        title = newReleaseTitle,
                         icon = Icons.Default.TrendingUp,
-                        cards = vm.mangaHome.newRelease,
+                        cards = filteredNewRelease,
                         onCardClick = onMangaClick
                     )
+                }
+            }
+        }
+
+        // 7. Empty State for filtered category
+        if (filteredTrending.isEmpty() && filteredLatest.isEmpty() && filteredNewRelease.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 40.dp, bottom = 40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "No $selectedCategory titles found in current source.",
+                            color = OttSecondary,
+                            fontSize = 13.sp
+                        )
+                        if (selectedCategory == "Manhua" && vm.activeMangaSource != com.nyyrox.aniverse.data.manga.MangaSource.MANHUA) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(OttPillShape)
+                                    .background(Color(0xFFEAB308))
+                                    .clickable {
+                                        vm.setMangaSource(com.nyyrox.aniverse.data.manga.MangaSource.MANHUA)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "Switch to Manhua Source",
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -314,7 +314,7 @@ class ComicKRepository(
     private val baseUrl = "https://comick.art"
     private val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-    private suspend fun fetchJson(url: String): JSONObject? = withContext(Dispatchers.IO) {
+    internal suspend fun fetchJson(url: String): JSONObject? = withContext(Dispatchers.IO) {
         try {
             val req = Request.Builder()
                 .url(url)
@@ -374,7 +374,7 @@ class ComicKRepository(
         return null
     }
 
-    private fun parseComics(arr: JSONArray?): List<MangaCard> {
+    internal fun parseComics(arr: JSONArray?): List<MangaCard> {
         if (arr == null) return emptyList()
         val list = mutableListOf<MangaCard>()
         for (i in 0 until arr.length()) {
@@ -435,7 +435,7 @@ class ComicKRepository(
     }
 
     override suspend fun getInfo(mangaId: String): MangaInfo? {
-        val slug = mangaId.removePrefix("ck_")
+        val slug = mangaId.removePrefix("ck_").removePrefix("mh_")
         val pageUrl = "$baseUrl/comic/$slug"
         val html = fetchHtml(pageUrl)
 
@@ -492,7 +492,7 @@ class ComicKRepository(
     }
 
     override suspend fun getChapters(mangaId: String): List<MangaChapter> = coroutineScope {
-        val slug = mangaId.removePrefix("ck_")
+        val slug = mangaId.removePrefix("ck_").removePrefix("mh_")
         val url = "$baseUrl/api/comics/$slug/chapter-list?lang=en&page=1"
         var firstJson = fetchJson(url)
         var isEn = true
@@ -566,7 +566,7 @@ class ComicKRepository(
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
-        val clean = chapterId.removePrefix("ck_ch_").removePrefix("ck_")
+        val clean = chapterId.removePrefix("ck_ch_").removePrefix("ck_").removePrefix("mh_ch_").removePrefix("mh_")
         val parts = clean.split("__")
         val chapterUrl = if (parts.size >= 4) {
             val slug = parts[0]
@@ -605,6 +605,91 @@ class ComicKRepository(
         val directImgs = Regex("""https?://(?:cdn1\.comicknew\.pictures|meo\.comick\.pictures|meo3\.comick\.pictures)/[^\s"']+\.(?:jpg|jpeg|png|webp)""", RegexOption.IGNORE_CASE)
         val matches = directImgs.findAll(html).map { it.value }.distinct().toList()
         return matches
+    }
+}
+
+// ============================================================================
+// 2.5 MANHUA REPOSITORY (Dedicated Chinese Cultivation & Martial Arts Comics)
+// ============================================================================
+class ManhuaRepository(
+    private val comicK: ComicKRepository = ComicKRepository()
+) : IMangaSourceRepository {
+    override val source: MangaSource = MangaSource.MANHUA
+
+    private val baseUrl = "https://comick.art"
+
+    override suspend fun getHome(): MangaHome = coroutineScope {
+        val trendingDeferred = async {
+            val json = comicK.fetchJson("$baseUrl/api/search?country=cn&order_by=user_follow_count&order_direction=desc&type=comic&limit=24")
+            parseManhuaCards(json?.optJSONArray("data"))
+        }
+        val latestDeferred = async {
+            val json = comicK.fetchJson("$baseUrl/api/search?country=cn&order_by=latest&type=comic&limit=24")
+            parseManhuaCards(json?.optJSONArray("data"))
+        }
+        val newDeferred = async {
+            val json = comicK.fetchJson("$baseUrl/api/search?country=cn&order_by=created_at&order_direction=desc&type=comic&limit=24")
+            parseManhuaCards(json?.optJSONArray("data"))
+        }
+
+        MangaHome(
+            trending = trendingDeferred.await(),
+            latest = latestDeferred.await(),
+            newRelease = newDeferred.await()
+        )
+    }
+
+    override suspend fun search(query: String): List<MangaCard> {
+        val enc = URLEncoder.encode(query.trim(), "UTF-8")
+        val url = "$baseUrl/api/search?q=$enc&country=cn&type=comic&showAll=false&exclude_mylist=false"
+        val json = comicK.fetchJson(url)
+        val cards = parseManhuaCards(json?.optJSONArray("data"))
+        if (cards.isNotEmpty()) return cards
+
+        // Fallback: search broad catalog and wrap as Manhua
+        return comicK.search(query).map {
+            it.copy(
+                id = if (it.id.startsWith("ck_")) "mh_" + it.id.removePrefix("ck_") else it.id,
+                source = source.id,
+                type = "Manhua"
+            )
+        }
+    }
+
+    override suspend fun getInfo(mangaId: String): MangaInfo? {
+        val cleanSlug = mangaId.removePrefix("mh_").removePrefix("ck_")
+        val info = comicK.getInfo("ck_$cleanSlug") ?: return null
+        return info.copy(
+            id = "mh_$cleanSlug",
+            type = "Manhua",
+            source = source.id
+        )
+    }
+
+    override suspend fun getChapters(mangaId: String): List<MangaChapter> {
+        val cleanSlug = mangaId.removePrefix("mh_").removePrefix("ck_")
+        return comicK.getChapters("ck_$cleanSlug").map {
+            it.copy(
+                chapterId = if (it.chapterId.startsWith("ck_")) "mh_" + it.chapterId.removePrefix("ck_") else it.chapterId,
+                source = source.id
+            )
+        }
+    }
+
+    override suspend fun getPages(chapterId: String): List<String> {
+        val cleanId = chapterId.removePrefix("mh_ch_").removePrefix("mh_")
+        return comicK.getPages("ck_$cleanId")
+    }
+
+    private fun parseManhuaCards(arr: JSONArray?): List<MangaCard> {
+        val raw = comicK.parseComics(arr)
+        return raw.map {
+            it.copy(
+                id = if (it.id.startsWith("ck_")) "mh_" + it.id.removePrefix("ck_") else it.id,
+                source = source.id,
+                type = "Manhua"
+            )
+        }
     }
 }
 

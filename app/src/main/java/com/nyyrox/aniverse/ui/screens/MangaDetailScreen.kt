@@ -427,6 +427,7 @@ fun MangaDetailScreen(
                                     val (badgeBg, badgeBorder, badgeText) = when (activeSource) {
                                         MangaSource.MANGADEX -> Triple(Color(0x25FF6740), Color(0x60FF6740), Color(0xFFFF8A65))
                                         MangaSource.COMICK -> Triple(Color(0x253B82F6), Color(0x603B82F6), Color(0xFF60A5FA))
+                                        MangaSource.MANHUA -> Triple(Color(0x25EAB308), Color(0x60EAB308), Color(0xFFFACC15))
                                         MangaSource.ASURA -> Triple(Color(0x2510B981), Color(0x6010B981), Color(0xFF34D399))
                                         MangaSource.WEEBCENTRAL -> Triple(Color(0x258B5CF6), Color(0x608B5CF6), Color(0xFFA78BFA))
                                     }
@@ -590,6 +591,7 @@ fun MangaDetailScreen(
                                 val (activeBg, activeBorder, activeTextColor) = when (srcOption) {
                                     MangaSource.MANGADEX -> Triple(Color(0x35FF6740), Color(0x90FF6740), Color(0xFFFF8A65))
                                     MangaSource.COMICK -> Triple(Color(0x353B82F6), Color(0x903B82F6), Color(0xFF60A5FA))
+                                    MangaSource.MANHUA -> Triple(Color(0x35EAB308), Color(0x90EAB308), Color(0xFFFACC15))
                                     MangaSource.ASURA -> Triple(Color(0x3510B981), Color(0x9010B981), Color(0xFF34D399))
                                     MangaSource.WEEBCENTRAL -> Triple(Color(0x358B5CF6), Color(0x908B5CF6), Color(0xFFA78BFA))
                                 }

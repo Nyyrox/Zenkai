@@ -8,12 +8,14 @@ enum class MangaSource(
 ) {
     MANGADEX("mangadex", "MangaDex", "https://mangadex.org", "Multilingual"),
     COMICK("comick", "ComicK", "https://comick.art", "Manhwa & Manga"),
+    MANHUA("manhua", "Manhua", "https://comick.art", "Cultivation & Action"),
     ASURA("asura", "Asura Scans", "https://asuracomic.net", "Action / Regression"),
     WEEBCENTRAL("weebcentral", "WeebCentral", "https://weebcentral.com", "Classic");
 
     companion object {
         fun fromId(id: String?): MangaSource {
             if (id.isNullOrBlank()) return MANGADEX
+            if (id.equals("mh", ignoreCase = true)) return MANHUA
             return entries.find { it.id.equals(id, ignoreCase = true) } ?: MANGADEX
         }
     }
