@@ -142,54 +142,75 @@ object DisplayRefreshRateManager {
         isPowerSavingEnabled: Boolean
     ): Int {
         val effectiveHz = calculateEffectiveRefreshRate(activity, preferredHz, isPowerSavingEnabled)
-        try {
-            val window = activity.window ?: return effectiveHz
-            val params = window.attributes ?: return effectiveHz
+        activity.runOnUiThread {
+            try {
+                val window = activity.window ?: return@runOnUiThread
+                val currentAttrs = window.attributes ?: return@runOnUiThread
+                val params = WindowManager.LayoutParams().apply { copyFrom(currentAttrs) }
 
-            // Explicitly set preferredRefreshRate (API 23+)
-            params.preferredRefreshRate = effectiveHz.toFloat()
+                val rate = effectiveHz.toFloat()
+                // Explicitly set preferredRefreshRate (API 23+)
+                params.preferredRefreshRate = rate
 
-            // In Android 11+ (API 30+), clamp the variable refresh rate range safely via reflection
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                try {
-                    val minField = params.javaClass.getField("preferredMinDisplayRefreshRate")
-                    val maxField = params.javaClass.getField("preferredMaxDisplayRefreshRate")
-                    val rate = effectiveHz.toFloat()
-                    minField.setFloat(params, rate)
-                    maxField.setFloat(params, rate)
-                } catch (_: Throwable) {}
-            }
-
-            // Find matching hardware display mode ID
-            val modes = getDisplayModes(activity)
-            val matchingMode = modes.filter { abs(it.refreshRate - effectiveHz.toFloat()) < 3.5f }
-                .maxByOrNull { it.physicalWidth * it.physicalHeight }
-                ?: if (effectiveHz == 60) {
-                    modes.find { abs(it.refreshRate - 60f) < 2f }
-                } else if (effectiveHz == 144) {
-                    modes.find { it.refreshRate >= 140f }
-                } else {
-                    modes.minByOrNull { abs(it.refreshRate - effectiveHz.toFloat()) }
+                // In Android 11+ (API 30+), clamp the variable refresh rate range safely via reflection
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        val minField = params.javaClass.getField("preferredMinDisplayRefreshRate")
+                        val maxField = params.javaClass.getField("preferredMaxDisplayRefreshRate")
+                        minField.setFloat(params, rate)
+                        maxField.setFloat(params, rate)
+                    } catch (_: Throwable) {}
                 }
 
-            if (matchingMode != null) {
-                params.preferredDisplayModeId = matchingMode.modeId
-            }
+                // Get current display mode resolution to ensure we don't switch resolution
+                val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    activity.display ?: (activity.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)?.getDisplay(Display.DEFAULT_DISPLAY)
+                } else {
+                    @Suppress("DEPRECATION")
+                    activity.windowManager?.defaultDisplay
+                }
+                val currentMode = display?.mode
+                val curW = currentMode?.physicalWidth ?: 0
+                val curH = currentMode?.physicalHeight ?: 0
 
-            window.attributes = params
+                // Find matching hardware display mode ID with same resolution
+                val modes = getDisplayModes(activity)
+                val sameResModes = modes.filter {
+                    (curW == 0 || it.physicalWidth == curW) && (curH == 0 || it.physicalHeight == curH)
+                }
+                val candidateModes = if (sameResModes.isNotEmpty()) sameResModes else modes.toList()
 
-            // On Android 11+ (API 30+), safely set frame rate on root surface control via reflection
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                try {
-                    val decor = window.decorView
-                    val root = decor.javaClass.getMethod("getRootSurfaceControl").invoke(decor)
-                    if (root != null) {
-                        root.javaClass.getMethod("setFrameRate", Float::class.javaPrimitiveType, Int::class.javaPrimitiveType)
-                            .invoke(root, effectiveHz.toFloat(), 0)
+                val matchingMode = candidateModes.filter { abs(it.refreshRate - rate) < 3.5f }
+                    .maxByOrNull { it.physicalWidth * it.physicalHeight }
+                    ?: if (effectiveHz == 60) {
+                        candidateModes.find { abs(it.refreshRate - 60f) < 2f }
+                    } else if (effectiveHz == 144) {
+                        candidateModes.find { it.refreshRate >= 140f }
+                    } else {
+                        candidateModes.minByOrNull { abs(it.refreshRate - rate) }
                     }
-                } catch (_: Throwable) {}
-            }
-        } catch (_: Throwable) {}
+
+                if (matchingMode != null) {
+                    params.preferredDisplayModeId = matchingMode.modeId
+                }
+
+                window.attributes = params
+
+                // Request layout on decor view and set frame rate on root surface control
+                window.decorView.post {
+                    try {
+                        window.decorView.requestLayout()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val root = window.decorView.javaClass.getMethod("getRootSurfaceControl").invoke(window.decorView)
+                            if (root != null) {
+                                root.javaClass.getMethod("setFrameRate", Float::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                                    .invoke(root, rate, 0)
+                            }
+                        }
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
+        }
         return effectiveHz
     }
 }

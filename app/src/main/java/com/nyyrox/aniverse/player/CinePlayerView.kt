@@ -1491,44 +1491,41 @@ fun CinePlayerView(
                     qualityTracks = qualities.sortedByDescending { it.height }
                     subtitleTracks = emptyList() // HLS stream tracks omitted per user instruction
 
-                    // Auto-apply audio track preference (DUB vs SUB vs saved preference)
+                    // Auto-apply audio track preference (User selection priority > DUB vs SUB defaults)
                     if (audios.isNotEmpty()) {
-                        val targetAudio = if (isDub) {
-                            // In DUB mode: strictly ensure English track is selected
+                        val targetAudio = if (preferredAudioLanguage.isNotBlank()) {
+                            audios.firstOrNull {
+                                it.language.equals(preferredAudioLanguage, ignoreCase = true) ||
+                                it.label.equals(preferredAudioLanguage, ignoreCase = true) ||
+                                it.label.contains(preferredAudioLanguage, ignoreCase = true)
+                            }
+                        } else if (isDub) {
+                            // In DUB mode: default to English track if user hasn't explicitly selected
                             audios.firstOrNull {
                                 it.language.startsWith("en", ignoreCase = true) ||
                                 it.label.contains("english", ignoreCase = true) ||
                                 it.label.contains("dub", ignoreCase = true)
-                            } ?: if (preferredAudioLanguage.isNotBlank()) {
-                                audios.firstOrNull {
-                                    it.language.equals(preferredAudioLanguage, ignoreCase = true) ||
-                                    it.label.contains(preferredAudioLanguage, ignoreCase = true)
-                                }
-                            } else null
+                            }
                         } else {
-                            // In SUB mode: use saved preference if available, else prioritize Japanese/Native track
-                            if (preferredAudioLanguage.isNotBlank()) {
-                                audios.firstOrNull {
-                                    it.language.equals(preferredAudioLanguage, ignoreCase = true) ||
-                                    it.label.contains(preferredAudioLanguage, ignoreCase = true)
-                                }
-                            } else {
-                                audios.firstOrNull {
-                                    it.language.startsWith("ja", ignoreCase = true) ||
-                                    it.label.contains("japanese", ignoreCase = true) ||
-                                    it.label.contains("native", ignoreCase = true)
-                                }
+                            // In SUB mode: default to Japanese/Native track
+                            audios.firstOrNull {
+                                it.language.startsWith("ja", ignoreCase = true) ||
+                                it.label.contains("japanese", ignoreCase = true) ||
+                                it.label.contains("native", ignoreCase = true)
                             }
                         }
 
                         if (targetAudio != null && !targetAudio.isSelected) {
                             try {
                                 val grp = tracks.groups[targetAudio.groupIndex]
+                                val lang = if (targetAudio.language.isNotBlank() && targetAudio.language != "und") targetAudio.language else null
                                 player.trackSelectionParameters = player.trackSelectionParameters
                                     .buildUpon()
+                                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
                                     .setOverrideForType(
                                         TrackSelectionOverride(grp.mediaTrackGroup, targetAudio.trackIndex)
                                     )
+                                    .setPreferredAudioLanguage(lang)
                                     .build()
                             } catch (_: Exception) {}
                         }
@@ -3451,13 +3448,18 @@ fun CinePlayerView(
                 val chosenLang = if (track.language.isNotBlank() && track.language != "und") track.language else track.label
                 preferredAudioLanguage = chosenLang
                 exoPlayer?.let { p ->
-                    val group = p.currentTracks.groups[track.groupIndex]
-                    p.trackSelectionParameters = p.trackSelectionParameters
-                        .buildUpon()
-                        .setOverrideForType(
-                            TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex)
-                        )
-                        .build()
+                    try {
+                        val group = p.currentTracks.groups[track.groupIndex]
+                        val lang = if (track.language.isNotBlank() && track.language != "und") track.language else null
+                        p.trackSelectionParameters = p.trackSelectionParameters
+                            .buildUpon()
+                            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                            .setOverrideForType(
+                                TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex)
+                            )
+                            .setPreferredAudioLanguage(lang)
+                            .build()
+                    } catch (_: Exception) {}
                 }
             },
             autoPlayNextEnabled = autoPlayNextEnabled,

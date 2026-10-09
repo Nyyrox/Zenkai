@@ -882,6 +882,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return allNovels.firstOrNull { it.slug == slug || (it.slug.isNotBlank() && slug.contains(it.slug)) }
     }
 
+    fun loadAnimeForPlayer(id: Int) = viewModelScope.launch {
+        if (selected?.id == id && !detailLoading) return@launch
+        val known = findKnownAnime(id)
+        if (known != null && selected?.id != id) {
+            selected = known
+        }
+        detailLoading = true
+        detailError = null
+        try {
+            val fetched = repo.detail(id)
+            selected = fetched
+        } catch (e: Exception) {
+            if (selected == null) {
+                detailError = e.message ?: "Could not load anime details."
+            }
+        } finally {
+            detailLoading = false
+        }
+    }
+
     fun openDetail(id: Int) = viewModelScope.launch {
         activeDetailAnimeId = id
         if (selected?.id == id && !detailLoading) return@launch

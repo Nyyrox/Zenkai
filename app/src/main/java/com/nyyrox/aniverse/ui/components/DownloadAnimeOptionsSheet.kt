@@ -129,8 +129,24 @@ fun DownloadAnimeOptionsSheet(
         } else {
             com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio)
         }
-        // Strictly filter to ONLY available direct servers - zero embed servers
-        directList.filter { it.isDirectStream && !it.isEmbedOnly }.distinctBy { it.id }
+
+        // Direct servers
+        val directServers = directList.filter { it.isDirectStream && !it.isEmbedOnly }
+
+        // Embed mode servers supported via StreamSniffer (ACDN, MegaPlay, Vidstream)
+        val embedServers = ALL_PROVIDERS.filter { prov ->
+            prov.isEmbedOnly && (
+                prov.id.contains("animesalt", ignoreCase = true) ||
+                prov.id.contains("megaplay", ignoreCase = true) ||
+                prov.id.contains("vidstream", ignoreCase = true)
+            ) && when {
+                isDubSelected -> prov.isDub || prov.isMulti
+                isMultiSelected -> prov.isMulti
+                else -> !prov.isDub && !prov.isMulti
+            }
+        }
+
+        (directServers + embedServers).distinctBy { it.id }
     }
 
     var selectedProvider by remember(selectedAudio, initialProvider, availableProviders) {
@@ -380,10 +396,15 @@ fun DownloadAnimeOptionsSheet(
                             )
                             val badgeText = when {
                                 isMulti -> "MULTI-AUDIO"
+                                prov.isEmbedOnly -> "SNIFFER"
                                 prov.serverBadge.isNotBlank() -> prov.serverBadge.uppercase()
                                 else -> "DIRECT HD"
                             }
-                            val badgeColor = if (isMulti) Color(0xFF38BDF8) else Color(0xFF10B981)
+                            val badgeColor = when {
+                                isMulti -> Color(0xFF38BDF8)
+                                prov.isEmbedOnly -> Color(0xFFA855F7)
+                                else -> Color(0xFF10B981)
+                            }
                             Box(
                                 modifier = Modifier
                                     .clip(OttPillShape)

@@ -253,8 +253,9 @@ object MangaRepository {
                 var resolvedChapters = chapters
                 var resolvedId = mangaId
 
-                // If chapters are empty or <= 1 (e.g. MangaDex licensed titles with only external links), search other sources for readable chapters!
-                if (resolvedChapters.size <= 1) {
+                // If chapters are empty or severely incomplete compared to expected chapters (e.g. MangaDex licensed titles with only external links), search other sources for readable chapters!
+                val expectedChapters = curAniChapters ?: 10
+                if (resolvedChapters.size <= 1 || (resolvedChapters.size < 5 && expectedChapters >= 15)) {
                     val searchQuery = curAniTitle ?: info.title
                     val otherSources = repositories.keys.filter { it != src }
                     for (otherSrc in otherSources) {

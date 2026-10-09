@@ -5,6 +5,10 @@ import android.util.Log
 import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.extractor.DirectStreamResolver
+import com.nyyrox.aniverse.player.StreamSniffer
+import com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver
+import com.nyyrox.aniverse.data.mapping.AnimeMappingRepository
+import com.nyyrox.aniverse.data.mapping.AniBridgeResolver
 import com.nyyrox.aniverse.data.manga.MangaChapter
 import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.data.novel.INovelSourceRepository
@@ -442,9 +446,62 @@ class DownloadManager(private val context: Context) {
                             streamSubtitles = directResolved.subtitles
                         }
                     } else {
-                        // Embed server downloads via stream sniffer are disabled. Only direct streams supported.
-                        lastFailureReason = "Embed server downloads are disabled. Please use Direct HD servers."
-                        break
+                        // Embed server downloads via headless StreamSniffer
+                        val isMovie = anime.format?.equals("MOVIE", ignoreCase = true) == true
+                        val malId = anime.idMal ?: try {
+                            AniBridgeResolver.resolve(anime.id)?.malId
+                        } catch (_: Exception) { null }
+                        val tmdbId = try {
+                            AniBridgeResolver.resolve(anime.id)?.tmdbId
+                        } catch (_: Exception) { null }
+
+                        val embedUrl = if (targetProvider.id.startsWith("animesalt")) {
+                            val candidate = AnimeMappingRepository.resolveCandidate(anime.id, episode, anime.title)
+                            val saltId = candidate.saltId.ifBlank {
+                                AnimeSaltResolver.normalizeAnimeSaltTitle(anime.title)
+                            }
+                            val season = candidate.season ?: 1
+                            val finalEp = candidate.finalEp
+                            val slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
+                            val extracted = AnimeSaltResolver.extractServers(slug, isMovie)
+                            extracted.myStreamUrl ?: extracted.abyssUrl ?: "https://animesalt.cx/episode/$slug/"
+                        } else {
+                            targetProvider.url(
+                                anilistId = anime.id,
+                                episode = episode,
+                                slug = null,
+                                malId = malId,
+                                tmdbId = tmdbId,
+                                isMovie = isMovie
+                            )
+                        }
+
+                        if (embedUrl.isNotBlank()) {
+                            _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                                providerId = targetProvider.id,
+                                providerName = targetProvider.name,
+                                speedFormatted = "Sniffing stream from ${targetProvider.name}...",
+                                status = DownloadStatus.DOWNLOADING
+                            ))
+
+                            val sniffed = try {
+                                StreamSniffer.sniff(
+                                    context = context,
+                                    embedUrl = embedUrl,
+                                    timeoutMs = 15000L
+                                )
+                            } catch (_: Exception) { null }
+
+                            if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
+                                streamUrl = sniffed.streamUrl
+                                streamHeaders = sniffed.headers
+                                streamSubtitles = sniffed.subtitles
+                            } else {
+                                lastFailureReason = "Could not sniff stream from ${targetProvider.name}"
+                            }
+                        } else {
+                            lastFailureReason = "Could not resolve embed URL for ${targetProvider.name}"
+                        }
                     }
 
                     if (streamUrl.isNullOrBlank()) {

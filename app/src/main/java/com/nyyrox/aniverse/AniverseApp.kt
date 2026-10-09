@@ -168,7 +168,12 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     val novelReaderSlug = novelReaderParts.getOrNull(0).orEmpty()
     val novelReaderChapterSlug = novelReaderParts.getOrNull(1).orEmpty()
 
+    var playerOpenedFromDetail by remember { mutableStateOf(false) }
+
     fun push(route: String) {
+        if (!route.startsWith("player:")) {
+            playerOpenedFromDetail = false
+        }
         navStack = navStack + route
     }
 
@@ -181,7 +186,10 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     // Mini player "expand" -> open the full player for the parked episode
     DisposableEffect(Unit) {
         com.nyyrox.aniverse.player.MiniPlayerManager.onExpand = { id, ep, prov ->
-            if (!navStack.last().startsWith("player:")) push("player:$id:$ep:${prov.orEmpty()}")
+            if (!navStack.last().startsWith("player:")) {
+                playerOpenedFromDetail = false
+                push("player:$id:$ep:${prov.orEmpty()}")
+            }
         }
         onDispose { com.nyyrox.aniverse.player.MiniPlayerManager.onExpand = null }
     }
@@ -203,6 +211,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
 
     BackHandler(enabled = isPlayerRoute || isDetailOverlayOpen || navStack.size > 1 || currentRoute != "home") {
         if (isPlayerRoute) {
+            if (!playerOpenedFromDetail && vm.activeDetailAnimeId != null) {
+                vm.closeAnimeDetail()
+            }
             pop()
         } else if (vm.activeDetailAnimeId != null) {
             if (sharedPosterCoordinator.phase == SharedTransitionPhase.PRESENTED || sharedPosterCoordinator.phase == SharedTransitionPhase.FORWARD) {
@@ -783,6 +794,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         }
                                     },
                                     onPlay = { id, ep, prov ->
+                                        playerOpenedFromDetail = true
                                         push("player:$id:$ep:${prov.id}")
                                     },
                                     onWatchTogether = { anime, ep ->
@@ -867,7 +879,12 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     animeId = playerId,
                                     initialEpisode = playerEpisode,
                                     initialProviderId = playerProviderId,
-                                    onBack = { pop() }
+                                    onBack = {
+                                        if (!playerOpenedFromDetail && vm.activeDetailAnimeId != null) {
+                                            vm.closeAnimeDetail()
+                                        }
+                                        pop()
+                                    }
                                 )
                             }
                         }

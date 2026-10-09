@@ -153,6 +153,10 @@ class MainActivity : ComponentActivity() {
                     when {
                         host.contains("mangadex") -> {
                             requestBuilder.header("Referer", "https://mangadex.org/")
+                            requestBuilder.header("Origin", "https://mangadex.org")
+                            requestBuilder.header("Sec-Fetch-Dest", "image")
+                            requestBuilder.header("Sec-Fetch-Mode", "no-cors")
+                            requestBuilder.header("Sec-Fetch-Site", "cross-site")
                         }
                         host.contains("comick") -> {
                             requestBuilder.header("Referer", "https://comick.art/")

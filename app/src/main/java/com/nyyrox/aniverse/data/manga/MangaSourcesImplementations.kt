@@ -56,7 +56,7 @@ class MangaDexRepository(
             if (r.optString("type") == "cover_art") {
                 val fileName = r.optJSONObject("attributes")?.optString("fileName").orEmpty()
                 if (fileName.isNotBlank()) {
-                    return if (highRes) "$uploadsBase/covers/$id/$fileName.512.jpg" else "$uploadsBase/covers/$id/$fileName.256.jpg"
+                    return if (highRes) "$uploadsBase/covers/$id/$fileName.512.jpg?v=2" else "$uploadsBase/covers/$id/$fileName.256.jpg?v=2"
                 }
             }
         }
@@ -201,8 +201,8 @@ class MangaDexRepository(
         val limit = 500
         val baseFeed = "$apiBase/manga/$cleanId/feed?contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&order[chapter]=asc&limit=$limit"
 
-        // Try English first
-        var firstJson = fetchJson("$baseFeed&translatedLanguage[]=en&offset=0")
+        // Try English first (en and en-us)
+        var firstJson = fetchJson("$baseFeed&translatedLanguage[]=en&translatedLanguage[]=en-us&offset=0")
         var isEn = true
         var total = firstJson?.optInt("total", 0) ?: 0
         var allData = firstJson?.optJSONArray("data")
@@ -221,15 +221,15 @@ class MangaDexRepository(
             allData.optJSONObject(i)?.let { rawItems.add(it) }
         }
 
-        // Fetch remaining pages concurrently if total > limit (up to 1500 chapters)
+        // Fetch remaining pages concurrently if total > limit (up to 2500 chapters)
         if (total > limit) {
             val offsets = generateSequence(limit) { it + limit }
-                .takeWhile { it < total && it < 1500 }
+                .takeWhile { it < total && it < 2500 }
                 .toList()
 
             val deferredPages = offsets.map { off ->
                 async {
-                    val langParam = if (isEn) "&translatedLanguage[]=en" else ""
+                    val langParam = if (isEn) "&translatedLanguage[]=en&translatedLanguage[]=en-us" else ""
                     val pageJson = fetchJson("$baseFeed$langParam&offset=$off")
                     pageJson?.optJSONArray("data")
                 }

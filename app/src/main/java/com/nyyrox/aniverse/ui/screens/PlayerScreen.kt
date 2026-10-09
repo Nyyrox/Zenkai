@@ -150,7 +150,7 @@ fun PlayerScreen(
 
     LaunchedEffect(animeId) {
         if (vm.selected?.id != animeId) {
-            vm.openDetail(animeId)
+            vm.loadAnimeForPlayer(animeId)
         }
     }
 

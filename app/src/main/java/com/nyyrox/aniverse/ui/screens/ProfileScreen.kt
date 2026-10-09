@@ -2175,8 +2175,19 @@ fun ProfileScreen(
                     color = Color(0xFF94A3B8)
                 )
 
-                val currentPhysicalHz = remember(themeSettings.preferredRefreshRate) {
-                    DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
+                var currentPhysicalHz by remember {
+                    mutableFloatStateOf(DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context))
+                }
+                LaunchedEffect(showRefreshRateSheet, themeSettings.preferredRefreshRate) {
+                    if (showRefreshRateSheet) {
+                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
+                        kotlinx.coroutines.delay(100)
+                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
+                        kotlinx.coroutines.delay(250)
+                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
+                        kotlinx.coroutines.delay(400)
+                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
+                    }
                 }
                 Box(
                     modifier = Modifier

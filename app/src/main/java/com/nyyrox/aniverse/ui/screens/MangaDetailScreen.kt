@@ -4,9 +4,15 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -149,6 +155,15 @@ fun MangaDetailScreen(
     var visibleChapterCount by remember { mutableIntStateOf(50) }
     val downloadTasks by vm.downloadManager.tasks.collectAsState()
 
+    val cachedPoster = remember(mangaId, currentMangaId) {
+        if (coordinator?.activeAnimeId == mangaId.hashCode()) coordinator.activePosterUrl
+        else vm.findKnownManga(mangaId)?.poster
+            ?: vm.findKnownManga(currentMangaId)?.poster
+            ?: vm.getMangaHistoryItem(mangaId)?.poster
+            ?: vm.getMangaHistoryItem(currentMangaId)?.poster
+            ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == currentMangaId }?.poster
+    }
+
     // Header collapse tracking for sticky top app bar
     val isScrolledPastHero by remember {
         derivedStateOf {
@@ -263,9 +278,11 @@ fun MangaDetailScreen(
             )
     ) {
         if (loading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OttPrimary, strokeWidth = 3.dp)
-            }
+            MangaWaveSkeleton(
+                cachedPoster = cachedPoster,
+                onBack = onBack,
+                coordinator = coordinator
+            )
             return@Box
         }
 
@@ -1466,6 +1483,288 @@ fun MangaDetailScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MangaWaveSkeleton(
+    cachedPoster: String?,
+    onBack: () -> Unit,
+    coordinator: SharedPosterCoordinator?
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "mangaWaveTransition")
+
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wavePhase"
+    )
+
+    val waveBreathe by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.82f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "waveBreathe"
+    )
+
+    val waveBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF131722).copy(alpha = 0.65f),
+            Color(0xFF1E2638).copy(alpha = 0.85f),
+            Color(0xFF323F58).copy(alpha = 0.95f),
+            Color(0xFF1E2638).copy(alpha = 0.85f),
+            Color(0xFF131722).copy(alpha = 0.65f),
+        ),
+        start = Offset((wavePhase * 1600f) - 600f, (wavePhase * 600f) - 200f),
+        end = Offset((wavePhase * 1600f) + 400f, (wavePhase * 600f) + 400f)
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(OttBg)
+            .then(
+                if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
+                    Modifier.graphicsLayer { alpha = coordinator.progress.value }
+                } else Modifier
+            )
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = false,
+            contentPadding = PaddingValues(bottom = 90.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. Hero Skeleton
+            item {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    // Ambient Backdrop
+                    if (!cachedPoster.isNullOrBlank()) {
+                        AsyncImage(
+                            model = cachedPoster,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(460.dp),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(460.dp)
+                                .background(waveBrush)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(460.dp)
+                            .background(OttHeroGradient)
+                    )
+
+                    // Hero Content
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(top = 54.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Poster Card
+                            Box(
+                                modifier = Modifier
+                                    .width(125.dp)
+                                    .height(180.dp)
+                                    .clip(OttCardShape)
+                                    .background(waveBrush)
+                                    .border(1.dp, Color(0x35FFFFFF), OttCardShape)
+                                    .shadow(12.dp, OttCardShape)
+                            ) {
+                                if (!cachedPoster.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = cachedPoster,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+
+                            // Meta column
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.9f)
+                                        .height(24.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(waveBrush)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.55f)
+                                        .height(16.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(waveBrush)
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(modifier = Modifier.size(54.dp, 22.dp).clip(OttPillShape).background(waveBrush))
+                                    Box(modifier = Modifier.size(60.dp, 22.dp).clip(OttPillShape).background(waveBrush))
+                                    Box(modifier = Modifier.size(48.dp, 22.dp).clip(OttPillShape).background(waveBrush))
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(18.dp))
+
+                        // Full width read button placeholder
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .clip(OttPillShape)
+                                .background(waveBrush)
+                        )
+                    }
+                }
+            }
+
+            // 2. Source chips placeholder
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(modifier = Modifier.size(100.dp, 34.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(90.dp, 34.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(95.dp, 34.dp).clip(OttPillShape).background(waveBrush))
+                    Box(modifier = Modifier.size(105.dp, 34.dp).clip(OttPillShape).background(waveBrush))
+                }
+            }
+
+            // 3. Synopsis lines placeholder
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                    Box(modifier = Modifier.fillMaxWidth(0.92f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                    Box(modifier = Modifier.fillMaxWidth(0.70f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
+                }
+            }
+
+            // 4. Chapter search / controls bar placeholder
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(130.dp, 20.dp).clip(RoundedCornerShape(6.dp)).background(waveBrush))
+                    Box(modifier = Modifier.size(36.dp, 36.dp).clip(CircleShape).background(waveBrush))
+                }
+            }
+
+            // 5. Chapter rows placeholders (6 chapters)
+            items(6) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .height(68.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0x0CFFFFFF))
+                        .border(1.dp, Color(0x15FFFFFF), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(waveBrush)
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(140.dp, 16.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(waveBrush)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp, 12.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(waveBrush)
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(waveBrush)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Top App Bar skeleton overlay
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x60000000))
+                    .border(1.dp, Color(0x35FFFFFF), CircleShape)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
