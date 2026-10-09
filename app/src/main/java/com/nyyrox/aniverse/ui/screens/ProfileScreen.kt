@@ -2176,7 +2176,7 @@ fun ProfileScreen(
                 )
 
                 var currentPhysicalHz by remember {
-                    mutableFloatStateOf(DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context))
+                    mutableStateOf(DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context))
                 }
                 LaunchedEffect(showRefreshRateSheet, themeSettings.preferredRefreshRate) {
                     if (showRefreshRateSheet) {

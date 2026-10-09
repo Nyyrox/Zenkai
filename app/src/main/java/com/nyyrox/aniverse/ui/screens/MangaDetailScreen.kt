@@ -98,6 +98,7 @@ import com.nyyrox.aniverse.data.manga.MangaHistoryItem
 import com.nyyrox.aniverse.data.manga.MangaInfo
 import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
+import com.nyyrox.aniverse.ui.animation.SharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedTransitionPhase
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
