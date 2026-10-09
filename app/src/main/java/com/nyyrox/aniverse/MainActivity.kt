@@ -158,14 +158,17 @@ class MainActivity : ComponentActivity() {
                             requestBuilder.header("Sec-Fetch-Mode", "no-cors")
                             requestBuilder.header("Sec-Fetch-Site", "cross-site")
                         }
-                        host.contains("comick") -> {
+                        host.contains("comick") || host.contains("meo") -> {
                             requestBuilder.header("Referer", "https://comick.art/")
+                            requestBuilder.header("Origin", "https://comick.art")
                         }
                         host.contains("asura") -> {
                             requestBuilder.header("Referer", "https://asuracomic.net/")
+                            requestBuilder.header("Origin", "https://asuracomic.net")
                         }
                         host.contains("weebcentral") || host.contains("compsci88") -> {
                             requestBuilder.header("Referer", "https://weebcentral.com/")
+                            requestBuilder.header("Origin", "https://weebcentral.com")
                         }
                     }
                     chain.proceed(requestBuilder.build())

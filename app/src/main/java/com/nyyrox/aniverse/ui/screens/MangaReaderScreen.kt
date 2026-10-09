@@ -133,15 +133,24 @@ fun MangaReaderScreen(
 ) {
     val context = LocalContext.current
     fun getMangaHeadersForUrl(url: String): NetworkHeaders {
+        val src = MangaRepository.getSourceForId(activeMangaId)
         val referer = when {
-            url.contains("comick") -> "https://comick.art/"
-            url.contains("asura") -> "https://asuracomic.net/"
-            url.contains("mangadex") -> "https://mangadex.org/"
+            url.contains("asura") || src == com.nyyrox.aniverse.data.manga.MangaSource.ASURA -> "https://asuracomic.net/"
+            url.contains("comick") || url.contains("meo") || src == com.nyyrox.aniverse.data.manga.MangaSource.COMICK || src == com.nyyrox.aniverse.data.manga.MangaSource.MANHUA -> "https://comick.art/"
+            url.contains("mangadex") || src == com.nyyrox.aniverse.data.manga.MangaSource.MANGADEX -> "https://mangadex.org/"
             else -> "https://weebcentral.com/"
+        }
+        val origin = when {
+            referer.contains("asura") -> "https://asuracomic.net"
+            referer.contains("comick") -> "https://comick.art"
+            referer.contains("mangadex") -> "https://mangadex.org"
+            else -> "https://weebcentral.com"
         }
         return NetworkHeaders.Builder()
             .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             .set("Referer", referer)
+            .set("Origin", origin)
+            .set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
             .build()
     }
 
@@ -255,17 +264,27 @@ fun MangaReaderScreen(
         )
     }
 
-    val currentChapter = remember(chapters, activeChapterId) {
-        chapters.find {
-            it.chapterId == activeChapterId ||
-            (activeChapterId.isNotBlank() && MangaRepository.cleanChapterId(it.chapterId) == MangaRepository.cleanChapterId(activeChapterId))
-        }
-    }
-
     val currentChapterIndex = remember(chapters, activeChapterId) {
         chapters.indexOfFirst {
             it.chapterId == activeChapterId ||
-            (activeChapterId.isNotBlank() && MangaRepository.cleanChapterId(it.chapterId) == MangaRepository.cleanChapterId(activeChapterId))
+            (activeChapterId.isNotBlank() && (
+                MangaRepository.cleanChapterId(it.chapterId) == MangaRepository.cleanChapterId(activeChapterId) ||
+                it.number == activeChapterId ||
+                it.number == activeChapterId.substringAfterLast("__") ||
+                it.chapterId.substringAfterLast("__") == activeChapterId.substringAfterLast("__")
+            ))
+        }
+    }
+
+    val currentChapter = remember(chapters, activeChapterId, currentChapterIndex) {
+        if (currentChapterIndex in chapters.indices) chapters[currentChapterIndex]
+        else chapters.find {
+            it.chapterId == activeChapterId ||
+            (activeChapterId.isNotBlank() && (
+                MangaRepository.cleanChapterId(it.chapterId) == MangaRepository.cleanChapterId(activeChapterId) ||
+                it.number == activeChapterId ||
+                it.number == activeChapterId.substringAfterLast("__")
+            ))
         }
     }
 
@@ -353,8 +372,8 @@ fun MangaReaderScreen(
         }
         val titleFallback = historyItem?.title ?: bookmarkItem?.title ?: MangaRepository.extractSlugTitle(mangaId)
 
-        // 1. Resolve exact target chapter ID
-        var chToFetch = rawCh.ifBlank { null }
+        // 1. Resolve exact target chapter ID (prioritizing activeChapterId selected by user navigation)
+        var chToFetch = if (activeChapterId.isNotBlank()) activeChapterId else rawCh.ifBlank { null }
 
         // If chapters list is currently empty, try cache or downloads
         if (chapters.isEmpty()) {
@@ -383,23 +402,45 @@ fun MangaReaderScreen(
                 chapters.find { 
                     it.chapterId == chToFetch || 
                     it.number == chToFetch || 
-                    MangaRepository.cleanChapterId(it.chapterId) == chToFetch 
+                    MangaRepository.cleanChapterId(it.chapterId) == chToFetch ||
+                    it.number == chToFetch.substringAfterLast("__")
                 }
             } else null
 
             chToFetch = match?.chapterId
+                ?: chToFetch
                 ?: historyItem?.chapterId?.let { MangaRepository.cleanChapterId(it) }
                 ?: chapters.firstOrNull { it.number == "1" || it.number == "1.0" }?.chapterId
                 ?: chapters.firstOrNull()?.chapterId
         }
 
-        // 2. Background job for metadata if needed (never blocks reader page extraction)
+        // 2. Direct fast fetch for known source prefixes, otherwise resolve
         if (info == null || chapters.isEmpty()) {
             launch(Dispatchers.IO) {
                 try {
-                    val (_, resInfo, resChapters) = MangaRepository.resolveMangaDetails(cleanM, titleFallback)
-                    if (resInfo != null && info == null) info = resInfo
-                    if (resChapters.isNotEmpty() && chapters.isEmpty()) chapters = resChapters
+                    val hasPrefix = cleanM.startsWith("as_") || cleanM.startsWith("ck_") ||
+                            cleanM.startsWith("mh_") || cleanM.startsWith("md_") || cleanM.startsWith("wc_")
+
+                    if (hasPrefix) {
+                        if (chapters.isEmpty()) {
+                            val directChapters = MangaRepository.getChapters(cleanM)
+                            if (directChapters.isNotEmpty()) {
+                                chapters = directChapters
+                            }
+                        }
+                        if (info == null) {
+                            val directInfo = MangaRepository.getInfo(cleanM)
+                            if (directInfo != null) {
+                                info = directInfo
+                            }
+                        }
+                    }
+
+                    if (info == null || chapters.isEmpty()) {
+                        val (_, resInfo, resChapters) = MangaRepository.resolveMangaDetails(cleanM, titleFallback)
+                        if (resInfo != null && info == null) info = resInfo
+                        if (resChapters.isNotEmpty() && chapters.isEmpty()) chapters = resChapters
+                    }
                 } catch (e: Exception) {
                     Log.w("MangaReaderScreen", "Background metadata resolution: ${e.message}")
                 }
@@ -628,7 +669,10 @@ fun MangaReaderScreen(
                             modifier = Modifier
                                 .clip(OttPillShape)
                                 .background(Color(0x33FFFFFF))
-                                .clickable { onBack() }
+                                .clickable {
+                                    saveCurrentProgress()
+                                    onBack()
+                                }
                                 .padding(horizontal = 20.dp, vertical = 10.dp)
                         ) {
                             Text(text = "Go Back", color = Color.White, fontWeight = FontWeight.Bold)

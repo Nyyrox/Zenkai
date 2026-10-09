@@ -90,8 +90,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
+import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.WatchHistoryItem
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
@@ -868,8 +872,40 @@ fun OttUnifiedContinueWatchingRow(
                             .height(104.dp)
                     ) {
                         if (!meta.coverUrl.isNullOrBlank()) {
+                            val context = LocalContext.current
+                            val coverRequest = remember(meta.coverUrl) {
+                                val url = meta.coverUrl
+                                val ref = when {
+                                    url.contains("asura") -> "https://asuracomic.net/"
+                                    url.contains("comick") || url.contains("meo") -> "https://comick.art/"
+                                    url.contains("mangadex") -> "https://mangadex.org/"
+                                    url.contains("weebcentral") || url.contains("compsci88") -> "https://weebcentral.com/"
+                                    else -> null
+                                }
+                                ImageRequest.Builder(context)
+                                    .data(url)
+                                    .crossfade(true)
+                                    .apply {
+                                        if (ref != null) {
+                                            val orig = when {
+                                                ref.contains("asura") -> "https://asuracomic.net"
+                                                ref.contains("comick") -> "https://comick.art"
+                                                ref.contains("mangadex") -> "https://mangadex.org"
+                                                else -> "https://weebcentral.com"
+                                            }
+                                            httpHeaders(
+                                                NetworkHeaders.Builder()
+                                                    .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                                                    .set("Referer", ref)
+                                                    .set("Origin", orig)
+                                                    .build()
+                                            )
+                                        }
+                                    }
+                                    .build()
+                            }
                             AsyncImage(
-                                model = meta.coverUrl,
+                                model = coverRequest,
                                 contentDescription = meta.title,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop

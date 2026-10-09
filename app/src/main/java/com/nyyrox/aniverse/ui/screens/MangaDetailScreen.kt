@@ -182,11 +182,7 @@ fun MangaDetailScreen(
     val isStickyPinned by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 }
     }
-    val stickyTopOffset by animateDpAsState(
-        targetValue = if (isStickyPinned) statusBarTop + 54.dp else 0.dp,
-        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-        label = "mangaStickyTopOffset"
-    )
+    val stickyTopOffset = if (isStickyPinned) statusBarTop + 54.dp else 0.dp
 
     LaunchedEffect(mangaId) {
         val cleanCurrent = MangaRepository.cleanWeebId(mangaId)
@@ -324,7 +320,7 @@ fun MangaDetailScreen(
                 ) {
                     // Ambient Backdrop Cover with Vignette
                     AsyncImage(
-                        model = currentInfo.banner ?: currentInfo.poster,
+                        model = rememberMangaImageRequest(currentInfo.banner ?: currentInfo.poster),
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -371,7 +367,7 @@ fun MangaDetailScreen(
                                     .shadow(12.dp, OttCardShape)
                             ) {
                                 AsyncImage(
-                                    model = currentInfo.poster,
+                                    model = rememberMangaImageRequest(currentInfo.poster),
                                     contentDescription = currentInfo.title,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -671,9 +667,9 @@ fun MangaDetailScreen(
                 }
             }
 
-            // ── Sticky Header: Segmented Tabs & Chapter Filters ──────────────────
+            // ── Sticky Header: Segmented Tabs Only ──────────────────
             stickyHeader(key = "manga_sticky_tabs") {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(OttBg)
@@ -712,10 +708,21 @@ fun MangaDetailScreen(
                             }
                         }
                     }
+                }
+            }
 
-                    // Search & Sort Bar (Only in Chapters tab)
-                    if (selectedTab == 0) {
-                        Spacer(Modifier.height(8.dp))
+            // ── Tab 0: Chapters List Content ──────────────────────────────────────
+            if (selectedTab == 0) {
+                val pagedChapters = displayChapters.take(visibleChapterCount)
+
+                // Chapter Filters: Search Bar, Sort Toggle, Volumes (Scrollable item, unclipped)
+                item(key = "manga_chapter_filters") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 4.dp)
+                    ) {
+                        // Search & Sort Bar
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -812,7 +819,7 @@ fun MangaDetailScreen(
 
                         // Volumes Row (if multiple volumes available)
                         if (availableVolumes.size > 1) {
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(8.dp))
                             LazyRow(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -861,11 +868,6 @@ fun MangaDetailScreen(
                         }
                     }
                 }
-            }
-
-            // ── Tab 0: Chapters List Content ──────────────────────────────────────
-            if (selectedTab == 0) {
-                val pagedChapters = displayChapters.take(visibleChapterCount)
 
                 // Batch Download Controls Row
                 item(key = "manga_batch_downloads") {
@@ -969,12 +971,12 @@ fun MangaDetailScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .padding(horizontal = 16.dp, vertical = 3.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     when {
-                                        isChBookmarked -> Color(0x280284C7)
-                                        isCurrent -> Color(0x18FFFFFF)
+                                        isChBookmarked -> Color(0x220284C7)
+                                        isCurrent -> Color(0x1CFFFFFF)
                                         else -> Color(0x0EFFFFFF)
                                     }
                                 )
@@ -982,13 +984,13 @@ fun MangaDetailScreen(
                                     width = 1.dp,
                                     color = when {
                                         isChBookmarked -> Color(0xFF38BDF8)
-                                        isCurrent -> Color(0x80E50914)
-                                        else -> Color(0x16FFFFFF)
+                                        isCurrent -> Color(0x90E50914)
+                                        else -> Color(0x18FFFFFF)
                                     },
-                                    shape = RoundedCornerShape(10.dp)
+                                    shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable { onReadChapter(MangaRepository.cleanWeebId(currentMangaId), MangaRepository.cleanChapterId(ch.chapterId)) }
-                                .padding(horizontal = 14.dp, vertical = 12.dp)
+                                .padding(horizontal = 14.dp, vertical = 9.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -998,7 +1000,8 @@ fun MangaDetailScreen(
                                 Column(
                                     modifier = Modifier
                                         .weight(1f, fill = false)
-                                        .padding(end = 8.dp)
+                                        .padding(end = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -1009,7 +1012,7 @@ fun MangaDetailScreen(
                                                 Icons.Default.Bookmark,
                                                 contentDescription = "Bookmarked",
                                                 tint = Color(0xFF38BDF8),
-                                                modifier = Modifier.size(15.dp)
+                                                modifier = Modifier.size(14.dp)
                                             )
                                         }
                                         Text(
@@ -1028,7 +1031,7 @@ fun MangaDetailScreen(
                                         if (chapterPageText != null) {
                                             Text(
                                                 text = chapterPageText,
-                                                fontSize = 11.5.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = if (isCurrent) OttPrimary else OttSecondary
                                             )
@@ -1040,7 +1043,7 @@ fun MangaDetailScreen(
                                                     .clip(RoundedCornerShape(4.dp))
                                                     .background(Color(0x18FFFFFF))
                                                     .border(0.5.dp, Color(0x30FFFFFF), RoundedCornerShape(4.dp))
-                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                                    .padding(horizontal = 5.dp, vertical = 1.5.dp)
                                             ) {
                                                 Text(
                                                     text = cleanVol,
@@ -1051,15 +1054,37 @@ fun MangaDetailScreen(
                                             }
                                         }
                                     }
+
+                                    // Subtitle Row: Title or Release Date
                                     val cleanTitle = ch.title?.takeIf { !it.equals("null", ignoreCase = true) && it.isNotBlank() }
-                                    if (cleanTitle != null) {
-                                        Text(
-                                            text = cleanTitle,
-                                            fontSize = 11.5.sp,
-                                            color = OttTextSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                    val cleanDate = ch.releaseDate?.takeIf { !it.equals("null", ignoreCase = true) && it.isNotBlank() }
+                                    if (cleanTitle != null || cleanDate != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (cleanTitle != null) {
+                                                Text(
+                                                    text = cleanTitle,
+                                                    fontSize = 11.5.sp,
+                                                    color = OttTextSecondary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                            }
+                                            if (cleanDate != null) {
+                                                if (cleanTitle != null) {
+                                                    Text(text = "•", fontSize = 10.sp, color = OttTextMuted)
+                                                }
+                                                Text(
+                                                    text = cleanDate,
+                                                    fontSize = 10.5.sp,
+                                                    color = OttTextMuted,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
                                     }
                                 }
 
@@ -1103,11 +1128,11 @@ fun MangaDetailScreen(
                                                 .clip(OttPillShape)
                                                 .background(Color(0x300284C7))
                                                 .border(1.dp, Color(0xFF38BDF8), OttPillShape)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
                                         ) {
                                             Text(
                                                 text = "BOOKMARKED",
-                                                fontSize = 9.sp,
+                                                fontSize = 8.5.sp,
                                                 fontWeight = FontWeight.Black,
                                                 color = Color(0xFF38BDF8)
                                             )
@@ -1120,11 +1145,11 @@ fun MangaDetailScreen(
                                                 .clip(OttPillShape)
                                                 .background(Color(0x30E50914))
                                                 .border(1.dp, Color(0x70E50914), OttPillShape)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
                                         ) {
                                             Text(
                                                 text = "READING",
-                                                fontSize = 9.sp,
+                                                fontSize = 8.5.sp,
                                                 fontWeight = FontWeight.Black,
                                                 color = Color(0xFFFF8A8A)
                                             )
@@ -1403,13 +1428,13 @@ fun MangaDetailScreen(
                     )
                 }
 
-                // Centered Show Name + Chapter Count in Navbar
-                Column(
+                // Centered Show Name in Navbar
+                Box(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 12.dp)
                         .graphicsLayer { alpha = navbarAlpha },
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = currentInfo.title,
@@ -1418,12 +1443,6 @@ fun MangaDetailScreen(
                         color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${displayChapters.size} Chapters",
-                        fontSize = 11.sp,
-                        color = OttAccentGold,
-                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
@@ -1553,7 +1572,7 @@ private fun MangaWaveSkeleton(
                     // Ambient Backdrop
                     if (!cachedPoster.isNullOrBlank()) {
                         AsyncImage(
-                            model = cachedPoster,
+                            model = rememberMangaImageRequest(cachedPoster),
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1600,7 +1619,7 @@ private fun MangaWaveSkeleton(
                             ) {
                                 if (!cachedPoster.isNullOrBlank()) {
                                     AsyncImage(
-                                        model = cachedPoster,
+                                        model = rememberMangaImageRequest(cachedPoster),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
