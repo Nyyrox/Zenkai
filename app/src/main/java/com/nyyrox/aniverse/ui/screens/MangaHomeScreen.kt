@@ -285,8 +285,6 @@ private fun MangaHeaderSearch(
                 }
             }
         }
-
-        }
     }
 }
 

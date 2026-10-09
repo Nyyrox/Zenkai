@@ -132,6 +132,22 @@ fun MangaReaderScreen(
     onSelectChapter: (newChapterId: String) -> Unit
 ) {
     val context = LocalContext.current
+
+    val cleanManga = remember(mangaId) { MangaRepository.cleanWeebId(mangaId) }
+    val initialCached = remember(cleanManga, mangaId) {
+        vm.mangaDetailCache[cleanManga] ?: vm.mangaDetailCache[mangaId]
+    }
+
+    var info by remember { mutableStateOf<MangaInfo?>(initialCached?.info) }
+    var chapters by remember { mutableStateOf<List<MangaChapter>>(initialCached?.chapters ?: emptyList()) }
+    var pages by remember { mutableStateOf<List<String>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val cleanInputChapterId = remember(chapterId) { MangaRepository.cleanChapterId(chapterId) }
+    var activeMangaId by remember(cleanManga) { mutableStateOf(cleanManga) }
+    var activeChapterId by remember(cleanInputChapterId) { mutableStateOf(cleanInputChapterId) }
+
     fun getMangaHeadersForUrl(url: String): NetworkHeaders {
         val src = MangaRepository.getSourceForId(activeMangaId)
         val referer = when {
@@ -153,21 +169,6 @@ fun MangaReaderScreen(
             .set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
             .build()
     }
-
-    val cleanManga = remember(mangaId) { MangaRepository.cleanWeebId(mangaId) }
-    val initialCached = remember(cleanManga, mangaId) {
-        vm.mangaDetailCache[cleanManga] ?: vm.mangaDetailCache[mangaId]
-    }
-
-    var info by remember { mutableStateOf<MangaInfo?>(initialCached?.info) }
-    var chapters by remember { mutableStateOf<List<MangaChapter>>(initialCached?.chapters ?: emptyList()) }
-    var pages by remember { mutableStateOf<List<String>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    val cleanInputChapterId = remember(chapterId) { MangaRepository.cleanChapterId(chapterId) }
-    var activeMangaId by remember(cleanManga) { mutableStateOf(cleanManga) }
-    var activeChapterId by remember(cleanInputChapterId) { mutableStateOf(cleanInputChapterId) }
 
     LaunchedEffect(cleanInputChapterId) {
         if (cleanInputChapterId.isNotBlank()) {
