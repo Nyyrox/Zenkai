@@ -881,8 +881,8 @@ class FreeWebNovelRepository(
             list.add(
                 NovelChapter(
                     slug = chSlug,
-                    name = name,
-                    date = null
+                    title = name,
+                    releaseTime = null
                 )
             )
         }
