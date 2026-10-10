@@ -1931,6 +1931,7 @@ fun CinePlayerView(
                                     val isLeftSide = startX < size.width * 0.45f
                                     var hasDragged = false
                                     var dragMode = 0 // 0: undecided, 1: horizontal seek, 2: volume, 3: brightness
+                                    var lastDragYDown = 0f
                                     val touchSlopPx = 14.dp.toPx()
                                     val initialSeekPosMs = currentPositionMs
 
@@ -1957,6 +1958,7 @@ fun CinePlayerView(
                                         val deltaX = change.position.x - startX
                                         val deltaY = startY - change.position.y
                                         val deltaYDown = change.position.y - startY
+                                        lastDragYDown = deltaYDown
 
                                         if (!isFullscreen && onCollapseToMiniPlayer != null && dragMode == 0 && !hasDragged && deltaYDown > touchSlopPx && deltaYDown > kotlin.math.abs(deltaX) * 1.3f) {
                                             dragMode = 4
@@ -2065,7 +2067,7 @@ fun CinePlayerView(
                                 }
 
                                     if (dragMode == 4) {
-                                        val finalDragY = deltaYDown.coerceAtLeast(0f)
+                                        val finalDragY = lastDragYDown.coerceAtLeast(0f)
                                         if (onDragDownRelease != null) {
                                             onDragDownRelease.invoke(finalDragY)
                                         } else if (finalDragY > 70.dp.toPx()) {
