@@ -2970,8 +2970,8 @@ fun CinePlayerView(
                         }
                     }
 
-                    // Buffering Spinner with Sleek Frosted Backdrop Disc
-                    if (isBuffering && !isInPip) {
+                    // Buffering Spinner
+                    if ((isBuffering || !hasStartedPlayback) && !isInPip) {
                         if (!hasStartedPlayback) {
                             CineStreamLoader(
                                 modifier = Modifier.align(Alignment.Center),
@@ -2982,17 +2982,17 @@ fun CinePlayerView(
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.Center)
-                                    .size(64.dp)
+                                    .size(56.dp)
                                     .clip(CircleShape)
                                     .background(Color(0x8A08080C))
                                     .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CineLoadingBarRenderer(
-                                    style = playerCustomization.loadingStyle,
-                                    palette = themePalette,
-                                    accentColor = playerCustomization.accentColor.color,
-                                    size = 44.dp
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(36.dp),
+                                    color = playerCustomization.accentColor.color,
+                                    trackColor = Color.White.copy(alpha = 0.15f),
+                                    strokeWidth = 3.2.dp
                                 )
                             }
                         }

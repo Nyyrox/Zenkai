@@ -1697,19 +1697,6 @@ fun CineStreamLoader(
     )
 ) {
     val n = stages.size.coerceAtLeast(1)
-    val tr = rememberInfiniteTransition(label = "streamLoader")
-    val rot = tr.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
-        label = "rot"
-    )
-    val pulse = tr.animateFloat(
-        initialValue = 0.88f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
-        label = "pulse"
-    )
 
     var stage by remember(stages) { mutableStateOf(0) }
     var secs by remember { mutableStateOf(0) }
@@ -1739,45 +1726,13 @@ fun CineStreamLoader(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(horizontal = 24.dp)
         ) {
-            // Minimalist transformation loading UI (Delicate glowing dual rings)
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .scale(pulse.value),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(Modifier.fillMaxSize()) {
-                    val strokeW = 2.5.dp.toPx()
-                    // Subtle background track
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.08f),
-                        radius = size.minDimension / 2f - strokeW,
-                        style = Stroke(strokeW)
-                    )
-                    // Outer rotating accent arc
-                    drawArc(
-                        brush = Brush.sweepGradient(
-                            listOf(
-                                accentColor.copy(alpha = 0.05f),
-                                accentColor.copy(alpha = 0.45f),
-                                accentColor
-                            )
-                        ),
-                        startAngle = rot.value,
-                        sweepAngle = 230f,
-                        useCenter = false,
-                        style = Stroke(strokeW, cap = StrokeCap.Round)
-                    )
-                    // Inner counter-rotating accent arc
-                    drawArc(
-                        color = accentColor.copy(alpha = 0.55f),
-                        startAngle = -rot.value * 1.5f,
-                        sweepAngle = 120f,
-                        useCenter = false,
-                        style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-            }
+            // Basic clean circular loading animation
+            CircularProgressIndicator(
+                modifier = Modifier.size(46.dp),
+                color = accentColor,
+                trackColor = Color.White.copy(alpha = 0.15f),
+                strokeWidth = 3.5.dp
+            )
 
             // Smooth Primary Text Transformation
             AnimatedContent(
