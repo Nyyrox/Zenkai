@@ -2381,6 +2381,7 @@ fun PlayerScreen(
                 }
             }
         }
+        }
     }
 }
 
