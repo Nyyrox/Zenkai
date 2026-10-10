@@ -102,6 +102,7 @@ fun rememberNovelImageRequest(url: String?): Any? {
                 url.contains("wuxiaworld") -> "https://wuxiaworld.site/"
                 url.contains("novelfire") -> "https://novelfire.net/"
                 url.contains("novelfull") -> "https://novelfull.com/"
+                url.contains("freewebnovel") -> "https://freewebnovel.com/"
                 else -> null
             }
             val builder = ImageRequest.Builder(context)
@@ -113,7 +114,6 @@ fun rememberNovelImageRequest(url: String?): Any? {
                 .set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
             if (ref != null) {
                 headers.set("Referer", ref)
-                headers.set("Origin", ref.removeSuffix("/"))
             }
             builder.httpHeaders(headers.build()).build()
         }
@@ -408,6 +408,7 @@ private fun NovelSearchHeader(
                     val sourceGradient = when (src) {
                         NovelSource.NOVEL_FULL -> Brush.horizontalGradient(listOf(Color(0xFFFF7A45), Color(0xFFFF5722)))
                         NovelSource.NOVEL_FIRE -> Brush.horizontalGradient(listOf(Color(0xFFE50914), Color(0xFFB71C1C)))
+                        NovelSource.FREE_WEB_NOVEL -> Brush.horizontalGradient(listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)))
                         NovelSource.ROYAL_ROAD -> Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF1D4ED8)))
                         NovelSource.WUXIA_WORLD -> Brush.horizontalGradient(listOf(Color(0xFF059669), Color(0xFF047857)))
                         else -> Brush.horizontalGradient(listOf(OttPrimary, OttPrimary))
@@ -415,6 +416,7 @@ private fun NovelSearchHeader(
                     val iconColor = when (src) {
                         NovelSource.NOVEL_FULL -> Color(0xFFFF7A45)
                         NovelSource.NOVEL_FIRE -> Color(0xFFE50914)
+                        NovelSource.FREE_WEB_NOVEL -> Color(0xFFA78BFA)
                         NovelSource.ROYAL_ROAD -> Color(0xFF3B82F6)
                         NovelSource.WUXIA_WORLD -> Color(0xFF10B981)
                         else -> OttPrimary
@@ -422,6 +424,7 @@ private fun NovelSearchHeader(
                     val icon = when (src) {
                         NovelSource.NOVEL_FULL -> Icons.Default.MenuBook
                         NovelSource.NOVEL_FIRE -> Icons.Default.Whatshot
+                        NovelSource.FREE_WEB_NOVEL -> Icons.Default.AutoStories
                         NovelSource.ROYAL_ROAD -> Icons.Default.Star
                         NovelSource.WUXIA_WORLD -> Icons.Default.AutoStories
                         else -> Icons.Default.MenuBook

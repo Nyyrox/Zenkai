@@ -44,10 +44,16 @@ class NovelFireRepository(
         response.body.string()
     }
 
-    private fun parseNovelList(doc: Document): List<NovelItem> {
+    private fun parseNovelList(doc: Document, excludePopular: Boolean = false): List<NovelItem> {
         val list = mutableListOf<NovelItem>()
-        val cards = doc.select(".novel-item, li.item, .list-novel .row, .book-item")
-        val items = if (cards.isNotEmpty()) cards else doc.select("li:has(a[href*=/book/])")
+        val targetDoc = if (excludePopular) {
+            val clone = doc.clone()
+            clone.select(".popular-novels, #search-section .popular-novels").remove()
+            clone
+        } else doc
+
+        val cards = targetDoc.select(".novel-item, li.item, .list-novel .row, .book-item")
+        val items = if (cards.isNotEmpty()) cards else targetDoc.select("li:has(a[href*=/book/]), div:has(> a[href*=/book/])")
 
         for (c in items) {
             val a = c.selectFirst("a[href*=/book/]") ?: continue
@@ -123,50 +129,77 @@ class NovelFireRepository(
     }
 
     override suspend fun search(query: String, page: Int): List<NovelItem> {
-        val encoded = URLEncoder.encode(query, "UTF-8")
-        val liveResults = mutableListOf<NovelItem>()
-        if (page <= 1) {
-            try {
-                val liveUrl = "$baseUrl/ajax/searchLive?keyword=$encoded&type=title"
-                val jsonStr = fetchString(liveUrl)
-                val json = org.json.JSONObject(jsonStr)
-                val arr = json.optJSONArray("data")
-                if (arr != null) {
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        val title = obj.optString("title")
-                        val slug = obj.optString("slug")
-                        val img = obj.optString("image")
-                        val rank = obj.optInt("rank", 0)
-                        val totalChapters = obj.optInt("total_chapter", 0)
-                        val cover = if (img.startsWith("http")) img else "$baseUrl/$img"
-                        val stats = if (totalChapters > 0) "$totalChapters Chapters" else if (rank > 0) "Rank #$rank" else null
-                        if (slug.isNotBlank() && title.isNotBlank()) {
-                            liveResults.add(
-                                NovelItem(
-                                    slug = slug,
-                                    title = title,
-                                    cover = cover,
-                                    stats = stats,
-                                    rating = null,
-                                    source = source.id
-                                )
-                            )
-                        }
-                    }
-                }
-            } catch (_: Exception) {}
+        val candidates = mutableListOf(query.trim())
+        if (query.contains("class room", ignoreCase = true)) {
+            candidates.add(query.replace("class room", "classroom", ignoreCase = true))
+        }
+        if (query.contains("alya", ignoreCase = true)) {
+            candidates.add("alya")
+            candidates.add("roshidere")
+        }
+        if (query.contains("bunny girl", ignoreCase = true)) {
+            candidates.add("bunny girl")
+            candidates.add("rascal does not dream")
+        }
+        val words = query.trim().split("\\s+".toRegex())
+        if (words.size > 3) {
+            candidates.add(words.take(3).joinToString(" "))
+            candidates.add(words.take(2).joinToString(" "))
         }
 
-        val url = "$baseUrl/search?keyword=$encoded&type=title&page=$page"
-        val htmlList = try { parseNovelList(fetchHtml(url)) } catch (_: Exception) { emptyList() }
-
         val combined = mutableListOf<NovelItem>()
-        combined.addAll(liveResults)
-        for (item in htmlList) {
-            if (combined.none { it.slug == item.slug }) {
-                combined.add(item)
+        for (cand in candidates.distinct()) {
+            val encoded = URLEncoder.encode(cand, "UTF-8")
+            if (page <= 1) {
+                try {
+                    val liveUrl = "$baseUrl/ajax/searchLive?keyword=$encoded&type=title"
+                    val jsonStr = fetchString(liveUrl)
+                    val json = org.json.JSONObject(jsonStr)
+                    val arr = json.optJSONArray("data")
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.getJSONObject(i)
+                            val title = obj.optString("title")
+                            val slug = obj.optString("slug")
+                            val img = obj.optString("image")
+                            val rank = obj.optInt("rank", 0)
+                            val totalChapters = obj.optInt("total_chapter", 0)
+                            val cover = if (img.startsWith("http")) img else "$baseUrl/$img"
+                            val stats = if (totalChapters > 0) "$totalChapters Chapters" else if (rank > 0) "Rank #$rank" else null
+                            if (slug.isNotBlank() && title.isNotBlank() && combined.none { it.slug == slug }) {
+                                combined.add(
+                                    NovelItem(
+                                        slug = slug,
+                                        title = title,
+                                        cover = cover,
+                                        stats = stats,
+                                        rating = null,
+                                        source = source.id
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
             }
+
+            val searchUrls = listOf(
+                "$baseUrl/search?keyword=$encoded&page=$page",
+                "$baseUrl/search?keyword=$encoded&type=title&page=$page"
+            )
+            for (url in searchUrls) {
+                try {
+                    val doc = fetchHtml(url)
+                    val htmlList = parseNovelList(doc, excludePopular = true)
+                    for (item in htmlList) {
+                        if (combined.none { it.slug == item.slug }) {
+                            combined.add(item)
+                        }
+                    }
+                } catch (_: Exception) {}
+                if (combined.isNotEmpty()) break
+            }
+            if (combined.isNotEmpty()) break
         }
         return combined
     }

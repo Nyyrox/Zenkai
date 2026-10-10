@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class UnifiedNovelRepository(
     val novelFull: NovelFullRepository = NovelFullRepository(),
     val novelFire: NovelFireRepository = NovelFireRepository(),
+    val freeWebNovel: FreeWebNovelRepository = FreeWebNovelRepository(),
     val royalRoad: RoyalRoadRepository = RoyalRoadRepository(),
     val wuxiaWorld: WuxiaWorldRepository = WuxiaWorldRepository(),
     val webNovel: WebNovelRepository = WebNovelRepository(royalRoad)
@@ -15,6 +16,7 @@ class UnifiedNovelRepository(
     private val repositories = mapOf<NovelSource, INovelSourceRepository>(
         NovelSource.NOVEL_FULL to novelFull,
         NovelSource.NOVEL_FIRE to novelFire,
+        NovelSource.FREE_WEB_NOVEL to freeWebNovel,
         NovelSource.ROYAL_ROAD to royalRoad,
         NovelSource.WUXIA_WORLD to wuxiaWorld,
         NovelSource.WEB_NOVEL to webNovel
@@ -48,21 +50,59 @@ class UnifiedNovelRepository(
     override suspend fun getLightNovels(page: Int): List<NovelItem> = currentRepo.getLightNovels(page)
 
     override suspend fun search(query: String, page: Int): List<NovelItem> {
-        val primary = try { currentRepo.search(query, page) } catch (_: Exception) { emptyList() }
-        if (primary.isNotEmpty()) return primary
+        val candidates = mutableListOf(query.trim())
+        if (query.contains("class room", ignoreCase = true)) {
+            candidates.add(query.replace("class room", "classroom", ignoreCase = true))
+        }
+        if (query.contains("alya", ignoreCase = true)) {
+            candidates.add("alya")
+            candidates.add("roshidere")
+        }
+        if (query.contains("bunny girl", ignoreCase = true)) {
+            candidates.add("bunny girl")
+            candidates.add("rascal does not dream")
+        }
+        val words = query.trim().split("\\s+".toRegex())
+        if (words.size > 3) {
+            candidates.add(words.take(3).joinToString(" "))
+            candidates.add(words.take(2).joinToString(" "))
+        }
 
-        // Fallback: If active source has no results, search other available sources
-        for ((s, repo) in repositories) {
-            if (s != _activeSource.value && s != NovelSource.WEB_NOVEL) {
+        val allResults = mutableListOf<NovelItem>()
+        // 1. Search active source with candidates
+        for (q in candidates.distinct()) {
+            try {
+                val res = currentRepo.search(q, page)
+                for (item in res) {
+                    if (allResults.none { it.slug == item.slug }) {
+                        allResults.add(item)
+                    }
+                }
+            } catch (_: Exception) {}
+            if (allResults.isNotEmpty()) break
+        }
+
+        if (allResults.isNotEmpty()) return allResults
+
+        // 2. Fallback: Search across other repositories (prioritizing FreeWebNovel and NovelFire for light novels)
+        val otherRepos = listOf(freeWebNovel, novelFire, novelFull, royalRoad, wuxiaWorld)
+            .filter { it.source != _activeSource.value }
+
+        for (repo in otherRepos) {
+            for (q in candidates.distinct()) {
                 try {
-                    val fallbackResults = repo.search(query, page)
-                    if (fallbackResults.isNotEmpty()) {
-                        return fallbackResults
+                    val fallbackResults = repo.search(q, page)
+                    for (item in fallbackResults) {
+                        if (allResults.none { it.slug == item.slug }) {
+                            allResults.add(item)
+                        }
                     }
                 } catch (_: Exception) {}
+                if (allResults.isNotEmpty()) break
             }
+            if (allResults.isNotEmpty()) break
         }
-        return emptyList()
+        return allResults
     }
 
     override suspend fun getDetail(slug: String): NovelDetail? {
