@@ -256,9 +256,11 @@ class RoyalRoadRepository(
 
     private fun parseFictionList(doc: Document): List<NovelItem> {
         val list = mutableListOf<NovelItem>()
-        val items = doc.select(".fiction-list-item, div:has(h2.fiction-title)")
+        val items = doc.select(".fiction-list-item, div.row:has(h2.fiction-title), .row:has(.fiction-title)")
         for (item in items) {
-            val a = item.selectFirst("h2.fiction-title a, .fiction-title a, a[href*='/fiction/']") ?: continue
+            val a = item.selectFirst("h2.fiction-title a, .fiction-title a")
+                ?: item.select("a[href*='/fiction/']").firstOrNull { it.text().isNotBlank() }
+                ?: continue
             val href = a.attr("href")
             val slug = href.removePrefix("/fiction/").trim('/')
             if (slug.isBlank() || list.any { it.slug == slug }) continue
@@ -761,9 +763,11 @@ class FreeWebNovelRepository(
 
     private fun parseList(doc: Document): List<NovelItem> {
         val list = mutableListOf<NovelItem>()
-        val items = doc.select(".li-row, .col-xs-12:has(.tit), div:has(h3.tit), .ul-list1 li")
+        val items = doc.select(".li-row, div.li-row, .col-xs-12:has(.tit):has(img), .ul-list1 li")
         for (item in items) {
-            val a = item.selectFirst("h3.tit a, .tit a, a[href*='/novel/']") ?: continue
+            val a = item.selectFirst("h3.tit a, .tit a")
+                ?: item.select("a[href*='/novel/']").firstOrNull { it.attr("title").isNotBlank() || it.text().isNotBlank() }
+                ?: continue
             val href = a.attr("href")
             val slug = href.substringAfter("/novel/").substringBefore("/chapter").substringBefore("?").trim('/')
             if (slug.isBlank() || list.any { it.slug == slug }) continue
@@ -771,8 +775,11 @@ class FreeWebNovelRepository(
             val title = a.attr("title").ifBlank { a.text() }.trim()
             if (title.isBlank()) continue
 
-            val img = item.selectFirst("img")
+            val img = item.selectFirst(".pic img, picture img, img:not([src*='logo']):not([src*='avatar']), img")
             var cover = img?.attr("src")?.ifBlank { img.attr("data-src") }.orEmpty()
+            if (cover.contains("logo") || cover.contains("avatar")) {
+                cover = ""
+            }
             if (cover.isNotBlank() && !cover.startsWith("http")) {
                 cover = baseUrl + (if (cover.startsWith("/")) "" else "/") + cover
             }
@@ -803,14 +810,14 @@ class FreeWebNovelRepository(
     }
 
     override suspend fun getRankings(page: Int): List<NovelItem> {
-        val url = if (page <= 1) "$baseUrl/most-popular-novel" else "$baseUrl/most-popular-novel/$page"
+        val url = if (page <= 1) "$baseUrl/sort/most-popular/" else "$baseUrl/sort/most-popular/$page"
         return parseList(fetchHtml(url))
     }
 
     override suspend fun getPopular(page: Int): List<NovelItem> = getRankings(page)
 
     override suspend fun getLatest(page: Int): List<NovelItem> {
-        val url = if (page <= 1) "$baseUrl/latest-release-novel" else "$baseUrl/latest-release-novel/$page"
+        val url = if (page <= 1) "$baseUrl/sort/latest-release/" else "$baseUrl/sort/latest-release/$page"
         return parseList(fetchHtml(url))
     }
 

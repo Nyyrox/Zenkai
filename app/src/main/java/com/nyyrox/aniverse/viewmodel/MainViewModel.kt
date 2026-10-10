@@ -206,7 +206,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun closeNovelDetail() { activeDetailNovelSlug = null }
 
     // Manga Data
-    var activeMangaSource by mutableStateOf(com.nyyrox.aniverse.data.manga.MangaSource.MANGADEX); private set
+    var activeMangaSource by mutableStateOf(com.nyyrox.aniverse.data.manga.MangaSource.COMICK); private set
     var mangaHome by mutableStateOf(MangaHome()); private set
     var mangaHomeLoading by mutableStateOf(false); private set
     var mangaHomeError by mutableStateOf<String?>(null); private set

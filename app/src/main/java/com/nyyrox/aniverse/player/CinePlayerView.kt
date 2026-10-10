@@ -615,6 +615,8 @@ fun CinePlayerView(
     onToggleFullscreen: () -> Unit = {},
     onBack: () -> Unit = {},
     onCollapseToMiniPlayer: (() -> Unit)? = null,
+    onDragDownDelta: ((Float) -> Unit)? = null,
+    onDragDownRelease: ((Float) -> Unit)? = null,
     modifier: Modifier = Modifier,
     initialTimeMs: Long = 0L,
     startPaused: Boolean = false,
@@ -1956,7 +1958,8 @@ fun CinePlayerView(
                                         val deltaY = startY - change.position.y
                                         val deltaYDown = change.position.y - startY
 
-                                        if (!isFullscreen && onCollapseToMiniPlayer != null && deltaYDown > 52.dp.toPx() && deltaYDown > kotlin.math.abs(deltaX) * 1.4f) {
+                                        if (!isFullscreen && onCollapseToMiniPlayer != null && dragMode == 0 && !hasDragged && deltaYDown > touchSlopPx && deltaYDown > kotlin.math.abs(deltaX) * 1.3f) {
+                                            dragMode = 4
                                             hasDragged = true
                                             hold2xJob.cancel()
                                             if (isHolding2x) {
@@ -1965,12 +1968,14 @@ fun CinePlayerView(
                                                 } catch (_: Exception) {}
                                                 isHolding2x = false
                                             }
-                                            try { change.consume() } catch (_: Exception) {}
-                                            onCollapseToMiniPlayer()
-                                            return@awaitEachGesture
                                         }
 
-                                        if (!hasDragged && (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx)) {
+                                        if (dragMode == 4) {
+                                            try { change.consume() } catch (_: Exception) {}
+                                            val currentDragY = (change.position.y - startY).coerceAtLeast(0f)
+                                            onDragDownDelta?.invoke(currentDragY)
+                                        } else {
+                                            if (!hasDragged && (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx)) {
                                             hasDragged = true
                                             hold2xJob.cancel()
                                             if (isHolding2x) {
@@ -2056,6 +2061,17 @@ fun CinePlayerView(
                                                 }
                                             }
                                         }
+                                    }
+                                }
+
+                                    if (dragMode == 4) {
+                                        val finalDragY = deltaYDown.coerceAtLeast(0f)
+                                        if (onDragDownRelease != null) {
+                                            onDragDownRelease.invoke(finalDragY)
+                                        } else if (finalDragY > 70.dp.toPx()) {
+                                            onCollapseToMiniPlayer?.invoke()
+                                        }
+                                        return@awaitEachGesture
                                     }
 
                                     isInteractingVolume = false

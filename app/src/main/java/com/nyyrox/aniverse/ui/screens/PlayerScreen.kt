@@ -10,6 +10,12 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
@@ -664,6 +670,10 @@ fun PlayerScreen(
         }
     }
 
+    val dragOffsetY = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val collapseThresholdPx = with(density) { 110.dp.toPx() }
+
     val handleExit = {
         isScreenExiting = true
         // ask CinePlayerView to hand its player to the mini player instead of releasing it
@@ -687,6 +697,17 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(OttBg)
             .then(if (!isFullscreen) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
+            .graphicsLayer {
+                if (!isFullscreen) {
+                    val currentDrag = dragOffsetY.value
+                    translationY = currentDrag
+                    val progress = (currentDrag / 700f).coerceIn(0f, 1f)
+                    scaleX = 1f - (progress * 0.18f)
+                    scaleY = 1f - (progress * 0.18f)
+                    alpha = 1f - (progress * 0.55f)
+                    transformOrigin = TransformOrigin(0.5f, 0.2f)
+                }
+            }
     ) {
         // Video Player Container (Edge-to-edge flush 16:9, zero curve in portrait, fillMaxSize in Fullscreen)
         Box(
@@ -700,11 +721,27 @@ fun PlayerScreen(
                     .aspectRatio(16f / 9f)
                     .background(Color.Black)
                     .pointerInput(isFullscreen) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 25f) {
-                                handleExit()
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                val next = (dragOffsetY.value + dragAmount).coerceAtLeast(0f)
+                                coroutineScope.launch { dragOffsetY.snapTo(next) }
+                            },
+                            onDragEnd = {
+                                coroutineScope.launch {
+                                    if (dragOffsetY.value > collapseThresholdPx) {
+                                        handleExit()
+                                    } else {
+                                        dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                coroutineScope.launch {
+                                    dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
+                                }
                             }
-                        }
+                        )
                     }
             }).onGloballyPositioned { com.nyyrox.aniverse.player.MiniPlayerManager.videoSlot = it.boundsInRoot() }
         ) {
@@ -844,6 +881,22 @@ fun PlayerScreen(
                         onToggleFullscreen = { toggleFullscreen() },
                         onBack = handleExit,
                         onCollapseToMiniPlayer = handleExit,
+                        onDragDownDelta = { dy ->
+                            if (!isScreenExiting) {
+                                coroutineScope.launch { dragOffsetY.snapTo(dy) }
+                            }
+                        },
+                        onDragDownRelease = { dy ->
+                            if (!isScreenExiting) {
+                                coroutineScope.launch {
+                                    if (dy > collapseThresholdPx) {
+                                        handleExit()
+                                    } else {
+                                        dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
+                                    }
+                                }
+                            }
+                        },
                         modifier = Modifier.fillMaxSize(),
                         initialTimeMs = savedPos,
                         startPaused = false,
