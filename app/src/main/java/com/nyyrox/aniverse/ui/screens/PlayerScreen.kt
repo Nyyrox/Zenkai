@@ -11,11 +11,15 @@ import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.util.lerp
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
@@ -670,18 +674,41 @@ fun PlayerScreen(
         }
     }
 
-    val dragOffsetY = remember { Animatable(0f) }
+    val dragProgress = remember { Animatable(0f) }
+    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val collapseThresholdPx = with(density) { 110.dp.toPx() }
+
+    val screenW = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenH = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val miniW = with(density) { 208.dp.toPx() }
+    val miniH = miniW / (16f / 9f)
+    val horizontalMargin = with(density) { 12.dp.toPx() }
+    val bottomClearance = with(density) { 110.dp.toPx() }
+    val targetMiniX = (screenW - miniW - horizontalMargin).coerceAtLeast(0f)
+    val targetMiniY = (screenH - miniH - bottomClearance).coerceAtLeast(0f)
+    val targetScale = (miniW / screenW.coerceAtLeast(1f)).coerceIn(0.35f, 0.70f)
+    val maxDragPx = with(density) { 260.dp.toPx() }
+
+    LaunchedEffect(animeId, currentEpisode) {
+        dragProgress.snapTo(0f)
+        isScreenExiting = false
+    }
 
     val handleExit = {
-        isScreenExiting = true
-        // ask CinePlayerView to hand its player to the mini player instead of releasing it
-        com.nyyrox.aniverse.player.MiniPlayerManager.parkRequest =
-            com.nyyrox.aniverse.player.MiniPlayerManager.ParkRequest(animeId, currentEpisode, currentProvider.id)
-        com.nyyrox.aniverse.player.MiniPlayerManager.parkNow?.invoke()
-        com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
-        onBack()
+        if (!isScreenExiting) {
+            isScreenExiting = true
+            coroutineScope.launch {
+                if (dragProgress.value < 0.99f && !isFullscreen) {
+                    dragProgress.animateTo(1f, tween(180, easing = FastOutSlowInEasing))
+                }
+                // ask CinePlayerView to hand its player to the mini player instead of releasing it
+                com.nyyrox.aniverse.player.MiniPlayerManager.parkRequest =
+                    com.nyyrox.aniverse.player.MiniPlayerManager.ParkRequest(animeId, currentEpisode, currentProvider.id)
+                com.nyyrox.aniverse.player.MiniPlayerManager.parkNow?.invoke()
+                com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
+                onBack()
+            }
+        }
     }
 
     BackHandler {
@@ -692,59 +719,72 @@ fun PlayerScreen(
         }
     }
 
-    Column(
+    val progress = dragProgress.value
+    val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(OttBg)
+            .background(if (isFullscreen) Color.Black else OttBg.copy(alpha = bgAlpha))
             .then(if (!isFullscreen) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
-            .graphicsLayer {
-                if (!isFullscreen) {
-                    val currentDrag = dragOffsetY.value
-                    translationY = currentDrag
-                    val progress = (currentDrag / 700f).coerceIn(0f, 1f)
-                    scaleX = 1f - (progress * 0.18f)
-                    scaleY = 1f - (progress * 0.18f)
-                    alpha = 1f - (progress * 0.55f)
-                    transformOrigin = TransformOrigin(0.5f, 0.2f)
-                }
-            }
     ) {
-        // Video Player Container (Edge-to-edge flush 16:9, zero curve in portrait, fillMaxSize in Fullscreen)
-        Box(
-            modifier = (if (isFullscreen) {
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .background(Color.Black)
-                    .pointerInput(isFullscreen) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { change, dragAmount ->
-                                change.consume()
-                                val next = (dragOffsetY.value + dragAmount).coerceAtLeast(0f)
-                                coroutineScope.launch { dragOffsetY.snapTo(next) }
-                            },
-                            onDragEnd = {
-                                coroutineScope.launch {
-                                    if (dragOffsetY.value > collapseThresholdPx) {
-                                        handleExit()
-                                    } else {
-                                        dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Video Player Container (Morphs into floating mini-player box at bottom-right)
+            Box(
+                modifier = (if (isFullscreen) {
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .graphicsLayer {
+                            if (progress > 0f) {
+                                val currentScale = lerp(1f, targetScale, progress)
+                                scaleX = currentScale
+                                scaleY = currentScale
+                                transformOrigin = TransformOrigin(0f, 0f)
+                                translationX = lerp(0f, targetMiniX, progress)
+                                translationY = lerp(0f, targetMiniY, progress)
+                                shadowElevation = (progress * 16f).dp.toPx()
+                                shape = RoundedCornerShape((progress * 14f).dp)
+                                clip = progress > 0.04f
+                            }
+                        }
+                        .background(Color.Black)
+                        .pointerInput(isFullscreen) {
+                            detectVerticalDragGestures(
+                                onVerticalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val next = (dragProgress.value + dragAmount / maxDragPx).coerceIn(0f, 1f)
+                                    coroutineScope.launch { dragProgress.snapTo(next) }
+                                },
+                                onDragEnd = {
+                                    coroutineScope.launch {
+                                        if (dragProgress.value > 0.35f) {
+                                            dragProgress.animateTo(1f, tween(160, easing = FastOutSlowInEasing))
+                                            handleExit()
+                                        } else {
+                                            dragProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    coroutineScope.launch {
+                                        dragProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
                                     }
                                 }
-                            },
-                            onDragCancel = {
-                                coroutineScope.launch {
-                                    dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
-                                }
-                            }
-                        )
+                            )
+                        }
+                }).onGloballyPositioned {
+                    if (progress == 0f && !isScreenExiting && !isFullscreen) {
+                        com.nyyrox.aniverse.player.MiniPlayerManager.videoSlot = it.boundsInRoot()
                     }
-            }).onGloballyPositioned { com.nyyrox.aniverse.player.MiniPlayerManager.videoSlot = it.boundsInRoot() }
-        ) {
+                }
+            ) {
             key(currentEpisode, currentProvider.id) {
                 val playingEpisode = currentEpisode
                 val savedPos = remember(anime.id, playingEpisode) {
@@ -883,16 +923,19 @@ fun PlayerScreen(
                         onCollapseToMiniPlayer = handleExit,
                         onDragDownDelta = { dy ->
                             if (!isScreenExiting) {
-                                coroutineScope.launch { dragOffsetY.snapTo(dy) }
+                                val next = (dy / maxDragPx).coerceIn(0f, 1f)
+                                coroutineScope.launch { dragProgress.snapTo(next) }
                             }
                         },
                         onDragDownRelease = { dy ->
                             if (!isScreenExiting) {
+                                val releaseProg = (dy / maxDragPx).coerceIn(0f, 1f)
                                 coroutineScope.launch {
-                                    if (dy > collapseThresholdPx) {
+                                    if (releaseProg > 0.35f) {
+                                        dragProgress.animateTo(1f, tween(160, easing = FastOutSlowInEasing))
                                         handleExit()
                                     } else {
-                                        dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
+                                        dragProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
                                     }
                                 }
                             }
@@ -955,11 +998,24 @@ fun PlayerScreen(
 
         // Below Video Section (Hidden in Fullscreen)
         if (!isFullscreen) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        if (progress > 0f) {
+                            alpha = (1f - progress * 2.5f).coerceIn(0f, 1f)
+                            translationY = progress * with(density) { 50.dp.toPx() }
+                            scaleX = 1f - progress * 0.08f
+                            scaleY = 1f - progress * 0.08f
+                        }
+                    }
             ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                 // Zenkai Player / Embed Mode Toggle Bar (Option down below the player with proper spacing)
                 val isEmbedModeActive = !isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
                 if (isEmbedModeActive || playInZenkaiPlayer) {
@@ -2326,6 +2382,7 @@ fun PlayerScreen(
             }
         }
     }
+}
 
     showDownloadSheetEpisode?.let { (ep, epTitle) ->
         com.nyyrox.aniverse.ui.components.DownloadAnimeOptionsSheet(

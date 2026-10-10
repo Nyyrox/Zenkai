@@ -534,7 +534,8 @@ data class PlayerGestureSettings(
     val brightnessEnabled: Boolean = true,
     val swipeSeekEnabled: Boolean = true,
     val holdTo2xEnabled: Boolean = true,
-    val doubleTapSeekEnabled: Boolean = true
+    val doubleTapSeekEnabled: Boolean = true,
+    val pinchToZoomEnabled: Boolean = true
 )
 
 data class CinePlayerCustomizationSettings(
@@ -623,6 +624,7 @@ data class CinePlayerCustomizationSettings(
                 put("swipeSeekEnabled", gestures.swipeSeekEnabled)
                 put("holdTo2xEnabled", gestures.holdTo2xEnabled)
                 put("doubleTapSeekEnabled", gestures.doubleTapSeekEnabled)
+                put("pinchToZoomEnabled", gestures.pinchToZoomEnabled)
             }
             put("gestures", gesturesObj)
         }
@@ -722,7 +724,8 @@ data class CinePlayerCustomizationSettings(
                         brightnessEnabled = gesturesObj.optBoolean("brightnessEnabled", true),
                         swipeSeekEnabled = gesturesObj.optBoolean("swipeSeekEnabled", true),
                         holdTo2xEnabled = gesturesObj.optBoolean("holdTo2xEnabled", true),
-                        doubleTapSeekEnabled = gesturesObj.optBoolean("doubleTapSeekEnabled", true)
+                        doubleTapSeekEnabled = gesturesObj.optBoolean("doubleTapSeekEnabled", true),
+                        pinchToZoomEnabled = gesturesObj.optBoolean("pinchToZoomEnabled", true)
                     )
                 } else PlayerGestureSettings()
 
@@ -766,9 +769,27 @@ fun CineLoadingBarRenderer(
         ),
         label = "spinRot"
     )
+    val counterRotation by infiniteTransition.animateFloat(
+        initialValue = 360f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "counterSpinRot"
+    )
+    val dynamicSweep by infiniteTransition.animateFloat(
+        initialValue = 60f,
+        targetValue = 260f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dynamicSweep"
+    )
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
+        initialValue = 0.82f,
+        targetValue = 1.18f,
         animationSpec = infiniteRepeatable(
             animation = tween(850, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -782,55 +803,94 @@ fun CineLoadingBarRenderer(
     ) {
         when (style) {
             LoadingBarStyle.ZENKAI_FLAME -> {
-                Canvas(modifier = Modifier.fillMaxSize().rotate(rotation)) {
-                    val stroke = 3.5.dp.toPx()
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val stroke = 3.2.dp.toPx()
+                    val centerPt = Offset(this.size.width / 2f, this.size.height / 2f)
+                    val r = (this.size.minDimension / 2f) - stroke
+
+                    // Subtle background orbit track
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.12f),
+                        radius = r,
+                        center = centerPt,
+                        style = Stroke(width = stroke * 0.7f)
+                    )
+
+                    // Outer primary glowing energy arc
                     drawArc(
                         brush = Brush.sweepGradient(
                             listOf(
-                                accentColor.copy(alpha = 0.90f),
-                                accentColor.copy(alpha = 0.50f),
-                                accentColor.copy(alpha = 0.15f),
-                                Color.Transparent
+                                accentColor.copy(alpha = 0.05f),
+                                accentColor.copy(alpha = 0.40f),
+                                accentColor.copy(alpha = 0.95f),
+                                Color.White
                             )
                         ),
-                        startAngle = 0f,
-                        sweepAngle = 260f,
+                        startAngle = rotation,
+                        sweepAngle = dynamicSweep,
                         useCenter = false,
                         style = Stroke(width = stroke, cap = StrokeCap.Round)
                     )
+
+                    // Inner counter-orbiting micro-arc
+                    val innerStroke = 1.8.dp.toPx()
+                    val innerR = r * 0.62f
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            listOf(
+                                accentColor.copy(alpha = 0.10f),
+                                accentColor.copy(alpha = 0.85f),
+                                Color.White
+                            )
+                        ),
+                        startAngle = counterRotation,
+                        sweepAngle = 130f,
+                        useCenter = false,
+                        topLeft = Offset(centerPt.x - innerR, centerPt.y - innerR),
+                        size = androidx.compose.ui.geometry.Size(innerR * 2, innerR * 2),
+                        style = Stroke(width = innerStroke, cap = StrokeCap.Round)
+                    )
                 }
+                // Glowing pulsating center core
                 Box(
                     modifier = Modifier
-                        .size(size * 0.36f)
+                        .size(size * 0.22f)
                         .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.20f))
+                        .background(accentColor)
                 )
             }
 
             LoadingBarStyle.NEON_PULSE -> {
                 Canvas(modifier = Modifier.fillMaxSize().rotate(rotation)) {
                     val stroke = 3.dp.toPx()
+                    val r = (this.size.minDimension / 2f) - stroke
+                    drawCircle(
+                        color = accentColor.copy(alpha = 0.12f),
+                        radius = r,
+                        style = Stroke(width = stroke * 0.6f)
+                    )
                     drawArc(
-                        color = accentColor.copy(alpha = 0.85f),
+                        brush = Brush.sweepGradient(listOf(Color.Transparent, accentColor.copy(alpha = 0.4f), accentColor)),
                         startAngle = 0f,
-                        sweepAngle = 120f,
+                        sweepAngle = 130f,
                         useCenter = false,
                         style = Stroke(width = stroke, cap = StrokeCap.Round)
                     )
                     drawArc(
-                        color = accentColor.copy(alpha = 0.35f),
+                        brush = Brush.sweepGradient(listOf(Color.Transparent, accentColor.copy(alpha = 0.4f), accentColor)),
                         startAngle = 180f,
-                        sweepAngle = 120f,
+                        sweepAngle = 130f,
                         useCenter = false,
                         style = Stroke(width = stroke, cap = StrokeCap.Round)
                     )
                 }
                 Box(
                     modifier = Modifier
-                        .size(size * 0.28f)
+                        .size(size * 0.26f)
+                        .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.45f))
+                        .background(accentColor.copy(alpha = 0.85f))
                 )
             }
 
@@ -839,38 +899,60 @@ fun CineLoadingBarRenderer(
                     val stroke = 2.5.dp.toPx()
                     for (i in 0 until 4) {
                         drawArc(
-                            color = if (i % 2 == 0) accentColor.copy(alpha = 0.85f) else accentColor.copy(alpha = 0.30f),
-                            startAngle = i * 90f + 10f,
-                            sweepAngle = 70f,
+                            color = if (i % 2 == 0) accentColor else accentColor.copy(alpha = 0.35f),
+                            startAngle = i * 90f + 12f,
+                            sweepAngle = 66f,
                             useCenter = false,
-                            style = Stroke(width = stroke, cap = StrokeCap.Square)
+                            style = Stroke(width = stroke, cap = StrokeCap.Round)
                         )
                     }
                 }
+                Box(
+                    modifier = Modifier
+                        .size(size * 0.20f)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.60f))
+                )
             }
 
             LoadingBarStyle.MINIMAL_ARC -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(size * 0.85f),
-                    color = accentColor.copy(alpha = 0.85f),
-                    trackColor = accentColor.copy(alpha = 0.15f),
-                    strokeWidth = 2.8.dp
-                )
+                Canvas(modifier = Modifier.fillMaxSize().rotate(rotation)) {
+                    val stroke = 2.8.dp.toPx()
+                    val r = (this.size.minDimension / 2f) - stroke
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.12f),
+                        radius = r,
+                        style = Stroke(width = stroke)
+                    )
+                    drawArc(
+                        color = accentColor,
+                        startAngle = 0f,
+                        sweepAngle = dynamicSweep,
+                        useCenter = false,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                    )
+                }
             }
 
             LoadingBarStyle.QUANTUM_DOTS -> {
                 Canvas(modifier = Modifier.fillMaxSize().rotate(rotation)) {
                     val centerOffset = Offset(this.size.width / 2, this.size.height / 2)
                     val orbitRadius = this.size.minDimension / 2.6f
-                    val dotRadius = 4.5.dp.toPx()
+                    val dotRadius = 4.dp.toPx()
+
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.08f),
+                        radius = orbitRadius,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
 
                     for (i in 0 until 3) {
                         val angle = (i * 120f) * (PI / 180f)
                         val x = centerOffset.x + (orbitRadius * cos(angle)).toFloat()
                         val y = centerOffset.y + (orbitRadius * sin(angle)).toFloat()
                         drawCircle(
-                            color = if (i == 0) accentColor.copy(alpha = 0.90f) else accentColor.copy(alpha = 0.40f),
-                            radius = dotRadius,
+                            color = if (i == 0) accentColor else accentColor.copy(alpha = 0.45f),
+                            radius = if (i == 0) dotRadius * 1.25f else dotRadius,
                             center = Offset(x, y)
                         )
                     }

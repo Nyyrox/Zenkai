@@ -1937,6 +1937,9 @@ fun CinePlayerView(
 
                                     val startVol = PlayerGesturePlugin.getVolumeFraction(context)
                                     val startBright = PlayerGesturePlugin.getBrightnessFraction(activity)
+                                    var initialPinchSpan = -1f
+                                    var pinchTriggered = false
+                                    var twoFingerStartY = -1f
 
                                     val hold2xJob = scope.launch {
                                         if (!currentGestureSettings.masterEnabled || !currentGestureSettings.holdTo2xEnabled) return@launch
@@ -1951,6 +1954,59 @@ fun CinePlayerView(
 
                                     while (true) {
                                         val event = awaitPointerEvent()
+                                        val pressedPointers = event.changes.filter { it.pressed }
+                                        if (pressedPointers.size >= 2) {
+                                            hold2xJob.cancel()
+                                            if (isHolding2x) {
+                                                try {
+                                                    exoPlayer?.playbackParameters = PlaybackParameters(playbackSpeed)
+                                                } catch (_: Exception) {}
+                                                isHolding2x = false
+                                            }
+                                            if (isInteractingVolume) isInteractingVolume = false
+                                            if (isInteractingBrightness) isInteractingBrightness = false
+                                            if (isSwipeSeeking) {
+                                                isSwipeSeeking = false
+                                                swipeSeekDeltaMs = 0L
+                                            }
+                                            dragMode = 5
+                                            hasDragged = true
+
+                                            val p1 = pressedPointers[0].position
+                                            val p2 = pressedPointers[1].position
+                                            val span = kotlin.math.hypot(p1.x - p2.x, p1.y - p2.y)
+                                            val centroidY = (p1.y + p2.y) / 2f
+
+                                            if (initialPinchSpan <= 0f) {
+                                                initialPinchSpan = span
+                                                twoFingerStartY = centroidY
+                                            } else if (!pinchTriggered && currentGestureSettings.masterEnabled && currentGestureSettings.pinchToZoomEnabled) {
+                                                val spanRatio = if (initialPinchSpan > 0f) span / initialPinchSpan else 1f
+                                                val dragYDelta = twoFingerStartY - centroidY
+
+                                                if (spanRatio > 1.18f || dragYDelta > 50.dp.toPx()) {
+                                                    pinchTriggered = true
+                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                    val nextMode = when (resizeMode) {
+                                                        AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                                        AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                                        else -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                                    }
+                                                    notifyFitChange(nextMode)
+                                                } else if (spanRatio < 0.82f || dragYDelta < -50.dp.toPx()) {
+                                                    pinchTriggered = true
+                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                    val nextMode = when (resizeMode) {
+                                                        AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                                        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                                    }
+                                                    notifyFitChange(nextMode)
+                                                }
+                                            }
+                                            event.changes.forEach { try { it.consume() } catch (_: Exception) {} }
+                                            continue
+                                        }
+
                                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                         if (!change.pressed) {
                                             break
@@ -1963,6 +2019,7 @@ fun CinePlayerView(
                                         if (!isFullscreen && onCollapseToMiniPlayer != null && dragMode == 0 && !hasDragged && deltaYDown > touchSlopPx && deltaYDown > kotlin.math.abs(deltaX) * 1.3f) {
                                             dragMode = 4
                                             hasDragged = true
+                                            showControls = false
                                             hold2xJob.cancel()
                                             if (isHolding2x) {
                                                 try {
@@ -2066,6 +2123,10 @@ fun CinePlayerView(
                                     }
                                 }
 
+                                    if (dragMode == 5 || pinchTriggered) {
+                                        return@awaitEachGesture
+                                    }
+
                                     if (dragMode == 4) {
                                         val finalDragY = lastDragYDown.coerceAtLeast(0f)
                                         if (onDragDownRelease != null) {
@@ -2143,19 +2204,14 @@ fun CinePlayerView(
                                                     } catch (_: Exception) {}
                                                 }
                                             } else if (!isRightSide && !isLeftSide) {
-                                                // Center double-tap: cycle aspect ratio / fit mode with clean HUD notification
+                                                // Center double-tap: Toggle Play / Pause video
                                                 singleTapJob?.cancel()
                                                 singleTapJob = null
                                                 lastTapTime = now
                                                 lastTapX = startX
 
-                                                val nextMode = when (resizeMode) {
-                                                    AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                                                    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                                                    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                                }
-                                                notifyFitChange(nextMode)
                                                 controlsTimeoutKey++
+                                                PlayerPlaybackPlugin.togglePlayPause(exoPlayer, context)
                                             } else {
                                                 // Double-tap seek disabled on sides: treat as normal single tap
                                                 lastTapTime = now
@@ -2908,7 +2964,7 @@ fun CinePlayerView(
                         }
                     }
 
-                    // Buffering Spinner with Custom Animated Styles
+                    // Buffering Spinner with Sleek Frosted Backdrop Disc
                     if (isBuffering && !isInPip) {
                         if (!hasStartedPlayback) {
                             CineStreamLoader(
@@ -2917,13 +2973,22 @@ fun CinePlayerView(
                                 subtitle = if (isDirectStream) "Direct · HD" else null
                             )
                         } else {
-                            CineLoadingBarRenderer(
-                                style = playerCustomization.loadingStyle,
-                                palette = themePalette,
-                                accentColor = playerCustomization.accentColor.color,
-                                size = 52.dp,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x8A08080C))
+                                    .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CineLoadingBarRenderer(
+                                    style = playerCustomization.loadingStyle,
+                                    palette = themePalette,
+                                    accentColor = playerCustomization.accentColor.color,
+                                    size = 44.dp
+                                )
+                            }
                         }
                     }
 
@@ -3502,23 +3567,6 @@ fun CinePlayerView(
                         modifier = Modifier.align(Alignment.BottomCenter)
                     ) {
                         YtBottomLoadingBar(accentColor = playerCustomization.accentColor.color)
-                    }
-
-                    // YouTube-style bottom border razor progress bar when controls hidden
-                    AnimatedVisibility(
-                        visible = !showControls && !isScreenLocked && !isInPip && hasStartedPlayback,
-                        enter = fadeIn(tween(140)),
-                        exit = fadeOut(tween(100)),
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    ) {
-                        val activePosMs = if (isScrubbing) scrubPositionMs else currentPositionMs
-                        val playedFrac = if (durationMs > 0L) (activePosMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
-                        val bufferedFrac = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
-                        YtBottomProgressBar(
-                            playedFrac = playedFrac,
-                            bufferedFrac = bufferedFrac,
-                            accentColor = playerCustomization.accentColor.color
-                        )
                     }
                 }
             }
@@ -5291,6 +5339,19 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.SPEED) }
                         )
 
+                        // Aspect Ratio / Video Fit
+                        val fitSubtitle = when (resizeMode) {
+                            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Crop to Fill / Zoom"
+                            AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Stretch"
+                            else -> "Fit to Screen"
+                        }
+                        SettingsItemRow(
+                            icon = Icons.Default.AspectRatio,
+                            title = "Aspect Ratio",
+                            subtitle = fitSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.ORIENTATION) }
+                        )
+
                         // Server (only when there is a choice)
                         if (availableServers.size > 1) {
                             val activeSrv = availableServers.find { it.streamUrl == currentStreamUrl } ?: availableServers.firstOrNull()
@@ -5309,12 +5370,13 @@ private fun PlayerSettingsModal(
                             g.brightnessEnabled,
                             g.swipeSeekEnabled,
                             g.holdTo2xEnabled,
-                            g.doubleTapSeekEnabled
+                            g.doubleTapSeekEnabled,
+                            g.pinchToZoomEnabled
                         ).count { it }
                         val gestureSubtitle = when {
                             !g.masterEnabled || activeGesturesCount == 0 -> "Gestures disabled"
-                            activeGesturesCount == 5 -> "All gestures enabled"
-                            else -> "$activeGesturesCount of 5 enabled"
+                            activeGesturesCount == 6 -> "All gestures enabled"
+                            else -> "$activeGesturesCount of 6 enabled"
                         }
                         SettingsItemRow(
                             icon = Icons.Default.TouchApp,
@@ -5858,7 +5920,8 @@ private fun PlayerSettingsModal(
                                             brightnessEnabled = true,
                                             swipeSeekEnabled = true,
                                             holdTo2xEnabled = true,
-                                            doubleTapSeekEnabled = true
+                                            doubleTapSeekEnabled = true,
+                                            pinchToZoomEnabled = true
                                         )
                                     } else {
                                         g.copy(masterEnabled = false)
@@ -5892,7 +5955,8 @@ private fun PlayerSettingsModal(
                                             brightnessEnabled = true,
                                             swipeSeekEnabled = true,
                                             holdTo2xEnabled = true,
-                                            doubleTapSeekEnabled = true
+                                            doubleTapSeekEnabled = true,
+                                            pinchToZoomEnabled = true
                                         )
                                     } else {
                                         g.copy(masterEnabled = false)
@@ -5983,17 +6047,33 @@ private fun PlayerSettingsModal(
                             }
                         )
 
-                        // 5. Double-Tap to Seek
+                        // 5. Double-Tap to Seek / Play-Pause
                         GestureToggleRow(
                             icon = Icons.Default.Forward10,
-                            title = "Double Tap to Seek",
-                            subtitle = "Double tap edges to jump 10 seconds back or forward",
+                            title = "Double Tap Gestures",
+                            subtitle = "Double tap sides to seek 10s, double tap center to play/pause",
                             checked = g.masterEnabled && g.doubleTapSeekEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
                                 val newGestures = g.copy(
                                     masterEnabled = if (isChecked) true else g.masterEnabled,
                                     doubleTapSeekEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        // 6. Pinch to Change Ratio
+                        GestureToggleRow(
+                            icon = Icons.Default.AspectRatio,
+                            title = "Pinch to Change Ratio",
+                            subtitle = "Pinch or drag with two fingers to adjust video aspect ratio",
+                            checked = g.masterEnabled && g.pinchToZoomEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    pinchToZoomEnabled = isChecked
                                 )
                                 onApplyCustomization(currentCustomization.copy(gestures = newGestures))
                             }
