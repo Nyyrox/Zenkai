@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,6 +61,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -122,8 +127,13 @@ fun MiniPlayerHost() {
             wasFull = false
             contentAlpha.snapTo(1f)
             dismissOffsetY.snapTo(0f)
-            t.snapTo(1f)
-            t.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
+            if (MiniPlayerManager.startAtCollapsed) {
+                MiniPlayerManager.startAtCollapsed = false
+                t.snapTo(0f)
+            } else {
+                t.snapTo(1f)
+                t.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+            }
         }
     }
 
@@ -341,14 +351,17 @@ private fun MiniPlayerContent(
         }
     }
 
+    val miniCorner = (16f * (1f - f)).dp
+
     Box(
         modifier = (if (pip) Modifier.fillMaxSize() else Modifier
             .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
             .size(with(density) { w.toDp() }, with(density) { h.toDp() })
-            .shadow((12f * (1f - f)).dp, RoundedCornerShape((14f + 2f * f).dp))
-            .clip(RoundedCornerShape((14f + 2f * f).dp)))
+            .shadow((16f * (1f - f)).dp, RoundedCornerShape(miniCorner))
+            .border(1.dp, Color(0x38FFFFFF).copy(alpha = (1f - f).coerceIn(0f, 1f)), RoundedCornerShape(miniCorner))
+            .clip(RoundedCornerShape(miniCorner)))
             .alpha(contentAlpha)
-            .background(Color.Black)
+            .background(Color(0xFF0A0C14))
             .then(
                 if (mini) {
                     Modifier
@@ -374,7 +387,7 @@ private fun MiniPlayerContent(
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onDoubleTap = { onToggleZoomCap() },
-                                onTap = { showControls = !showControls }
+                                onTap = { onExpand() }
                             )
                         }
                 } else Modifier
@@ -382,70 +395,115 @@ private fun MiniPlayerContent(
     ) {
         AndroidView(factory = { playerView }, modifier = Modifier.fillMaxSize())
 
-        AnimatedVisibility(
-            visible = showControls && mini,
-            enter = fadeIn(tween(180)),
-            exit = fadeOut(tween(180)),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f))) {
+        if (mini) {
+            // Sleek top frosted gradient backdrop
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent)
+                        )
+                    )
+            )
+
+            // Top bar: Title & Subtitle + Frosted Action Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 10.dp, top = 7.dp, end = 7.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
                 Column(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 10.dp, top = 8.dp, end = 36.dp)
+                        .weight(1f)
+                        .padding(end = 8.dp)
                         .clickable { onExpand() }
                 ) {
-                    Text(p.title, color = Color.White, fontSize = 11.5.sp, maxLines = 1)
-                    Text(p.subtitle, color = Color.White.copy(alpha = 0.72f), fontSize = 9.5.sp, maxLines = 1)
+                    Text(
+                        text = p.title,
+                        color = Color.White,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = p.subtitle,
+                        color = Color.White.copy(alpha = 0.78f),
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .clickable { MiniPlayerManager.release(context) }
-                )
 
                 Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        Icons.Default.OpenInFull,
-                        contentDescription = "Expand",
-                        tint = Color.White,
+                    // Circular Frosted Play/Pause Button
+                    Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
-                            .clickable { onExpand() }
-                            .padding(6.dp)
-                    )
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = Color.White,
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .border(0.8.dp, Color.White.copy(alpha = 0.32f), CircleShape)
+                            .clickable {
+                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                PlayerPlaybackPlugin.togglePlayPause(player, context)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+
+                    // Circular Frosted Close Button
+                    Box(
                         modifier = Modifier
-                            .padding(horizontal = 14.dp)
-                            .size(44.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
-                            .clickable { PlayerPlaybackPlugin.togglePlayPause(player, context) }
-                            .padding(6.dp)
-                    )
-                    Box(Modifier.size(34.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .border(0.8.dp, Color.White.copy(alpha = 0.32f), CircleShape)
+                            .clickable {
+                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                MiniPlayerManager.release(context)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
                 }
             }
-        }
 
-        if (!pip && f == 0f) {
-            // Thin accent progress bar
+            // Hairline Progress Bar
             val frac = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.5.dp).background(Color.White.copy(alpha = 0.28f)))
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(frac).height(2.5.dp).background(Color(0xFFE50914)))
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .background(Color.White.copy(alpha = 0.22f))
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth(frac)
+                    .height(2.5.dp)
+                    .background(Color(0xFFE50914))
+            )
         }
     }
 }

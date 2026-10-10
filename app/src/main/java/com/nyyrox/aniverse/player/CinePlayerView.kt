@@ -105,6 +105,7 @@ import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -1898,10 +1899,12 @@ fun CinePlayerView(
             }
 
             PlayerEngineMode.NATIVE_EXO -> {
+                var exoSurfaceCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 // ExoPlayer Surface Container
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .onGloballyPositioned { exoSurfaceCoordinates = it }
                         .pointerInput(isScreenLocked, isInPip) {
                             var lastTapTime = 0L
                             var lastTapX = 0f
@@ -1927,10 +1930,11 @@ fun CinePlayerView(
 
                                     val startX = down.position.x
                                     val startY = down.position.y
+                                    val rootStartY = exoSurfaceCoordinates?.localToRoot(down.position)?.y ?: down.position.y
                                     val isRightSide = startX > size.width * 0.55f
                                     val isLeftSide = startX < size.width * 0.45f
                                     var hasDragged = false
-                                    var dragMode = 0 // 0: undecided, 1: horizontal seek, 2: volume, 3: brightness
+                                    var dragMode = 0 // 0: undecided, 1: horizontal seek, 2: volume, 3: brightness, 4: drag down collapse
                                     var lastDragYDown = 0f
                                     val touchSlopPx = 14.dp.toPx()
                                     val initialSeekPosMs = currentPositionMs
@@ -2031,7 +2035,9 @@ fun CinePlayerView(
 
                                         if (dragMode == 4) {
                                             try { change.consume() } catch (_: Exception) {}
-                                            val currentDragY = (change.position.y - startY).coerceAtLeast(0f)
+                                            val currentRootY = exoSurfaceCoordinates?.localToRoot(change.position)?.y ?: change.position.y
+                                            val currentDragY = (currentRootY - rootStartY).coerceAtLeast(0f)
+                                            lastDragYDown = currentDragY
                                             onDragDownDelta?.invoke(currentDragY)
                                         } else {
                                             if (!hasDragged && (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx)) {
@@ -3343,20 +3349,21 @@ fun CinePlayerView(
                                 verticalAlignment = Alignment.Bottom
                             ) {
                                 Column(modifier = Modifier.weight(1f, fill = false)) {
-                                    if (!glassCompact) {
-                                    val epSubtitle = if (!episodeTitle.isNullOrBlank()) "Episode $episode: $episodeTitle" else "Episode $episode"
-                                    Text(
-                                        text = epSubtitle,
-                                        fontSize = 11.5.sp,
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
+                                    if (!glassCompact && hasCustomEpName) {
+                                        Text(
+                                            text = "Episode $episode: $episodeTitle",
+                                            fontSize = 11.5.sp,
+                                            color = Color.White.copy(alpha = 0.75f),
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
+                                    val displayTitle = if (hasCustomEpName || isFullscreen) title else "$title • Ep. $episode"
                                     Text(
-                                        text = title,
-                                        fontSize = if (glassCompact) 14.sp else 17.sp,
+                                        text = displayTitle,
+                                        fontSize = if (glassCompact) 14.sp else 16.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         maxLines = 1,

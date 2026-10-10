@@ -61,6 +61,9 @@ object MiniPlayerManager {
     /** Registered by App(): navigate to the player route. */
     var onExpand: ((routeAnimeId: Int, episode: Int, providerId: String?) -> Unit)? = null
 
+    /** When true, MiniPlayerHost starts directly at t = 0f because interactive drag already collapsed it. */
+    var startAtCollapsed by mutableStateOf(false)
+
     fun freshRequest(): ParkRequest? =
         parkRequest?.takeIf { SystemClock.elapsedRealtime() - it.at < 2000L }
 

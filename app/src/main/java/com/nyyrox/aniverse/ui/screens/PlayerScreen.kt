@@ -698,13 +698,12 @@ fun PlayerScreen(
         if (!isScreenExiting) {
             isScreenExiting = true
             coroutineScope.launch {
-                if (dragProgress.value < 0.99f && !isFullscreen) {
-                    dragProgress.animateTo(1f, tween(180, easing = FastOutSlowInEasing))
-                }
-                // ask CinePlayerView to hand its player to the mini player instead of releasing it
+                // Park player into MiniPlayerManager immediately; MiniPlayerHost takes over from full videoSlot bounds to mini window
+                com.nyyrox.aniverse.player.MiniPlayerManager.startAtCollapsed = false
                 com.nyyrox.aniverse.player.MiniPlayerManager.parkRequest =
                     com.nyyrox.aniverse.player.MiniPlayerManager.ParkRequest(animeId, currentEpisode, currentProvider.id)
                 com.nyyrox.aniverse.player.MiniPlayerManager.parkNow?.invoke()
+                com.nyyrox.aniverse.player.MiniPlayerManager.fullScreenOpen = false
                 com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
                 onBack()
             }
@@ -750,35 +749,11 @@ fun PlayerScreen(
                                 translationX = lerp(0f, targetMiniX, progress)
                                 translationY = lerp(0f, targetMiniY, progress)
                                 shadowElevation = (progress * 16f).dp.toPx()
-                                shape = RoundedCornerShape((progress * 14f).dp)
+                                shape = RoundedCornerShape((progress * 16f).dp)
                                 clip = progress > 0.04f
                             }
                         }
                         .background(Color.Black)
-                        .pointerInput(isFullscreen) {
-                            detectVerticalDragGestures(
-                                onVerticalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    val next = (dragProgress.value + dragAmount / maxDragPx).coerceIn(0f, 1f)
-                                    coroutineScope.launch { dragProgress.snapTo(next) }
-                                },
-                                onDragEnd = {
-                                    coroutineScope.launch {
-                                        if (dragProgress.value > 0.35f) {
-                                            dragProgress.animateTo(1f, tween(160, easing = FastOutSlowInEasing))
-                                            handleExit()
-                                        } else {
-                                            dragProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
-                                        }
-                                    }
-                                },
-                                onDragCancel = {
-                                    coroutineScope.launch {
-                                        dragProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
-                                    }
-                                }
-                            )
-                        }
                 }).onGloballyPositioned {
                     if (progress == 0f && !isScreenExiting && !isFullscreen) {
                         com.nyyrox.aniverse.player.MiniPlayerManager.videoSlot = it.boundsInRoot()
@@ -932,8 +907,15 @@ fun PlayerScreen(
                                 val releaseProg = (dy / maxDragPx).coerceIn(0f, 1f)
                                 coroutineScope.launch {
                                     if (releaseProg > 0.35f) {
+                                        isScreenExiting = true
                                         dragProgress.animateTo(1f, tween(160, easing = FastOutSlowInEasing))
-                                        handleExit()
+                                        com.nyyrox.aniverse.player.MiniPlayerManager.startAtCollapsed = true
+                                        com.nyyrox.aniverse.player.MiniPlayerManager.parkRequest =
+                                            com.nyyrox.aniverse.player.MiniPlayerManager.ParkRequest(animeId, currentEpisode, currentProvider.id)
+                                        com.nyyrox.aniverse.player.MiniPlayerManager.parkNow?.invoke()
+                                        com.nyyrox.aniverse.player.MiniPlayerManager.fullScreenOpen = false
+                                        com.nyyrox.aniverse.data.discord.DiscordRpcService.clearPresence()
+                                        onBack()
                                     } else {
                                         dragProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy))
                                     }
@@ -1149,8 +1131,8 @@ fun PlayerScreen(
                             .padding(horizontal = 14.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // 1. Anime Title & OTT Metadata Badges Row
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // 1. Anime Title, Episode Subheading & Metadata
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 text = anime.displayTitle,
                                 fontSize = 19.sp,
@@ -1160,6 +1142,34 @@ fun PlayerScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 lineHeight = 24.sp
                             )
+
+                            val customEpTitle = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
+                            if (!isMovie && customEpTitle != null) {
+                                Text(
+                                    text = "Episode $currentEpisode: $customEpTitle",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = OttSecondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            val subtitleText = if (isMovie) {
+                                (anime.format ?: "Movie") + (anime.duration?.let { " • $it min" } ?: "")
+                            } else {
+                                (anime.format ?: "TV Series") + (anime.duration?.let { " • $it min" } ?: " • 24 min") + (anime.score?.let { " • ★ $it%" } ?: "")
+                            }
+                            Text(
+                                text = subtitleText,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = OttTextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(Modifier.height(2.dp))
 
                             // Metadata & Mode Badges Row
                             Row(
@@ -1180,7 +1190,7 @@ fun PlayerScreen(
                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {
                                         Text(
-                                            text = if (isMovie) "MOVIE" else "EPISODE $currentEpisode OF $maxEpisode",
+                                            text = if (isMovie) "MOVIE" else "EP $currentEpisode / $maxEpisode",
                                             fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
@@ -1275,32 +1285,6 @@ fun PlayerScreen(
                             }
                         }
 
-                        // Prominent Episode Title & Anime Details
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            val epTitle = if (isMovie) anime.title else (currentEpInfo?.name?.takeIf { it.isNotBlank() } ?: "Episode $currentEpisode")
-                            Text(
-                                text = epTitle,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White.copy(alpha = 0.95f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            val subtitleText = if (isMovie) {
-                                (anime.format ?: "Movie") + (anime.duration?.let { " • $it min" } ?: "")
-                            } else {
-                                (anime.format ?: "TV Series") + (anime.duration?.let { " • $it min" } ?: " • 24 min") + (anime.score?.let { " • ★ $it%" } ?: "")
-                            }
-                            Text(
-                                text = subtitleText,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = OttTextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
                         // Episode Still Image & Synopsis with Action Bar
                         Row(
                             modifier = Modifier
@@ -1348,7 +1332,7 @@ fun PlayerScreen(
                                         .padding(horizontal = 5.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = "EP $currentEpisode",
+                                        text = if (isMovie) "MOVIE" else "HD",
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
@@ -1372,7 +1356,7 @@ fun PlayerScreen(
                                     )
                                 } else {
                                     Text(
-                                        text = "No episode description available for Episode $currentEpisode.",
+                                        text = "Stream episode in HD. Select download or toggle servers below.",
                                         fontSize = 11.sp,
                                         color = OttTextMuted,
                                         maxLines = 2
