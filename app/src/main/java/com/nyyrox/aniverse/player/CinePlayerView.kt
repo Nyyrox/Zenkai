@@ -118,6 +118,9 @@ import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
@@ -610,6 +613,8 @@ fun CinePlayerView(
     isDub: Boolean = false,
     isFullscreen: Boolean = false,
     onToggleFullscreen: () -> Unit = {},
+    onBack: () -> Unit = {},
+    onCollapseToMiniPlayer: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     initialTimeMs: Long = 0L,
     startPaused: Boolean = false,
@@ -801,12 +806,15 @@ fun CinePlayerView(
     // Controls visibility
     var showControls by remember { mutableStateOf(handoff != null) }   // visible immediately when adopting
     var controlsTimeoutKey by remember { mutableIntStateOf(0) }
+    var isAutoHideTransition by remember { mutableStateOf(false) }
     // No player UI over the loading screen: controls appear once playback actually starts.
     val isInitialLoading = engineMode != PlayerEngineMode.IFRAME_FALLBACK && !hasStartedPlayback
     LaunchedEffect(isInitialLoading) {
         if (isInitialLoading) {
+            isAutoHideTransition = false
             showControls = false
         } else {
+            isAutoHideTransition = false
             showControls = true
             controlsTimeoutKey++
         }
@@ -889,7 +897,7 @@ fun CinePlayerView(
     LaunchedEffect(Unit) {
         try {
             val savedAudio = UserPreferences.getAudioLanguageSync(context)
-            if (savedAudio.isNotBlank() && (!isDub || savedAudio.startsWith("en", ignoreCase = true))) {
+            if (savedAudio.isNotBlank()) {
                 preferredAudioLanguage = savedAudio
             }
             val savedSubLang = UserPreferences.getSubLanguageSync(context)
@@ -953,6 +961,32 @@ fun CinePlayerView(
             try {
                 UserPreferences.saveAudioLanguage(context, preferredAudioLanguage)
             } catch (_: Exception) {}
+        }
+    }
+
+    // Apply preferred audio track when audio tracks become available or preference changes
+    LaunchedEffect(preferredAudioLanguage, audioTracks) {
+        val p = exoPlayer ?: return@LaunchedEffect
+        if (preferredAudioLanguage.isNotBlank() && audioTracks.isNotEmpty()) {
+            val targetAudio = audioTracks.firstOrNull {
+                it.language.equals(preferredAudioLanguage, ignoreCase = true) ||
+                it.label.equals(preferredAudioLanguage, ignoreCase = true) ||
+                it.label.contains(preferredAudioLanguage, ignoreCase = true)
+            }
+            if (targetAudio != null && !targetAudio.isSelected) {
+                try {
+                    val grp = p.currentTracks.groups[targetAudio.groupIndex]
+                    val lang = if (targetAudio.language.isNotBlank() && targetAudio.language != "und") targetAudio.language else null
+                    p.trackSelectionParameters = p.trackSelectionParameters
+                        .buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                        .setOverrideForType(
+                            TrackSelectionOverride(grp.mediaTrackGroup, targetAudio.trackIndex)
+                        )
+                        .setPreferredAudioLanguage(lang)
+                        .build()
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -1187,6 +1221,7 @@ fun CinePlayerView(
         val timeoutSec = playerCustomization.glass.autoHideTimeoutSeconds
         if (showControls && isPlaying && timeoutSec > 0) {
             delay(timeoutSec * 1000L)
+            isAutoHideTransition = true
             showControls = false
         }
     }
@@ -1919,6 +1954,21 @@ fun CinePlayerView(
                                         }
                                         val deltaX = change.position.x - startX
                                         val deltaY = startY - change.position.y
+                                        val deltaYDown = change.position.y - startY
+
+                                        if (!isFullscreen && onCollapseToMiniPlayer != null && deltaYDown > 52.dp.toPx() && deltaYDown > kotlin.math.abs(deltaX) * 1.4f) {
+                                            hasDragged = true
+                                            hold2xJob.cancel()
+                                            if (isHolding2x) {
+                                                try {
+                                                    exoPlayer?.playbackParameters = PlaybackParameters(playbackSpeed)
+                                                } catch (_: Exception) {}
+                                                isHolding2x = false
+                                            }
+                                            try { change.consume() } catch (_: Exception) {}
+                                            onCollapseToMiniPlayer()
+                                            return@awaitEachGesture
+                                        }
 
                                         if (!hasDragged && (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx)) {
                                             hasDragged = true
@@ -2095,6 +2145,7 @@ fun CinePlayerView(
                                                 singleTapJob?.cancel()
                                                 singleTapJob = scope.launch {
                                                     delay(340L)
+                                                    isAutoHideTransition = false
                                                     showControls = !showControls
                                                     controlsTimeoutKey++
                                                 }
@@ -2105,6 +2156,7 @@ fun CinePlayerView(
                                             singleTapJob?.cancel()
                                             singleTapJob = scope.launch {
                                                 delay(340L)
+                                                isAutoHideTransition = false
                                                 showControls = !showControls
                                                 controlsTimeoutKey++
                                             }
@@ -2880,17 +2932,21 @@ fun CinePlayerView(
                         )
                     }
 
-                    // 2. Top Controls Bar (Arrives first: slides down from top, 0-280ms; exits with 40ms delay)
+                    // 2. Top Controls Bar (Arrives first: slides down from top; YouTube fade/slide exit)
                     AnimatedVisibility(
                         visible = showControls && !isScreenLocked && !isInPip,
                         enter = slideInVertically(
                             animationSpec = tween(180, easing = FastOutSlowInEasing),
                             initialOffsetY = { -it / 2 }
                         ) + fadeIn(tween(140, easing = LinearEasing)),
-                        exit = slideOutVertically(
-                            animationSpec = tween(130, easing = FastOutLinearInEasing),
-                            targetOffsetY = { -it / 2 }
-                        ) + fadeOut(tween(100, easing = LinearEasing)),
+                        exit = if (isAutoHideTransition) {
+                            slideOutVertically(
+                                animationSpec = tween(180, easing = FastOutLinearInEasing),
+                                targetOffsetY = { -it / 2 }
+                            ) + fadeOut(tween(220, easing = LinearEasing))
+                        } else {
+                            fadeOut(tween(120, easing = LinearEasing))
+                        },
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
@@ -2902,12 +2958,25 @@ fun CinePlayerView(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Top-left glass pill: settings, PiP, quality, lock
+                            // Top-left glass pill: back/minimize, settings, PiP, quality, lock
                             GlassPill {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
+                                    if (!isFullscreen && onCollapseToMiniPlayer != null) {
+                                        GlassPillIcon(
+                                            icon = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Collapse to Mini-player",
+                                            onClick = { onCollapseToMiniPlayer() }
+                                        )
+                                    } else if (isFullscreen) {
+                                        GlassPillIcon(
+                                            icon = Icons.Default.ArrowBack,
+                                            contentDescription = "Exit Fullscreen",
+                                            onClick = { onToggleFullscreen() }
+                                        )
+                                    }
                                     GlassPillIcon(
                                         icon = Icons.Outlined.Settings,
                                         contentDescription = "Settings",
@@ -2959,17 +3028,21 @@ fun CinePlayerView(
                         }
                     }
 
-                    // 3. Center Controls Deck (Arrives second: punches in with 50ms stagger; snaps out first on exit)
+                    // 3. Center Controls Deck (YouTube fade/scale exit)
                     AnimatedVisibility(
                         visible = showControls && !isScreenLocked && !isInPip,
                         enter = scaleIn(
                             initialScale = 0.88f,
                             animationSpec = tween(170, easing = FastOutSlowInEasing)
                         ) + fadeIn(tween(130, easing = LinearEasing)),
-                        exit = scaleOut(
-                            targetScale = 0.92f,
-                            animationSpec = tween(110, easing = FastOutLinearInEasing)
-                        ) + fadeOut(tween(100, easing = LinearEasing)),
+                        exit = if (isAutoHideTransition) {
+                            scaleOut(
+                                targetScale = 0.92f,
+                                animationSpec = tween(160, easing = FastOutLinearInEasing)
+                            ) + fadeOut(tween(200, easing = LinearEasing))
+                        } else {
+                            fadeOut(tween(110, easing = LinearEasing))
+                        },
                         modifier = Modifier
                             .align(Alignment.Center)
                             .scale(playerCustomization.placement.centerScale)
@@ -3142,17 +3215,21 @@ fun CinePlayerView(
                         }
                     }
 
-                    // 4. Bottom Bar: Scrubber & Time (Arrives third: rises up with 80ms stagger; exits with 20ms delay)
+                    // 4. Bottom Bar: Scrubber & Time (YouTube fade & morphing timeline)
                     AnimatedVisibility(
                         visible = showControls && !isScreenLocked && !isInPip,
                         enter = slideInVertically(
                             animationSpec = tween(180, easing = FastOutSlowInEasing),
                             initialOffsetY = { it / 2 }
                         ) + fadeIn(tween(140, easing = LinearEasing)),
-                        exit = slideOutVertically(
-                            animationSpec = tween(130, easing = FastOutLinearInEasing),
-                            targetOffsetY = { it / 2 }
-                        ) + fadeOut(tween(100, easing = LinearEasing)),
+                        exit = if (isAutoHideTransition) {
+                            slideOutVertically(
+                                animationSpec = tween(220, easing = FastOutLinearInEasing),
+                                targetOffsetY = { it / 3 }
+                            ) + fadeOut(tween(240, easing = LinearEasing))
+                        } else {
+                            fadeOut(tween(130, easing = LinearEasing))
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
@@ -3164,6 +3241,16 @@ fun CinePlayerView(
                                 .fillMaxWidth()
                                 .padding(start = if (glassCompact) 12.dp else 20.dp, end = if (glassCompact) 12.dp else 20.dp, top = 4.dp, bottom = if (glassCompact) 4.dp else 8.dp)
                         ) {
+                            val timeTextAlpha by animateFloatAsState(
+                                targetValue = if (showControls && !isAutoHideTransition) 1f else if (showControls) 0.5f else 0f,
+                                animationSpec = tween(if (isAutoHideTransition) 180 else 100),
+                                label = "timeTextAlpha"
+                            )
+                            val animatedSeekbarHeight by animateFloatAsState(
+                                targetValue = if (showControls && !isAutoHideTransition) playerCustomization.placement.seekbarHeightDp else 2.5f,
+                                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                label = "animatedSeekbarHeight"
+                            )
                             // Info (left) + quick pill: captions / audio / speed (right)
                             Row(
                                 modifier = Modifier
@@ -3278,7 +3365,8 @@ fun CinePlayerView(
                                     text = formatTime(if (isScrubbing) scrubPositionMs else currentPositionMs),
                                     fontSize = 11.5.sp,
                                     color = Color.White.copy(alpha = 0.9f),
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.graphicsLayer { alpha = timeTextAlpha }
                                 )
 
                                 BoxWithConstraints(
@@ -3300,7 +3388,7 @@ fun CinePlayerView(
                                     playedFrac = playedFrac,
                                     bufferedFrac = bufferedFrac,
                                     isScrubbing = isScrubbing,
-                                    heightDp = playerCustomization.placement.seekbarHeightDp,
+                                    heightDp = animatedSeekbarHeight,
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
@@ -3380,10 +3468,39 @@ fun CinePlayerView(
                                     fontSize = 11.5.sp,
                                     color = Color.White.copy(alpha = 0.9f),
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.clickable { showTimeRemaining = !showTimeRemaining }
+                                    modifier = Modifier
+                                        .graphicsLayer { alpha = timeTextAlpha }
+                                        .clickable { showTimeRemaining = !showTimeRemaining }
                                 )
                             }
                         }
+                    }
+
+                    // YouTube-style bottom border loading line
+                    AnimatedVisibility(
+                        visible = (isBuffering || (isInitialLoading && !hasStartedPlayback)) && !isInPip,
+                        enter = fadeIn(tween(140)),
+                        exit = fadeOut(tween(140)),
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    ) {
+                        YtBottomLoadingBar(accentColor = playerCustomization.accentColor.color)
+                    }
+
+                    // YouTube-style bottom border razor progress bar when controls hidden
+                    AnimatedVisibility(
+                        visible = !showControls && !isScreenLocked && !isInPip && hasStartedPlayback,
+                        enter = fadeIn(tween(140)),
+                        exit = fadeOut(tween(100)),
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    ) {
+                        val activePosMs = if (isScrubbing) scrubPositionMs else currentPositionMs
+                        val playedFrac = if (durationMs > 0L) (activePosMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                        val bufferedFrac = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                        YtBottomProgressBar(
+                            playedFrac = playedFrac,
+                            bufferedFrac = bufferedFrac,
+                            accentColor = playerCustomization.accentColor.color
+                        )
                     }
                 }
             }
@@ -3447,6 +3564,11 @@ fun CinePlayerView(
             onSelectAudio = { track: AudioTrackInfo ->
                 val chosenLang = if (track.language.isNotBlank() && track.language != "und") track.language else track.label
                 preferredAudioLanguage = chosenLang
+                try {
+                    scope.launch(Dispatchers.IO) {
+                        UserPreferences.saveAudioLanguage(context, chosenLang)
+                    }
+                } catch (_: Exception) {}
                 exoPlayer?.let { p ->
                     try {
                         val group = p.currentTracks.groups[track.groupIndex]
@@ -6025,6 +6147,85 @@ private fun SubHeader(
                 contentDescription = "Close",
                 tint = Color.White,
                 modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun YtBottomLoadingBar(
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ytLoadingSweep")
+    val sweepFrac by infiniteTransition.animateFloat(
+        initialValue = -0.3f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sweepFrac"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(2.5.dp)
+            .background(Color.Black.copy(alpha = 0.45f))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    val width = size.width
+                    val lineLen = width * 0.42f
+                    val startX = (width * sweepFrac) - (lineLen / 2f)
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                accentColor.copy(alpha = 0.65f),
+                                accentColor,
+                                accentColor.copy(alpha = 0.65f),
+                                Color.Transparent
+                            ),
+                            startX = startX,
+                            endX = startX + lineLen
+                        )
+                    )
+                }
+        )
+    }
+}
+
+@Composable
+private fun YtBottomProgressBar(
+    playedFrac: Float,
+    bufferedFrac: Float,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(2.5.dp)
+            .background(Color.White.copy(alpha = 0.18f))
+    ) {
+        if (bufferedFrac > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(bufferedFrac.coerceIn(0f, 1f))
+                    .background(Color.White.copy(alpha = 0.38f))
+            )
+        }
+        if (playedFrac > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(playedFrac.coerceIn(0f, 1f))
+                    .background(accentColor)
             )
         }
     }

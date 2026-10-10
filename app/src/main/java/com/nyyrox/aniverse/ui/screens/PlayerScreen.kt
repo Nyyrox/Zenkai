@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -684,56 +686,9 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(OttBg)
-            .navigationBarsPadding()
+            .then(if (!isFullscreen) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
     ) {
-        // Player Top Bar (Hidden in Fullscreen)
-        if (!isFullscreen) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(OttBg)
-                    .statusBarsPadding()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = handleExit,
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(OttSurfaceElevated)
-                ) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(10.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = anime.displayTitle,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val serverDesc = "${currentProvider.name} (${if (selectedCategory == "DUB") "DUB" else "SUB"})"
-                    Text(
-                        text = "Episode $currentEpisode of $maxEpisode • $serverDesc",
-                        fontSize = 11.sp,
-                        color = OttSecondary,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // Video Player Container (16:9 Aspect Ratio in portrait, fillMaxSize in Fullscreen)
+        // Video Player Container (Edge-to-edge flush 16:9, zero curve in portrait, fillMaxSize in Fullscreen)
         Box(
             modifier = (if (isFullscreen) {
                 Modifier
@@ -742,10 +697,15 @@ fun PlayerScreen(
             } else {
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(14.dp))
                     .background(Color.Black)
+                    .pointerInput(isFullscreen) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 25f) {
+                                handleExit()
+                            }
+                        }
+                    }
             }).onGloballyPositioned { com.nyyrox.aniverse.player.MiniPlayerManager.videoSlot = it.boundsInRoot() }
         ) {
             key(currentEpisode, currentProvider.id) {
@@ -882,6 +842,8 @@ fun PlayerScreen(
                         externalSubtitles = combinedSubtitles,
                         isFullscreen = isFullscreen,
                         onToggleFullscreen = { toggleFullscreen() },
+                        onBack = handleExit,
+                        onCollapseToMiniPlayer = handleExit,
                         modifier = Modifier.fillMaxSize(),
                         initialTimeMs = savedPos,
                         startPaused = false,
@@ -1078,99 +1040,128 @@ fun PlayerScreen(
                             .padding(horizontal = 14.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Metadata & Mode Badges Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        // 1. Anime Title & OTT Metadata Badges Row
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = anime.displayTitle,
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OttTextPrimary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 24.sp
+                            )
+
+                            // Metadata & Mode Badges Row
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // Episode Number Badge (or MOVIE badge)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color.White.copy(alpha = 0.12f))
-                                        .border(0.8.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = if (isMovie) "MOVIE" else "EPISODE $currentEpisode OF $maxEpisode",
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        letterSpacing = 0.5.sp
-                                    )
-                                }
-
-                                // Audio Badge (SUB / DUB)
-                                val audioLabel = if (currentProvider.isDub || selectedCategory == "DUB") "DUB" else "SUB"
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = audioLabel,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White.copy(alpha = 0.85f)
-                                    )
-                                }
-                            }
-
-                            // Embed Toggle Chip in Header
-                            Box(
-                                modifier = Modifier
-                                    .clip(OttPillShape)
-                                    .background(if (vm.isPlayEmbed) Color.White.copy(alpha = 0.2f) else Color(0x18FFFFFF))
-                                    .border(1.dp, if (vm.isPlayEmbed) Color.White else Color(0x28FFFFFF), OttPillShape)
-                                    .clickable {
-                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                        val targetEmbed = !vm.isPlayEmbed
-                                        vm.setPlayEmbed(targetEmbed)
-                                        if (targetEmbed) {
-                                            selectedSourceMode = "EMBED"
-                                            val embedList = when (selectedCategory) {
-                                                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                            }
-                                            val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                            currentProvider = prov
-                                            vm.setPreferredServer(prov.id)
-                                        } else {
-                                            selectedSourceMode = "DIRECT"
-                                            if (selectedCategory == "MULTI") selectedCategory = "SUB"
-                                            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-                                            availableDirectServers = nextDirect
-                                            val prov = nextDirect.first()
-                                            currentProvider = prov
-                                            vm.setPreferredServer(prov.id)
-                                        }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInBrowser,
-                                        contentDescription = "Toggle Embed",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = if (vm.isPlayEmbed) "Embed Mode" else "Switch Embed",
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
+                                    // Episode Number Badge (or MOVIE badge)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color.White.copy(alpha = 0.12f))
+                                            .border(0.8.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isMovie) "MOVIE" else "EPISODE $currentEpisode OF $maxEpisode",
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+
+                                    // Audio Badge (SUB / DUB)
+                                    val audioLabel = if (currentProvider.isDub || selectedCategory == "DUB") "DUB" else "SUB"
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0x18FFFFFF))
+                                            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = audioLabel,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White.copy(alpha = 0.85f)
+                                        )
+                                    }
+
+                                    // Server Name Badge
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0x14FFFFFF))
+                                            .border(0.8.dp, Color(0x20FFFFFF), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = currentProvider.name,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = OttTextMuted
+                                        )
+                                    }
+                                }
+
+                                // Embed Toggle Chip in Header
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OttPillShape)
+                                        .background(if (vm.isPlayEmbed) Color.White.copy(alpha = 0.2f) else Color(0x18FFFFFF))
+                                        .border(1.dp, if (vm.isPlayEmbed) Color.White else Color(0x28FFFFFF), OttPillShape)
+                                        .clickable {
+                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                            val targetEmbed = !vm.isPlayEmbed
+                                            vm.setPlayEmbed(targetEmbed)
+                                            if (targetEmbed) {
+                                                selectedSourceMode = "EMBED"
+                                                val embedList = when (selectedCategory) {
+                                                    "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                                                    "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                                                    else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                                }
+                                                val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+                                                currentProvider = prov
+                                                vm.setPreferredServer(prov.id)
+                                            } else {
+                                                selectedSourceMode = "DIRECT"
+                                                if (selectedCategory == "MULTI") selectedCategory = "SUB"
+                                                val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
+                                                availableDirectServers = nextDirect
+                                                val prov = nextDirect.first()
+                                                currentProvider = prov
+                                                vm.setPreferredServer(prov.id)
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInBrowser,
+                                            contentDescription = "Toggle Embed",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = if (vm.isPlayEmbed) "Embed Mode" else "Switch Embed",
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1180,16 +1171,16 @@ fun PlayerScreen(
                             val epTitle = if (isMovie) anime.title else (currentEpInfo?.name?.takeIf { it.isNotBlank() } ?: "Episode $currentEpisode")
                             Text(
                                 text = epTitle,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.95f),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             val subtitleText = if (isMovie) {
                                 (anime.format ?: "Movie") + (anime.duration?.let { " • $it min" } ?: "")
                             } else {
-                                anime.title + (anime.duration?.let { " • $it min" } ?: " • 24 min")
+                                (anime.format ?: "TV Series") + (anime.duration?.let { " • $it min" } ?: " • 24 min") + (anime.score?.let { " • ★ $it%" } ?: "")
                             }
                             Text(
                                 text = subtitleText,
