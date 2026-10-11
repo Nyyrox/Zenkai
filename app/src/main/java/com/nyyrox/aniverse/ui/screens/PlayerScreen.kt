@@ -2,6 +2,13 @@
 
 package com.nyyrox.aniverse.ui.screens
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedVisibility
 import com.nyyrox.aniverse.player.CineStreamLoader
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -1035,7 +1042,8 @@ fun PlayerScreen(
             ) {
                 PlayerAmbientArt(
                     layer = backdrop,
-                    model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
+                    model = tmdbEpisodes[currentEpisode]?.stillUrl?.takeIf { it.isNotBlank() }
+                        ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
                     modifier = Modifier.fillMaxSize()
                 )
                 LazyColumn(
@@ -1213,9 +1221,13 @@ fun PlayerScreen(
                             verticalAlignment = Alignment.Top
                         ) {
                             // High-Res Episode Still with 16:9 Aspect Ratio
+                            Column(
+                                modifier = Modifier.width(136.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                             Box(
                                 modifier = Modifier
-                                    .width(136.dp)
+                                    .fillMaxWidth()
                                     .aspectRatio(16f / 9.5f)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(Color(0x18FFFFFF))
@@ -1255,55 +1267,6 @@ fun PlayerScreen(
                                     )
                                 }
                             }
-
-                            // Details of the video properly beside the image!
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Episode Title (Shown ONCE here!)
-                                val customEpName = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
-                                val epDisplayHeading = when {
-                                    isMovie -> anime.title
-                                    customEpName != null -> "$currentEpisode. $customEpName"
-                                    else -> "Episode $currentEpisode"
-                                }
-                                Text(
-                                    text = epDisplayHeading,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                // Badges wrap instead of squeezing a chip ("Dire/ct"). The Embed/Direct chip is gone:
-                                // the DIRECT/EMBED switch in the server card does the same job.
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    if (!isMovie) {
-                                        TagChip("EP $currentEpisode / $maxEpisode", Color.White, Color(0x1FFFFFFF), Color(0x38FFFFFF))
-                                    }
-                                    val audioLabel = if (currentProvider.isDub || selectedCategory == "DUB") "DUB" else "SUB"
-                                    TagChip(audioLabel, Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
-                                    val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
-                                    val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
-                                    if (isCurrentFiller || isCurrentMixed) FillerTag(isCurrentMixed)
-                                }
-
-                                // Synopsis text
-                                val synopsis = currentEpInfo?.overview?.takeIf { it.isNotBlank() }
-                                    ?: "Stream episode in HD. Select download or toggle servers below."
-                                Text(
-                                    text = synopsis,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp,
-                                    color = Color(0xFFCBD5E1),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
 
                                 // Real-time Download Action Container
                                 if (isCurrentEpDownloading && currentEpTask != null) {
@@ -1356,15 +1319,16 @@ fun PlayerScreen(
                                 } else if (isCurrentEpDownloaded) {
                                     Row(
                                         modifier = Modifier
+                                            .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(Color(0x1A10B981))
                                             .border(0.8.dp, Color(0x4010B981), RoundedCornerShape(8.dp))
                                             .clickable {
                                                 if (!playOfflineMode) playOfflineMode = true
                                             }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            .padding(horizontal = 8.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
@@ -1382,15 +1346,16 @@ fun PlayerScreen(
                                 } else {
                                     Row(
                                         modifier = Modifier
+                                            .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(Color(0x18FFFFFF))
                                             .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
                                             .clickable {
                                                 showDownloadSheetEpisode = currentEpisode to currentEpInfo?.name
                                             }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            .padding(horizontal = 8.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Download,
@@ -1406,6 +1371,57 @@ fun PlayerScreen(
                                         )
                                     }
                                 }
+                            }
+
+                            // Details of the video properly beside the image!
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Episode Title (Shown ONCE here!)
+                                val customEpName = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
+                                val epDisplayHeading = when {
+                                    isMovie -> anime.title
+                                    customEpName != null -> "$currentEpisode. $customEpName"
+                                    else -> "Episode $currentEpisode"
+                                }
+                                Text(
+                                    text = epDisplayHeading,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                // Badges wrap instead of squeezing a chip ("Dire/ct"). The Embed/Direct chip is gone:
+                                // the DIRECT/EMBED switch in the server card does the same job.
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (!isMovie) {
+                                        TagChip("EP $currentEpisode / $maxEpisode", Color.White, Color(0x1FFFFFFF), Color(0x38FFFFFF))
+                                    }
+                                    val audioLabel = if (currentProvider.isDub || selectedCategory == "DUB") "DUB" else "SUB"
+                                    TagChip(audioLabel, Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
+                                    val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
+                                    val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
+                                    if (isCurrentFiller || isCurrentMixed) FillerTag(isCurrentMixed)
+                                }
+
+                                // Synopsis text
+                                val synopsis = currentEpInfo?.overview?.takeIf { it.isNotBlank() }
+                                    ?: "Stream episode in HD. Select download or toggle servers below."
+                                Text(
+                                    text = synopsis,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                    color = Color(0xFFCBD5E1),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
                             }
                         }
                     }
@@ -1768,8 +1784,8 @@ fun PlayerScreen(
 
                         Spacer(Modifier.height(14.dp))
 
-                        // Clean Server Dropdown Trigger Selector Button
-                        Box(modifier = Modifier.fillMaxWidth()) {
+                        // Server selector: trigger + inline expanding list
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             val currentServerTitle = currentProvider.name
                             val currentServerBadge = currentProvider.serverBadge.replace("Direct HD", "HD")
 
@@ -1779,7 +1795,7 @@ fun PlayerScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(Color(0x59000000))
                                     .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                                    .clickable { isServerDropdownExpanded = true }
+                                    .clickable { isServerDropdownExpanded = !isServerDropdownExpanded }
                                     .padding(horizontal = 16.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1819,160 +1835,64 @@ fun PlayerScreen(
 
                                 Spacer(Modifier.weight(1f))
 
+                                val arrowRot by animateFloatAsState(
+                                    targetValue = if (isServerDropdownExpanded) 180f else 0f,
+                                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                                    label = "arrowRot"
+                                )
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
                                     contentDescription = "Select Server",
                                     tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = arrowRot }
                                 )
                             }
 
-                            // Clean Server Dropdown Menu
-                            DropdownMenu(
-                                expanded = isServerDropdownExpanded,
-                                onDismissRequest = { isServerDropdownExpanded = false },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.92f)
-                                    .background(Color(0xFF141722))
-                                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
+                            // Inline server list: expands in place (no popup overlapping the card)
+                            AnimatedVisibility(
+                                visible = isServerDropdownExpanded,
+                                enter = expandVertically(spring(dampingRatio = 0.8f, stiffness = 400f)) + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
                             ) {
-                                if (selectedSourceMode == "DIRECT") {
-                                    Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
-                                        Text(
-                                            text = "DIRECT SERVERS",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            letterSpacing = 1.sp
-                                        )
-                                    }
-
-                                    if (availableDirectServers.isEmpty()) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                                        ) {
-                                            Text(
-                                                text = "No direct servers available for this audio category.",
-                                                fontSize = 12.sp,
-                                                color = OttTextMuted
-                                            )
-                                        }
-                                    } else {
-                                        val filteredDirectServers = when (selectedCategory) {
-                                            "DUB" -> availableDirectServers.filter { it.isDub || it.isMulti }
-                                            "MULTI" -> availableDirectServers.filter { it.isMulti }
-                                            else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
-                                        }.ifEmpty { availableDirectServers }
-                                        filteredDirectServers.forEach { prov ->
-                                            val isSelected = prov.id == currentProvider.id
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = prov.name,
-                                                            fontSize = 13.sp,
-                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                            color = if (isSelected) Color.White else OttTextSecondary
-                                                        )
-                                                        Spacer(Modifier.width(8.dp))
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(4.dp))
-                                                                .background(if (isSelected) Color(0x33FFFFFF) else Color(0x15FFFFFF))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = prov.serverBadge.replace("Direct HD", "HD"),
-                                                                fontSize = 9.sp,
-                                                                color = if (isSelected) Color.White else OttTextMuted
-                                                            )
-                                                        }
-                                                    }
-                                                },
-                                                leadingIcon = {
-                                                    if (isSelected) {
-                                                        Icon(
-                                                            Icons.Default.Check,
-                                                            contentDescription = null,
-                                                            tint = Color.White,
-                                                            modifier = Modifier.size(18.dp)
-                                                        )
-                                                    } else {
-                                                        Spacer(Modifier.size(18.dp))
-                                                    }
-                                                },
-                                                onClick = {
-                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                    isServerDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
+                                val isDirect = selectedSourceMode == "DIRECT"
+                                val servers = if (isDirect) {
+                                    when (selectedCategory) {
+                                        "DUB" -> availableDirectServers.filter { it.isDub || it.isMulti }
+                                        "MULTI" -> availableDirectServers.filter { it.isMulti }
+                                        else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
+                                    }.ifEmpty { availableDirectServers }
                                 } else {
-                                    val embedServers = when (selectedCategory) {
+                                    when (selectedCategory) {
                                         "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
                                         "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
                                         else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
                                     }
-
-                                    Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                                }
+                                Column(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (isDirect) "DIRECT SERVERS" else "EMBED SOURCES",
+                                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF8E94A3),
+                                        letterSpacing = 1.sp
+                                    )
+                                    if (servers.isEmpty()) {
                                         Text(
-                                            text = "EMBED SOURCES",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            letterSpacing = 1.sp
+                                            text = "No servers available for this audio category.",
+                                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                                            fontSize = 12.sp,
+                                            color = OttTextMuted
                                         )
                                     }
-
-                                    embedServers.forEach { prov ->
-                                        val isSelected = prov.id == currentProvider.id
-                                        DropdownMenuItem(
-                                            text = {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = prov.name,
-                                                        fontSize = 13.sp,
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                        color = if (isSelected) Color.White else OttTextSecondary
-                                                    )
-                                                    Spacer(Modifier.width(8.dp))
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(if (isSelected) Color(0x33FFFFFF) else Color(0x15FFFFFF))
-                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = prov.serverBadge.replace("Direct HD", "HD"),
-                                                            fontSize = 9.sp,
-                                                            color = if (isSelected) Color.White else OttTextMuted
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            leadingIcon = {
-                                                if (isSelected) {
-                                                    Icon(
-                                                        Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = Color.White,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                } else {
-                                                    Spacer(Modifier.size(18.dp))
-                                                }
-                                            },
+                                    servers.forEach { prov ->
+                                        ServerRow(
+                                            name = prov.name,
+                                            badge = prov.serverBadge.replace("Direct HD", "HD"),
+                                            selected = prov.id == currentProvider.id,
                                             onClick = {
                                                 com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                 currentProvider = prov
@@ -2591,32 +2511,49 @@ fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modi
     )
 }
 
-/** Dim, blurred artwork behind the list. It is the pixel source every glass surface samples. */
+/**
+ * Live ambient backdrop: the current episode still, blurred, slowly drifting, crossfading when the episode changes.
+ * Every glass surface samples this layer, so the glass colours follow the episode too.
+ */
 @Composable
 fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
     if (layer == null) return
+    val t = rememberInfiniteTransition(label = "ambient")
+    val drift by t.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "drift"
+    )
     Box(modifier.prismalGlassLayer(layer).background(Color.Black)) {
-        AsyncImage(
-            model = model,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(36.dp)
-                .alpha(0.36f)
-        )
+        Crossfade(targetState = model, animationSpec = tween(900), label = "ambientFade") { art ->
+            AsyncImage(
+                model = art,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(40.dp)
+                    .graphicsLayer {
+                        scaleX = 1.4f
+                        scaleY = 1.4f
+                        translationX = (drift - 0.5f) * 140f
+                        translationY = (0.5f - drift) * 90f
+                    }
+                    .alpha(0.55f)
+            )
+        }
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.8f), Color.Black)
+                        listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.7f), Color.Black)
                     )
                 )
         )
     }
 }
-
 
 /** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. */
 @Composable
@@ -2902,5 +2839,39 @@ fun PlayerEpisodeRow(
                 }
             }
         }
+    }
+}
+
+
+/** One row of the inline server list. */
+@Composable
+private fun ServerRow(name: String, badge: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (selected) Color(0x26FFFFFF) else Color(0x0DFFFFFF))
+            .border(1.dp, if (selected) Color(0x66FFFFFF) else Color(0x1AFFFFFF), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = name,
+            modifier = Modifier.weight(1f),
+            fontSize = 13.5.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) Color.White else Color(0xFFCBD5E1),
+            maxLines = 1
+        )
+        TagChip(badge, Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null,
+            tint = if (selected) Color.White else Color.Transparent,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
