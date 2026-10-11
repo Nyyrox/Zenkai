@@ -42,6 +42,16 @@ class StorageManager(context: Context) {
         private const val KEY_DELETED_HISTORY_IDS = "key_deleted_history_ids"
         private const val KEY_DELETED_MANGA_IDS = "key_deleted_manga_ids"
         private const val KEY_DELETED_NOVEL_SLUGS = "key_deleted_novel_slugs"
+        private const val KEY_LAST_DAILY_CLOUD_SYNC = "key_last_daily_cloud_sync"
+    }
+
+    // --- Daily Cloud Sync Tracking ---
+    fun getLastCloudSyncTimestamp(): Long {
+        return prefs.getLong(KEY_LAST_DAILY_CLOUD_SYNC, 0L)
+    }
+
+    fun setLastCloudSyncTimestamp(ts: Long = System.currentTimeMillis()) {
+        prefs.edit().putLong(KEY_LAST_DAILY_CLOUD_SYNC, ts).apply()
     }
 
     // --- Watchlist ---

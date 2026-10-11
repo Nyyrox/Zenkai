@@ -322,28 +322,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setAppForeground(isInForeground: Boolean) {
         if (isAppInForeground == isInForeground) return
         isAppInForeground = isInForeground
-        val uid = (authState as? AuthState.LoggedIn)?.userId
         if (!isInForeground) {
-            // Immediately mark inactive in Supabase when app goes to background
-            if (uid != null) {
-                viewModelScope.launch(Dispatchers.IO) {
-                    try {
-                        supabaseRepo.updateUserActivity(
-                            userId = uid,
-                            activity = null,
-                            activityType = null,
-                            targetId = null,
-                            isOnline = false
-                        )
-                    } catch (_: Exception) {}
-                    syncTimeSpentAndReadingToCloud()
-                }
-            }
-        } else {
-            // Restore active state when returning to foreground
-            if (uid != null) {
-                updatePresenceHeartbeat()
-            }
+            syncDailyToCloudIfDue()
         }
     }
 
@@ -446,40 +426,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     loadNotifications(isSilent = true)
                 }
 
-                // Every 2-3 minutes (15 ticks = 150s), send presence heartbeat and refresh active otakus
-                if (tickerCount % 15 == 0) {
-                    if (authState is AuthState.LoggedIn) {
-                        updatePresenceHeartbeat()
-                    }
-                    loadActiveOnlineUsers()
-                }
-
-                // Every 60 seconds (6 ticks), sync time spent and reading metadata to cloud profile if logged in
-                if (tickerCount % 6 == 0 && authState is AuthState.LoggedIn) {
-                    syncTimeSpentAndReadingToCloud()
+                // Daily cloud sync check (runs periodically, syncs once every 24 hours)
+                if (tickerCount % 60 == 0 && authState is AuthState.LoggedIn) {
+                    syncDailyToCloudIfDue()
                 }
             }
         }
     }
 
     fun updatePresenceHeartbeat() {
-        if (!isAppInForeground) return
-        val uid = (authState as? AuthState.LoggedIn)?.userId ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val act = if (currentActivityMode == CurrentActivityMode.EXPLORING_APP) null else myCurrentActivity
-                val actType = if (currentActivityMode == CurrentActivityMode.EXPLORING_APP) null else myCurrentActivityType
-                val actTarget = if (currentActivityMode == CurrentActivityMode.EXPLORING_APP) null else myCurrentActivityTargetId
-
-                supabaseRepo.updateUserActivity(
-                    userId = uid,
-                    activity = act,
-                    activityType = actType,
-                    targetId = actTarget,
-                    isOnline = true
-                )
-            } catch (_: Exception) {}
-        }
+        // Disabled: Presence and activity status tracking removed per user request
     }
 
     private var isInitialLoaded = false
@@ -1054,10 +1010,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         storage.recordProgress(anime, episode, positionMs, durationMs, resolvedStill)
         history = storage.getHistory()
         watchlist = storage.getWatchlist()
-        syncHistoryItemToCloud(anime.id)
-        // Auto-sync watchlist progress to cloud and connected trackers
+        // Daily cloud sync check (only upserts to Supabase once per 24 hours)
+        syncDailyToCloudIfDue()
+        // Auto-sync watchlist progress to connected trackers
         if (isInWatchlist(anime.id)) {
-            syncWatchlistItemToCloud(anime.id)
             syncWatchlistItemToTrackers(anime.id, anime.idMal)
         } else if (trackerSettings.syncOnEpisodeComplete) {
             // Push episode progress to tracker even if not explicitly bookmarked
@@ -1434,7 +1390,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pageIndex, pageCount
         )
         mangaHistory = storage.getMangaHistory()
-        syncTimeSpentAndReadingToCloud()
+        syncDailyToCloudIfDue()
     }
 
     fun getMangaHistoryItem(mangaId: String): MangaHistoryItem? {
@@ -1691,7 +1647,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     lastChapterTitle = cTitle
                 )
                 novelHistoryList = storage.getNovelHistory()
-                syncTimeSpentAndReadingToCloud()
+                syncDailyToCloudIfDue()
             } catch (e: Exception) {
                 chapterContentError = e.message ?: "Failed to load chapter content"
             } finally {
@@ -1891,9 +1847,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     loadCloudProfile(state.userId)
                     isUsernameSetupRequired = userProfile.username.isBlank()
                     syncFromCloud(state.userId)
-                    syncToCloud(state.userId)
-                    updatePresenceHeartbeat()
-                    loadActiveOnlineUsers()
+                    syncDailyToCloudIfDue()
                 }
             } catch (_: Throwable) {
                 authState = AuthState.LoggedOut
@@ -1960,9 +1914,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isUsernameSetupRequired = userProfile.username.isBlank()
                     authState = AuthState.LoggedIn(userId, email)
                     syncFromCloud(userId)
-                    syncToCloud(userId)
-                    updatePresenceHeartbeat()
-                    loadActiveOnlineUsers()
+                    syncDailyToCloudIfDue()
                 } else {
                     authError = "Sign in returned no user ID. Please check your credentials."
                     authState = AuthState.Error(authError!!)
@@ -2005,7 +1957,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isUsernameSetupRequired = userProfile.username.isBlank()
                     authState = AuthState.LoggedIn(userId, email)
                     syncFromCloud(userId)
-                    syncToCloud(userId)
+                    syncDailyToCloudIfDue()
                     loadNotifications()
                 } else {
                     authError = "Account created! A confirmation email has been sent to $email. Please check your inbox and verify before signing in."
@@ -2148,7 +2100,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isUsernameSetupRequired = userProfile.username.isBlank()
                 authState = AuthState.LoggedIn(finalUserId, email)
                 syncFromCloud(finalUserId)
-                syncToCloud(finalUserId)
+                syncDailyToCloudIfDue()
                 loadNotifications()
             } catch (e: Throwable) {
                 e.printStackTrace()
@@ -2194,7 +2146,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (_: Throwable) {}
 
                 syncFromCloud(userId)
-                syncToCloud(userId)
+                syncDailyToCloudIfDue()
                 loadNotifications()
             } catch (e: Throwable) {
                 e.printStackTrace()
@@ -2217,7 +2169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     loadCloudProfile(state.userId)
                     isUsernameSetupRequired = userProfile.username.isBlank()
                     syncFromCloud(state.userId)
-                    syncToCloud(state.userId)
+                    syncDailyToCloudIfDue()
                 }
             } catch (e: Exception) {
                 val msg = e.message ?: ""
@@ -3343,19 +3295,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         myCurrentActivity = activity
         myCurrentActivityType = activityType
         myCurrentActivityTargetId = targetId
-        val uid = (authState as? AuthState.LoggedIn)?.userId ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                supabaseRepo.updateUserActivity(
-                    userId = uid,
-                    activity = activity,
-                    activityType = activityType,
-                    targetId = targetId
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        // Network presence / activity tracking disabled per user request
     }
 
     fun searchSocialUsers(query: String) {
@@ -3378,16 +3318,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadActiveOnlineUsers() {
-        viewModelScope.launch {
-            isActiveUsersLoading = true
-            try {
-                activeOnlineUsers = supabaseRepo.fetchActiveUsers(50)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                isActiveUsersLoading = false
-            }
-        }
+        // Disabled per user request to conserve Supabase quota/cache
+        activeOnlineUsers = emptyList()
+        isActiveUsersLoading = false
     }
 
     fun selectWatchTimeRankingTimeframe(timeframe: String) {
@@ -3681,65 +3614,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Sync a single watchlist change to cloud (called after local mutations) */
-    private fun syncWatchlistItemToCloud(animeId: Int) {
+    fun syncDailyToCloudIfDue(force: Boolean = false) {
         val currentUserId = (authState as? AuthState.LoggedIn)?.userId
             ?: userProfile.id?.takeIf { it.isNotBlank() && it != "guest" }
             ?: supabaseRepo.getCurrentUserId()
             ?: return
-        val item = getWatchlistItem(animeId) ?: watchlist.firstOrNull { it.animeId == animeId } ?: return
+        val now = System.currentTimeMillis()
+        val lastSync = storage.getLastCloudSyncTimestamp()
+        val oneDayMs = 24 * 60 * 60 * 1000L
+        if (!force && (now - lastSync < oneDayMs)) {
+            return
+        }
+        storage.setLastCloudSyncTimestamp(now)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                supabaseRepo.upsertWatchlistItem(
-                    currentUserId,
-                    CloudWatchlistItem(
-                        userId = currentUserId,
-                        animeId = item.animeId,
-                        title = item.title,
-                        cover = item.cover,
-                        banner = item.banner,
-                        score = item.score,
-                        genres = item.genres,
-                        episodes = item.episodes,
-                        status = item.status,
-                        progressEpisode = item.progressEpisode,
-                        releaseYear = item.releaseYear,
-                        customTags = item.customTags
-                    )
-                )
+                syncToCloud(currentUserId)
+                performSyncTimeSpentAndReadingToCloud(currentUserId)
             } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Failed to sync watchlist item to cloud", e)
+                e.printStackTrace()
             }
         }
     }
 
-    /** Sync a single history change to cloud */
+    /** Sync a single watchlist change to cloud (now throttled to daily interval) */
+    private fun syncWatchlistItemToCloud(animeId: Int) {
+        syncDailyToCloudIfDue(force = false)
+    }
+
+    /** Sync a single history change to cloud (now throttled to daily interval) */
     private fun syncHistoryItemToCloud(animeId: Int) {
-        val currentUserId = (authState as? AuthState.LoggedIn)?.userId
-            ?: userProfile.id?.takeIf { it.isNotBlank() && it != "guest" }
-            ?: supabaseRepo.getCurrentUserId()
-            ?: return
-        val item = storage.getHistoryItem(animeId) ?: history.firstOrNull { it.animeId == animeId } ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                supabaseRepo.upsertWatchHistory(
-                    currentUserId,
-                    CloudHistoryItem(
-                        userId = currentUserId,
-                        animeId = item.animeId,
-                        title = item.title,
-                        cover = item.cover,
-                        banner = item.banner,
-                        lastEpisode = item.lastEpisode,
-                        totalEpisodes = item.totalEpisodes,
-                        positionMs = item.positionMs,
-                        durationMs = item.durationMs
-                    )
-                )
-            } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Failed to sync watch history to cloud", e)
-            }
-        }
+        syncDailyToCloudIfDue(force = false)
     }
 
     private fun deleteHistoryItemFromCloud(animeId: Int) {
@@ -3771,97 +3675,98 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Cloud Sync for Time Spent & Manga / Novel Reading Data ---
-    fun syncTimeSpentAndReadingToCloud() {
-        val currentUserId = (authState as? AuthState.LoggedIn)?.userId ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val record = storage.getTimeSpentRecord(currentUserId)
-                val mangaHistJson = org.json.JSONArray().apply {
-                    storage.getMangaHistory().take(25).forEach { item ->
-                        put(org.json.JSONObject().apply {
-                            put("mangaId", item.mangaId)
-                            put("title", item.title)
-                            put("poster", item.poster ?: "")
-                            put("type", item.type ?: "Manga")
-                            put("chapterId", item.chapterId)
-                            put("chapterNumber", item.chapterNumber)
-                            put("chapterTitle", item.chapterTitle ?: "")
-                            put("pageIndex", item.pageIndex)
-                            put("pageCount", item.pageCount)
-                            put("updatedAt", item.updatedAt)
-                        })
-                    }
-                }.toString()
+    fun syncTimeSpentAndReadingToCloud(force: Boolean = false) {
+        syncDailyToCloudIfDue(force = force)
+    }
 
-                val novelHistJson = org.json.JSONArray().apply {
-                    storage.getNovelHistory().take(20).forEach { item ->
-                        put(org.json.JSONObject().apply {
-                            put("slug", item.slug)
-                            put("title", item.title)
-                            put("cover", item.cover)
-                            put("lastChapterSlug", item.lastChapterSlug)
-                            put("lastChapterTitle", item.lastChapterTitle)
-                            put("timestamp", item.timestamp)
-                        })
-                    }
-                }.toString()
+    private suspend fun performSyncTimeSpentAndReadingToCloud(currentUserId: String) {
+        try {
+            val record = storage.getTimeSpentRecord(currentUserId)
+            val mangaHistJson = org.json.JSONArray().apply {
+                storage.getMangaHistory().take(25).forEach { item ->
+                    put(org.json.JSONObject().apply {
+                        put("mangaId", item.mangaId)
+                        put("title", item.title)
+                        put("poster", item.poster ?: "")
+                        put("type", item.type ?: "Manga")
+                        put("chapterId", item.chapterId)
+                        put("chapterNumber", item.chapterNumber)
+                        put("chapterTitle", item.chapterTitle ?: "")
+                        put("pageIndex", item.pageIndex)
+                        put("pageCount", item.pageCount)
+                        put("updatedAt", item.updatedAt)
+                    })
+                }
+            }.toString()
 
-                val mangaBookmarksJson = org.json.JSONArray().apply {
-                    storage.getMangaBookmarks().take(25).forEach { item ->
-                        put(org.json.JSONObject().apply {
-                            put("mangaId", item.mangaId)
-                            put("title", item.title)
-                            put("poster", item.poster ?: "")
-                            put("type", item.type ?: "Manga")
-                            put("latestChapter", item.latestChapter ?: "")
-                            put("updatedAt", item.updatedAt)
-                        })
-                    }
-                }.toString()
+            val novelHistJson = org.json.JSONArray().apply {
+                storage.getNovelHistory().take(20).forEach { item ->
+                    put(org.json.JSONObject().apply {
+                        put("slug", item.slug)
+                        put("title", item.title)
+                        put("cover", item.cover)
+                        put("lastChapterSlug", item.lastChapterSlug)
+                        put("lastChapterTitle", item.lastChapterTitle)
+                        put("timestamp", item.timestamp)
+                    })
+                }
+            }.toString()
 
-                val cloudP = cloudProfile
-                val todayStr = com.nyyrox.aniverse.data.TimeSpentRecord.getTodayDateString()
-                val isCloudToday = cloudP?.lastActiveDate == todayStr
+            val mangaBookmarksJson = org.json.JSONArray().apply {
+                storage.getMangaBookmarks().take(25).forEach { item ->
+                    put(org.json.JSONObject().apply {
+                        put("mangaId", item.mangaId)
+                        put("title", item.title)
+                        put("poster", item.poster ?: "")
+                        put("type", item.type ?: "Manga")
+                        put("latestChapter", item.latestChapter ?: "")
+                        put("updatedAt", item.updatedAt)
+                    })
+                }
+            }.toString()
 
-                val finalAnime = maxOf(record.allTime.animeSeconds, cloudP?.timeSpentAnime ?: 0L)
-                val finalManga = maxOf(record.allTime.mangaSeconds, cloudP?.timeSpentManga ?: 0L)
-                val finalNovel = maxOf(record.allTime.novelSeconds, cloudP?.timeSpentNovel ?: 0L)
-                val finalApp = maxOf(record.allTime.appSeconds, cloudP?.timeSpentApp ?: 0L)
-                val finalTotal = finalAnime + finalManga + finalNovel + finalApp
+            val cloudP = cloudProfile
+            val todayStr = com.nyyrox.aniverse.data.TimeSpentRecord.getTodayDateString()
+            val isCloudToday = cloudP?.lastActiveDate == todayStr
 
-                val localDailyMedia = (record.daily.animeSeconds + record.daily.mangaSeconds + record.daily.novelSeconds).coerceAtLeast(0L)
-                val localWeeklyMedia = (record.weekly.animeSeconds + record.weekly.mangaSeconds + record.weekly.novelSeconds).coerceAtLeast(0L)
-                val cloudMediaTotal = (finalAnime + finalManga + finalNovel).coerceAtLeast(0L)
+            val finalAnime = maxOf(record.allTime.animeSeconds, cloudP?.timeSpentAnime ?: 0L)
+            val finalManga = maxOf(record.allTime.mangaSeconds, cloudP?.timeSpentManga ?: 0L)
+            val finalNovel = maxOf(record.allTime.novelSeconds, cloudP?.timeSpentNovel ?: 0L)
+            val finalApp = maxOf(record.allTime.appSeconds, cloudP?.timeSpentApp ?: 0L)
+            val finalTotal = finalAnime + finalManga + finalNovel + finalApp
 
-                val finalDaily = minOf(
-                    if (isCloudToday) maxOf(localDailyMedia, minOf(cloudP?.dailyTimeSpent ?: 0L, cloudMediaTotal)) else localDailyMedia,
-                    cloudMediaTotal
-                )
-                val finalWeekly = minOf(
-                    maxOf(localWeeklyMedia, if (isCloudToday) minOf(cloudP?.weeklyTimeSpent ?: 0L, cloudMediaTotal) else 0L),
-                    cloudMediaTotal
-                )
+            val localDailyMedia = (record.daily.animeSeconds + record.daily.mangaSeconds + record.daily.novelSeconds).coerceAtLeast(0L)
+            val localWeeklyMedia = (record.weekly.animeSeconds + record.weekly.mangaSeconds + record.weekly.novelSeconds).coerceAtLeast(0L)
+            val cloudMediaTotal = (finalAnime + finalManga + finalNovel).coerceAtLeast(0L)
 
-                supabaseRepo.updateProfile(
-                    userId = currentUserId,
-                    timeSpentAnime = finalAnime,
-                    timeSpentManga = finalManga,
-                    timeSpentNovel = finalNovel,
-                    timeSpentApp = finalApp,
-                    timeSpentTotal = finalTotal,
-                    weeklyTimeSpent = finalWeekly,
-                    dailyTimeSpent = finalDaily,
-                    mangaHistoryJson = mangaHistJson,
-                    novelHistoryJson = novelHistJson,
-                    mangaBookmarksJson = mangaBookmarksJson,
-                    isWatchlistPrivate = userProfile.isWatchlistPrivate,
-                    isHistoryPrivate = userProfile.isWatchHistoryPrivate,
-                    isMangaPrivate = userProfile.isMangaPrivate,
-                    isNovelPrivate = userProfile.isNovelPrivate
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            val finalDaily = minOf(
+                if (isCloudToday) maxOf(localDailyMedia, minOf(cloudP?.dailyTimeSpent ?: 0L, cloudMediaTotal)) else localDailyMedia,
+                cloudMediaTotal
+            )
+            val finalWeekly = minOf(
+                maxOf(localWeeklyMedia, if (isCloudToday) minOf(cloudP?.weeklyTimeSpent ?: 0L, cloudMediaTotal) else 0L),
+                cloudMediaTotal
+            )
+
+            supabaseRepo.updateProfile(
+                userId = currentUserId,
+                timeSpentAnime = finalAnime,
+                timeSpentManga = finalManga,
+                timeSpentNovel = finalNovel,
+                timeSpentApp = finalApp,
+                timeSpentTotal = finalTotal,
+                weeklyTimeSpent = finalWeekly,
+                dailyTimeSpent = finalDaily,
+                mangaHistoryJson = mangaHistJson,
+                novelHistoryJson = novelHistJson,
+                mangaBookmarksJson = mangaBookmarksJson,
+                isWatchlistPrivate = userProfile.isWatchlistPrivate,
+                isHistoryPrivate = userProfile.isWatchHistoryPrivate,
+                isMangaPrivate = userProfile.isMangaPrivate,
+                isNovelPrivate = userProfile.isNovelPrivate
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

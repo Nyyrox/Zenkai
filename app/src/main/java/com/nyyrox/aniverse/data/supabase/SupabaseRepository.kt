@@ -1300,35 +1300,8 @@ class SupabaseRepository {
         targetId: String? = null,
         isOnline: Boolean = true
     ) {
-        try {
-            val isoNow = com.nyyrox.aniverse.util.DateTimeUtils.getCurrentIsoUtc()
-            val changes = buildJsonObject {
-                if (!activity.isNullOrBlank() && isOnline) {
-                    put("current_activity", activity)
-                    put("is_online", true)
-                    if (!activityType.isNullOrBlank()) {
-                        put("current_activity_type", activityType)
-                    } else {
-                        put("current_activity_type", "")
-                    }
-                    if (!targetId.isNullOrBlank()) {
-                        put("current_activity_target_id", targetId)
-                    } else {
-                        put("current_activity_target_id", "")
-                    }
-                } else {
-                    put("current_activity", "")
-                    put("current_activity_type", "")
-                    put("current_activity_target_id", "")
-                    put("is_online", isOnline)
-                }
-                put("last_seen_at", isoNow)
-            }
-            client.postgrest.from("profiles")
-                .update(changes) { filter { eq("id", userId) } }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Disabled: Activity status tracking removed per user request to conserve Supabase quota/cache
+        return
     }
 
     suspend fun searchUsers(query: String, limit: Int = 30): List<CloudProfile> {
