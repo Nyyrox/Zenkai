@@ -763,7 +763,12 @@ fun PlayerScreen(
 
     // One backdrop (ambient artwork) sampled by every glass surface. null = glass off.
     val glassLayer = rememberPrismalGlassLayer()
-    val backdrop = if (liquidGlass) glassLayer else null
+    // Shader glass needs Android 13+ (AGSL) and a device with headroom; everything else gets the flat AMOLED cards.
+    val glassOk = remember {
+        android.os.Build.VERSION.SDK_INT >= 33 &&
+            context.getSystemService(android.app.ActivityManager::class.java)?.isLowRamDevice != true
+    }
+    val backdrop = if (liquidGlass && glassOk) glassLayer else null
 
     val progress = dragProgress.value
     val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
