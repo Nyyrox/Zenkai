@@ -23,7 +23,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -1059,12 +1063,26 @@ fun DetailScreen(
 
                                     val curStart = selectedPage * pageSize + 1
                                     val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
+                                    val dlAllInteraction = remember { MutableInteractionSource() }
+                                    val dlAllPressed by dlAllInteraction.collectIsPressedAsState()
+                                    val dlAllScale by animateFloatAsState(
+                                        targetValue = if (dlAllPressed) 0.91f else 1f,
+                                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                        label = "dlAllScale"
+                                    )
                                     Row(
                                         modifier = Modifier
+                                            .scale(dlAllScale)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x20FFFFFF))
-                                            .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(8.dp))
-                                            .clickable { showDownloadRangeSheet = curStart..curEnd }
+                                            .background(Color(0x30FFFFFF))
+                                            .border(1.dp, Color(0x48FFFFFF), RoundedCornerShape(8.dp))
+                                            .clickable(
+                                                interactionSource = dlAllInteraction,
+                                                indication = null
+                                            ) {
+                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                showDownloadRangeSheet = curStart..curEnd
+                                            }
                                             .padding(horizontal = 9.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1340,15 +1358,28 @@ fun DetailScreen(
                                             }
 
                                             // Download Button Top Right
+                                            val dlInteraction = remember { MutableInteractionSource() }
+                                            val dlPressed by dlInteraction.collectIsPressedAsState()
+                                            val dlScale by animateFloatAsState(
+                                                targetValue = if (dlPressed) 0.85f else 1f,
+                                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                                label = "epDlScale"
+                                            )
                                             Box(
                                                 modifier = Modifier
                                                     .align(Alignment.TopEnd)
                                                     .padding(8.dp)
                                                     .size(32.dp)
+                                                    .scale(dlScale)
                                                     .clip(CircleShape)
-                                                    .background(Color(0x80000000))
-                                                    .clickable {
+                                                    .background(Color(0x99101420))
+                                                    .border(1.dp, Color(0x38FFFFFF), CircleShape)
+                                                    .clickable(
+                                                        interactionSource = dlInteraction,
+                                                        indication = null
+                                                    ) {
                                                         if (!isDownloaded && !isDownloading) {
+                                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                             showDownloadSheetEpisode = epNum to (epStillInfo?.name ?: "Episode $epNum")
                                                         }
                                                     },

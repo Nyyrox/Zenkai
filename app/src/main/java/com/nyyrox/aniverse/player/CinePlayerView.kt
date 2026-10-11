@@ -470,79 +470,49 @@ private fun DoubleTapSeekOverlay(
         )
     }
 
-    // Elegant curved tap zone arc that fills the tapped side
-    val arcShape = if (isForward) {
-        RoundedCornerShape(topStartPercent = 100, bottomStartPercent = 100)
-    } else {
-        RoundedCornerShape(topEndPercent = 100, bottomEndPercent = 100)
-    }
-
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .fillMaxWidth(0.45f)
-            .clip(arcShape)
-            .background(
-                Brush.horizontalGradient(
-                    if (isForward) listOf(Color.Transparent, Color(0x33FFFFFF))
-                    else listOf(Color(0x33FFFFFF), Color.Transparent)
-                )
-            ),
+            .fillMaxWidth(0.42f),
         contentAlignment = Alignment.Center
     ) {
-        // Unified Liquid Glass Seek Pod
-        val podShape = RoundedCornerShape(26.dp)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .scale(scaleAnim.value)
-                .shadow(16.dp, podShape, ambientColor = Color(0x66000000), spotColor = Color(0x80000000))
-                .clip(podShape)
-                .background(Color(0xB8101420))
-                .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(Color(0x80FFFFFF), Color(0x28FFFFFF), Color(0x0EFFFFFF))
-                    ),
-                    shape = podShape
-                )
-                .padding(horizontal = 22.dp, vertical = 14.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.scale(scaleAnim.value)
         ) {
             // Animated Chevrons with smooth sine wave pulse
             Row(
-                horizontalArrangement = Arrangement.spacedBy(1.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 for (i in 0..2) {
                     val idx = if (isForward) i else (2 - i)
                     val waveOffset = idx * 0.28f
                     val waveNorm = (animPhase + waveOffset) % 1f
-                    val alpha = 0.25f + 0.75f * kotlin.math.sin(waveNorm * Math.PI.toFloat()).coerceAtLeast(0f)
+                    val alpha = 0.35f + 0.65f * kotlin.math.sin(waveNorm * Math.PI.toFloat()).coerceAtLeast(0f)
 
                     Icon(
                         imageVector = if (isForward) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
                         contentDescription = null,
                         tint = Color.White.copy(alpha = alpha),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
 
-            Spacer(Modifier.height(4.dp))
-
             Text(
                 text = "${if (isForward) "+" else "-"}${accumulatedSeconds}s",
                 color = Color.White,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.5.sp
             )
 
             Text(
                 text = if (isForward) "FORWARD" else "REWIND",
-                color = Color.White.copy(alpha = 0.65f),
-                fontSize = 9.sp,
+                color = Color.White.copy(alpha = 0.70f),
+                fontSize = 9.5.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp
             )
@@ -2944,22 +2914,14 @@ fun CinePlayerView(
                                 subtitle = if (isDirectStream) "Direct · HD" else null
                             )
                         } else {
-                            Box(
+                            CircularProgressIndicator(
                                 modifier = Modifier
                                     .align(Alignment.Center)
-                                    .size(56.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x8A08080C))
-                                    .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp),
-                                    color = playerCustomization.accentColor.color,
-                                    trackColor = Color.White.copy(alpha = 0.15f),
-                                    strokeWidth = 3.2.dp
-                                )
-                            }
+                                    .size(42.dp),
+                                color = playerCustomization.accentColor.color,
+                                trackColor = Color.White.copy(alpha = 0.18f),
+                                strokeWidth = 3.2.dp
+                            )
                         }
                     }
 

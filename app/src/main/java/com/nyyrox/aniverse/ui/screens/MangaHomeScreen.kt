@@ -47,6 +47,7 @@ import com.nyyrox.aniverse.ui.animation.mediaCardPhysics
 import com.nyyrox.aniverse.ui.animation.staggeredEntrance
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import com.nyyrox.aniverse.ui.components.OttGlassIconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -216,13 +217,9 @@ private fun MangaHeaderSearch(
             )
 
             if (onDownloadsClick != null) {
-                IconButton(
+                OttGlassIconButton(
                     onClick = onDownloadsClick,
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x22FFFFFF))
-                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                    size = 46.dp
                 ) {
                     Icon(
                         Icons.Default.DownloadDone,

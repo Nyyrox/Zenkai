@@ -24,6 +24,7 @@ import com.styropyr0.prismal.specular.PrismalSpecular
 import com.styropyr0.prismal.specular.PrismalSpecularStyle
 import com.styropyr0.prismal.depth.PrismalDepthShadow
 import com.styropyr0.prismal.LocalPrismalBackdrop
+import androidx.compose.ui.util.lerp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -983,16 +984,49 @@ fun CineSeekbarRenderer(
     heightDp: Float = 3.5f,
     modifier: Modifier = Modifier
 ) {
-    val barHeight = heightDp.dp
-    val thumbSize = if (isScrubbing) 16.dp else 12.dp
     val clampedPlayed = playedFrac.coerceIn(0f, 1f)
     val clampedBuffered = bufferedFrac.coerceIn(0f, 1f)
+
+    val pressProgress by animateFloatAsState(
+        targetValue = if (isScrubbing) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "seekbarPress"
+    )
+
+    // Track dynamic drag velocity to stretch and squash the thumb in the swipe direction
+    var prevPlayed by remember { mutableFloatStateOf(clampedPlayed) }
+    var scrubVelocity by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(clampedPlayed, isScrubbing) {
+        if (isScrubbing) {
+            val delta = clampedPlayed - prevPlayed
+            prevPlayed = clampedPlayed
+            scrubVelocity = (delta * 140f).coerceIn(-1.5f, 1.5f)
+        } else {
+            prevPlayed = clampedPlayed
+            scrubVelocity = 0f
+        }
+    }
+    val animatedVelocity by animateFloatAsState(
+        targetValue = if (isScrubbing) scrubVelocity else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "scrubVelocity"
+    )
+
+    val stretchFactor = (kotlin.math.abs(animatedVelocity) * 0.45f).coerceIn(0f, 0.6f)
+    val thumbScaleX = lerp(1f, 1.45f, pressProgress) * (1f + stretchFactor)
+    val thumbScaleY = lerp(1f, 1.45f, pressProgress) / (1f + stretchFactor * 0.6f)
+
+    val barHeight = (heightDp + (1.5f * pressProgress)).dp
+    val thumbSize = 13.dp
 
     var trackWidthPx by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val thumbSizePx = with(density) { thumbSize.toPx() }
     val maxOffsetPx = (trackWidthPx - thumbSizePx).coerceAtLeast(0f)
     val thumbOffsetXPx = (maxOffsetPx * clampedPlayed).roundToInt()
+
+    val prismalBackdrop = LocalPrismalBackdrop.current
+    val isGlassEnabled = LocalThemeSettings.current.isGlassmorphismEnabled
 
     Box(
         modifier = modifier
@@ -1030,15 +1064,53 @@ fun CineSeekbarRenderer(
                         )
                     }
                 }
-                // Thumb Head
+                // Thumb Head with velocity squash/stretch and live video refraction
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(thumbOffsetXPx, 0) }
                         .size(thumbSize)
-                        .shadow(4.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(accentColor)
-                        .border(1.5.dp, accentColor.copy(alpha = 0.70f), CircleShape)
+                        .graphicsLayer {
+                            scaleX = thumbScaleX
+                            scaleY = thumbScaleY
+                        }
+                        .then(
+                            if (isGlassEnabled && prismalBackdrop != null) {
+                                Modifier.drawPrismalGlass(
+                                    backdrop = prismalBackdrop,
+                                    shape = { CircleShape },
+                                    effects = {
+                                        applyPrismalGlassEffects(
+                                            density = density,
+                                            adaptiveLuminance = false,
+                                            luminance = 0.5f,
+                                            blurRadiusPx = with(density) { 14.dp.toPx() } * (1f - pressProgress * 0.5f),
+                                            refractionHeightPx = with(density) { 10.dp.toPx() } * pressProgress,
+                                            refractionAmountPx = with(density) { 16.dp.toPx() } * pressProgress,
+                                            chromaticAberration = 1f,
+                                            useVibrancy = true,
+                                            saturation = 1.35f
+                                        )
+                                    },
+                                    specular = {
+                                        PrismalSpecular.Default.copy(
+                                            alpha = 0.75f + (0.25f * pressProgress)
+                                        )
+                                    },
+                                    depthShadow = {
+                                        PrismalDepthShadow(radius = 6.dp * pressProgress, alpha = 0.8f)
+                                    },
+                                    onDrawSurface = {
+                                        drawRect(accentColor.copy(alpha = 0.85f))
+                                    }
+                                )
+                            } else {
+                                Modifier
+                                    .shadow(4.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(accentColor)
+                            }
+                        )
+                        .border(1.5.dp, accentColor.copy(alpha = 0.85f), CircleShape)
                 )
             }
 
@@ -1073,7 +1145,10 @@ fun CineSeekbarRenderer(
                     modifier = Modifier
                         .offset { IntOffset(neonOffset, 0) }
                         .size(8.dp)
-                        .scale(if (isScrubbing) 1.5f else 1.0f)
+                        .graphicsLayer {
+                            scaleX = thumbScaleX
+                            scaleY = thumbScaleY
+                        }
                         .clip(CircleShape)
                         .background(accentColor)
                         .border(1.dp, accentColor.copy(alpha = 0.70f), CircleShape)
@@ -1085,7 +1160,7 @@ fun CineSeekbarRenderer(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(6.dp)
+                        .height(barHeight + 2.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .background(Color(0x30FFFFFF))
                         .border(0.5.dp, Color(0x20FFFFFF), RoundedCornerShape(4.dp))
@@ -1113,6 +1188,10 @@ fun CineSeekbarRenderer(
                     modifier = Modifier
                         .offset { IntOffset(chunkyOffset, 0) }
                         .size(14.dp)
+                        .graphicsLayer {
+                            scaleX = thumbScaleX
+                            scaleY = thumbScaleY
+                        }
                         .clip(RoundedCornerShape(4.dp))
                         .background(accentColor)
                         .border(1.5.dp, accentColor.copy(alpha = 0.70f), RoundedCornerShape(4.dp))

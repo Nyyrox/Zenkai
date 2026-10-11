@@ -68,6 +68,9 @@ import com.styropyr0.prismal.specular.PrismalSpecular
 import com.styropyr0.prismal.PrismalBackdrop
 import com.styropyr0.prismal.LocalPrismalBackdrop
 import com.styropyr0.prismal.sources.emptyGlassSource
+import com.styropyr0.prismal.drawPrismalGlass
+import com.styropyr0.prismal.effects.applyPrismalGlassEffects
+import androidx.compose.ui.draw.scale
 import androidx.compose.material3.LinearProgressIndicator
 import com.nyyrox.aniverse.ui.animation.mediaCardPhysics
 import androidx.compose.material3.Text
@@ -149,13 +152,9 @@ fun OttTopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Three-line Hamburger Navigation Action
-            IconButton(
+            OttGlassIconButton(
                 onClick = onMenuClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x24FFFFFF))
-                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                size = 40.dp
             ) {
                 Icon(
                     Icons.Default.Menu,
@@ -173,13 +172,9 @@ fun OttTopBar(
             Spacer(Modifier.weight(1f))
 
             // Glass Search Action
-            IconButton(
+            OttGlassIconButton(
                 onClick = onSearchClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x24FFFFFF))
-                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                size = 40.dp
             ) {
                 Icon(
                     Icons.Default.Search,
@@ -189,6 +184,82 @@ fun OttTopBar(
                 )
             }
         }
+    }
+}
+
+/** Premium liquid glass icon button with spring press haptics and backdrop refraction. */
+@Composable
+fun OttGlassIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 40.dp,
+    content: @Composable () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "ottBtnPress"
+    )
+    val backdrop = com.styropyr0.prismal.LocalPrismalBackdrop.current
+    val isGlassEnabled = LocalThemeSettings.current.isGlassmorphismEnabled
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .scale(pressScale)
+            .clip(CircleShape)
+            .then(
+                if (isGlassEnabled && backdrop != null) {
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    Modifier.drawPrismalGlass(
+                        backdrop = backdrop,
+                        shape = { CircleShape },
+                        effects = {
+                            applyPrismalGlassEffects(
+                                density = density,
+                                adaptiveLuminance = false,
+                                luminance = 0.5f,
+                                blurRadiusPx = with(density) { 16.dp.toPx() },
+                                refractionHeightPx = with(density) { 12.dp.toPx() },
+                                refractionAmountPx = with(density) { 16.dp.toPx() },
+                                useVibrancy = true,
+                                saturation = 1.3f
+                            )
+                        },
+                        specular = {
+                            com.styropyr0.prismal.specular.PrismalSpecular.Default.copy(
+                                alpha = if (isPressed) 1f else 0.8f
+                            )
+                        },
+                        depthShadow = {
+                            com.styropyr0.prismal.depth.PrismalDepthShadow(radius = 4.dp, alpha = 0.6f)
+                        },
+                        onDrawSurface = {
+                            drawRect(Color(0x28FFFFFF))
+                            if (isPressed) drawRect(Color(0x33FFFFFF))
+                        }
+                    )
+                } else {
+                    Modifier
+                        .background(Color(0x28FFFFFF))
+                        .then(if (isPressed) Modifier.background(Color(0x33FFFFFF)) else Modifier)
+                }
+            )
+            .border(1.dp, Color(0x40FFFFFF), CircleShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                    onClick()
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
 }
 
@@ -243,7 +314,7 @@ fun OttBottomDock(
                 backdrop = ambientBackdrop,
                 tabsCount = tabs.size,
                 specular = { PrismalSpecular.Default },
-                dropletContentTint = themeColors.primary,
+                tintDropletContent = false,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val highlightedIndex = LocalPrismalBottomTabHighlightedIndex.current

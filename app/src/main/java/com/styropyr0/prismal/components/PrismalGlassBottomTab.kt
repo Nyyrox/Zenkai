@@ -1,12 +1,19 @@
 package com.styropyr0.prismal.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,11 +41,19 @@ fun RowScope.PrismalGlassBottomTab(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalPrismalBottomTabScale.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.90f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "tabPress"
+    )
+
     Column(
         modifier
             .clip(PrismalCapsule())
             .clickable(
-                interactionSource = null,
+                interactionSource = interactionSource,
                 indication = null,
                 role = Role.Tab,
                 onClick = onClick
@@ -46,7 +61,7 @@ fun RowScope.PrismalGlassBottomTab(
             .fillMaxHeight()
             .weight(1f)
             .graphicsLayer {
-                val s = scale()
+                val s = scale() * pressScale
                 scaleX = s
                 scaleY = s
             },
@@ -55,3 +70,4 @@ fun RowScope.PrismalGlassBottomTab(
         content = content
     )
 }
+

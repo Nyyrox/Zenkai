@@ -140,6 +140,7 @@ fun PrismalGlassBottomTabs(
                     dragHighlightIndex = targetIndex
                     currentIndex = targetIndex
                     animateToValue(targetIndex.toFloat())
+                    onTabSelected(targetIndex)
                     animationScope.launch {
                         offsetAnimation.animateTo(
                             0f,
@@ -161,20 +162,13 @@ fun PrismalGlassBottomTabs(
                 }
             )
         }
-        LaunchedEffect(selectedTabIndex) {
-            snapshotFlow { selectedTabIndex() }
-                .collectLatest { index ->
-                    currentIndex = index
-                    dragHighlightIndex = null
-                }
-        }
-        LaunchedEffect(dampedDragAnimation) {
-            snapshotFlow { currentIndex }
-                .drop(1)
-                .collectLatest { index ->
-                    dampedDragAnimation.animateToValue(index.toFloat())
-                    onTabSelected(index)
-                }
+        val targetTabIndex = selectedTabIndex()
+        LaunchedEffect(targetTabIndex) {
+            dragHighlightIndex = null
+            currentIndex = targetTabIndex
+            if (dampedDragAnimation.targetValue.fastRoundToInt() != targetTabIndex) {
+                dampedDragAnimation.animateToValue(targetTabIndex.toFloat())
+            }
         }
 
         val interactivePrismalSpecular = remember(animationScope, tabWidth, isLtr) {
