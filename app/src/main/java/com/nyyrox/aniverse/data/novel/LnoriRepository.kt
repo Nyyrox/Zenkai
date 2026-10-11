@@ -288,13 +288,35 @@ class LnoriRepository(
         if (desc.isBlank()) {
             desc = doc.selectFirst(".description, .synopsis, p")?.text()?.trim().orEmpty()
         }
-        if (cover.isBlank()) {
-            cover = doc.selectFirst("meta[property=og:image]")?.attr("content").orEmpty()
-            if (cover.isBlank()) {
-                val img = doc.selectFirst(".series-cover img, .cover img")
-                cover = img?.attr("src")?.ifBlank { img.attr("data-src") }.orEmpty()
+        // 1. Look up series in catalog first - catalog always has the authentic vertical book cover from the homepage
+        val cleanSlug = slug.removePrefix("/series/").removePrefix("series/").removePrefix("/")
+        val catalog = getCatalog()
+        val catEntry = catalog.find {
+            it.id == cleanSlug || it.slug == cleanSlug || it.slug.startsWith("$cleanSlug/") || it.slug.endsWith("/$cleanSlug")
+        }
+        if (catEntry != null && catEntry.cover.isNotBlank()) {
+            cover = catEntry.cover
+        }
+
+        // 2. If not found in catalog, extract hero cover image from page
+        if (cover.isBlank() || cover.contains("/series/")) {
+            val heroImg = doc.selectFirst(".hero-card img, .cover-wrap img, .card-cover img, .series-cover img, .cover img, .vol-grid .card img")
+            val heroSrc = heroImg?.attr("src")?.ifBlank { heroImg.attr("data-src") }.orEmpty()
+            if (heroSrc.isNotBlank()) {
+                cover = if (heroSrc.startsWith("http")) heroSrc else "$baseUrl$heroSrc"
             }
         }
+
+        // 3. Fallback: extract volume ID from first chapter
+        if (cover.isBlank() || cover.contains("/series/")) {
+            if (!firstChapterSlug.isNullOrBlank()) {
+                val volId = firstChapterSlug.removePrefix("book/").substringBefore("/")
+                if (volId.all { it.isDigit() }) {
+                    cover = "https://cdn.lnori.com/cover/$volId.webp"
+                }
+            }
+        }
+
         if (cover.isNotBlank() && !cover.startsWith("http")) {
             cover = "$baseUrl$cover"
         }
@@ -321,37 +343,89 @@ class LnoriRepository(
 
         val chapters = mutableListOf<NovelChapter>()
 
-        val scripts = doc.select("script[type=application/ld+json]")
-        for (s in scripts) {
-            val jsonText = s.data().trim()
-            if (jsonText.contains("\"hasPart\"")) {
-                try {
-                    val obj = JSONObject(jsonText)
-                    val parts = obj.optJSONArray("hasPart")
-                    if (parts != null) {
-                        for (i in 0 until parts.length()) {
-                            val part = parts.getJSONObject(i)
-                            val name = part.optString("name").trim()
-                            val url = part.optString("url").trim()
-                            val pos = part.optString("position").ifBlank { "${i + 1}" }
-                            if (url.isNotBlank()) {
-                                val chSlug = url.removePrefix("$baseUrl/").removePrefix("/")
-                                chapters.add(
-                                    NovelChapter(
-                                        slug = chSlug,
-                                        title = name.ifBlank { "Volume ${i + 1}" },
-                                        number = pos,
-                                        releaseTime = "Light Novel"
-                                    )
-                                )
-                            }
-                        }
-                    }
-                } catch (_: Exception) {}
+        // 1. Parse directly from HTML volume cards (.vol-grid article.card, article.card[data-id])
+        val articles = doc.select(".vol-grid article.card, article.card[data-id]")
+        if (articles.isNotEmpty()) {
+            val seen = mutableSetOf<String>()
+            var idx = 1
+            for (art in articles) {
+                val a = art.selectFirst("a[href*='/book/']") ?: continue
+                val href = a.attr("href").trim()
+                val chSlug = href.removePrefix("$baseUrl/").removePrefix("/")
+                if (chSlug.isBlank() || !seen.add(chSlug)) continue
+
+                val dataId = art.attr("data-id").trim()
+                val title = art.selectFirst(".card-title, .popup-title")?.text()?.trim()
+                    ?.ifBlank { a.attr("aria-label").trim() }
+                    ?: "Volume $idx"
+
+                val img = art.selectFirst("img")
+                var cover = img?.attr("src")?.ifBlank { img.attr("data-src") }.orEmpty()
+                if (cover.isNotBlank() && !cover.startsWith("http")) {
+                    cover = "https://cdn.lnori.com$cover"
+                }
+                if (cover.isBlank() && dataId.isNotBlank()) {
+                    cover = "https://cdn.lnori.com/cover/$dataId.webp"
+                }
+
+                val desc = art.selectFirst(".popup-description")?.text()?.trim().orEmpty()
+                val release = if (desc.isNotBlank()) {
+                    desc.take(90) + if (desc.length > 90) "..." else ""
+                } else {
+                    "Light Novel"
+                }
+
+                chapters.add(
+                    NovelChapter(
+                        slug = chSlug,
+                        title = title,
+                        number = "$idx",
+                        releaseTime = release,
+                        cover = cover
+                    )
+                )
+                idx++
             }
-            if (chapters.isNotEmpty()) break
         }
 
+        // 2. If HTML cards were empty, parse JSON-LD hasPart with computed volume covers
+        if (chapters.isEmpty()) {
+            val scripts = doc.select("script[type=application/ld+json]")
+            for (s in scripts) {
+                val jsonText = s.data().trim()
+                if (jsonText.contains("\"hasPart\"")) {
+                    try {
+                        val obj = JSONObject(jsonText)
+                        val parts = obj.optJSONArray("hasPart")
+                        if (parts != null) {
+                            for (i in 0 until parts.length()) {
+                                val part = parts.getJSONObject(i)
+                                val name = part.optString("name").trim()
+                                val url = part.optString("url").trim()
+                                val pos = part.optString("position").ifBlank { "${i + 1}" }
+                                if (url.isNotBlank()) {
+                                    val chSlug = url.removePrefix("$baseUrl/").removePrefix("/")
+                                    val volId = chSlug.removePrefix("book/").substringBefore("/")
+                                    val volCover = if (volId.all { it.isDigit() }) "https://cdn.lnori.com/cover/$volId.webp" else null
+                                    chapters.add(
+                                        NovelChapter(
+                                            slug = chSlug,
+                                            title = name.ifBlank { "Volume ${i + 1}" },
+                                            number = pos,
+                                            releaseTime = "Light Novel",
+                                            cover = volCover
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+                if (chapters.isNotEmpty()) break
+            }
+        }
+
+        // 3. Fallback to generic book links
         if (chapters.isEmpty()) {
             val bookLinks = doc.select("a[href*='/book/']")
             val seen = mutableSetOf<String>()
@@ -366,12 +440,15 @@ class LnoriRepository(
                 } else {
                     "Volume $idx"
                 }
+                val volId = chSlug.removePrefix("book/").substringBefore("/")
+                val volCover = if (volId.all { it.isDigit() }) "https://cdn.lnori.com/cover/$volId.webp" else null
                 chapters.add(
                     NovelChapter(
                         slug = chSlug,
                         title = title,
                         number = "$idx",
-                        releaseTime = "Light Novel"
+                        releaseTime = "Light Novel",
+                        cover = volCover
                     )
                 )
                 idx++

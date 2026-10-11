@@ -31,7 +31,8 @@ data class NovelChapter(
     val slug: String,
     val title: String,
     val number: String? = null,
-    val releaseTime: String? = null
+    val releaseTime: String? = null,
+    val cover: String? = null
 )
 
 data class NovelChapterContent(

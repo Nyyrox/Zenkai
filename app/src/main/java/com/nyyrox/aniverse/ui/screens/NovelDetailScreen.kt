@@ -127,6 +127,10 @@ fun NovelDetailScreen(
     }
 
     val novel = vm.selectedNovel
+    val knownNovel = remember(novelSlug) { vm.findKnownNovel(novelSlug) }
+    val effectiveCover = novel?.cover?.takeIf { it.isNotBlank() && !it.contains("/series/") }
+        ?: knownNovel?.cover
+        ?: novel?.cover
     val isBookmarked = vm.novelBookmarks.contains(novelSlug)
     val lastReadChapter = vm.novelHistory[novelSlug] ?: vm.novelHistoryList.find { it.slug == novelSlug }?.lastChapterSlug
     val downloadTasks by vm.downloadManager.tasks.collectAsState()
@@ -222,7 +226,7 @@ fun NovelDetailScreen(
                     ) {
                         // Ambient Backdrop Cover with Vignette
                         AsyncImage(
-                            model = rememberNovelImageRequest(novel.cover),
+                            model = rememberNovelImageRequest(effectiveCover),
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -269,7 +273,7 @@ fun NovelDetailScreen(
                                         .shadow(12.dp, OttCardShape)
                                 ) {
                                     AsyncImage(
-                                        model = rememberNovelImageRequest(novel.cover),
+                                        model = rememberNovelImageRequest(effectiveCover),
                                         contentDescription = novel.title,
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -474,7 +478,9 @@ fun NovelDetailScreen(
                                 .padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf("Chapters (${displayChapters.size})", "Overview & Info").forEachIndexed { index, tabTitle ->
+                            val isVolumeBased = novel?.source == "lnori" || displayChapters.any { it.title.startsWith("Volume", ignoreCase = true) }
+                            val chaptersTabTitle = if (isVolumeBased) "Volumes (${displayChapters.size})" else "Chapters (${displayChapters.size})"
+                            listOf(chaptersTabTitle, "Overview & Info").forEachIndexed { index, tabTitle ->
                                 val isSelected = selectedTab == index
                                 Box(
                                     modifier = Modifier
@@ -618,7 +624,7 @@ fun NovelDetailScreen(
                                     .border(1.dp, Color(0x25FFFFFF), OttPillShape)
                                     .clickable {
                                         val targetChapters = displayChapters.take(10).map { it.slug to it.title }
-                                        vm.downloadNovelChaptersBatch(novelSlug, novel.title, novel.cover ?: "", targetChapters)
+                                        vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
                                     }
                                     .padding(vertical = 7.dp),
                                 contentAlignment = Alignment.Center
@@ -640,7 +646,7 @@ fun NovelDetailScreen(
                                     .border(1.dp, Color(0x25FFFFFF), OttPillShape)
                                     .clickable {
                                         val targetChapters = displayChapters.map { it.slug to it.title }
-                                        vm.downloadNovelChaptersBatch(novelSlug, novel.title, novel.cover ?: "", targetChapters)
+                                        vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
                                     }
                                     .padding(vertical = 7.dp),
                                 contentAlignment = Alignment.Center
@@ -704,6 +710,26 @@ fun NovelDetailScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    // Volume Cover Artwork Thumbnail (when present)
+                                    if (!ch.cover.isNullOrBlank()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(46.dp)
+                                                .height(66.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0x20FFFFFF))
+                                                .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
+                                        ) {
+                                            AsyncImage(
+                                                model = rememberNovelImageRequest(ch.cover),
+                                                contentDescription = ch.title,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                        Spacer(Modifier.width(12.dp))
+                                    }
+
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = ch.title,
@@ -768,7 +794,7 @@ fun NovelDetailScreen(
                                             IconButton(
                                                 onClick = {
                                                     if (!isDownloaded) {
-                                                        vm.downloadNovelChapter(novelSlug, novel.title, novel.cover ?: "", ch.slug, ch.title)
+                                                        vm.downloadNovelChapter(novelSlug, novel.title, effectiveCover ?: "", ch.slug, ch.title)
                                                     }
                                                 },
                                                 modifier = Modifier.size(28.dp)
@@ -983,8 +1009,9 @@ fun NovelDetailScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        val isVolumeBased = novel.source == "lnori" || displayChapters.any { it.title.startsWith("Volume", ignoreCase = true) }
                         Text(
-                            text = "${displayChapters.size} Chapters",
+                            text = "${displayChapters.size} ${if (isVolumeBased) "Volumes" else "Chapters"}",
                             fontSize = 11.sp,
                             color = OttAccentGold,
                             fontWeight = FontWeight.SemiBold
