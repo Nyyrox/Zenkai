@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class UnifiedNovelRepository(
+    val lnori: LnoriRepository = LnoriRepository(),
     val novelFull: NovelFullRepository = NovelFullRepository(),
     val novelFire: NovelFireRepository = NovelFireRepository(),
     val freeWebNovel: FreeWebNovelRepository = FreeWebNovelRepository(),
@@ -14,6 +15,7 @@ class UnifiedNovelRepository(
 ) : INovelSourceRepository {
 
     private val repositories = mapOf<NovelSource, INovelSourceRepository>(
+        NovelSource.LNORI to lnori,
         NovelSource.NOVEL_FULL to novelFull,
         NovelSource.NOVEL_FIRE to novelFire,
         NovelSource.FREE_WEB_NOVEL to freeWebNovel,
@@ -84,8 +86,8 @@ class UnifiedNovelRepository(
 
         if (allResults.isNotEmpty()) return allResults
 
-        // 2. Fallback: Search across other repositories (prioritizing FreeWebNovel and NovelFire for light novels)
-        val otherRepos = listOf(freeWebNovel, novelFire, novelFull, royalRoad, wuxiaWorld)
+        // 2. Fallback: Search across other repositories (prioritizing Lnori, FreeWebNovel and NovelFire for light novels)
+        val otherRepos = listOf(lnori, freeWebNovel, novelFire, novelFull, royalRoad, wuxiaWorld)
             .filter { it.source != _activeSource.value }
 
         for (repo in otherRepos) {

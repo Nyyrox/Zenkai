@@ -104,6 +104,7 @@ fun rememberNovelImageRequest(url: String?): Any? {
                 url.contains("novelfire") -> "https://novelfire.net/"
                 url.contains("novelfull") -> "https://novelfull.com/"
                 url.contains("freewebnovel") -> "https://freewebnovel.com/"
+                url.contains("lnori") -> "https://lnori.com/"
                 else -> null
             }
             val builder = ImageRequest.Builder(context)
@@ -403,6 +404,7 @@ private fun NovelSearchHeader(
                 items(displaySources) { src ->
                     val isSelected = src == activeSource
                     val sourceGradient = when (src) {
+                        NovelSource.LNORI -> Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF4F46E5)))
                         NovelSource.NOVEL_FULL -> Brush.horizontalGradient(listOf(Color(0xFFFF7A45), Color(0xFFFF5722)))
                         NovelSource.NOVEL_FIRE -> Brush.horizontalGradient(listOf(Color(0xFFE50914), Color(0xFFB71C1C)))
                         NovelSource.FREE_WEB_NOVEL -> Brush.horizontalGradient(listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)))
@@ -411,6 +413,7 @@ private fun NovelSearchHeader(
                         else -> Brush.horizontalGradient(listOf(OttPrimary, OttPrimary))
                     }
                     val iconColor = when (src) {
+                        NovelSource.LNORI -> Color(0xFF818CF8)
                         NovelSource.NOVEL_FULL -> Color(0xFFFF7A45)
                         NovelSource.NOVEL_FIRE -> Color(0xFFE50914)
                         NovelSource.FREE_WEB_NOVEL -> Color(0xFFA78BFA)
@@ -419,6 +422,7 @@ private fun NovelSearchHeader(
                         else -> OttPrimary
                     }
                     val icon = when (src) {
+                        NovelSource.LNORI -> Icons.Default.AutoStories
                         NovelSource.NOVEL_FULL -> Icons.Default.MenuBook
                         NovelSource.NOVEL_FIRE -> Icons.Default.Whatshot
                         NovelSource.FREE_WEB_NOVEL -> Icons.Default.AutoStories

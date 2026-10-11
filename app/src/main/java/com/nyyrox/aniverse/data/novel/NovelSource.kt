@@ -7,6 +7,7 @@ enum class NovelSource(
     val badge: String? = null,
     val isLightNovelFocused: Boolean = false
 ) {
+    LNORI("lnori", "Lnori", "https://lnori.com", "LN Library", true),
     NOVEL_FULL("novelfull", "NovelFull", "https://novelfull.com", "Light Novels", true),
     NOVEL_FIRE("novelfire", "NovelFire", "https://novelfire.net", "Trending", false),
     FREE_WEB_NOVEL("freewebnovel", "FreeWebNovel", "https://freewebnovel.com", "Light Novels", true),
@@ -17,6 +18,7 @@ enum class NovelSource(
     companion object {
         fun fromId(id: String?): NovelSource {
             if (id.isNullOrBlank()) return NOVEL_FULL
+            if (id.equals("lnori", ignoreCase = true)) return LNORI
             if (id.equals("novelfire", ignoreCase = true)) return NOVEL_FIRE
             if (id.equals("freewebnovel", ignoreCase = true)) return FREE_WEB_NOVEL
             if (id.equals("royalroad", ignoreCase = true)) return ROYAL_ROAD
