@@ -14,6 +14,23 @@ import com.styropyr0.prismal.sources.PrismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import android.net.Uri
 import android.os.Build
+import android.content.Context
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
+import kotlin.math.roundToInt
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -183,6 +200,10 @@ import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import java.util.Locale
+
+// The tabs item sits at this index in the LazyColumn (hero, meta, tabs).
+private const val TABS_INDEX = 2
+private val TabsHeight = 54.dp // pill height 38dp + 8dp padding top/bottom
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -456,7 +477,10 @@ fun DetailScreen(
 
     // Continuous subtle time-based Ken Burns zoom animation
     val infiniteTransition = rememberInfiniteTransition(label = "heroZoom")
-    val heroTimeScale by infiniteTransition.animateFloat(
+    val themeSettings = LocalThemeSettings.current
+    val reduceMotion = themeSettings.isPowerSavingEnabled || themeSettings.isReducedMotionEnabled
+    // ponytail: Ken Burns is skipped under battery saver / reduced motion (it redraws the full hero every frame).
+    val heroScaleState = if (reduceMotion) null else infiniteTransition.animateFloat(
         initialValue = 1.0f,
         targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
@@ -476,7 +500,9 @@ fun DetailScreen(
         label = "redDotBlink"
     )
 
-    // Glass follows Settings > Liquid Glassmorphism (and device capability). null backdrop = flat AMOLED cards.
+    // Glass follows Settings > Liquid Glassmorphism (and device capability). It is kept for small controls only;
+    // big cards are flat translucent surfaces. null backdrop = flat AMOLED controls.
+    // ponytail: per-card backdrop sampling was the main render cost; upgrade path = playerGlass(backdrop, r) on cards again.
     val glassOn = rememberGlassEnabled()
     val glassLayer = rememberPrismalGlassLayer()
     val backdrop = if (glassOn) glassLayer else null
@@ -491,21 +517,41 @@ fun DetailScreen(
         context.startActivity(Intent.createChooser(shareIntent, "Share Anime"))
     }
 
+    val density = LocalDensity.current
+    val barHeightPx = with(density) { (WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 48.dp).toPx() }
+    val barStartPx = with(density) { 220.dp.toPx() }
+    val barRangePx = with(density) { 140.dp.toPx() }
+    val heroFadePx = with(density) { 380.dp.toPx() }
+    val barBg = if (glassOn) Color(0xF2050507) else OttBg
+
     val lazyListState = rememberLazyListState()
     val scrollOffset by remember {
         derivedStateOf {
             val item0 = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == 0 }
-            if (item0 != null) {
-                (-item0.offset).toFloat().coerceAtLeast(0f)
-            } else {
-                val item1 = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == 1 }
-                if (item1 != null) {
-                    (320f - item1.offset.toFloat()).coerceAtLeast(0f)
-                } else {
-                    600f
-                }
-            }
+            if (item0 != null) (-item0.offset).toFloat().coerceAtLeast(0f) else 100_000f
         }
+    }
+    // Continuous 0..1 progress so the top bar fades in instead of popping at a threshold.
+    // Only read inside graphicsLayer/draw lambdas, so scrolling never recomposes this screen.
+    val barProgress by remember(barStartPx, barRangePx) {
+        derivedStateOf { ((scrollOffset - barStartPx) / barRangePx).coerceIn(0f, 1f) }
+    }
+    val barVisible by remember { derivedStateOf { barProgress > 0.02f } }
+    // Tabs are an overlay that follows the in-list spacer and clamps under the top bar (no sticky-header jump).
+    val tabsY by remember(barHeightPx) {
+        derivedStateOf {
+            val info = lazyListState.layoutInfo
+            val tabsItem = info.visibleItemsInfo.firstOrNull { it.key == "tabs" }
+            val raw = when {
+                tabsItem != null -> tabsItem.offset.toFloat()
+                lazyListState.firstVisibleItemIndex > TABS_INDEX -> 0f
+                else -> info.viewportEndOffset.toFloat()
+            }
+            maxOf(raw, barHeightPx)
+        }
+    }
+    val tabsPin by remember(barHeightPx) {
+        derivedStateOf { ((barHeightPx + 36f - tabsY) / 36f).coerceIn(0f, 1f) }
     }
 
     val isTransitioning = coordinator != null && coordinator.activeAnimeId == anime.id && coordinator.phase == SharedTransitionPhase.FORWARD
@@ -527,6 +573,124 @@ fun DetailScreen(
         label = "detailRevealAlpha"
     )
 
+    // ---- Tabs ----
+    val tabs = if (anime.isMovie) {
+        listOf("Characters", "Casts", "Videos", "How to Watch", "More Like This")
+    } else {
+        listOf("Episodes", "Characters", "Casts", "Videos", "How to Watch", "More Like This")
+    }
+    val activeTabIndex = selectedTab.coerceIn(0, tabs.lastIndex)
+    val currentTabTitle = tabs[activeTabIndex]
+    val tabLabels = tabs.map { title ->
+        when (title) {
+            "Episodes" -> "$title ($maxEpisode)"
+            "Characters" -> if (anime.characters.isNotEmpty()) "$title (${anime.characters.size})" else title
+            "How to Watch" -> if (anime.relations.isNotEmpty()) "$title (${anime.relations.size})" else title
+            else -> title
+        }
+    }
+
+    // Switching tabs while pinned: land just under the tabs instead of deep inside the previous list.
+    LaunchedEffect(selectedTab) {
+        if (tabsY <= barHeightPx + 1f && lazyListState.firstVisibleItemIndex >= TABS_INDEX) {
+            lazyListState.scrollToItem(TABS_INDEX)
+            lazyListState.scrollBy(-barHeightPx)
+        }
+    }
+
+    // ---- Per-tab data (computed here because LazyColumn content is not composable) ----
+    val pageEpisodes = remember(episodeSearchQuery, selectedPage, isOldestFirst, maxEpisode, tmdbEpisodes) {
+        val query = episodeSearchQuery.trim()
+        val raw = if (query.isNotEmpty()) {
+            (1..maxEpisode).filter { epNum ->
+                epNum.toString() == query || tmdbEpisodes[epNum]?.name.orEmpty().contains(query, ignoreCase = true)
+            }
+        } else {
+            val pStart = selectedPage * pageSize + 1
+            (pStart..minOf(pStart + pageSize - 1, maxEpisode)).toList()
+        }
+        if (isOldestFirst) raw else raw.reversed()
+    }
+    val rangeLabels = List(pageCount) { p ->
+        val s = p * pageSize + 1
+        "$s–${minOf(s + pageSize - 1, maxEpisode)}"
+    }
+
+    val characters = anime.characters
+    var charFilter by remember(anime.id) { mutableIntStateOf(0) }
+    val charRoles = listOf("ALL") + characters.map { it.role.uppercase() }.distinct()
+        .sortedBy { r -> listOf("MAIN", "SUPPORTING", "BACKGROUND").indexOf(r).let { if (it < 0) 99 else it } }
+    val charIdx = charFilter.coerceIn(0, charRoles.lastIndex)
+    val shownCharacters = if (charIdx == 0) characters else characters.filter { it.role.uppercase() == charRoles[charIdx] }
+    val charLabels = charRoles.mapIndexed { i, r ->
+        if (i == 0) "All (${characters.size})"
+        else "${r.lowercase().replaceFirstChar { it.uppercase() }} (${characters.count { c -> c.role.uppercase() == r }})"
+    }
+
+    val staffList = anime.staff
+    val tmdbCast = tmdbDetails?.cast.orEmpty()
+
+    val allVideos = remember(anime.trailerId, tmdbDetails?.videos, tmdbDetails?.trailerUrl) {
+        val list = mutableListOf<TmdbVideo>()
+        // 1. AniList official trailer
+        val rawAnimeTrailer = anime.trailerId
+        if (!rawAnimeTrailer.isNullOrBlank()) {
+            val trimmed = rawAnimeTrailer.trim()
+            val key = when {
+                trimmed.contains("v=") -> trimmed.substringAfter("v=").substringBefore("&").substringBefore("?")
+                trimmed.contains("youtu.be/") -> trimmed.substringAfter("youtu.be/").substringBefore("?").substringBefore("&")
+                trimmed.contains("embed/") -> trimmed.substringAfter("embed/").substringBefore("?").substringBefore("&")
+                else -> trimmed
+            }.trim()
+            if (key.isNotEmpty()) {
+                list.add(TmdbVideo(key = key, name = "Official Trailer", type = "Trailer"))
+            }
+        }
+        // 2. TMDB videos
+        tmdbDetails?.videos?.forEach { vid ->
+            if (list.none { it.key == vid.key }) list.add(vid)
+        }
+        // 3. Fallback TMDB single trailerUrl if list is empty
+        if (list.isEmpty()) {
+            val tKey = tmdbDetails?.trailerUrl
+            if (!tKey.isNullOrBlank()) {
+                list.add(TmdbVideo(key = tKey.trim(), name = "Trailer", type = "Trailer"))
+            }
+        }
+        list
+    }
+
+    val relationGroups = remember(anime.relations) {
+        val rels = anime.relations
+        val prequels = rels.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+        val sequels = rels.filter { it.relationType.equals("SEQUEL", ignoreCase = true) }
+        val adaptations = rels.filter { it.relationType.equals("ADAPTATION", ignoreCase = true) || it.relationType.equals("SOURCE", ignoreCase = true) }
+        val others = rels.filter { it !in prequels && it !in sequels && it !in adaptations }
+        listOf(
+            "PREQUEL · WATCH BEFORE" to prequels,
+            "SEQUEL · WATCH NEXT" to sequels,
+            "ORIGINAL SOURCE & ADAPTATION" to adaptations,
+            "SIDE STORIES & ALTERNATIVES" to others
+        ).filter { it.second.isNotEmpty() }
+    }
+
+    val recs: List<AnimeRecommendation> = when {
+        currentTabTitle != "More Like This" -> emptyList()
+        anime.recommendations.isNotEmpty() -> anime.recommendations
+        else -> (vm.popular + vm.trending).filter { it.id != anime.id }.take(12).map {
+            AnimeRecommendation(
+                id = it.id,
+                title = it.displayTitle,
+                romajiTitle = it.romajiTitle,
+                cover = it.cover,
+                banner = it.banner,
+                score = it.score,
+                format = it.displayFormat,
+                episodes = it.episodes
+            )
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -536,17 +700,17 @@ fun DetailScreen(
                 translationY = (1f - revealAlpha) * 16f
             }
     ) {
-        // Live ambient backdrop: every glass surface samples it. Draws nothing when glass is off.
+        // Live ambient backdrop: only the small glass controls sample it. Draws nothing when glass is off.
         PlayerAmbientArt(layer = backdrop, model = heroImageUrl, modifier = Modifier.fillMaxSize())
 
-        // === 1. HERO IMAGE AT BG IN ITS PLACE (PARALLAX + TIME-BASED KEN BURNS) ===
+        // === 1. HERO IMAGE (PARALLAX + OPTIONAL KEN BURNS) ===
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(440.dp)
                 .graphicsLayer {
                     translationY = -scrollOffset * 0.42f
-                    alpha = (1f - scrollOffset / 600f).coerceIn(0f, 1f)
+                    alpha = (1f - scrollOffset / heroFadePx).coerceIn(0f, 1f)
                     clip = true
                     compositingStrategy = if (glassOn) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }
@@ -580,8 +744,9 @@ fun DetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = heroTimeScale
-                            scaleY = heroTimeScale
+                            val s = heroScaleState?.value ?: 1f
+                            scaleX = s
+                            scaleY = s
                         },
                     contentScale = ContentScale.Crop
                 )
@@ -608,10 +773,10 @@ fun DetailScreen(
             state = lazyListState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Hero Title Overlay space at bottom of hero area
-            item {
+            // Hero title overlay space at bottom of hero area
+            item(key = "hero") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -622,7 +787,6 @@ fun DetailScreen(
                     Column(
                         modifier = Modifier.graphicsLayer { alpha = contentAlpha }
                     ) {
-                        // Title row: logo/text left, Play button right
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.Bottom,
@@ -682,8 +846,8 @@ fun DetailScreen(
                 }
             }
 
-            // === 2. METADATA HEADER & DETAILS ===
-            item {
+            // === METADATA HEADER & DETAILS ===
+            item(key = "meta") {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -768,7 +932,7 @@ fun DetailScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .playerGlass(backdrop, 18.dp)
+                                .cardSurface(glassOn, 18.dp)
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -806,7 +970,7 @@ fun DetailScreen(
                     val displayOverview = tmdbDetails?.overview?.ifBlank { null } ?: anime.cleanDescription
                     if (displayOverview.isNotBlank()) {
                         val isLongOverview = displayOverview.length > 170
-                        DetailCard(backdrop, "SYNOPSIS") {
+                        DetailCard(glassOn, "SYNOPSIS") {
                             Text(
                                 text = displayOverview,
                                 fontSize = 13.5.sp,
@@ -838,7 +1002,7 @@ fun DetailScreen(
                         "Studio" to (anime.studios.firstOrNull()?.ifBlank { null } ?: "Unknown"),
                         "Source" to anime.displaySource
                     ).filter { it.second.isNotBlank() }
-                    DetailCard(backdrop, "DETAILS") {
+                    DetailCard(glassOn, "DETAILS") {
                         if (combinedGenres.isNotEmpty()) {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -864,76 +1028,14 @@ fun DetailScreen(
                 }
             }
 
-            // === 3. CONTENT TABS (sticky pill row) ===
-            stickyHeader {
-                val tabs = if (anime.isMovie) {
-                    listOf("Characters", "Casts", "Videos", "How to Watch", "More Like This")
-                } else {
-                    listOf("Episodes", "Characters", "Casts", "Videos", "How to Watch", "More Like This")
-                }
-                val activeTabIndex = selectedTab.coerceIn(0, (tabs.size - 1).coerceAtLeast(0))
+            // Placeholder the pinned tab overlay sits on (see tabsY).
+            item(key = "tabs") { Spacer(Modifier.height(TabsHeight)) }
 
-                // Once pinned, sit below the top bar (status bar + 50dp) instead of hiding under it
-                val tabsStuck by remember { derivedStateOf { lazyListState.firstVisibleItemIndex >= 2 } }
-                val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 50.dp
-                val tabsTopPad by animateDpAsState(
-                    targetValue = if (tabsStuck) topInset else 0.dp,
-                    animationSpec = tween(200),
-                    label = "tabsTopPad"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (glassOn) Color(0xE6050507) else OttBg)
-                        .padding(top = tabsTopPad, bottom = 2.dp)
-                ) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
-                    ) {
-                        itemsIndexed(tabs) { index, title ->
-                            val isActive = activeTabIndex == index
-                            val countBadge = when (title) {
-                                "Episodes" -> " ($maxEpisode)"
-                                "Characters" -> if (anime.characters.isNotEmpty()) " (${anime.characters.size})" else ""
-                                "How to Watch" -> if (anime.relations.isNotEmpty()) " (${anime.relations.size})" else ""
-                                else -> ""
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(if (isActive) Color.White else Color(0x14FFFFFF))
-                                    .border(1.dp, if (isActive) Color.White else Color(0x2EFFFFFF), CircleShape)
-                                    .clickable { selectedTab = index }
-                                    .padding(horizontal = 16.dp, vertical = 9.dp)
-                            ) {
-                                Text(
-                                    text = "$title$countBadge",
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isActive) Color.Black else Color(0xFFCBD5E1),
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // === 4. TAB CONTENTS ===
-            val currentTabs = if (anime.isMovie) {
-                listOf("Characters", "Casts", "Videos", "How to Watch", "More Like This")
-            } else {
-                listOf("Episodes", "Characters", "Casts", "Videos", "How to Watch", "More Like This")
-            }
-            val currentTabTitle = currentTabs.getOrElse(selectedTab.coerceIn(0, currentTabs.lastIndex)) { currentTabs.first() }
-
+            // === TAB CONTENTS ===
             when (currentTabTitle) {
-                // --- TAB: EPISODES ---
+                // --- EPISODES: compact rows (thumbnail + title + 2-line synopsis), lazily composed ---
                 "Episodes" -> {
-                    // Controls Row: Search, Episode Count Badge, Sort Oldest/Newest, Range Pills, View Toggle
-                    item {
+                    item(key = "ep_controls") {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -945,7 +1047,6 @@ fun DetailScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Search Box without text cut-off (using BasicTextField)
                                 BasicTextField(
                                     value = episodeSearchQuery,
                                     onValueChange = { episodeSearchQuery = it },
@@ -959,7 +1060,7 @@ fun DetailScreen(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .playerGlass(backdrop, 20.dp)
+                                                .cardSurface(glassOn, 20.dp)
                                                 .padding(horizontal = 12.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -972,11 +1073,7 @@ fun DetailScreen(
                                             )
                                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                                                 if (episodeSearchQuery.isEmpty()) {
-                                                    Text(
-                                                        "Search episode...",
-                                                        fontSize = 13.sp,
-                                                        color = OttTextMuted
-                                                    )
+                                                    Text("Search episode...", fontSize = 13.sp, color = OttTextMuted)
                                                 }
                                                 innerTextField()
                                             }
@@ -987,7 +1084,7 @@ fun DetailScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Close,
-                                                        contentDescription = null,
+                                                        contentDescription = "Clear search",
                                                         tint = Color.White,
                                                         modifier = Modifier.size(14.dp)
                                                     )
@@ -997,12 +1094,11 @@ fun DetailScreen(
                                     }
                                 )
 
-                                // Sort Oldest / Newest Toggle Button
                                 IconButton(
                                     onClick = { isOldestFirst = !isOldestFirst },
                                     modifier = Modifier
                                         .size(40.dp)
-                                        .playerGlass(backdrop, 20.dp)
+                                        .cardSurface(glassOn, 20.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.SwapVert,
@@ -1012,12 +1108,11 @@ fun DetailScreen(
                                     )
                                 }
 
-                                // Grid vs List Toggle
                                 IconButton(
                                     onClick = { isEpisodeGridView = !isEpisodeGridView },
                                     modifier = Modifier
                                         .size(40.dp)
-                                        .playerGlass(backdrop, 20.dp)
+                                        .cardSurface(glassOn, 20.dp)
                                 ) {
                                     Icon(
                                         imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
@@ -1028,39 +1123,23 @@ fun DetailScreen(
                                 }
                             }
 
-                            // Episode Range Selector Pills (1-25, 26-50, etc.)
+                            // Episode range selector (1-25, 26-50, ...) with the same sliding pill as the tabs
                             if (pageCount > 1) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    LazyRow(
+                                    SlidingPillTabs(
+                                        items = rangeLabels,
+                                        selectedIndex = selectedPage,
+                                        onSelect = { selectedPage = it },
                                         modifier = Modifier.weight(1f),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        contentPadding = PaddingValues(vertical = 4.dp)
-                                    ) {
-                                        items(pageCount) { page ->
-                                            val pStart = page * pageSize + 1
-                                            val pEnd = minOf(pStart + pageSize - 1, maxEpisode)
-                                            val isSelected = selectedPage == page
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(OttPillShape)
-                                                    .background(if (isSelected) Color.White else Color(0x14FFFFFF))
-                                                    .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), OttPillShape)
-                                                    .clickable { selectedPage = page }
-                                                    .padding(horizontal = 11.dp, vertical = 5.dp)
-                                            ) {
-                                                Text(
-                                                    text = "$pStart–$pEnd",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSelected) Color.Black else OttTextSecondary
-                                                )
-                                            }
-                                        }
-                                    }
+                                        edge = 0.dp,
+                                        vPad = 2.dp,
+                                        tabHeight = 32.dp,
+                                        tabHPad = 12.dp,
+                                        fontSize = 12.sp
+                                    )
 
                                     Spacer(Modifier.width(8.dp))
 
@@ -1086,7 +1165,7 @@ fun DetailScreen(
                                                 com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                 showDownloadRangeSheet = curStart..curEnd
                                             }
-                                            .padding(horizontal = 9.dp, vertical = 6.dp),
+                                            .padding(horizontal = 9.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
@@ -1098,1159 +1177,352 @@ fun DetailScreen(
                         }
                     }
 
-                    // Episode List / Grid Content
-                    item {
-                        val rawEpisodes = if (episodeSearchQuery.isNotBlank()) {
-                            (1..maxEpisode).filter { epNum ->
-                                val epTitle = tmdbEpisodes[epNum]?.name.orEmpty()
-                                epNum.toString() == episodeSearchQuery.trim() || epTitle.contains(episodeSearchQuery.trim(), ignoreCase = true)
-                            }
-                        } else {
-                            val pStart = selectedPage * pageSize + 1
-                            val pEnd = minOf(pStart + pageSize - 1, maxEpisode)
-                            (pStart..pEnd).toList()
+                    if (pageEpisodes.isEmpty()) {
+                        item(key = "ep_empty") {
+                            EmptyNote(
+                                if (episodeSearchQuery.isNotBlank()) "No episodes match \"$episodeSearchQuery\"" else "No episodes available"
+                            )
                         }
-
-                        val pageEpisodes = if (isOldestFirst) rawEpisodes else rawEpisodes.reversed()
-
-                        if (pageEpisodes.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (episodeSearchQuery.isNotBlank()) "No episodes match \"$episodeSearchQuery\"" else "No episodes available",
-                                    color = OttTextMuted,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        } else if (isEpisodeGridView) {
-                            // Compact Grid View
-                            Column(
+                    } else if (isEpisodeGridView) {
+                        itemsIndexed(pageEpisodes.chunked(5), key = { i, _ -> "ep_grid_$i" }) { _, row ->
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                val chunked = pageEpisodes.chunked(5)
-                                chunked.forEach { row ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        row.forEach { epNum ->
-                                            val isCurrent = epNum == selectedEpisode
-                                            val isEpFiller = fillerInfo.isFiller(epNum)
-                                            val isEpMixed = fillerInfo.isMixed(epNum)
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(46.dp)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(
-                                                        if (isCurrent) Color.White
-                                                        else if (isEpFiller) Color(0x24F59E0B)
-                                                        else if (isEpMixed) Color(0x246366F1)
-                                                        else Color(0x18FFFFFF)
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (isCurrent) Color.White
-                                                        else if (isEpFiller) Color(0x60FBBF24)
-                                                        else if (isEpMixed) Color(0x60818CF8)
-                                                        else Color(0x25FFFFFF),
-                                                        RoundedCornerShape(10.dp)
-                                                    )
-                                                .clickable {
-                                                    selectedEpisode = epNum
-                                                    if (anime.id <= 0) showMissingAnilistDialog = true
-                                                    else onPlay(anime.id, epNum, selectedProvider)
-                                                },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "$epNum",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else Color.White
-                                                )
-                                                if (isEpFiller || isEpMixed) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .align(Alignment.TopEnd)
-                                                            .padding(4.dp)
-                                                            .size(5.dp)
-                                                            .clip(CircleShape)
-                                                            .background(if (isEpMixed) Color(0xFFA5B4FC) else Color(0xFFFBBF24))
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        repeat(5 - row.size) {
-                                            Spacer(Modifier.weight(1f))
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            // Anikura-style Rich 16:9 Episode Cards
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                pageEpisodes.forEachIndexed { epIndex, epNum ->
-                                    val epStillInfo = tmdbEpisodes[epNum]
-                                    val isDownloaded = vm.isAnimeEpisodeDownloaded(anime.id, epNum)
-                                    val isDownloading = activeAnimeTasks.containsKey("${anime.id}:$epNum")
-                                    val isSelected = epNum == selectedEpisode
-
-                                    val savedPos = vm.getSavedPosition(anime.id, epNum)
-                                    val dur = (anime.duration ?: 24) * 60 * 1000L
-                                    val progressRatio = if (dur > 0 && savedPos > 0) (savedPos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
-
-                                    // 3D Staggered Entrance Animation
-                                    val animState = remember { mutableStateOf(false) }
-                                    LaunchedEffect(epNum) { animState.value = true }
-                                    val cardAlpha by animateFloatAsState(
-                                        targetValue = if (animState.value) 1f else 0f,
-                                        animationSpec = tween(durationMillis = 300, delayMillis = (epIndex * 35).coerceAtMost(280)),
-                                        label = "ep_alpha_$epNum"
-                                    )
-                                    val cardScale by animateFloatAsState(
-                                        targetValue = if (animState.value) 1f else 0.94f,
-                                        animationSpec = tween(durationMillis = 300, delayMillis = (epIndex * 35).coerceAtMost(280)),
-                                        label = "ep_scale_$epNum"
-                                    )
-                                    val cardRotationX by animateFloatAsState(
-                                        targetValue = if (animState.value) 0f else 10f,
-                                        animationSpec = tween(durationMillis = 300, delayMillis = (epIndex * 35).coerceAtMost(280)),
-                                        label = "ep_rot_$epNum"
-                                    )
-
-                                    var itemTopInWindow by remember { mutableStateOf(Float.MAX_VALUE) }
-                                    var itemHeightPx by remember { mutableStateOf(1f) }
-
-                                    Column(
+                                row.forEach { epNum ->
+                                    val isCurrent = epNum == selectedEpisode
+                                    val isEpFiller = fillerInfo.isFiller(epNum)
+                                    val isEpMixed = fillerInfo.isMixed(epNum)
+                                    Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .onGloballyPositioned { coords ->
-                                                itemTopInWindow = coords.boundsInWindow().top
-                                                itemHeightPx = coords.size.height.toFloat()
-                                            }
-                                            .graphicsLayer {
-                                                val baseAlpha = cardAlpha
-                                                val baseScale = cardScale
-
-                                                // Top dismiss threshold near sticky tab bar
-                                                val dismissThreshold = 220f * density
-                                                if (itemTopInWindow < dismissThreshold) {
-                                                    val progress = ((dismissThreshold - itemTopInWindow) / (itemHeightPx * 0.7f).coerceAtLeast(1f)).coerceIn(0f, 1f)
-                                                    scaleX = baseScale * (1f - progress * 0.12f)
-                                                    scaleY = baseScale * (1f - progress * 0.12f)
-                                                    rotationX = cardRotationX + progress * 15f
-                                                    alpha = baseAlpha * (1f - progress * 0.85f).coerceIn(0f, 1f)
-                                                    translationY = -progress * 22f * density
-                                                } else {
-                                                    val zoomZone = dismissThreshold + itemHeightPx * 0.9f
-                                                    if (itemTopInWindow < zoomZone) {
-                                                        val fwdProg = ((zoomZone - itemTopInWindow) / (itemHeightPx * 0.9f).coerceAtLeast(1f)).coerceIn(0f, 1f)
-                                                        scaleX = baseScale * (0.95f + fwdProg * 0.05f)
-                                                        scaleY = baseScale * (0.95f + fwdProg * 0.05f)
-                                                        rotationX = cardRotationX - (1f - fwdProg) * 4f
-                                                        alpha = baseAlpha
-                                                        translationY = 0f
-                                                    } else {
-                                                        scaleX = baseScale * 0.95f
-                                                        scaleY = baseScale * 0.95f
-                                                        rotationX = cardRotationX
-                                                        alpha = baseAlpha
-                                                        translationY = 0f
-                                                    }
-                                                }
-                                                cameraDistance = 12f * density
-                                            }
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(Color(0xFF050507))
+                                            .weight(1f)
+                                            .height(46.dp)
+                                            .clip(RoundedCornerShape(10.dp))
                                             .background(
-                                                if (isSelected) Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
-                                                else Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
+                                                if (isCurrent) Color.White
+                                                else if (isEpFiller) Color(0x24F59E0B)
+                                                else if (isEpMixed) Color(0x246366F1)
+                                                else Color(0x18FFFFFF)
                                             )
                                             .border(
-                                                if (isSelected) 1.2.dp else 1.dp,
-                                                if (isSelected) Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
-                                                else Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF))),
-                                                RoundedCornerShape(20.dp)
+                                                1.dp,
+                                                if (isCurrent) Color.White
+                                                else if (isEpFiller) Color(0x60FBBF24)
+                                                else if (isEpMixed) Color(0x60818CF8)
+                                                else Color(0x25FFFFFF),
+                                                RoundedCornerShape(10.dp)
                                             )
                                             .clickable {
                                                 selectedEpisode = epNum
                                                 if (anime.id <= 0) showMissingAnilistDialog = true
                                                 else onPlay(anime.id, epNum, selectedProvider)
-                                            }
-                                            .padding(12.dp)
+                                            },
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        // 16:9 Thumbnail Box
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .aspectRatio(16f / 9f)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0xFF141722))
-                                        ) {
-                                            val epThumbnail = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
-                                                ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
-                                                ?: tmdbDetails?.backdropUrl?.takeIf { it.isNotBlank() }
-                                                ?: heroImageUrl?.takeIf { it.isNotBlank() }
-                                                ?: anime.banner?.takeIf { it.isNotBlank() }
-                                                ?: anime.cover
-
-                                            SubcomposeAsyncImage(
-                                                model = epThumbnail,
-                                                contentDescription = epStillInfo?.name ?: "Episode $epNum",
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop,
-                                                loading = {
-                                                    ShimmerBox(
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        shape = RoundedCornerShape(12.dp)
-                                                    )
-                                                },
-                                                error = {
-                                                    AsyncImage(
-                                                        model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
-                                                        contentDescription = epStillInfo?.name ?: "Episode $epNum",
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = ContentScale.Crop
-                                                    )
-                                                }
-                                            )
-
-                                            // Dark gradient overlay
+                                        Text(
+                                            text = "$epNum",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else Color.White
+                                        )
+                                        if (isEpFiller || isEpMixed) {
                                             Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            listOf(Color.Transparent, Color(0xAA000000))
-                                                        )
-                                                    )
-                                            )
-
-                                            // Play Icon in Center
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.Center)
-                                                    .size(42.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0x60000000))
-                                                    .border(1.dp, Color(0x40FFFFFF), CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.PlayArrow,
-                                                    contentDescription = null,
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                            }
-
-                                            // Episode Badge Bottom Left (e.g. Episode 1)
-                                            val isEpFiller = fillerInfo.isFiller(epNum)
-                                            val isEpMixed = fillerInfo.isMixed(epNum)
-                                            Row(
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomStart)
-                                                    .padding(8.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(6.dp))
-                                                        .background(Color(0xCC000000))
-                                                        .border(0.6.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
-                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "Episode $epNum",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color.White
-                                                    )
-                                                }
-
-                                                if (isEpFiller || isEpMixed) {
-                                                    EpisodeFillerBadge(isMixed = isEpMixed)
-                                                }
-                                            }
-
-                                            // Duration Bottom Right (e.g. 24m)
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomEnd)
-                                                    .padding(8.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(Color(0xCC000000))
-                                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                                            ) {
-                                                val runMin = tmdbDetails?.episodeRunTime ?: anime.duration ?: 24
-                                                Text(
-                                                    text = "${runMin}m",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = Color(0xDDFFFFFF)
-                                                )
-                                            }
-
-                                            // Action Buttons Top Right: Share & Download
-                                            Row(
                                                 modifier = Modifier
                                                     .align(Alignment.TopEnd)
-                                                    .padding(8.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                // Share Episode Button
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(32.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color(0x99101420))
-                                                        .border(1.dp, Color(0x38FFFFFF), CircleShape)
-                                                        .clickable {
-                                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                                type = "text/plain"
-                                                                putExtra(
-                                                                    Intent.EXTRA_TEXT,
-                                                                    "Watch ${anime.displayTitle} Ep $epNum on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/anime/${anime.id}?ep=$epNum"
-                                                                )
-                                                            }
-                                                            context.startActivity(Intent.createChooser(shareIntent, "Share Episode"))
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Share,
-                                                        contentDescription = "Share Episode",
-                                                        tint = Color.White,
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                }
-
-                                                // Download Button Top Right
-                                                val dlInteraction = remember { MutableInteractionSource() }
-                                                val dlPressed by dlInteraction.collectIsPressedAsState()
-                                                val dlScale by animateFloatAsState(
-                                                    targetValue = if (dlPressed) 0.85f else 1f,
-                                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                                                    label = "epDlScale"
-                                                )
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(32.dp)
-                                                        .scale(dlScale)
-                                                        .clip(CircleShape)
-                                                        .background(Color(0x99101420))
-                                                        .border(1.dp, Color(0x38FFFFFF), CircleShape)
-                                                        .clickable(
-                                                            interactionSource = dlInteraction,
-                                                            indication = null
-                                                        ) {
-                                                            if (!isDownloaded && !isDownloading) {
-                                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                                showDownloadSheetEpisode = epNum to (epStillInfo?.name ?: "Episode $epNum")
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    when {
-                                                        isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                                                        isDownloading -> Icon(Icons.Default.Downloading, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(16.dp))
-                                                        else -> Icon(Icons.Default.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                                    }
-                                                }
-                                            }
-
-                                            // Watch progress bar at bottom edge
-                                            if (progressRatio > 0.05f) {
-                                                LinearProgressIndicator(
-                                                    progress = { progressRatio },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(3.dp)
-                                                        .align(Alignment.BottomCenter),
-                                                    color = Color.White,
-                                                    trackColor = Color(0x40FFFFFF)
-                                                )
-                                            }
+                                                    .padding(4.dp)
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isEpMixed) Color(0xFFA5B4FC) else Color(0xFFFBBF24))
+                                            )
                                         }
-
-                                        Spacer(Modifier.height(10.dp))
-
-                                        // Episode Title
-                                        Text(
-                                            text = epStillInfo?.name ?: "Episode $epNum",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-
-                                        // Episode Description
-                                        val desc = epStillInfo?.overview?.takeIf { it.isNotBlank() } ?: "sit back and enjoy Episode $epNum of ${anime.displayTitle}."
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            text = desc,
-                                            fontSize = 12.sp,
-                                            lineHeight = 17.sp,
-                                            color = OttTextSecondary,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
                                     }
                                 }
+                                repeat(5 - row.size) {
+                                    Spacer(Modifier.weight(1f))
+                                }
                             }
+                        }
+                    } else {
+                        items(pageEpisodes, key = { "ep_$it" }) { epNum ->
+                            val still = tmdbEpisodes[epNum]
+                            val isDownloaded = vm.isAnimeEpisodeDownloaded(anime.id, epNum)
+                            val isDownloading = activeAnimeTasks.containsKey("${anime.id}:$epNum")
+                            val savedPos = vm.getSavedPosition(anime.id, epNum)
+                            val durMs = (anime.duration ?: 24) * 60 * 1000L
+                            val progressRatio = if (durMs > 0 && savedPos > 0) (savedPos.toFloat() / durMs.toFloat()).coerceIn(0f, 1f) else 0f
+                            EpisodeRow(
+                                epNum = epNum,
+                                title = still?.name ?: "Episode $epNum",
+                                overview = still?.overview?.takeIf { it.isNotBlank() }
+                                    ?: "sit back and enjoy Episode $epNum of ${anime.displayTitle}.",
+                                thumb = still?.stillUrl?.takeIf { it.isNotBlank() }
+                                    ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                                    ?: tmdbDetails?.backdropUrl?.takeIf { it.isNotBlank() }
+                                    ?: anime.banner?.takeIf { it.isNotBlank() }
+                                    ?: anime.cover,
+                                runMin = tmdbDetails?.episodeRunTime ?: anime.duration ?: 24,
+                                progress = progressRatio,
+                                isSelected = epNum == selectedEpisode,
+                                isDownloaded = isDownloaded,
+                                isDownloading = isDownloading,
+                                isFiller = fillerInfo.isFiller(epNum),
+                                isMixed = fillerInfo.isMixed(epNum),
+                                glassOn = glassOn,
+                                onClick = {
+                                    selectedEpisode = epNum
+                                    if (anime.id <= 0) showMissingAnilistDialog = true
+                                    else onPlay(anime.id, epNum, selectedProvider)
+                                },
+                                onShare = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Watch ${anime.displayTitle} Ep $epNum on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/anime/${anime.id}?ep=$epNum"
+                                        )
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Episode"))
+                                },
+                                onDownload = {
+                                    if (!isDownloaded && !isDownloading) {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        showDownloadSheetEpisode = epNum to (still?.name ?: "Episode $epNum")
+                                    }
+                                }
+                            )
                         }
                     }
                 }
 
-                // --- TAB: CHARACTERS (3D Card Swipe Deck) ---
+                // --- CHARACTERS: role filter + full-width rows (portrait, role, voice actor) ---
                 "Characters" -> {
-                    item {
-                        val characters = anime.characters
-                        if (characters.isEmpty() && vm.detailLoading) {
-                            // Skeleton shimmer placeholders while characters load
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                contentPadding = PaddingValues(horizontal = 20.dp)
-                            ) {
-                                items(6) {
-                                    Column(
-                                        modifier = Modifier
-                                            .width(152.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(Color(0x14FFFFFF))
-                                            .padding(10.dp)
-                                    ) {
-                                        ShimmerBox(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .aspectRatio(0.78f)
-                                                .clip(RoundedCornerShape(10.dp))
-                                        )
-                                        Spacer(Modifier.height(8.dp))
-                                        ShimmerBox(
-                                            modifier = Modifier
-                                                .fillMaxWidth(0.8f)
-                                                .height(12.dp)
-                                                .clip(RoundedCornerShape(4.dp))
-                                        )
-                                        Spacer(Modifier.height(4.dp))
-                                        ShimmerBox(
-                                            modifier = Modifier
-                                                .fillMaxWidth(0.5f)
-                                                .height(10.dp)
-                                                .clip(RoundedCornerShape(4.dp))
-                                        )
-                                    }
-                                }
-                            }
-                        } else if (characters.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("No character information available.", color = OttTextMuted, fontSize = 13.sp)
+                    if (characters.isEmpty()) {
+                        if (vm.detailLoading) {
+                            items(3, key = { "ch_skel_$it" }) {
+                                ShimmerBox(
+                                    modifier = Modifier
+                                        .padding(horizontal = 18.dp)
+                                        .fillMaxWidth()
+                                        .height(108.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                )
                             }
                         } else {
-                            val charListState = rememberLazyListState()
-                            LazyRow(
-                                state = charListState,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                contentPadding = PaddingValues(horizontal = 20.dp)
-                            ) {
-                                itemsIndexed(characters, key = { index, it -> "char_${it.id}_$index" }) { charIdx, char ->
-                                    val itemInfo = remember {
-                                        derivedStateOf {
-                                            charListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == charIdx }
-                                        }
-                                    }
-                                    val rotY = remember {
-                                        derivedStateOf {
-                                            val info = itemInfo.value ?: return@derivedStateOf 0f
-                                            val viewportCenter = (charListState.layoutInfo.viewportStartOffset + charListState.layoutInfo.viewportEndOffset) / 2f
-                                            val itemCenter = info.offset + info.size / 2f
-                                            val delta = (itemCenter - viewportCenter) / charListState.layoutInfo.viewportEndOffset.toFloat().coerceAtLeast(1f)
-                                            (-delta * 30f).coerceIn(-35f, 35f)
-                                        }
-                                    }
-                                    val cardScale = remember {
-                                        derivedStateOf {
-                                            val info = itemInfo.value ?: return@derivedStateOf 1f
-                                            val viewportCenter = (charListState.layoutInfo.viewportStartOffset + charListState.layoutInfo.viewportEndOffset) / 2f
-                                            val itemCenter = info.offset + info.size / 2f
-                                            val delta = kotlin.math.abs((itemCenter - viewportCenter) / charListState.layoutInfo.viewportEndOffset.toFloat().coerceAtLeast(1f))
-                                            (1f - (delta * 0.14f)).coerceIn(0.86f, 1f)
-                                        }
-                                    }
-
-                                    Column(
-                                        modifier = Modifier
-                                            .width(152.dp)
-                                            .graphicsLayer {
-                                                rotationY = rotY.value
-                                                scaleX = cardScale.value
-                                                scaleY = cardScale.value
-                                                cameraDistance = 8f * density
-                                            }
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(Color(0x14FFFFFF))
-                                            .border(1.dp, Color(0x20FFFFFF), RoundedCornerShape(14.dp))
-                                            .padding(10.dp)
-                                    ) {
-                                        // Character Portrait + Role Badge
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .aspectRatio(0.78f)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(Color(0x22FFFFFF))
-                                        ) {
-                                            AsyncImage(
-                                                model = char.image,
-                                                contentDescription = char.name,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.TopEnd)
-                                                    .padding(6.dp)
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(if (char.role.equals("MAIN", ignoreCase = true)) Color(0xD0E50914) else Color(0xB0000000))
-                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = char.role.lowercase().replaceFirstChar { it.uppercase() },
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(Modifier.height(8.dp))
-
-                                        // Character Names
-                                        Text(
-                                            text = char.name,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (!char.nativeName.isNullOrBlank()) {
-                                            Text(
-                                                text = char.nativeName,
-                                                fontSize = 10.5.sp,
-                                                color = OttTextMuted,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-
-                                        // Voice Actor
-                                        if (!char.voiceActorName.isNullOrBlank()) {
-                                            Spacer(Modifier.height(8.dp))
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                AsyncImage(
-                                                    model = char.voiceActorImage,
-                                                    contentDescription = char.voiceActorName,
-                                                    modifier = Modifier
-                                                        .size(24.dp)
-                                                        .clip(CircleShape)
-                                                        .border(0.6.dp, Color(0x30FFFFFF), CircleShape),
-                                                    contentScale = ContentScale.Crop
-                                                )
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = char.voiceActorName,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color(0xEEFFFFFF),
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    Text("JP VA", fontSize = 8.5.sp, color = OttTextMuted)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            item(key = "ch_empty") { EmptyNote("No character information available.") }
+                        }
+                    } else {
+                        if (charRoles.size > 2) {
+                            item(key = "ch_filters") {
+                                SlidingPillTabs(
+                                    items = charLabels,
+                                    selectedIndex = charIdx,
+                                    onSelect = { charFilter = it },
+                                    edge = 18.dp,
+                                    vPad = 2.dp,
+                                    tabHeight = 32.dp,
+                                    tabHPad = 12.dp,
+                                    fontSize = 12.sp
+                                )
                             }
+                        }
+                        itemsIndexed(shownCharacters, key = { i, c -> "ch_${c.id}_$i" }) { _, c ->
+                            CharacterRow(char = c, glassOn = glassOn)
                         }
                     }
                 }
 
-                // --- TAB: CASTS & STAFF (Uniform Size Cards) ---
+                // --- CASTS: 3-column grids so the whole crew is visible at a glance ---
                 "Casts" -> {
-                    item {
-                        val staffList = anime.staff
-                        val tmdbCast = tmdbDetails?.cast.orEmpty()
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 18.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            // Key Production Staff (AniList)
-                            if (staffList.isNotEmpty()) {
-                                Text(
-                                    text = "PRODUCTION STAFF",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.8.sp,
-                                    color = OttSecondary
-                                )
-
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    itemsIndexed(staffList, key = { index, it -> "st_${it.id}_$index" }) { _, staff ->
-                                        Column(
-                                            modifier = Modifier
-                                                .width(104.dp)
-                                                .height(154.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0x12FFFFFF))
-                                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(12.dp))
-                                                .padding(8.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            AsyncImage(
-                                                model = staff.image,
-                                                contentDescription = staff.name,
-                                                modifier = Modifier
-                                                    .size(64.dp)
-                                                    .clip(CircleShape)
-                                                    .border(1.dp, Color(0x30FFFFFF), CircleShape)
-                                                    .background(Color(0x22FFFFFF)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = staff.name,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                                Spacer(Modifier.height(2.dp))
-                                                Text(
-                                                    text = staff.role,
-                                                    fontSize = 9.sp,
-                                                    color = OttTextMuted,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    textAlign = TextAlign.Center,
-                                                    lineHeight = 12.sp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // TMDB Voice & Screen Cast
-                            if (tmdbCast.isNotEmpty()) {
-                                Text(
-                                    text = "VOICE CAST (TMDB)",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.8.sp,
-                                    color = OttSecondary
-                                )
-
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    itemsIndexed(tmdbCast, key = { index, it -> "tmdbc_${it.id}_$index" }) { _, member ->
-                                        Column(
-                                            modifier = Modifier
-                                                .width(104.dp)
-                                                .height(154.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0x12FFFFFF))
-                                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(12.dp))
-                                                .padding(8.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            AsyncImage(
-                                                model = member.profileUrl,
-                                                contentDescription = member.name,
-                                                modifier = Modifier
-                                                    .size(64.dp)
-                                                    .clip(CircleShape)
-                                                    .border(1.dp, Color(0x30FFFFFF), CircleShape)
-                                                    .background(Color(0x22FFFFFF)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = member.name,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                                member.character?.let { charName ->
-                                                    Spacer(Modifier.height(2.dp))
-                                                    Text(
-                                                        text = charName,
-                                                        fontSize = 9.sp,
-                                                        color = OttTextSecondary,
-                                                        maxLines = 2,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        textAlign = TextAlign.Center,
-                                                        lineHeight = 12.sp
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    if (staffList.isEmpty() && tmdbCast.isEmpty()) {
+                        item(key = "cast_empty") { EmptyNote("No cast or staff information available.") }
+                    }
+                    if (staffList.isNotEmpty()) {
+                        item(key = "staff_h") { SectionHeader("PRODUCTION STAFF", staffList.size) }
+                        itemsIndexed(
+                            staffList.map { Triple(it.name, it.image, it.role) }.chunked(3),
+                            key = { i, _ -> "staff_$i" }
+                        ) { _, row -> PeopleRow(row, glassOn) }
+                    }
+                    if (tmdbCast.isNotEmpty()) {
+                        item(key = "cast_h") { SectionHeader("VOICE CAST (TMDB)", tmdbCast.size) }
+                        itemsIndexed(
+                            tmdbCast.map { Triple(it.name, it.profileUrl, it.character) }.chunked(3),
+                            key = { i, _ -> "cast_$i" }
+                        ) { _, row -> PeopleRow(row, glassOn) }
                     }
                 }
 
-                // --- TAB: VIDEOS (Trailers, Teasers, Clips with safe YouTube Launch) ---
+                // --- VIDEOS: one featured card, the rest as compact rows ---
                 "Videos" -> {
-                    item {
-                        val allVideos = remember(anime.trailerId, tmdbDetails?.videos, tmdbDetails?.trailerUrl) {
-                            val list = mutableListOf<TmdbVideo>()
-                            // 1. AniList official trailer
-                            val rawAnimeTrailer = anime.trailerId
-                            if (!rawAnimeTrailer.isNullOrBlank()) {
-                                val trimmed = rawAnimeTrailer.trim()
-                                val key = when {
-                                    trimmed.contains("v=") -> trimmed.substringAfter("v=").substringBefore("&").substringBefore("?")
-                                    trimmed.contains("youtu.be/") -> trimmed.substringAfter("youtu.be/").substringBefore("?").substringBefore("&")
-                                    trimmed.contains("embed/") -> trimmed.substringAfter("embed/").substringBefore("?").substringBefore("&")
-                                    else -> trimmed
-                                }.trim()
-                                if (key.isNotEmpty()) {
-                                    list.add(TmdbVideo(key = key, name = "Official Trailer", type = "Trailer"))
-                                }
-                            }
-                            // 2. TMDB videos
-                            tmdbDetails?.videos?.forEach { vid ->
-                                if (list.none { it.key == vid.key }) {
-                                    list.add(vid)
-                                }
-                            }
-                            // 3. Fallback TMDB single trailerUrl if list is empty
-                            if (list.isEmpty()) {
-                                val tKey = tmdbDetails?.trailerUrl
-                                if (!tKey.isNullOrBlank()) {
-                                    list.add(TmdbVideo(key = tKey.trim(), name = "Trailer", type = "Trailer"))
-                                }
-                            }
-                            list
-                        }
-
-                        if (allVideos.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("No videos or trailers available.", color = OttTextMuted, fontSize = 13.sp)
-                            }
-                        } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                allVideos.forEachIndexed { vIdx, video ->
-                                    val vidKey = video.key
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(Color(0x12FFFFFF))
-                                            .border(1.dp, Color(0x20FFFFFF), RoundedCornerShape(16.dp))
-                                            .clickable {
-                                                val ytAppIntent = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:$vidKey")).apply {
-                                                    putExtra("force_fullscreen", true)
-                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                try {
-                                                    context.startActivity(ytAppIntent)
-                                                } catch (_: Exception) {
-                                                    try {
-                                                        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$vidKey")).apply {
-                                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                        }
-                                                        context.startActivity(webIntent)
-                                                    } catch (_: Exception) {}
-                                                }
-                                            }
-                                            .padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        // 16:9 Thumbnail Box
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .aspectRatio(16f / 9f)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0xFF141722))
-                                        ) {
-                                            SubcomposeAsyncImage(
-                                                model = "https://img.youtube.com/vi/$vidKey/hqdefault.jpg",
-                                                contentDescription = video.name,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop,
-                                                loading = {
-                                                    ShimmerBox(
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        shape = RoundedCornerShape(12.dp)
-                                                    )
-                                                }
-                                            )
-
-                                            // Dark gradient overlay
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            listOf(Color(0x30000000), Color(0x75000000))
-                                                        )
-                                                    )
-                                            )
-
-                                            // Center Play Button
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.Center)
-                                                    .size(50.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0xDD000000))
-                                                    .border(1.5.dp, Color.White, CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.PlayArrow,
-                                                    contentDescription = "Play Video",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(28.dp)
-                                                )
-                                            }
-
-                                            // Video Type Badge
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomStart)
-                                                    .padding(10.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(Color(0xD0000000))
-                                                    .border(0.6.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = video.type.uppercase(Locale.US),
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-
-                                        // Video Title & Open action
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = video.name,
-                                                fontSize = 13.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.OpenInNew,
-                                                    contentDescription = null,
-                                                    tint = OttSecondary,
-                                                    modifier = Modifier.size(13.dp)
-                                                )
-                                                Text(
-                                                    text = "Watch",
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = OttSecondary
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                    if (allVideos.isEmpty()) {
+                        item(key = "vid_empty") { EmptyNote("No videos or trailers available.") }
+                    } else {
+                        itemsIndexed(allVideos, key = { i, v -> "vid_${v.key}_$i" }) { i, video ->
+                            VideoItem(
+                                video = video,
+                                featured = i == 0,
+                                glassOn = glassOn,
+                                onClick = { openYoutube(context, video.key) }
+                            )
                         }
                     }
                 }
 
-                // --- TAB: HOW TO WATCH (Watch Order, Prequels, Sequels, Adaptations) ---
+                // --- HOW TO WATCH: grouped vertical rows (prequel / sequel / source / side stories) ---
                 "How to Watch" -> {
-                    item {
-                        val relations = anime.relations
-                        if (relations.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("No watch order or relation data available.", color = OttTextMuted, fontSize = 13.sp)
-                            }
-                        } else {
-                            val prequels = relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
-                            val sequels = relations.filter { it.relationType.equals("SEQUEL", ignoreCase = true) }
-                            val adaptations = relations.filter { it.relationType.equals("ADAPTATION", ignoreCase = true) || it.relationType.equals("SOURCE", ignoreCase = true) }
-                            val others = relations.filter { it !in prequels && it !in sequels && it !in adaptations }
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                // Prequels (Watch First)
-                                if (prequels.isNotEmpty()) {
-                                    RelationGroupSection(
-                                        title = "PREQUEL (WATCH BEFORE)",
-                                        relations = prequels,
-                                        vm = vm
-                                    )
-                                }
-
-                                // Sequels (Watch Next)
-                                if (sequels.isNotEmpty()) {
-                                    RelationGroupSection(
-                                        title = "SEQUEL (WATCH NEXT)",
-                                        relations = sequels,
-                                        vm = vm
-                                    )
-                                }
-
-                                // Source / Manga Adaptation
-                                if (adaptations.isNotEmpty()) {
-                                    RelationGroupSection(
-                                        title = "ORIGINAL SOURCE & ADAPTATION",
-                                        relations = adaptations,
-                                        vm = vm
-                                    )
-                                }
-
-                                // Side Stories & Others
-                                if (others.isNotEmpty()) {
-                                    RelationGroupSection(
-                                        title = "SIDE STORIES & ALTERNATIVE VERSIONS",
-                                        relations = others,
-                                        vm = vm
-                                    )
-                                }
+                    if (relationGroups.isEmpty()) {
+                        item(key = "rel_empty") { EmptyNote("No watch order or relation data available.") }
+                    } else {
+                        relationGroups.forEach { (groupTitle, list) ->
+                            item(key = "rel_h_$groupTitle") { SectionHeader(groupTitle, list.size) }
+                            itemsIndexed(list, key = { i, r -> "rel_${groupTitle}_${r.id}_$i" }) { _, rel ->
+                                RelationRow(rel = rel, glassOn = glassOn, vm = vm)
                             }
                         }
                     }
                 }
 
-                // --- TAB: MORE LIKE THIS (3D Card Swipe Deck) ---
+                // --- MORE LIKE THIS: 3-column poster grid ---
                 "More Like This" -> {
-                    item {
-                        val recs = if (anime.recommendations.isNotEmpty()) {
-                            anime.recommendations
-                        } else {
-                            (vm.popular + vm.trending).filter { it.id != anime.id }.take(12).map {
-                                AnimeRecommendation(
-                                    id = it.id,
-                                    title = it.displayTitle,
-                                    romajiTitle = it.romajiTitle,
-                                    cover = it.cover,
-                                    banner = it.banner,
-                                    score = it.score,
-                                    format = it.displayFormat,
-                                    episodes = it.episodes
-                                )
-                            }
-                        }
-
-                        if (recs.isEmpty()) {
-                            Box(
+                    if (recs.isEmpty()) {
+                        item(key = "rec_empty") { EmptyNote("No recommendations found.") }
+                    } else {
+                        itemsIndexed(recs.chunked(3), key = { i, _ -> "rec_row_$i" }) { _, row ->
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
+                                    .padding(horizontal = 18.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text("No recommendations found.", color = OttTextMuted, fontSize = 13.sp)
-                            }
-                        } else {
-                            val recListState = rememberLazyListState()
-                            LazyRow(
-                                state = recListState,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                contentPadding = PaddingValues(horizontal = 20.dp)
-                            ) {
-                                itemsIndexed(recs, key = { index, it -> "rec_${it.id}_$index" }) { _, rec ->
-                                    Box(
-                                        modifier = Modifier.width(140.dp)
-                                    ) {
+                                row.forEach { rec ->
+                                    Box(modifier = Modifier.weight(1f)) {
                                         RecommendationPosterItem(rec = rec, onClick = { vm.openDetail(rec.id) })
                                     }
                                 }
+                                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
                 }
+
+                else -> Unit
             }
         }
 
-        // Pinned Top Bar with Scrolled Title, Quick Play Button, and Bare Watchlist Icon
-        val isScrolledPastHero = scrollOffset > 380f
+        // === 3. PINNED TABS (overlay; follows the list, then clamps under the top bar) ===
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(
-                    if (isScrolledPastHero) Modifier.background(if (glassOn) Color(0xE6050507) else OttBg)
-                    else Modifier.background(
+                .height(TabsHeight)
+                .graphicsLayer { translationY = tabsY }
+                .drawBehind { drawRect(barBg.copy(alpha = tabsPin)) }
+        ) {
+            SlidingPillTabs(
+                items = tabLabels,
+                selectedIndex = activeTabIndex,
+                onSelect = { selectedTab = it }
+            )
+        }
+
+        // === 4. TOP BAR: scrim over the hero that cross-fades to a solid bar (continuous, no pop) ===
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = 1f - barProgress }
+                    .background(
                         Brush.verticalGradient(
-                            listOf(
-                                Color(0xCC000000),
-                                Color(0x66000000),
-                                Color.Transparent
-                            )
+                            listOf(Color(0xCC000000), Color(0x66000000), Color.Transparent)
                         )
                     )
-                )
-        ) {
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = barProgress }
+                    .background(barBg)
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .height(48.dp)
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-            PlayerGlassButton(backdrop, onClick = handleBack, height = 40.dp, circle = true) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(10.dp))
+                PlayerGlassButton(backdrop, onClick = handleBack, height = 40.dp, circle = true) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(10.dp))
 
-            // Scrolled Title + Play Button
-            AnimatedVisibility(
-                visible = isScrolledPastHero,
-                enter = fadeIn(tween(180)) + slideInHorizontally(tween(180)),
-                exit = fadeOut(tween(120)),
-                modifier = Modifier.weight(1f)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Play Logo in Top Bar
-                    Box(
+                if (barVisible) {
+                    Row(
                         modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .clickable {
-                                if (anime.id <= 0) showMissingAnilistDialog = true
-                                else onPlay(anime.id, selectedEpisode, selectedProvider)
-                            },
-                        contentAlignment = Alignment.Center
+                            .weight(1f)
+                            .graphicsLayer { alpha = barProgress },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Play",
-                            tint = Color.Black,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .clickable {
+                                    if (anime.id <= 0) showMissingAnilistDialog = true
+                                    else onPlay(anime.id, selectedEpisode, selectedProvider)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Play",
+                                tint = Color.Black,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = anime.displayTitle,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (anime.isMovie) "Movie" else "Ep $selectedEpisode of $maxEpisode",
+                                fontSize = 11.sp,
+                                color = OttTextMuted,
+                                maxLines = 1
+                            )
+                        }
                     }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = anime.displayTitle,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = if (anime.isMovie) "Movie" else "Ep $selectedEpisode of $maxEpisode",
-                            fontSize = 11.sp,
-                            color = OttTextMuted,
-                            maxLines = 1
-                        )
+                    Row(
+                        modifier = Modifier.graphicsLayer { alpha = barProgress },
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PlayerGlassButton(backdrop, onClick = shareAnime, height = 40.dp, circle = true) {
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(19.dp))
+                        }
+                        PlayerGlassButton(backdrop, onClick = { showWatchlistStatusDialog = true }, height = 40.dp, circle = true) {
+                            Icon(
+                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = "Watchlist",
+                                tint = if (isBookmarked) OttAccentGold else Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
-            }
-
-            if (!isScrolledPastHero) {
-                Spacer(Modifier.weight(1f))
-            }
-
-            // Quick Share + Watchlist, only once the header actions have scrolled away
-            AnimatedVisibility(
-                visible = isScrolledPastHero,
-                enter = fadeIn(tween(180)),
-                exit = fadeOut(tween(120))
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PlayerGlassButton(backdrop, onClick = shareAnime, height = 40.dp, circle = true) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(19.dp))
-                    }
-                    PlayerGlassButton(backdrop, onClick = { showWatchlistStatusDialog = true }, height = 40.dp, circle = true) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = "Watchlist",
-                            tint = if (isBookmarked) OttAccentGold else Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
             }
         }
     }
-
     // === DIALOGS & BOTTOM SHEETS ===
     if (showWatchlistStatusDialog) {
         val watchlistItem = vm.getWatchlistItem(anime.id)
@@ -2464,36 +1736,26 @@ fun DetailScreen(
 }
 
 @Composable
-private fun SpecRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun EmptyNote(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = OttTextMuted,
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            text = value,
-            fontSize = 12.sp,
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Text(text = text, color = OttTextMuted, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun RelationGroupSection(
-    title: String,
-    relations: List<MediaRelation>,
-    vm: MainViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun SectionHeader(title: String, count: Int? = null) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         Text(
             text = title,
             fontSize = 11.sp,
@@ -2501,98 +1763,497 @@ private fun RelationGroupSection(
             letterSpacing = 0.8.sp,
             color = OttSecondary
         )
+        if (count != null) {
+            Text(text = "$count", fontSize = 11.sp, color = OttTextMuted)
+        }
+    }
+}
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
+@Composable
+private fun MiniChip(text: String, color: Color = Color(0xFFCBD5E1), bg: Color = Color(0x14FFFFFF), border: Color = Color(0x22FFFFFF)) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(0.6.dp, border, RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(text = text, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+    }
+}
+
+/** Compact episode row: ~6 fit on a phone screen instead of 2 big 16:9 cards. */
+@Composable
+private fun EpisodeRow(
+    epNum: Int,
+    title: String,
+    overview: String,
+    thumb: String?,
+    runMin: Int,
+    progress: Float,
+    isSelected: Boolean,
+    isDownloaded: Boolean,
+    isDownloading: Boolean,
+    isFiller: Boolean,
+    isMixed: Boolean,
+    glassOn: Boolean,
+    onClick: () -> Unit,
+    onShare: () -> Unit,
+    onDownload: () -> Unit
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 18.dp)
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                if (isSelected) Color(0x26FFFFFF)
+                else if (glassOn) Color(0x12FFFFFF)
+                else Color(0xFF0D1017)
+            )
+            .border(1.dp, if (isSelected) Color(0xCCFFFFFF) else Color(0x18FFFFFF), shape)
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(132.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF141722))
         ) {
-            itemsIndexed(relations, key = { index, it -> "rel_${it.id}_$index" }) { _, rel ->
-                val isNovel = rel.format.equals("NOVEL", ignoreCase = true) ||
-                    rel.format.equals("LIGHT_NOVEL", ignoreCase = true)
-                val isManga = rel.type.equals("MANGA", ignoreCase = true) ||
-                    rel.format.equals("MANGA", ignoreCase = true) ||
-                    rel.format.equals("ONE_SHOT", ignoreCase = true) ||
-                    rel.relationType.equals("ADAPTATION", ignoreCase = true)
-
-                val displayBadge = when {
-                    isNovel -> "NOVEL"
-                    isManga -> "MANGA"
-                    else -> rel.format ?: "ANIME"
-                }
-
-                Column(
+            // ponytail: plain AsyncImage (no shimmer/error subcompose) for scroll smoothness; add SubcomposeAsyncImage back if you want placeholders.
+            AsyncImage(
+                model = thumb,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(text = "EP $epNum", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x66000000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+            if (progress > 0.05f) {
+                LinearProgressIndicator(
+                    progress = { progress },
                     modifier = Modifier
-                        .width(110.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x12FFFFFF))
-                        .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(10.dp))
-                        .clickable {
-                            if (isNovel) {
-                                vm.openNovelDetail(rel.title)
-                            } else if (isManga) {
-                                vm.openMangaDetail(rel.id.toString(), rel.title)
-                            } else {
-                                vm.openDetail(rel.id)
-                            }
-                        }
-                        .padding(8.dp)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .align(Alignment.BottomCenter),
+                    color = Color.White,
+                    trackColor = Color(0x40FFFFFF)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(text = "${runMin}m", fontSize = 11.sp, color = OttTextMuted)
+                if (isFiller || isMixed) EpisodeFillerBadge(isMixed = isMixed)
+            }
+            Text(
+                text = overview,
+                fontSize = 11.5.sp,
+                lineHeight = 16.sp,
+                color = OttTextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            IconButton(
+                onClick = onShare,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x1AFFFFFF))
+            ) {
+                Icon(Icons.Default.Share, contentDescription = "Share episode $epNum", tint = Color.White, modifier = Modifier.size(14.dp))
+            }
+            IconButton(
+                onClick = onDownload,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x1AFFFFFF))
+            ) {
+                when {
+                    isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
+                    isDownloading -> Icon(Icons.Default.Downloading, contentDescription = "Downloading", tint = OttAccentGold, modifier = Modifier.size(15.dp))
+                    else -> Icon(Icons.Default.Download, contentDescription = "Download episode $epNum", tint = Color.White, modifier = Modifier.size(15.dp))
+                }
+            }
+        }
+    }
+}
+
+/** Full-width character row: portrait, role, native name and voice actor in one glance. */
+@Composable
+private fun CharacterRow(char: AnimeCharacter, glassOn: Boolean) {
+    val isMain = char.role.equals("MAIN", ignoreCase = true)
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 18.dp)
+            .fillMaxWidth()
+            .cardSurface(glassOn, 16.dp)
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AsyncImage(
+            model = char.image,
+            contentDescription = char.name,
+            modifier = Modifier
+                .width(66.dp)
+                .height(92.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0x22FFFFFF)),
+            contentScale = ContentScale.Crop
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = char.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!char.nativeName.isNullOrBlank()) {
+                Text(
+                    text = char.nativeName,
+                    fontSize = 11.sp,
+                    color = OttTextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            MiniChip(
+                text = char.role.lowercase().replaceFirstChar { it.uppercase() },
+                color = if (isMain) Color(0xFFFCA5A5) else Color(0xFFCBD5E1),
+                bg = if (isMain) Color(0x26E50914) else Color(0x14FFFFFF),
+                border = if (isMain) Color(0x66E50914) else Color(0x22FFFFFF)
+            )
+            if (!char.voiceActorName.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(
+                    AsyncImage(
+                        model = char.voiceActorImage,
+                        contentDescription = char.voiceActorName,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(0.72f)
-                            .clip(RoundedCornerShape(6.dp))
+                            .size(26.dp)
+                            .clip(CircleShape)
                             .background(Color(0x22FFFFFF))
-                    ) {
-                        AsyncImage(
-                            model = rel.cover,
-                            contentDescription = rel.title,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        // Format Badge on top corner
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(4.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color.Black.copy(alpha = 0.75f))
-                                .border(0.5.dp, Color(0x35FFFFFF), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 5.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = displayBadge,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(6.dp))
-
-                    Text(
-                        text = rel.title,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 15.sp
+                            .border(0.6.dp, Color(0x30FFFFFF), CircleShape),
+                        contentScale = ContentScale.Crop
                     )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = char.voiceActorName,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xEEFFFFFF),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text("Japanese VA", fontSize = 9.5.sp, color = OttTextMuted)
+                    }
+                }
+            }
+        }
+    }
+}
 
-                    Spacer(Modifier.height(2.dp))
-
+/** One row of up to 3 people (name, photo, subtitle). */
+@Composable
+private fun PeopleRow(people: List<Triple<String, String?, String?>>, glassOn: Boolean) {
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 18.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        people.forEach { (name, image, sub) ->
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(150.dp)
+                    .cardSurface(glassOn, 14.dp)
+                    .padding(horizontal = 6.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                AsyncImage(
+                    model = image,
+                    contentDescription = name,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x22FFFFFF))
+                        .border(1.dp, Color(0x30FFFFFF), CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                Text(
+                    text = name,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    lineHeight = 14.sp,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+                if (!sub.isNullOrBlank()) {
                     Text(
-                        text = if (isNovel || isManga) "Read $displayBadge ➔" else rel.format.orEmpty(),
+                        text = sub,
                         fontSize = 10.sp,
-                        fontWeight = if (isNovel || isManga) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isNovel || isManga) Color.White else OttSecondary
+                        color = OttTextMuted,
+                        maxLines = 2,
+                        lineHeight = 12.sp,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
         }
+        repeat(3 - people.size) { Spacer(Modifier.weight(1f)) }
+    }
+}
+
+@Composable
+private fun VideoItem(video: TmdbVideo, featured: Boolean, glassOn: Boolean, onClick: () -> Unit) {
+    val thumb = "https://img.youtube.com/vi/${video.key}/hqdefault.jpg"
+    if (featured) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 18.dp)
+                .fillMaxWidth()
+                .cardSurface(glassOn, 16.dp)
+                .clickable(onClick = onClick)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF141722))
+            ) {
+                AsyncImage(
+                    model = thumb,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.verticalGradient(listOf(Color(0x30000000), Color(0x75000000))))
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xDD000000))
+                        .border(1.5.dp, Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(10.dp)
+                ) {
+                    MiniChip(video.type.uppercase(Locale.US), Color.White, Color(0xD0000000), Color(0x40FFFFFF))
+                }
+            }
+            Text(
+                text = video.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 18.dp)
+                .fillMaxWidth()
+                .cardSurface(glassOn, 14.dp)
+                .clickable(onClick = onClick)
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(128.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF141722))
+            ) {
+                AsyncImage(
+                    model = thumb,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xAA000000)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    text = video.name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                MiniChip(video.type.uppercase(Locale.US))
+            }
+        }
+    }
+}
+
+private fun openYoutube(context: Context, key: String) {
+    val ytAppIntent = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:$key")).apply {
+        putExtra("force_fullscreen", true)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    try {
+        context.startActivity(ytAppIntent)
+    } catch (_: Exception) {
+        try {
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$key")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(webIntent)
+        } catch (_: Exception) {}
+    }
+}
+
+@Composable
+private fun RelationRow(rel: MediaRelation, glassOn: Boolean, vm: MainViewModel) {
+    val isNovel = rel.format.equals("NOVEL", ignoreCase = true) ||
+        rel.format.equals("LIGHT_NOVEL", ignoreCase = true)
+    val isManga = rel.type.equals("MANGA", ignoreCase = true) ||
+        rel.format.equals("MANGA", ignoreCase = true) ||
+        rel.format.equals("ONE_SHOT", ignoreCase = true) ||
+        rel.relationType.equals("ADAPTATION", ignoreCase = true)
+    val displayBadge = when {
+        isNovel -> "NOVEL"
+        isManga -> "MANGA"
+        else -> rel.format ?: "ANIME"
+    }
+    val relationLabel = rel.relationType.orEmpty().replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 18.dp)
+            .fillMaxWidth()
+            .cardSurface(glassOn, 14.dp)
+            .clickable {
+                if (isNovel) vm.openNovelDetail(rel.title)
+                else if (isManga) vm.openMangaDetail(rel.id.toString(), rel.title)
+                else vm.openDetail(rel.id)
+            }
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AsyncImage(
+            model = rel.cover,
+            contentDescription = null,
+            modifier = Modifier
+                .width(54.dp)
+                .aspectRatio(0.72f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0x22FFFFFF)),
+            contentScale = ContentScale.Crop
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(
+                text = rel.title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MiniChip(displayBadge.uppercase(Locale.US))
+                if (relationLabel.isNotBlank()) MiniChip(relationLabel)
+            }
+        }
+        Text(
+            text = if (isNovel || isManga) "Read ➔" else "Watch ➔",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = OttSecondary
+        )
     }
 }
 
@@ -2610,7 +2271,7 @@ private fun RecommendationPosterItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(0.72f)
+                .aspectRatio(0.7f)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0x18FFFFFF))
         ) {
@@ -2935,10 +2596,19 @@ private fun DetailWaveOscillatingSkeleton(
 private fun rememberGlassEnabled(): Boolean =
     LocalThemeSettings.current.isGlassmorphismEnabled && Build.VERSION.SDK_INT >= 33
 
-/** Glass section card (flat AMOLED card when [backdrop] is null). Grows/shrinks smoothly with its content. */
+/** Flat translucent card surface: no backdrop sampling, so it stays cheap while scrolling. */
+private fun Modifier.cardSurface(glassOn: Boolean, radius: Dp = 18.dp): Modifier {
+    val shape = RoundedCornerShape(radius)
+    return this
+        .clip(shape)
+        .background(if (glassOn) Color(0x14FFFFFF) else Color(0xFF0D1017))
+        .border(1.dp, Color(0x1AFFFFFF), shape)
+}
+
+/** Section card (flat). Grows/shrinks smoothly with its content. */
 @Composable
 private fun DetailCard(
-    backdrop: PrismalGlassLayer?,
+    glassOn: Boolean,
     title: String,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
@@ -2946,8 +2616,8 @@ private fun DetailCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(spring(dampingRatio = 0.8f, stiffness = 400f))
-            .playerGlass(backdrop, 22.dp)
+            .animateContentSize()
+            .cardSurface(glassOn, 20.dp)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -2980,5 +2650,105 @@ private fun DetailFact(label: String, value: String, modifier: Modifier = Modifi
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+/**
+ * Horizontally scrollable pill tabs with one white pill that slides (spring) to the selected tab,
+ * and the row auto-centers the selection. Used for the main tabs, episode ranges and character roles.
+ */
+@Composable
+private fun SlidingPillTabs(
+    items: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    edge: Dp = 18.dp,
+    vPad: Dp = 8.dp,
+    tabHeight: Dp = 38.dp,
+    tabHPad: Dp = 16.dp,
+    fontSize: TextUnit = 13.sp
+) {
+    val density = LocalDensity.current
+    val scroll = rememberScrollState()
+    val lefts = remember(items.size) { IntArray(items.size) }
+    val widths = remember(items.size) { IntArray(items.size) }
+    var tick by remember(items.size) { mutableIntStateOf(0) }
+    var viewportW by remember { mutableIntStateOf(0) }
+    val sel = selectedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+
+    LaunchedEffect(sel, tick, viewportW) {
+        if (tick > 0 && viewportW > 0) {
+            val center = with(density) { edge.roundToPx() } + lefts[sel] + widths[sel] / 2
+            scroll.animateScrollTo((center - viewportW / 2).coerceAtLeast(0))
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .onSizeChanged { viewportW = it.width }
+            .horizontalScroll(scroll)
+    ) {
+        Box(modifier = Modifier.padding(horizontal = edge, vertical = vPad)) {
+            // Indicator is only composed after the first measure so it never slides in from x = 0.
+            if (tick > 0) {
+                val indX by animateIntAsState(
+                    targetValue = lefts[sel],
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
+                    label = "pillX"
+                )
+                val indW by animateIntAsState(
+                    targetValue = widths[sel],
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
+                    label = "pillW"
+                )
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(indX, 0) }
+                        .width(with(density) { indW.toDp() })
+                        .height(tabHeight)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items.forEachIndexed { i, label ->
+                    val isSel = i == sel
+                    val textColor by animateColorAsState(
+                        targetValue = if (isSel) Color.Black else Color(0xFFCBD5E1),
+                        animationSpec = tween(180),
+                        label = "tabText"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(tabHeight)
+                            .onGloballyPositioned { c ->
+                                val x = c.positionInParent().x.roundToInt()
+                                val w = c.size.width
+                                if (lefts[i] != x || widths[i] != w) {
+                                    lefts[i] = x
+                                    widths[i] = w
+                                    tick++
+                                }
+                            }
+                            .clip(CircleShape)
+                            .background(if (isSel) Color.Transparent else Color(0x14FFFFFF))
+                            .border(1.dp, if (isSel) Color.Transparent else Color(0x2EFFFFFF), CircleShape)
+                            .semantics { selected = isSel }
+                            .clickable(role = Role.Tab) { onSelect(i) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = fontSize,
+                            fontWeight = FontWeight.SemiBold, // constant weight so selecting never reflows the row
+                            color = textColor,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = tabHPad)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
