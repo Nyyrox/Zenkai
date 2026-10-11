@@ -1000,7 +1000,7 @@ fun PlayerScreen(
                         }
                     }
             ) {
-                // ── Ambient Light Dynamic Glow Background ──────────────────────────
+                // ── Ambient Light Dynamic Glow Background (Connecting from Live Player) ──
                 val currentEpInfoForAmbient = tmdbEpisodes[currentEpisode]
                 val activePosterOrStill = currentEpInfoForAmbient?.stillUrl?.takeIf { it.isNotBlank() }
                     ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
@@ -1012,7 +1012,7 @@ fun PlayerScreen(
                     (kotlin.math.abs(hash % 360)).toFloat()
                 }
                 val ambientColorTarget = remember(ambientHue) {
-                    Color.hsv(ambientHue, 0.75f, 0.90f)
+                    Color.hsv(ambientHue, 0.70f, 0.85f)
                 }
                 val animatedAmbientColor by animateColorAsState(
                     targetValue = ambientColorTarget,
@@ -1022,59 +1022,59 @@ fun PlayerScreen(
 
                 val infiniteAmbient = rememberInfiniteTransition(label = "ambientBreath")
                 val ambientBreath by infiniteAmbient.animateFloat(
-                    initialValue = 0.85f,
-                    targetValue = 1.15f,
+                    initialValue = 0.88f,
+                    targetValue = 1.12f,
                     animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 5000, easing = FastOutSlowInEasing),
+                        animation = tween(durationMillis = 4500, easing = FastOutSlowInEasing),
                         repeatMode = RepeatMode.Reverse
                     ),
                     label = "ambientBreathScale"
                 )
 
+                // Background canvas: live gradient wash bleeding smoothly from the player at the top
                 Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = 0.40f * ambientBreath }
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    // Top radiating bloom downward from player
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                animatedAmbientColor.copy(alpha = 0.45f),
-                                animatedAmbientColor.copy(alpha = 0.15f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.5f, 0f),
-                            radius = size.width * 0.95f
-                        ),
-                        radius = size.width * 0.95f,
-                        center = Offset(size.width * 0.5f, 0f)
+                    // 1. Base dark background (deep OLED midnight)
+                    drawRect(Color(0xFF0A0D14))
+
+                    // 2. Direct vertical gradient wash bleeding from bottom of the player
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.0f to animatedAmbientColor.copy(alpha = 0.45f * ambientBreath),
+                            0.18f to animatedAmbientColor.copy(alpha = 0.22f * ambientBreath),
+                            0.45f to animatedAmbientColor.copy(alpha = 0.08f * ambientBreath),
+                            1.0f to Color.Transparent
+                        )
                     )
-                    // Mid-left bloom behind showcase card
+
+                    // 3. Wide radial bloom centered directly under the live player
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                animatedAmbientColor.copy(alpha = 0.25f),
+                                animatedAmbientColor.copy(alpha = 0.40f * ambientBreath),
+                                animatedAmbientColor.copy(alpha = 0.14f * ambientBreath),
                                 Color.Transparent
                             ),
-                            center = Offset(size.width * 0.2f, size.height * 0.35f),
+                            center = Offset(size.width * 0.5f, -size.height * 0.05f),
+                            radius = size.width * 1.15f
+                        ),
+                        radius = size.width * 1.15f,
+                        center = Offset(size.width * 0.5f, -size.height * 0.05f)
+                    )
+
+                    // 4. Secondary soft ambient glow behind the showcase card
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                animatedAmbientColor.copy(alpha = 0.16f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.25f, size.height * 0.35f),
                             radius = size.width * 0.70f
                         ),
                         radius = size.width * 0.70f,
-                        center = Offset(size.width * 0.2f, size.height * 0.35f)
-                    )
-                    // Lower right drifting bloom
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                animatedAmbientColor.copy(alpha = 0.18f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.8f, size.height * 0.65f),
-                            radius = size.width * 0.65f
-                        ),
-                        radius = size.width * 0.65f,
-                        center = Offset(size.width * 0.8f, size.height * 0.65f)
+                        center = Offset(size.width * 0.25f, size.height * 0.35f)
                     )
                 }
 
@@ -1083,128 +1083,6 @@ fun PlayerScreen(
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                // Zenkai Player / Embed Mode Toggle Bar (Option down below the player with proper spacing)
-                val isEmbedModeActive = !isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
-                if (isEmbedModeActive || playInZenkaiPlayer) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (playInZenkaiPlayer) Color(0xFF161B26) else Color(0xFF121622))
-                                .border(
-                                    1.dp,
-                                    if (playInZenkaiPlayer) OttPrimary.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.18f),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .clickable {
-                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                    if (playInZenkaiPlayer) {
-                                        playInZenkaiPlayer = false
-                                    } else {
-                                        if (!sniffedStreamUrl.isNullOrBlank()) {
-                                            playInZenkaiPlayer = true
-                                        } else {
-                                            coroutineScope.launch {
-                                                isSniffingStream = true
-                                                try {
-                                                    val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
-                                                        context = context,
-                                                        embedUrl = activeStreamUrl,
-                                                        timeoutMs = 12000L
-                                                    )
-                                                    if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
-                                                        sniffedStreamUrl = sniffed.streamUrl
-                                                        sniffedStreamHeaders = sniffed.headers
-                                                        sniffedStreamSubs = sniffed.subtitles
-                                                        playInZenkaiPlayer = true
-                                                    } else {
-                                                        android.widget.Toast.makeText(
-                                                            context,
-                                                            "Direct stream could not be extracted",
-                                                            android.widget.Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    }
-                                                } catch (_: Exception) {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "Extraction failed",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
-                                                } finally {
-                                                    isSniffingStream = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(horizontal = 16.dp, vertical = 11.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                if (isSniffingStream) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = OttPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Extracting Stream for Zenkai Player...",
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                } else if (playInZenkaiPlayer) {
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInBrowser,
-                                        contentDescription = null,
-                                        tint = OttPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Switch back to Embed Mode",
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "(Return to Web Player)",
-                                        fontSize = 11.sp,
-                                        color = OttTextMuted
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = OttPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Play in Zenkai Player",
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "(Native Player & Ad-Free)",
-                                        fontSize = 11.sp,
-                                        color = OttTextMuted
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // 0. Grand Liquid Glass Episode Showcase Card (player_design_1.jpg)
                 item {
                     val currentEpInfo = tmdbEpisodes[currentEpisode]
@@ -1602,205 +1480,34 @@ fun PlayerScreen(
                     }
                 }
 
-                // 2. SERVER SECTION (UP) - Streaming Server & Audio Controls (Glassmorphic Container)
+                // 2. Sleek Liquid Glass Control Strip: Audio (SUB/DUB), Server Selector & Source
                 item {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp)
-                            .clip(OttCardShape)
-                            .background(Color(0xFF0F1117))
-                            .border(1.dp, Color(0x22FFFFFF), OttCardShape)
-                            .padding(14.dp)
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (isPlayingOffline) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(Color.White)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "PLAYING DOWNLOADED VIDEO",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.8.sp,
-                                            color = Color.White
-                                        )
-                                    }
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(
-                                        text = "Offline Stream • ${downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"} · Local Storage",
-                                        fontSize = 10.sp,
-                                        color = OttTextMuted
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OttPillShape)
-                                        .background(Color(0x18FFFFFF))
-                                        .border(1.dp, Color(0x33FFFFFF), OttPillShape)
-                                        .clickable { playOfflineMode = false }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "Switch to Online",
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        } else {
-                            if (isCurrentEpDownloaded && downloadedEpInfo != null) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
-                                        .clickable { playOfflineMode = true }
-                                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.DownloadDone,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "Offline download available (${downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"})",
-                                        fontSize = 10.5.sp,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Text(
-                                        text = "Switch to Offline ➔",
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                                Spacer(Modifier.height(10.dp))
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                            Column {
-                                Text(
-                                    text = "STREAMING SERVERS",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.8.sp,
-                                    color = OttTextPrimary
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = if (selectedSourceMode == "DIRECT") "Native Direct Playback" else "Web Embed Sources",
-                                    fontSize = 10.sp,
-                                    color = OttTextMuted
-                                )
-                            }
-
-                            Spacer(Modifier.weight(1f))
-
-                            // DIRECT vs EMBED Clean Mode Toggle Pill
-                            Row(
-                                modifier = Modifier
-                                    .clip(OttPillShape)
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x22FFFFFF), OttPillShape)
-                                    .padding(3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                listOf("DIRECT" to "DIRECT", "EMBED" to "EMBED").forEach { (modeKey, label) ->
-                                    val isModeSelected = selectedSourceMode == modeKey
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(if (isModeSelected) Color.White else Color.Transparent)
-                                            .clickable {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                if (selectedSourceMode != modeKey) {
-                                                    selectedSourceMode = modeKey
-                                                    if (modeKey == "DIRECT") {
-                                                        vm.setPlayEmbed(false)
-                                                        if (selectedCategory == "MULTI") {
-                                                            selectedCategory = "SUB"
-                                                        }
-                                                        val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-                                                        availableDirectServers = nextDirect
-                                                        val prov = nextDirect.first()
-                                                        currentProvider = prov
-                                                        vm.setPreferredServer(prov.id)
-                                                    } else {
-                                                        vm.setPlayEmbed(true)
-                                                        val embedList = when (selectedCategory) {
-                                                            "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                                            "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                                            else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                                        }
-                                                        val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                                        currentProvider = prov
-                                                        vm.setPreferredServer(prov.id)
-                                                    }
-                                                }
-                                            }
-                                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                                    ) {
-                                        Text(
-                                            text = label,
-                                            fontSize = 10.5.sp,
-                                            fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isModeSelected) Color.Black else Color(0xFF94A3B8)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(10.dp))
-
-                        // SUB / DUB / MULTI-AUDIO Selection Bar (Direct mode only shows SUB / DUB)
+                        // A. Audio Pill (SUB / DUB / MULTI) — sleek segmented glass
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x14FFFFFF))
-                                .padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0x18FFFFFF))
+                                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
+                                .padding(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             val audioCategories = if (selectedSourceMode == "DIRECT") {
-                                listOf(
-                                    "SUB" to "SUB",
-                                    "DUB" to "DUB"
-                                )
+                                listOf("SUB" to "SUB", "DUB" to "DUB")
                             } else {
-                                listOf(
-                                    "SUB" to "SUB",
-                                    "DUB" to "DUB",
-                                    "MULTI" to "MULTI-AUDIO"
-                                )
+                                listOf("SUB" to "SUB", "DUB" to "DUB", "MULTI" to "MULTI")
                             }
                             audioCategories.forEach { (catKey, label) ->
                                 val isCatSelected = selectedCategory == catKey
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(10.dp))
                                         .background(if (isCatSelected) Color.White else Color.Transparent)
                                         .clickable {
                                             com.nyyrox.aniverse.util.AppHaptics.tick(context)
@@ -1824,12 +1531,12 @@ fun PlayerScreen(
                                                 }
                                             }
                                         }
-                                        .padding(vertical = 6.dp),
+                                        .padding(horizontal = 8.dp, vertical = 5.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = label,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isCatSelected) Color.Black else Color(0xFF94A3B8)
                                     )
@@ -1837,75 +1544,63 @@ fun PlayerScreen(
                             }
                         }
 
-                        Spacer(Modifier.height(12.dp))
-
-                        // Clean Server Dropdown Trigger Selector Button
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            val currentServerTitle = currentProvider.name
-                            val currentServerBadge = currentProvider.serverBadge.replace("Direct HD", "HD")
-
+                        // B. Active Server Dropdown Chip (Sleek Liquid Glass Chip)
+                        Box(modifier = Modifier.weight(1f)) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF161922))
-                                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                                     .clickable { isServerDropdownExpanded = true }
-                                    .padding(horizontal = 16.dp, vertical = 13.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // Clean active status dot (white)
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White)
-                                )
-
-                                Spacer(Modifier.width(10.dp))
-
-                                Text(
-                                    text = currentServerTitle,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-
-                                Spacer(Modifier.width(8.dp))
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x1FFFFFFF))
-                                        .border(0.8.dp, Color(0x35FFFFFF), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
                                 ) {
-                                    Text(
-                                        text = currentServerBadge,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isPlayingOffline) Color(0xFF34D399) else Color.White)
                                     )
+                                    Text(
+                                        text = if (isPlayingOffline) "Offline" else currentProvider.name,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (!isPlayingOffline) {
+                                        Text(
+                                            text = currentProvider.serverBadge.replace("Direct HD", "HD"),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
                                 }
-
-                                Spacer(Modifier.weight(1f))
 
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Select Server",
+                                    contentDescription = "Server menu",
                                     tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
-                            // Clean Server Dropdown Menu
+                            // Server dropdown menu
                             DropdownMenu(
                                 expanded = isServerDropdownExpanded,
                                 onDismissRequest = { isServerDropdownExpanded = false },
                                 modifier = Modifier
-                                    .fillMaxWidth(0.92f)
-                                    .background(Color(0xFF141722))
-                                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
+                                    .background(Color(0xF2101424))
+                                    .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
                             ) {
                                 if (selectedSourceMode == "DIRECT") {
                                     Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
@@ -1925,9 +1620,9 @@ fun PlayerScreen(
                                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                                         ) {
                                             Text(
-                                                text = "No direct servers available for this audio category.",
+                                                text = "No direct servers available.",
                                                 fontSize = 12.sp,
-                                                color = OttTextMuted
+                                                color = Color(0xFF94A3B8)
                                             )
                                         }
                                     } else {
@@ -1948,21 +1643,14 @@ fun PlayerScreen(
                                                             text = prov.name,
                                                             fontSize = 13.sp,
                                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                            color = if (isSelected) Color.White else OttTextSecondary
+                                                            color = if (isSelected) Color.White else Color(0xFF94A3B8)
                                                         )
                                                         Spacer(Modifier.width(8.dp))
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(4.dp))
-                                                                .background(if (isSelected) Color(0x33FFFFFF) else Color(0x15FFFFFF))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = prov.serverBadge.replace("Direct HD", "HD"),
-                                                                fontSize = 9.sp,
-                                                                color = if (isSelected) Color.White else OttTextMuted
-                                                            )
-                                                        }
+                                                        Text(
+                                                            text = prov.serverBadge.replace("Direct HD", "HD"),
+                                                            fontSize = 9.sp,
+                                                            color = if (isSelected) Color.White else Color(0xFF64748B)
+                                                        )
                                                     }
                                                 },
                                                 leadingIcon = {
@@ -1971,10 +1659,10 @@ fun PlayerScreen(
                                                             Icons.Default.Check,
                                                             contentDescription = null,
                                                             tint = Color.White,
-                                                            modifier = Modifier.size(18.dp)
+                                                            modifier = Modifier.size(16.dp)
                                                         )
                                                     } else {
-                                                        Spacer(Modifier.size(18.dp))
+                                                        Spacer(Modifier.size(16.dp))
                                                     }
                                                 },
                                                 onClick = {
@@ -1991,11 +1679,11 @@ fun PlayerScreen(
                                         "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
                                         "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
                                         else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                    }
+                                    }.ifEmpty { ALL_PROVIDERS.filter { it.isEmbedOnly } }
 
                                     Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
                                         Text(
-                                            text = "EMBED SOURCES",
+                                            text = "WEB EMBED SERVERS",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
@@ -2015,21 +1703,14 @@ fun PlayerScreen(
                                                         text = prov.name,
                                                         fontSize = 13.sp,
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                        color = if (isSelected) Color.White else OttTextSecondary
+                                                        color = if (isSelected) Color.White else Color(0xFF94A3B8)
                                                     )
                                                     Spacer(Modifier.width(8.dp))
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(if (isSelected) Color(0x33FFFFFF) else Color(0x15FFFFFF))
-                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = prov.serverBadge.replace("Direct HD", "HD"),
-                                                            fontSize = 9.sp,
-                                                            color = if (isSelected) Color.White else OttTextMuted
-                                                        )
-                                                    }
+                                                    Text(
+                                                        text = prov.serverBadge.replace("Direct HD", "HD"),
+                                                        fontSize = 9.sp,
+                                                        color = if (isSelected) Color.White else Color(0xFF64748B)
+                                                    )
                                                 }
                                             },
                                             leadingIcon = {
@@ -2038,10 +1719,10 @@ fun PlayerScreen(
                                                         Icons.Default.Check,
                                                         contentDescription = null,
                                                         tint = Color.White,
-                                                        modifier = Modifier.size(18.dp)
+                                                        modifier = Modifier.size(16.dp)
                                                     )
                                                 } else {
-                                                    Spacer(Modifier.size(18.dp))
+                                                    Spacer(Modifier.size(16.dp))
                                                 }
                                             },
                                             onClick = {
@@ -2055,11 +1736,108 @@ fun PlayerScreen(
                                 }
                             }
                         }
+
+                        // C. DIRECT / EMBED Toggle
+                        val isDirect = selectedSourceMode == "DIRECT"
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDirect) Color(0x28FFFFFF) else Color(0x18FFFFFF))
+                                .border(0.8.dp, if (isDirect) Color(0x40FFFFFF) else Color(0x20FFFFFF), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                    val nextMode = if (isDirect) "EMBED" else "DIRECT"
+                                    selectedSourceMode = nextMode
+                                    if (nextMode == "DIRECT") {
+                                        vm.setPlayEmbed(false)
+                                        if (selectedCategory == "MULTI") selectedCategory = "SUB"
+                                        val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
+                                        availableDirectServers = nextDirect
+                                        val newProv = nextDirect.first()
+                                        currentProvider = newProv
+                                        vm.setPreferredServer(newProv.id)
+                                    } else {
+                                        vm.setPlayEmbed(true)
+                                        val embedList = when (selectedCategory) {
+                                            "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                                            "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                                            else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                        }
+                                        val newProv = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+                                        currentProvider = newProv
+                                        vm.setPreferredServer(newProv.id)
+                                    }
+                                }
+                                .padding(horizontal = 9.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = if (isDirect) "Direct" else "Embed",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDirect) Color.White else Color(0xFF94A3B8)
+                            )
+                        }
+
+                        // D. Zenkai Native Player extractor chip (if in embed mode or extracting)
+                        if (!isCurrentEpDownloaded && vm.isPlayEmbed) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (playInZenkaiPlayer) Color(0xFF1E2638) else Color(0x18FFFFFF))
+                                    .border(0.8.dp, if (playInZenkaiPlayer) OttPrimary else Color(0x20FFFFFF), RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        if (playInZenkaiPlayer) {
+                                            playInZenkaiPlayer = false
+                                        } else {
+                                            if (!sniffedStreamUrl.isNullOrBlank()) {
+                                                playInZenkaiPlayer = true
+                                            } else {
+                                                coroutineScope.launch {
+                                                    isSniffingStream = true
+                                                    try {
+                                                        val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
+                                                            context = context,
+                                                            embedUrl = activeStreamUrl,
+                                                            timeoutMs = 12000L
+                                                        )
+                                                        if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
+                                                            sniffedStreamUrl = sniffed.streamUrl
+                                                            sniffedStreamHeaders = sniffed.headers
+                                                            sniffedStreamSubs = sniffed.subtitles
+                                                            playInZenkaiPlayer = true
+                                                        } else {
+                                                            android.widget.Toast.makeText(context, "Direct stream could not be extracted", android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    } catch (_: Exception) {
+                                                        android.widget.Toast.makeText(context, "Extraction failed", android.widget.Toast.LENGTH_SHORT).show()
+                                                    } finally {
+                                                        isSniffingStream = false
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 7.dp)
+                            ) {
+                                if (isSniffingStream) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(13.dp),
+                                        strokeWidth = 1.8.dp,
+                                        color = OttPrimary
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (playInZenkaiPlayer) Icons.Default.OpenInBrowser else Icons.Default.PlayArrow,
+                                        contentDescription = "Zenkai Native Player",
+                                        tint = if (playInZenkaiPlayer) OttPrimary else Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-            }
-
-
                 // 4. MOVIE DETAILS (if Movie) OR EPISODE SECTION (if Series)
                 if (isMovie) {
                     item {
@@ -2212,7 +1990,7 @@ fun PlayerScreen(
                     }
                 } else {
                     // EPISODE SECTION FOR SERIES
-                    // Range Selector Pills & View Toggle
+                    // Range Selector Tabs & Action Buttons (Pure glass styling, no heavy boxes)
                     item {
                         Row(
                             modifier = Modifier
@@ -2222,31 +2000,39 @@ fun PlayerScreen(
                         ) {
                             if (pageCount > 1) {
                                 LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     items(pageCount) { page ->
                                         val pStart = page * pageSize + 1
                                         val pEnd = minOf(pStart + pageSize - 1, maxEpisode)
                                         val isSelected = selectedPage == page
 
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(OttPillShape)
-                                                .background(if (isSelected) Color.White else Color(0x14FFFFFF))
-                                                .border(
-                                                    1.dp,
-                                                    if (isSelected) Color.White else Color(0x22FFFFFF),
-                                                    OttPillShape
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color.White)
+                                                    .padding(horizontal = 11.dp, vertical = 5.dp)
+                                            ) {
+                                                Text(
+                                                    text = "$pStart–$pEnd",
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.Black
                                                 )
-                                                .clickable { selectedPage = page }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
+                                            }
+                                        } else {
                                             Text(
                                                 text = "$pStart–$pEnd",
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) Color.Black else OttTextSecondary
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF94A3B8),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { selectedPage = page }
+                                                    .padding(horizontal = 5.dp, vertical = 5.dp)
                                             )
                                         }
                                     }
@@ -2254,7 +2040,7 @@ fun PlayerScreen(
                             } else {
                                 Text(
                                     text = "Episodes 1 – $maxEpisode",
-                                    fontSize = 13.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     modifier = Modifier.weight(1f)
@@ -2266,30 +2052,20 @@ fun PlayerScreen(
                             val curStart = selectedPage * pageSize + 1
                             val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
 
-                            // Download All in active page range (e.g. 1-25, 26-50)
-                            Row(
+                            // Download Range icon button (Clean glass circle)
+                            IconButton(
+                                onClick = { showDownloadRangeSheet = curStart..curEnd },
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.12f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        showDownloadRangeSheet = curStart..curEnd
-                                    }
-                                    .padding(horizontal = 9.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.8.dp, Color(0x28FFFFFF), CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Download,
-                                    contentDescription = "Download All",
+                                    contentDescription = "Download Range $curStart-$curEnd",
                                     tint = Color.White,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Text(
-                                    text = "Download All",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
 
@@ -2299,16 +2075,16 @@ fun PlayerScreen(
                             IconButton(
                                 onClick = { isEpisodeGridView = !isEpisodeGridView },
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(34.dp)
                                     .clip(CircleShape)
                                     .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x25FFFFFF), CircleShape)
+                                    .border(0.8.dp, Color(0x28FFFFFF), CircleShape)
                             ) {
                                 Icon(
                                     imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
                                     contentDescription = "Toggle Episode View",
                                     tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -2320,7 +2096,7 @@ fun PlayerScreen(
                     val episodeNumbers = (startEp..endEp).toList()
 
                     if (isEpisodeGridView) {
-                        // Compact fast-selection grid (5 columns)
+                        // Compact liquid glass grid (5 columns)
                         item {
                             Column(
                                 modifier = Modifier.padding(horizontal = 14.dp),
@@ -2334,16 +2110,17 @@ fun PlayerScreen(
                                     ) {
                                         row.forEach { epNum ->
                                             val isCurrent = epNum == currentEpisode
+                                            val isEpDl = downloadedAnimeList.any { it.animeId == anime.id && it.episodeNumber == epNum }
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .height(46.dp)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(if (isCurrent) Color.White else OttSurface)
+                                                    .height(44.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(if (isCurrent) Color.White else Color(0x18FFFFFF))
                                                     .border(
-                                                        1.dp,
-                                                        if (isCurrent) Color.White else OttSurfaceBorder,
-                                                        RoundedCornerShape(10.dp)
+                                                        0.8.dp,
+                                                        if (isCurrent) Color.White else Color(0x22FFFFFF),
+                                                        RoundedCornerShape(12.dp)
                                                     )
                                                     .clickable {
                                                         com.nyyrox.aniverse.util.AppHaptics.tick(context)
@@ -2354,9 +2131,19 @@ fun PlayerScreen(
                                                 Text(
                                                     text = "$epNum",
                                                     fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isCurrent) Color.Black else OttTextPrimary
+                                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isCurrent) Color.Black else Color.White
                                                 )
+                                                if (isEpDl && !isCurrent) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .padding(4.dp)
+                                                            .size(5.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color(0xFF34D399))
+                                                    )
+                                                }
                                             }
                                         }
                                         repeat(5 - row.size) {
