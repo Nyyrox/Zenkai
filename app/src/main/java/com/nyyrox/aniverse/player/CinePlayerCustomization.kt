@@ -1413,9 +1413,9 @@ fun GlassBackdropCapture(backdrop: GlassBackdrop, playerView: PlayerView?, enabl
  */
 fun Modifier.glassSurface(
     shape: Shape,
-    tint: Color = Color(0x29FFFFFF), // rgba(255, 255, 255, 0.16) matching web .cine-icon-circle-btn & .cine-center-btn
+    tint: Color = Color(0x18FFFFFF), // translucent glass tint for crisper transparency
     wash: Color = Color.Transparent,
-    elevation: Dp = 6.dp,
+    elevation: Dp = 4.dp,
     pressed: Boolean = false,
     borderWidth: Dp = 1.dp,
     borderColor: Color = Color(0x38FFFFFF), // rgba(255, 255, 255, 0.22)
@@ -1426,7 +1426,7 @@ fun Modifier.glassSurface(
         return@composed this
             .shadow(if (elevation > 0.dp) 2.dp else 0.dp, shape, clip = false)
             .clip(shape)
-            .background(Color(0xE6101420))
+            .background(Color(0x40101420))
             .drawBehind { if (pressed) drawRect(Color(0x33FFFFFF)) }
             .border(borderWidth, Color(0x28FFFFFF), shape)
     }
@@ -1441,9 +1441,9 @@ fun Modifier.glassSurface(
                     density = density,
                     adaptiveLuminance = false,
                     luminance = 0.5f,
-                    blurRadiusPx = with(density) { 20.dp.toPx() },
-                    refractionHeightPx = with(density) { 14.dp.toPx() },
-                    refractionAmountPx = with(density) { 20.dp.toPx() },
+                    blurRadiusPx = with(density) { 10.dp.toPx() },
+                    refractionHeightPx = with(density) { 8.dp.toPx() },
+                    refractionAmountPx = with(density) { 10.dp.toPx() },
                     useVibrancy = true,
                     saturation = 1.3f
                 )
@@ -1457,7 +1457,7 @@ fun Modifier.glassSurface(
                 )
             },
             depthShadow = {
-                PrismalDepthShadow(radius = elevation, alpha = 0.8f)
+                PrismalDepthShadow(radius = elevation, alpha = 0.5f)
             },
             onDrawSurface = {
                 drawRect(tint)
@@ -1469,19 +1469,19 @@ fun Modifier.glassSurface(
     // Android 12+: real live backdrop blur of the video (Haze / AGSL). Below 12: plain translucent glass.
     val haze = if (useBackdrop) LocalGlassHaze.current else null
     this
-        .shadow(elevation, shape, clip = false, ambientColor = Color(0x59000000), spotColor = Color(0x59000000))
+        .shadow(elevation, shape, clip = false, ambientColor = Color(0x33000000), spotColor = Color(0x33000000))
         .clip(shape)
         .then(
             if (haze != null) Modifier.hazeEffect(haze) {
-                blurRadius = 28.dp
+                blurRadius = 12.dp
                 tints = listOf(HazeTint(tint))
-                noiseFactor = 0.04f
+                noiseFactor = 0.02f
             } else Modifier.background(tint)
         )
         .background(wash)
-        .background(Brush.verticalGradient(listOf(Color(0x24FFFFFF), Color(0x0AFFFFFF), Color(0x0A000000))))
+        .background(Brush.verticalGradient(listOf(Color(0x18FFFFFF), Color(0x06FFFFFF), Color(0x04000000))))
         .drawBehind { if (pressed) drawRect(Color(0x33FFFFFF)) }
-        .border(borderWidth, Brush.verticalGradient(listOf(borderColor.copy(alpha = 0.55f), borderColor)), shape)
+        .border(borderWidth, Brush.verticalGradient(listOf(borderColor.copy(alpha = 0.45f), borderColor)), shape)
 }
 
 @Composable
@@ -1515,12 +1515,12 @@ fun CineButtonContainer(
             .scale(pressScale)
             .glassSurface(
                 shape = shape,
-                tint = if (isHero) Color(0x3DFFFFFF) else Color(0x29FFFFFF), // 0.24 for hero play, 0.16 for other buttons
-                wash = if (isHero) Color(0x1AFFFFFF) else Color.Transparent,
-                elevation = if (isHero) 10.dp else 5.dp,
+                tint = if (isHero) Color(0x22FFFFFF) else Color(0x14FFFFFF), // Increased transparency: 0.13 for hero play, 0.08 for seek/other buttons
+                wash = if (isHero) Color(0x0AFFFFFF) else Color.Transparent,
+                elevation = if (isHero) 5.dp else 2.dp,
                 pressed = isPressed,
-                borderWidth = if (isHero) 1.5.dp else 1.dp,
-                borderColor = if (isHero) Color(0x73FFFFFF) else Color(0x38FFFFFF)
+                borderWidth = if (isHero) 1.2.dp else 0.8.dp,
+                borderColor = if (isHero) Color(0x55FFFFFF) else Color(0x2EFFFFFF)
             )
             .then(if (isSelected && !isHero) Modifier.background(accentColor.copy(alpha = 0.25f)) else Modifier),
         contentAlignment = Alignment.Center

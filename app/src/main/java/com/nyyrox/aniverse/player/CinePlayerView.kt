@@ -712,6 +712,7 @@ fun CinePlayerView(
     var doubleTapSide by remember { mutableStateOf<String?>(null) }
     var accumulatedSeekSeconds by remember { mutableIntStateOf(0) }
     var doubleTapTriggerKey by remember { mutableIntStateOf(0) }
+    val isSkipActive = doubleTapSide != null || isSwipeSeeking || isScrubbing
 
     // Auto-hide unlock prompt
     LaunchedEffect(isScreenLocked, showUnlockPrompt, unlockPromptTimerKey) {
@@ -1149,10 +1150,10 @@ fun CinePlayerView(
         }
     }
 
-    // Auto-hide controls after user configured timeout
-    LaunchedEffect(showControls, controlsTimeoutKey, isPlaying, playerCustomization.glass.autoHideTimeoutSeconds) {
+    // Auto-hide controls after user configured timeout (suppressed during active skip/seek/scrub)
+    LaunchedEffect(showControls, controlsTimeoutKey, isPlaying, playerCustomization.glass.autoHideTimeoutSeconds, isSkipActive) {
         val timeoutSec = playerCustomization.glass.autoHideTimeoutSeconds
-        if (showControls && isPlaying && timeoutSec > 0) {
+        if (showControls && isPlaying && timeoutSec > 0 && !isSkipActive) {
             delay(timeoutSec * 1000L)
             isAutoHideTransition = true
             showControls = false
@@ -2135,10 +2136,11 @@ fun CinePlayerView(
                                                         controlsTimeoutKey++
                                                         val curKey = doubleTapTriggerKey
                                                         scope.launch {
-                                                            delay(750)
+                                                            delay(1200)
                                                             if (doubleTapTriggerKey == curKey) {
                                                                 doubleTapSide = null
                                                                 accumulatedSeekSeconds = 0
+                                                                controlsTimeoutKey++
                                                             }
                                                         }
                                                     } catch (_: Exception) {}
@@ -3046,7 +3048,7 @@ fun CinePlayerView(
 
                     // 3. Center Controls Deck (YouTube fade/scale exit)
                     AnimatedVisibility(
-                        visible = showControls && !isScreenLocked && !isInPip,
+                        visible = (showControls || isSkipActive) && !isScreenLocked && !isInPip,
                         enter = scaleIn(
                             initialScale = 0.88f,
                             animationSpec = tween(170, easing = FastOutSlowInEasing)
@@ -3073,6 +3075,8 @@ fun CinePlayerView(
                                 if (centerLayout == CenterControlsLayout.STANDARD_5 || centerLayout == CenterControlsLayout.WIDE_SPACED) {
                                     GlassIconButton(
                                         onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
                                             controlsTimeoutKey++
                                             onPreviousEpisode()
                                         },
@@ -3092,6 +3096,8 @@ fun CinePlayerView(
                                 if (centerLayout != CenterControlsLayout.PLAY_ONLY) {
                                     GlassIconButton(
                                         onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
                                             controlsTimeoutKey++
                                             PlayerPlaybackPlugin.seekBy(exoPlayer, -10000L)
                                             if (doubleTapSide == "LEFT") {
@@ -3103,10 +3109,11 @@ fun CinePlayerView(
                                             doubleTapTriggerKey++
                                             val curKey = doubleTapTriggerKey
                                             scope.launch {
-                                                delay(750)
+                                                delay(1200)
                                                 if (doubleTapTriggerKey == curKey) {
                                                     doubleTapSide = null
                                                     accumulatedSeekSeconds = 0
+                                                    controlsTimeoutKey++
                                                 }
                                             }
                                         },
@@ -3139,6 +3146,8 @@ fun CinePlayerView(
 
                                 GlassIconButton(
                                     onClick = {
+                                        showControls = true
+                                        isAutoHideTransition = false
                                         controlsTimeoutKey++
                                         PlayerPlaybackPlugin.togglePlayPause(exoPlayer, context)
                                     },
@@ -3165,6 +3174,8 @@ fun CinePlayerView(
                                 if (centerLayout != CenterControlsLayout.PLAY_ONLY) {
                                     GlassIconButton(
                                         onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
                                             controlsTimeoutKey++
                                             PlayerPlaybackPlugin.seekBy(exoPlayer, 10000L)
                                             if (doubleTapSide == "RIGHT") {
@@ -3176,10 +3187,11 @@ fun CinePlayerView(
                                             doubleTapTriggerKey++
                                             val curKey = doubleTapTriggerKey
                                             scope.launch {
-                                                delay(750)
+                                                delay(1200)
                                                 if (doubleTapTriggerKey == curKey) {
                                                     doubleTapSide = null
                                                     accumulatedSeekSeconds = 0
+                                                    controlsTimeoutKey++
                                                 }
                                             }
                                         },
@@ -3213,6 +3225,8 @@ fun CinePlayerView(
                                 if (centerLayout == CenterControlsLayout.STANDARD_5 || centerLayout == CenterControlsLayout.WIDE_SPACED) {
                                     GlassIconButton(
                                         onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
                                             controlsTimeoutKey++
                                             onNextEpisode()
                                         },
