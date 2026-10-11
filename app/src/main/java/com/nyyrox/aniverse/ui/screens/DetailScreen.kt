@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import com.styropyr0.prismal.sources.PrismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -178,6 +179,7 @@ import com.nyyrox.aniverse.ui.theme.OttSurfaceBorder
 import com.nyyrox.aniverse.ui.theme.OttSurfaceElevated
 import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import com.nyyrox.aniverse.ui.theme.OttTextPrimary
+import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import java.util.Locale
@@ -2927,6 +2929,11 @@ private fun DetailWaveOscillatingSkeleton(
 }
 
 
+
+// ponytail: reads the Profile toggle directly; AGSL glass needs API 33+. Move to a shared file if other screens need it.
+@Composable
+private fun rememberGlassEnabled(): Boolean =
+    LocalThemeSettings.current.isGlassmorphismEnabled && Build.VERSION.SDK_INT >= 33
 
 /** Glass section card (flat AMOLED card when [backdrop] is null). Grows/shrinks smoothly with its content. */
 @Composable
