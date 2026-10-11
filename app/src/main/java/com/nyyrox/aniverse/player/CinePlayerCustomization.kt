@@ -18,6 +18,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import com.styropyr0.prismal.drawPrismalGlass
+import com.styropyr0.prismal.effects.applyPrismalGlassEffects
+import com.styropyr0.prismal.specular.PrismalSpecular
+import com.styropyr0.prismal.specular.PrismalSpecularStyle
+import com.styropyr0.prismal.depth.PrismalDepthShadow
+import com.styropyr0.prismal.LocalPrismalBackdrop
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -1335,14 +1341,14 @@ fun Modifier.glassSurface(
             .drawBehind { if (pressed) drawRect(Color(0x33FFFFFF)) }
             .border(borderWidth, Color(0x28FFFFFF), shape)
     }
-    val prismalBackdrop = com.styropyr0.prismal.LocalPrismalBackdrop.current
+    val prismalBackdrop = LocalPrismalBackdrop.current
     if (useBackdrop && prismalBackdrop != null) {
         val density = androidx.compose.ui.platform.LocalDensity.current
-        return@composed this.com.styropyr0.prismal.drawPrismalGlass(
+        return@composed this.drawPrismalGlass(
             backdrop = prismalBackdrop,
             shape = { shape },
             effects = {
-                com.styropyr0.prismal.effects.applyPrismalGlassEffects(
+                applyPrismalGlassEffects(
                     density = density,
                     blurRadiusPx = with(density) { 20.dp.toPx() },
                     refractionHeightPx = with(density) { 14.dp.toPx() },
@@ -1352,15 +1358,15 @@ fun Modifier.glassSurface(
                 )
             },
             specular = {
-                com.styropyr0.prismal.specular.PrismalSpecular(
+                PrismalSpecular(
                     width = 0.8.dp,
                     blurRadius = 0.5.dp,
                     alpha = if (pressed) 1.0f else 0.75f,
-                    style = com.styropyr0.prismal.specular.PrismalSpecularStyle.Default
+                    style = PrismalSpecularStyle.Default
                 )
             },
             depthShadow = {
-                com.styropyr0.prismal.depth.PrismalDepthShadow(radius = elevation, alpha = 0.8f)
+                PrismalDepthShadow(radius = elevation, alpha = 0.8f)
             },
             onDrawSurface = {
                 drawRect(tint)
@@ -1676,14 +1682,14 @@ fun Modifier.glassPanel(radius: Dp = 28.dp): Modifier = composed {
             .background(Color(0xF2121418))
             .border(1.dp, Color(0x28FFFFFF), shape)
     }
-    val prismalBackdrop = com.styropyr0.prismal.LocalPrismalBackdrop.current
+    val prismalBackdrop = LocalPrismalBackdrop.current
     if (prismalBackdrop != null) {
         val density = androidx.compose.ui.platform.LocalDensity.current
-        return@composed this.com.styropyr0.prismal.drawPrismalGlass(
+        return@composed this.drawPrismalGlass(
             backdrop = prismalBackdrop,
             shape = { shape },
             effects = {
-                com.styropyr0.prismal.effects.applyPrismalGlassEffects(
+                applyPrismalGlassEffects(
                     density = density,
                     blurRadiusPx = with(density) { 24.dp.toPx() },
                     refractionHeightPx = with(density) { 16.dp.toPx() },
@@ -1693,15 +1699,15 @@ fun Modifier.glassPanel(radius: Dp = 28.dp): Modifier = composed {
                 )
             },
             specular = {
-                com.styropyr0.prismal.specular.PrismalSpecular(
+                PrismalSpecular(
                     width = 1.dp,
                     blurRadius = 0.5.dp,
                     alpha = 0.9f,
-                    style = com.styropyr0.prismal.specular.PrismalSpecularStyle.Default
+                    style = PrismalSpecularStyle.Default
                 )
             },
             depthShadow = {
-                com.styropyr0.prismal.depth.PrismalDepthShadow(radius = 24.dp, alpha = 0.9f)
+                PrismalDepthShadow(radius = 24.dp, alpha = 0.9f)
             },
             onDrawSurface = {
                 drawRect(Color(0xB310141E))

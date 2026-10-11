@@ -38,6 +38,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nyyrox.aniverse.data.supabase.AuthState
 import com.nyyrox.aniverse.ui.components.CompulsoryUsernameDialog
 import com.nyyrox.aniverse.ui.components.OttBottomDock
+import com.styropyr0.prismal.sources.prismalGlassLayer
+import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
+import com.styropyr0.prismal.LocalPrismalBackdrop
 import com.nyyrox.aniverse.ui.components.OttNavDrawer
 import com.nyyrox.aniverse.ui.components.OttTopBar
 import com.nyyrox.aniverse.ui.screens.AiringScreen
@@ -380,7 +383,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .com.styropyr0.prismal.sources.prismalGlassLayer(appBackdropLayer)
+                            .prismalGlassLayer(appBackdropLayer)
                     ) {
                         AnimatedContent(
                             targetState = currentRoute,

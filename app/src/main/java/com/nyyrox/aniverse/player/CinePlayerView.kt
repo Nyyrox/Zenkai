@@ -15,6 +15,9 @@ import android.graphics.Bitmap
 import android.os.Build
 import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.hazeSource
+import com.styropyr0.prismal.sources.prismalGlassLayer
+import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
+import com.styropyr0.prismal.LocalPrismalBackdrop
 import android.view.LayoutInflater
 import android.os.Message
 import android.webkit.WebViewClient
@@ -2214,7 +2217,7 @@ fun CinePlayerView(
                             .fillMaxSize()
                             .onSizeChanged { glassBackdrop.hostWidth = it.width }
                             .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier)
-                            .then(if (com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) Modifier.com.styropyr0.prismal.sources.prismalGlassLayer(playerPrismalBackdrop) else Modifier),
+                            .then(if (com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) Modifier.prismalGlassLayer(playerPrismalBackdrop) else Modifier),
                         factory = { ctx ->
                             (LayoutInflater.from(ctx).inflate(com.nyyrox.aniverse.R.layout.cine_player_texture, null, false) as PlayerView).apply {
                                 useController = false

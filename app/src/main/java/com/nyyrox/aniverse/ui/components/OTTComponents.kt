@@ -61,6 +61,13 @@ import com.nyyrox.aniverse.data.novel.NovelHistoryItem
 import com.nyyrox.aniverse.ui.theme.LocalThemeColors
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.components.decorations.AvatarDecorationRenderer
+import com.styropyr0.prismal.components.PrismalGlassBottomTabs
+import com.styropyr0.prismal.components.PrismalGlassBottomTab
+import com.styropyr0.prismal.components.LocalPrismalBottomTabHighlightedIndex
+import com.styropyr0.prismal.specular.PrismalSpecular
+import com.styropyr0.prismal.PrismalBackdrop
+import com.styropyr0.prismal.LocalPrismalBackdrop
+import com.styropyr0.prismal.sources.emptyGlassSource
 import androidx.compose.material3.LinearProgressIndicator
 import com.nyyrox.aniverse.ui.animation.mediaCardPhysics
 import androidx.compose.material3.Text
@@ -226,7 +233,7 @@ fun OttBottomDock(
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            com.styropyr0.prismal.components.PrismalGlassBottomTabs(
+            PrismalGlassBottomTabs(
                 selectedTabIndex = { activeIndex },
                 onTabSelected = { idx ->
                     if (idx in tabs.indices) {
@@ -235,15 +242,15 @@ fun OttBottomDock(
                 },
                 backdrop = ambientBackdrop,
                 tabsCount = tabs.size,
-                specular = { com.styropyr0.prismal.specular.PrismalSpecular.Default },
+                specular = { PrismalSpecular.Default },
                 dropletContentTint = themeColors.primary,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                tabs.forEachIndexed { index, tab ->
-                    val highlightedIndex = com.styropyr0.prismal.components.LocalPrismalBottomTabHighlightedIndex.current()
+                val highlightedIndex = LocalPrismalBottomTabHighlightedIndex.current
+                for ((index, tab) in tabs.withIndex()) {
                     val isSelected = highlightedIndex() == index
 
-                    com.styropyr0.prismal.components.PrismalGlassBottomTab(
+                    PrismalGlassBottomTab(
                         onClick = { onNavigate(tab.route) }
                     ) {
                         if (tab.route == "profile") {
