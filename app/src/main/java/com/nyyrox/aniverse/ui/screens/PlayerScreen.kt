@@ -2110,7 +2110,7 @@ fun PlayerScreen(
                                     ) {
                                         row.forEach { epNum ->
                                             val isCurrent = epNum == currentEpisode
-                                            val isEpDl = downloadedAnimeList.any { it.animeId == anime.id && it.episodeNumber == epNum }
+                                            val isEpDl = vm.isAnimeEpisodeDownloaded(anime.id, epNum)
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
