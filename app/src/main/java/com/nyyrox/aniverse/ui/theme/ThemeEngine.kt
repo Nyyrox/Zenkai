@@ -94,7 +94,8 @@ data class ThemeSettings(
     val theme: AnimeTheme = AnimeTheme.ZENKAI_CRIMSON,
     val isReducedMotionEnabled: Boolean = false,
     val isPowerSavingEnabled: Boolean = false,
-    val preferredRefreshRate: Int = 90
+    val preferredRefreshRate: Int = 90,
+    val isGlassmorphismEnabled: Boolean = true
 )
 
 fun getThemeColors(theme: AnimeTheme): ThemeColors {

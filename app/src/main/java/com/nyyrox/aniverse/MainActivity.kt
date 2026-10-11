@@ -114,6 +114,10 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     applyConfiguredRefreshRate()
 
+    if (com.styropyr0.prismal.isAGSLShaderSupported()) {
+        com.styropyr0.prismal.internal.PrismalAgslAssets.bind(applicationContext.assets)
+    }
+
     // Initialize notification channel and request notification permission on Android 13+
     ZenkaiNotificationHelper.createNotificationChannel(this)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

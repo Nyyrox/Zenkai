@@ -1326,7 +1326,16 @@ fun Modifier.glassSurface(
     borderColor: Color = Color(0x38FFFFFF), // rgba(255, 255, 255, 0.22)
     useBackdrop: Boolean = true
 ): Modifier = composed {
-    // Android 12+: real live backdrop blur of the video (Haze). Below 12: plain translucent glass.
+    val isGlassEnabled = com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled
+    if (!isGlassEnabled) {
+        return@composed this
+            .shadow(if (elevation > 0.dp) 2.dp else 0.dp, shape, clip = false)
+            .clip(shape)
+            .background(Color(0xE6101420))
+            .drawBehind { if (pressed) drawRect(Color(0x33FFFFFF)) }
+            .border(borderWidth, Color(0x28FFFFFF), shape)
+    }
+    // Android 12+: real live backdrop blur of the video (Haze / AGSL). Below 12: plain translucent glass.
     val haze = if (useBackdrop) LocalGlassHaze.current else null
     this
         .shadow(elevation, shape, clip = false, ambientColor = Color(0x59000000), spotColor = Color(0x59000000))

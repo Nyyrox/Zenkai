@@ -129,6 +129,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.datastore:datastore-preferences:1.1.0")
+    implementation("androidx.startup:startup-runtime:1.2.0")
 
     // Haze — live backdrop blur for glass UI (Android 12+)
     implementation("dev.chrisbanes.haze:haze:1.7.2")

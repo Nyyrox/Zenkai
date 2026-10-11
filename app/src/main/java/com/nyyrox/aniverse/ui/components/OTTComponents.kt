@@ -229,6 +229,8 @@ fun OttBottomDock(
         label = "liquid_pill_spring"
     )
 
+    val isGlassEnabled = themeSettings.isGlassmorphismEnabled
+
     // Floating Glassmorphism Pill Navigation Dock
     Box(
         modifier = modifier
@@ -236,28 +238,44 @@ fun OttBottomDock(
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .shadow(
-                elevation = 20.dp,
+                elevation = if (isGlassEnabled) 20.dp else 4.dp,
                 shape = RoundedCornerShape(32.dp),
                 ambientColor = Color(0x80000000),
                 spotColor = Color(0xB3000000)
             )
             .clip(RoundedCornerShape(32.dp))
             .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xEB0A0B0E),
-                        Color(0xF5060709)
+                if (isGlassEnabled) {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xEB0A0B0E),
+                            Color(0xF5060709)
+                        )
                     )
-                )
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF0F121C),
+                            Color(0xFF0B0D14)
+                        )
+                    )
+                }
             )
             .border(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
-                    listOf(
-                        Color(0x40FFFFFF),
-                        Color(0x14FFFFFF),
-                        Color(0x10FFFFFF)
-                    )
+                    if (isGlassEnabled) {
+                        listOf(
+                            Color(0x40FFFFFF),
+                            Color(0x14FFFFFF),
+                            Color(0x10FFFFFF)
+                        )
+                    } else {
+                        listOf(
+                            Color(0x22FFFFFF),
+                            Color(0x11FFFFFF)
+                        )
+                    }
                 ),
                 shape = RoundedCornerShape(32.dp)
             )
@@ -277,25 +295,41 @@ fun OttBottomDock(
                     .offset(x = (itemWidth * animatedIndex) + pillPaddingH)
                     .width(pillWidth)
                     .height(46.dp)
-                    .shadow(8.dp, RoundedCornerShape(24.dp), spotColor = Color(0x50000000), ambientColor = Color(0x20FFFFFF))
+                    .shadow(if (isGlassEnabled) 8.dp else 2.dp, RoundedCornerShape(24.dp), spotColor = Color(0x50000000), ambientColor = Color(0x20FFFFFF))
                     .clip(RoundedCornerShape(24.dp))
                     .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x2AFFFFFF),
-                                Color(0x14FFFFFF),
-                                Color(0x1EFFFFFF)
+                        if (isGlassEnabled) {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x2AFFFFFF),
+                                    Color(0x14FFFFFF),
+                                    Color(0x1EFFFFFF)
+                                )
                             )
-                        )
+                        } else {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x30FFFFFF),
+                                    Color(0x18FFFFFF)
+                                )
+                            )
+                        }
                     )
                     .border(
                         width = 1.dp,
                         brush = Brush.verticalGradient(
-                            listOf(
-                                Color(0x80FFFFFF),
-                                Color(0x40FFFFFF),
-                                Color(0x12FFFFFF)
-                            )
+                            if (isGlassEnabled) {
+                                listOf(
+                                    Color(0x80FFFFFF),
+                                    Color(0x40FFFFFF),
+                                    Color(0x12FFFFFF)
+                                )
+                            } else {
+                                listOf(
+                                    Color(0x38FFFFFF),
+                                    Color(0x18FFFFFF)
+                                )
+                            }
                         ),
                         shape = RoundedCornerShape(24.dp)
                     )

@@ -82,5 +82,13 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false">
+            <meta-data
+                android:name="com.styropyr0.prismal.internal.PrismalAgslInitializer"
+                android:value="androidx.startup" />
+        </provider>
     </application>
 </manifest>

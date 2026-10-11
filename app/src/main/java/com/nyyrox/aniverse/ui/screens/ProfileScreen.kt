@@ -944,6 +944,24 @@ fun ProfileScreen(
                         )
                     }
                 )
+                ProfileDivider()
+                ProfileSettingRow(
+                    icon = Icons.Default.AutoAwesome,
+                    title = "Liquid Glassmorphism",
+                    subtitle = if (themeSettings.isGlassmorphismEnabled) "Prismal AGSL refraction, dispersion & backdrop blur" else "Optimized flat render (Lower GPU overhead & battery)",
+                    trailing = {
+                        Switch(
+                            checked = themeSettings.isGlassmorphismEnabled,
+                            onCheckedChange = { vm.setGlassmorphism(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = Color.White,
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color(0x33FFFFFF)
+                            )
+                        )
+                    }
+                )
             }
         }
 

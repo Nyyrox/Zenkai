@@ -1126,7 +1126,8 @@ class StorageManager(context: Context) {
                 theme = theme,
                 isReducedMotionEnabled = obj.optBoolean("reducedMotion", false),
                 isPowerSavingEnabled = obj.optBoolean("powerSaving", false),
-                preferredRefreshRate = obj.optInt("preferredRefreshRate", 90)
+                preferredRefreshRate = obj.optInt("preferredRefreshRate", 90),
+                isGlassmorphismEnabled = obj.optBoolean("glassmorphism", true)
             )
         } catch (_: Exception) {
             ThemeSettings()
@@ -1139,6 +1140,7 @@ class StorageManager(context: Context) {
             put("reducedMotion", settings.isReducedMotionEnabled)
             put("powerSaving", settings.isPowerSavingEnabled)
             put("preferredRefreshRate", settings.preferredRefreshRate)
+            put("glassmorphism", settings.isGlassmorphismEnabled)
         }
         prefs.edit().putString(KEY_THEME_SETTINGS, obj.toString()).apply()
     }

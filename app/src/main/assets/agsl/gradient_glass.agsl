@@ -1,0 +1,67 @@
+uniform shader content;
+
+uniform float2 size;
+uniform float refractionHeight;
+uniform float refractionAmount;
+uniform float topWeight;
+uniform float middleWeight;
+uniform float bottomWeight;
+uniform float blurFadeStart;
+uniform float blurFadeEnd;
+layout(color) uniform half4 tint;
+uniform float tintIntensity;
+
+float prismalArcLift(float x) {
+    return 1.0 - sqrt(max(0.0, 1.0 - x * x));
+}
+
+float refractionProfile(float y) {
+    float h = max(size.y, 1.0);
+    float yn = clamp(y / h, 0.0, 1.0);
+    float top = topWeight * (1.0 - smoothstep(0.0, 0.5, yn));
+    float bottom = bottomWeight * smoothstep(0.5, 1.0, yn);
+    float middle = middleWeight * (1.0 - abs(yn - 0.5) / 0.5);
+    middle = max(middle, 0.0);
+    float sum = topWeight + middleWeight + bottomWeight;
+    if (sum <= 0.0001) return 0.0;
+    return clamp((top + bottom + middle) / sum, 0.0, 1.0);
+}
+
+float blurMask(float y) {
+    return smoothstep(blurFadeStart * size.y, blurFadeEnd * size.y, y);
+}
+
+half4 main(float2 coord) {
+    float profile = refractionProfile(coord.y);
+    float mask = blurMask(coord.y);
+
+    float profileAbove = refractionProfile(coord.y - 1.0);
+    float profileBelow = refractionProfile(coord.y + 1.0);
+    float gradY = (profileBelow - profileAbove) * 0.5;
+
+    float2 halfSize = size * 0.5;
+    float2 centeredCoord = coord - halfSize;
+    float distEdge = min(min(coord.x, size.x - coord.x), min(coord.y, size.y - coord.y));
+    float sd = -distEdge;
+
+    float2 refractedCoord = coord;
+    if (profile > 0.001 && refractionHeight > 0.001 && refractionAmount > 0.001) {
+        float effectiveHeight = refractionHeight * profile;
+        float effectiveAmount = refractionAmount * profile;
+        float2 offset = float2(0.0, gradY * effectiveAmount * 0.35);
+
+        if (-sd < effectiveHeight) {
+            float edgeSd = min(sd, 0.0);
+            float d = prismalArcLift(1.0 - (-edgeSd / effectiveHeight)) * effectiveAmount;
+            float2 edgeGrad = normalize(centeredCoord + float2(0.0001, 0.0001));
+            offset += d * edgeGrad * 0.45;
+        }
+
+        refractedCoord = coord + offset;
+    }
+
+    half4 color = content.eval(refractedCoord);
+    color.a *= mask;
+    color.rgb *= mask;
+    return mix(color, half4(tint.rgb, tint.a * mask), tintIntensity * (1.0 - mask) * 0.35);
+}

@@ -567,23 +567,16 @@ private fun DoubleTapSeekOverlay(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            GlassPill(
+                modifier = Modifier.padding(top = 4.dp)
             ) {
                 Text(
                     text = "${if (isForward) "+" else "-"}$accumulatedSeconds sec",
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 13.sp,
+                    color = Color.White,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
-                    style = LocalTextStyle.current.copy(
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.85f),
-                            offset = Offset(1f, 1f),
-                            blurRadius = 4f
-                        )
-                    )
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
         }
@@ -5399,6 +5392,59 @@ private fun PlayerSettingsModal(
                             subtitle = currentCustomization.themePack.displayName,
                             onClick = { onTabChange(PlayerSettingsTab.THEME_PACKS) }
                         )
+
+                        // Liquid Glassmorphism Transparency Optimization Toggle
+                        var glassEnabled by remember { mutableStateOf(com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    val newVal = !glassEnabled
+                                    glassEnabled = newVal
+                                    com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
+                                    try {
+                                        val sm = StorageManager(context)
+                                        val cur = sm.getThemeSettings()
+                                        sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
+                                    } catch (_: Throwable) {}
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Liquid Glassmorphism",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (glassEnabled) "AGSL refraction & blur enabled" else "Optimized flat render (Fast)",
+                                    color = OttSecondary,
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                            Switch(
+                                checked = glassEnabled,
+                                onCheckedChange = { newVal ->
+                                    glassEnabled = newVal
+                                    com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
+                                    try {
+                                        val sm = StorageManager(context)
+                                        val cur = sm.getThemeSettings()
+                                        sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
+                                    } catch (_: Throwable) {}
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = Color.White,
+                                    uncheckedThumbColor = Color.Gray,
+                                    uncheckedTrackColor = Color(0x33FFFFFF)
+                                )
+                            )
+                        }
 
                         Box(
                             modifier = Modifier

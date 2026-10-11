@@ -358,6 +358,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = themeSettings.isGlassmorphismEnabled
         com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.init(application.applicationContext)
         com.nyyrox.aniverse.data.AvatarBannerRepository.init(application.applicationContext)
         viewModelScope.launch {
@@ -1486,6 +1487,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = themeSettings.copy(isPowerSavingEnabled = enabled)
         storage.saveThemeSettings(updated)
         themeSettings = updated
+    }
+
+    fun setGlassmorphism(enabled: Boolean) {
+        val updated = themeSettings.copy(isGlassmorphismEnabled = enabled)
+        storage.saveThemeSettings(updated)
+        themeSettings = updated
+        com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = enabled
     }
 
     fun setPreferredRefreshRate(hz: Int) {
