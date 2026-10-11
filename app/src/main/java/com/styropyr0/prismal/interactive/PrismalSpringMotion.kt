@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.time.Clock
 
 /**
  * Spring-based drag controller for glass sliders, toggles, and tab indicators.
@@ -157,7 +156,7 @@ class PrismalSpringMotion(
 
     private fun updateVelocity(snap: Boolean = false) {
         velocityTracker.addPosition(
-            Clock.System.now().toEpochMilliseconds(),
+            System.currentTimeMillis(),
             Offset(value, 0f)
         )
         val targetVelocity =

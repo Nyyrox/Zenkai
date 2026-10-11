@@ -58,7 +58,7 @@ private class PrismalGlassLayerNode(
 
     override fun ContentDrawScope.draw() {
         drawContent()
-        capturePrismalLayer(node = this, layer = backdrop.graphicsLayer) { backdrop.onDraw(this@draw) }
+        capturePrismalLayer(node = this@PrismalGlassLayerNode, layer = backdrop.graphicsLayer) { backdrop.onDraw(this@draw) }
         backdrop.notifyContentRecorded()
     }
 

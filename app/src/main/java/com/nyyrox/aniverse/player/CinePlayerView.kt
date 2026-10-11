@@ -5394,6 +5394,7 @@ private fun PlayerSettingsModal(
                         )
 
                         // Liquid Glassmorphism Transparency Optimization Toggle
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
                         var glassEnabled by remember { mutableStateOf(com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) }
                         Row(
                             modifier = Modifier
@@ -5404,7 +5405,7 @@ private fun PlayerSettingsModal(
                                     glassEnabled = newVal
                                     com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
                                     try {
-                                        val sm = StorageManager(context)
+                                        val sm = com.nyyrox.aniverse.data.StorageManager(ctx)
                                         val cur = sm.getThemeSettings()
                                         sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
                                     } catch (_: Throwable) {}
@@ -5432,7 +5433,7 @@ private fun PlayerSettingsModal(
                                     glassEnabled = newVal
                                     com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
                                     try {
-                                        val sm = StorageManager(context)
+                                        val sm = com.nyyrox.aniverse.data.StorageManager(ctx)
                                         val cur = sm.getThemeSettings()
                                         sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
                                     } catch (_: Throwable) {}

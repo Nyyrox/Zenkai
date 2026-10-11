@@ -320,7 +320,7 @@ private class DrawPrismalGlassNode(
             val padding = padding
 
             capturePrismalLayer(
-                node = this,
+                node = this@DrawPrismalGlassNode,
                 layer = layer,
                 size = IntSize(
                     size.width.toInt() + padding.toInt() * 2,
@@ -365,7 +365,7 @@ private class DrawPrismalGlassNode(
         onDrawFront?.invoke(this)
 
         nestedGlassSource?.let { source ->
-            capturePrismalLayer(node = this, layer = source.graphicsLayer) {
+            capturePrismalLayer(node = this@DrawPrismalGlassNode, layer = source.graphicsLayer) {
                 onDrawBehind?.invoke(this)
                 drawPrismalGlassLayer()
                 onDrawSurface?.invoke(this)
