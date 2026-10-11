@@ -604,11 +604,17 @@ fun CinePlayerView(
         )
     }
 
-    var autoPlayNextEnabled by remember { mutableStateOf(true) }
+    val initialAutoPlay = remember(isAutoPlayNext) {
+        if (isAutoPlayNext) true else storageManager.isAutoPlayNext()
+    }
+    var autoPlayNextEnabled by remember(initialAutoPlay) { mutableStateOf(initialAutoPlay) }
     // the player listener lives in a long-running effect; plain params would be stale there
     val hasNextNow by rememberUpdatedState(hasNextEpisode)
     val onNextNow by rememberUpdatedState(onNextEpisode)
-    var autoSkipIntroOutroEnabled by remember(isAutoSkipIntroOutro) { mutableStateOf(isAutoSkipIntroOutro) }
+    val initialAutoSkip = remember(isAutoSkipIntroOutro) {
+        if (isAutoSkipIntroOutro) true else storageManager.isAutoSkipIntroOutro()
+    }
+    var autoSkipIntroOutroEnabled by remember(initialAutoSkip) { mutableStateOf(initialAutoSkip) }
     var isNextTriggered by remember(episode, streamUrl) { mutableStateOf(false) }
     var isUpNextCanceled by remember(episode, streamUrl) { mutableStateOf(false) }
     var showPlayerSettingsModal by remember { mutableStateOf(false) }
@@ -3602,11 +3608,13 @@ fun CinePlayerView(
             autoPlayNextEnabled = autoPlayNextEnabled,
             onToggleAutoPlayNext = { checked: Boolean ->
                 autoPlayNextEnabled = checked
+                storageManager.setAutoPlayNext(checked)
                 onToggleAutoPlayNext(checked)
             },
             autoSkipIntroOutroEnabled = autoSkipIntroOutroEnabled,
             onToggleAutoSkipIntroOutro = { checked: Boolean ->
                 autoSkipIntroOutroEnabled = checked
+                storageManager.setAutoSkipIntroOutro(checked)
                 onToggleAutoSkipIntroOutro(checked)
             },
             availableServers = availableServers,

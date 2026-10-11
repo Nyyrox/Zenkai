@@ -944,10 +944,10 @@ fun PlayerScreen(
                                 currentEpisode += 1
                             }
                         },
-                        isAutoPlayNext = true,
-                        onToggleAutoPlayNext = { /* mandatory */ },
-                        isAutoSkipIntroOutro = false,
-                        onToggleAutoSkipIntroOutro = { /* manual click on floating button */ },
+                        isAutoPlayNext = vm.isAutoPlayNext,
+                        onToggleAutoPlayNext = { vm.setAutoPlayNext(it) },
+                        isAutoSkipIntroOutro = vm.isAutoSkipIntroOutro,
+                        onToggleAutoSkipIntroOutro = { vm.setAutoSkipIntroOutro(it) },
                         onProgressUpdate = { pos, dur ->
                             val epStill = tmdbEpisodes[playingEpisode]?.stillUrl
                                 ?: vm.tmdbEpisodeStills["${anime.id}_$playingEpisode"]

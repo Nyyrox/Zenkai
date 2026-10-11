@@ -1185,7 +1185,7 @@ class StorageManager(context: Context) {
     }
 
     fun isAutoSkipIntroOutro(): Boolean {
-        return prefs.getBoolean(KEY_AUTO_SKIP_INTRO_OUTRO, false)
+        return prefs.getBoolean(KEY_AUTO_SKIP_INTRO_OUTRO, true)
     }
 
     fun setAutoSkipIntroOutro(enabled: Boolean) {

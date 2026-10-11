@@ -981,7 +981,11 @@ private fun WatchTogetherRoomView(
                     onProgressUpdate = { pos, _ ->
                         localPositionMs = pos
                     },
-                    availableServers = directStreamResult?.availableServers ?: emptyList()
+                    availableServers = directStreamResult?.availableServers ?: emptyList(),
+                    isAutoPlayNext = vm.isAutoPlayNext,
+                    onToggleAutoPlayNext = { vm.setAutoPlayNext(it) },
+                    isAutoSkipIntroOutro = vm.isAutoSkipIntroOutro,
+                    onToggleAutoSkipIntroOutro = { vm.setAutoSkipIntroOutro(it) }
                 )
             }
         }
