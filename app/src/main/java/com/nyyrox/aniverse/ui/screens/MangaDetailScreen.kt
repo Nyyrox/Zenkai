@@ -1092,6 +1092,31 @@ fun MangaDetailScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
+                                    // Share Chapter Button
+                                    IconButton(
+                                        onClick = {
+                                            val chNumInt = ch.number.toDoubleOrNull()?.toInt()
+                                            val chParam = if (chNumInt != null) "?ch=$chNumInt" else ""
+                                            val chShareUrl = "https://zenkai-auth-worker.ammhfoo.workers.dev/s/manga/${MangaRepository.cleanWeebId(currentMangaId)}$chParam"
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(
+                                                    Intent.EXTRA_TEXT,
+                                                    "Read ${info?.title ?: "Manga"} Chapter ${ch.number} on ZENKAI: $chShareUrl"
+                                                )
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share Chapter"))
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Share,
+                                            contentDescription = "Share Chapter",
+                                            tint = Color(0x75FFFFFF),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+
                                     if (isDownloading && activeTask != null) {
                                         Text(
                                             text = "${activeTask.percentage}%",
@@ -1457,7 +1482,7 @@ fun MangaDetailScreen(
                                 action = Intent.ACTION_SEND
                                 putExtra(
                                     Intent.EXTRA_TEXT,
-                                    "Read ${currentInfo.title} on ZENKAI: https://aniverse-kt.vercel.app/manga/$currentMangaId"
+                                    "Read ${currentInfo.title} on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/manga/${MangaRepository.cleanWeebId(currentMangaId)}"
                                 )
                                 type = "text/plain"
                             }

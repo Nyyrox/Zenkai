@@ -274,10 +274,60 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     LaunchedEffect(deepLinkUri) {
         if (!deepLinkUri.isNullOrBlank()) {
             try {
+                // If URL contains login-callback, let existing auth handler own it and resume pending share
+                if (deepLinkUri.contains("login-callback")) {
+                    vm.checkExistingSession()
+                    val storageManager = StorageManager(context)
+                    val pending = storageManager.getPendingShare()
+                    if (!pending.isNullOrBlank()) {
+                        storageManager.setPendingShare(null)
+                        push(pending)
+                    } else {
+                        switchTab("profile")
+                    }
+                    return@LaunchedEffect
+                }
+
                 val uri = android.net.Uri.parse(deepLinkUri)
                 val scheme = uri.scheme?.lowercase(java.util.Locale.US)
                 val host = uri.host?.lowercase(java.util.Locale.US)
                 val segments = uri.pathSegments
+
+                // Check share links: https://<host>/s/... or aniverse://s/...
+                // (for the custom scheme the path is "/" + url.host + url.pathname)
+                val normalizedPath = when {
+                    scheme == "aniverse" && host == "s" -> "/s" + (uri.path ?: "")
+                    scheme == "https" && (host == "zenkai-auth-worker.ammhfoo.workers.dev" || uri.path?.startsWith("/s/") == true) -> uri.path.orEmpty()
+                    else -> null
+                }
+
+                val shareMatch = normalizedPath?.let { Regex("^/s/(anime|manga|novel)/([\\w-]{1,64})/?$").find(it) }
+                if (shareMatch != null) {
+                    val kind = shareMatch.groupValues[1]
+                    val id = shareMatch.groupValues[2]
+                    val epParam = uri.getQueryParameter("ep")?.takeIf { it.matches(Regex("^\\d{1,5}$")) }?.toIntOrNull()
+                    val chParam = uri.getQueryParameter("ch")?.takeIf { it.matches(Regex("^\\d{1,5}$")) }?.toIntOrNull()
+
+                    val targetRoute = when (kind) {
+                        "anime" -> if (epParam != null && epParam > 0) "player:$id:$epParam:" else "detail:$id"
+                        "manga" -> "manga_detail:$id"
+                        "novel" -> "novel_detail:$id"
+                        else -> null
+                    }
+
+                    if (targetRoute != null) {
+                        val hasSession = vm.authState is AuthState.LoggedIn || (vm.userProfile.id?.takeIf { it.isNotBlank() && it != "guest" } != null)
+                        if (hasSession) {
+                            if (currentRoute != targetRoute) {
+                                push(targetRoute)
+                            }
+                        } else {
+                            StorageManager(context).setPendingShare(targetRoute)
+                            push("login")
+                        }
+                    }
+                    return@LaunchedEffect
+                }
 
                 val targetRoute = when {
                     scheme == "zenkai" || scheme == "aniverse" -> {
@@ -285,7 +335,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         val targetId = if (host != null) segments.firstOrNull() else segments.getOrNull(1)
                         if (targetType == "login-callback" || targetType == "callback" || targetType == "auth") {
                             vm.checkExistingSession()
-                            switchTab("profile")
+                            val storageManager = StorageManager(context)
+                            val pending = storageManager.getPendingShare()
+                            if (!pending.isNullOrBlank()) {
+                                storageManager.setPendingShare(null)
+                                push(pending)
+                            } else {
+                                switchTab("profile")
+                            }
                             null
                         } else if (targetType == "anilist-auth") {
                             val fragment = uri.fragment.orEmpty()
@@ -327,7 +384,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     }
                     segments.isNotEmpty() && (segments[0] == "login-callback" || segments[0] == "callback") -> {
                         vm.checkExistingSession()
-                        switchTab("profile")
+                        val storageManager = StorageManager(context)
+                        val pending = storageManager.getPendingShare()
+                        if (!pending.isNullOrBlank()) {
+                            storageManager.setPendingShare(null)
+                            push(pending)
+                        } else {
+                            switchTab("profile")
+                        }
                         null
                     }
                     segments.size >= 2 -> {
@@ -566,8 +630,24 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                 screen == "login" -> {
                                     LoginScreen(
                                         vm = vm,
-                                        onLoginSuccess = { pop() },
-                                        onContinueAsGuest = { pop() }
+                                        onLoginSuccess = {
+                                            val pending = StorageManager(context).getPendingShare()
+                                            if (!pending.isNullOrBlank()) {
+                                                StorageManager(context).setPendingShare(null)
+                                                push(pending)
+                                            } else {
+                                                pop()
+                                            }
+                                        },
+                                        onContinueAsGuest = {
+                                            val pending = StorageManager(context).getPendingShare()
+                                            if (!pending.isNullOrBlank()) {
+                                                StorageManager(context).setPendingShare(null)
+                                                push(pending)
+                                            } else {
+                                                pop()
+                                            }
+                                        }
                                     )
                                 }
 

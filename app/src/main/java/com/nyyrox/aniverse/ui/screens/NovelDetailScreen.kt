@@ -726,6 +726,32 @@ fun NovelDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
+                                        // Share Chapter Button
+                                        IconButton(
+                                            onClick = {
+                                                val chNumMatch = Regex("\\d+").find(ch.slug) ?: Regex("\\d+").find(ch.title)
+                                                val chNum = chNumMatch?.value?.toIntOrNull()
+                                                val chParam = if (chNum != null) "?ch=$chNum" else ""
+                                                val chShareUrl = "https://zenkai-auth-worker.ammhfoo.workers.dev/s/novel/$novelSlug$chParam"
+                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "text/plain"
+                                                    putExtra(
+                                                        Intent.EXTRA_TEXT,
+                                                        "Read ${novel.title} ${ch.title} on ZENKAI: $chShareUrl"
+                                                    )
+                                                }
+                                                context.startActivity(Intent.createChooser(shareIntent, "Share Chapter"))
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Share,
+                                                contentDescription = "Share Chapter",
+                                                tint = Color(0x75FFFFFF),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+
                                         if (isDownloading && activeTask != null) {
                                             Text(
                                                 text = "${activeTask.percentage}%",
@@ -976,7 +1002,7 @@ fun NovelDetailScreen(
                                     action = Intent.ACTION_SEND
                                     putExtra(
                                         Intent.EXTRA_TEXT,
-                                        "Read ${novel.title} on ZENKAI: https://aniverse-kt.vercel.app/novel/$novelSlug"
+                                        "Read ${novel.title} on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/novel/$novelSlug"
                                     )
                                     type = "text/plain"
                                 }

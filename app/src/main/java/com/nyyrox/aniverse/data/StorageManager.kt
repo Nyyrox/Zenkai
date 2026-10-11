@@ -1472,4 +1472,11 @@ class StorageManager(context: Context) {
         current.add(id)
         prefs.edit().putStringSet("key_deleted_notification_ids", current).apply()
     }
+
+    // --- Share Deep-Linking Pending Route ---
+    fun getPendingShare(): String? = prefs.getString("pendingShare", null)
+    fun setPendingShare(route: String?) {
+        if (route == null) prefs.edit().remove("pendingShare").apply()
+        else prefs.edit().putString("pendingShare", route).apply()
+    }
 }

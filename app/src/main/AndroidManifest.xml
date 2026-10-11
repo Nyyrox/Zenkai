@@ -67,7 +67,27 @@
                 <data android:scheme="https" android:host="aniverse-kt.vercel.app" />
                 <data android:scheme="https" android:host="aniverse.app" />
                 <data android:scheme="https" android:host="aniversee.vercel.app" />
-                <data android:scheme="https" android:host="zenkai-auth-worker.ammhfoo.workers.dev" />
+            </intent-filter>
+
+            <!-- Share Deep-Link: App Links https://zenkai-auth-worker.ammhfoo.workers.dev/s/ -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="zenkai-auth-worker.ammhfoo.workers.dev"
+                    android:pathPrefix="/s/" />
+            </intent-filter>
+
+            <!-- Share Deep-Link: Custom Scheme aniverse://s -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="aniverse"
+                    android:host="s" />
             </intent-filter>
         </activity>
 

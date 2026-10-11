@@ -808,7 +808,7 @@ fun DetailScreen(
                         SpecRow("Source", anime.displaySource)
                     }
 
-                    // Action Row: Watchlist only (Play is now on hero banner)
+                    // Action Row: Watchlist & Share (Play is on hero banner)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -841,6 +841,48 @@ fun DetailScreen(
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 text = if (isBookmarked) "In Watchlist" else "Watchlist",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = OttTextMuted
+                            )
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Watch ${anime.displayTitle} on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/anime/${anime.id}"
+                                        )
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Anime"))
+                                }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x18FFFFFF))
+                                    .border(1.dp, Color(0x28FFFFFF), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Share",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = OttTextMuted
@@ -1358,38 +1400,72 @@ fun DetailScreen(
                                                 )
                                             }
 
-                                            // Download Button Top Right
-                                            val dlInteraction = remember { MutableInteractionSource() }
-                                            val dlPressed by dlInteraction.collectIsPressedAsState()
-                                            val dlScale by animateFloatAsState(
-                                                targetValue = if (dlPressed) 0.85f else 1f,
-                                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                                                label = "epDlScale"
-                                            )
-                                            Box(
+                                            // Action Buttons Top Right: Share & Download
+                                            Row(
                                                 modifier = Modifier
                                                     .align(Alignment.TopEnd)
-                                                    .padding(8.dp)
-                                                    .size(32.dp)
-                                                    .scale(dlScale)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0x99101420))
-                                                    .border(1.dp, Color(0x38FFFFFF), CircleShape)
-                                                    .clickable(
-                                                        interactionSource = dlInteraction,
-                                                        indication = null
-                                                    ) {
-                                                        if (!isDownloaded && !isDownloading) {
-                                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                            showDownloadSheetEpisode = epNum to (epStillInfo?.name ?: "Episode $epNum")
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
+                                                    .padding(8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                when {
-                                                    isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                                                    isDownloading -> Icon(Icons.Default.Downloading, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(16.dp))
-                                                    else -> Icon(Icons.Default.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                // Share Episode Button
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0x99101420))
+                                                        .border(1.dp, Color(0x38FFFFFF), CircleShape)
+                                                        .clickable {
+                                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                                type = "text/plain"
+                                                                putExtra(
+                                                                    Intent.EXTRA_TEXT,
+                                                                    "Watch ${anime.displayTitle} Ep $epNum on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/anime/${anime.id}?ep=$epNum"
+                                                                )
+                                                            }
+                                                            context.startActivity(Intent.createChooser(shareIntent, "Share Episode"))
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Share,
+                                                        contentDescription = "Share Episode",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
+
+                                                // Download Button Top Right
+                                                val dlInteraction = remember { MutableInteractionSource() }
+                                                val dlPressed by dlInteraction.collectIsPressedAsState()
+                                                val dlScale by animateFloatAsState(
+                                                    targetValue = if (dlPressed) 0.85f else 1f,
+                                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                                    label = "epDlScale"
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .scale(dlScale)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0x99101420))
+                                                        .border(1.dp, Color(0x38FFFFFF), CircleShape)
+                                                        .clickable(
+                                                            interactionSource = dlInteraction,
+                                                            indication = null
+                                                        ) {
+                                                            if (!isDownloaded && !isDownloading) {
+                                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                                showDownloadSheetEpisode = epNum to (epStillInfo?.name ?: "Episode $epNum")
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    when {
+                                                        isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                                                        isDownloading -> Icon(Icons.Default.Downloading, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(16.dp))
+                                                        else -> Icon(Icons.Default.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                    }
                                                 }
                                             }
 
@@ -2149,6 +2225,28 @@ fun DetailScreen(
 
             if (!isScrolledPastHero) {
                 Spacer(Modifier.weight(1f))
+            }
+
+            // Share in Top Right
+            IconButton(
+                onClick = {
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "Watch ${anime.displayTitle} on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/anime/${anime.id}"
+                        )
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Anime"))
+                },
+                modifier = Modifier.size(42.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Share",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
             }
 
             // Watchlist in Top Right: BARE ICON, NO OUTER CIRCLE
