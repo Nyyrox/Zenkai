@@ -58,6 +58,16 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.scale
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlinx.coroutines.launch
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -523,6 +533,8 @@ fun DetailScreen(
     val barRangePx = with(density) { 140.dp.toPx() }
     val heroFadePx = with(density) { 380.dp.toPx() }
     val barBg = if (glassOn) Color(0xF2050507) else OttBg
+    // Episode cards start tilting/fading away once they slide under the pinned tabs.
+    val episodeTopLimitPx = barHeightPx + with(density) { TabsHeight.toPx() + 60.dp.toPx() }
 
     val lazyListState = rememberLazyListState()
     val scrollOffset by remember {
@@ -615,6 +627,9 @@ fun DetailScreen(
         val s = p * pageSize + 1
         "$s–${minOf(s + pageSize - 1, maxEpisode)}"
     }
+
+    // Entrance animations that already played, so lazy items don't replay them on every scroll-in.
+    val seen = remember(anime.id) { HashSet<String>() }
 
     val characters = anime.characters
     var charFilter by remember(anime.id) { mutableIntStateOf(0) }
@@ -785,7 +800,16 @@ fun DetailScreen(
                     contentAlignment = Alignment.BottomStart
                 ) {
                     Column(
-                        modifier = Modifier.graphicsLayer { alpha = contentAlpha }
+                        modifier = Modifier.graphicsLayer {
+                            // Title block shrinks + fades toward its corner as you scroll into the content.
+                            val t = (scrollOffset / heroFadePx * 1.6f).coerceIn(0f, 1f)
+                            alpha = contentAlpha * (1f - t)
+                            translationY = t * 24.dp.toPx()
+                            val sc = 1f - t * 0.10f
+                            scaleX = sc
+                            scaleY = sc
+                            transformOrigin = TransformOrigin(0f, 1f)
+                        }
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -862,6 +886,7 @@ fun DetailScreen(
 
                     // Quick facts
                     FlowRow(
+                        modifier = Modifier.staggerIn(0, seen, "meta_0"),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -891,33 +916,33 @@ fun DetailScreen(
                         else -> "Play Ep $selectedEpisode"
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .staggerIn(1, seen, "meta_1"),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp)
-                                .clip(CircleShape)
-                                .background(Color.White)
-                                .clickable {
-                                    if (anime.id <= 0) showMissingAnilistDialog = true
-                                    else onPlay(anime.id, selectedEpisode, selectedProvider)
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                        HeroPlayButton(
+                            label = playLabel,
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(24.dp))
-                            Text(playLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1)
+                            if (anime.id <= 0) showMissingAnilistDialog = true
+                            else onPlay(anime.id, selectedEpisode, selectedProvider)
                         }
                         PlayerGlassButton(backdrop, onClick = { showWatchlistStatusDialog = true }, height = 50.dp, circle = true) {
-                            Icon(
-                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Watchlist",
-                                tint = if (isBookmarked) OttAccentGold else Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            PopOnChange(isBookmarked) {
+                                val bmTint by animateColorAsState(
+                                    targetValue = if (isBookmarked) OttAccentGold else Color.White,
+                                    animationSpec = tween(220),
+                                    label = "bookmarkTint"
+                                )
+                                Icon(
+                                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Watchlist",
+                                    tint = bmTint,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
                         PlayerGlassButton(backdrop, onClick = shareAnime, height = 50.dp, circle = true) {
                             Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(21.dp))
@@ -932,6 +957,7 @@ fun DetailScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .staggerIn(2, seen, "meta_2")
                                 .cardSurface(glassOn, 18.dp)
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -970,7 +996,15 @@ fun DetailScreen(
                     val displayOverview = tmdbDetails?.overview?.ifBlank { null } ?: anime.cleanDescription
                     if (displayOverview.isNotBlank()) {
                         val isLongOverview = displayOverview.length > 170
-                        DetailCard(glassOn, "SYNOPSIS") {
+                        DetailCard(
+                            glassOn, "SYNOPSIS",
+                            modifier = Modifier
+                                .staggerIn(3, seen, "meta_3")
+                                .then(
+                                    if (isLongOverview) Modifier.pressable(0.985f, haptic = false) { isSynopsisExpanded = !isSynopsisExpanded }
+                                    else Modifier
+                                )
+                        ) {
                             Text(
                                 text = displayOverview,
                                 fontSize = 13.5.sp,
@@ -1002,7 +1036,7 @@ fun DetailScreen(
                         "Studio" to (anime.studios.firstOrNull()?.ifBlank { null } ?: "Unknown"),
                         "Source" to anime.displaySource
                     ).filter { it.second.isNotBlank() }
-                    DetailCard(glassOn, "DETAILS") {
+                    DetailCard(glassOn, "DETAILS", modifier = Modifier.staggerIn(4, seen, "meta_4")) {
                         if (combinedGenres.isNotEmpty()) {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1033,7 +1067,7 @@ fun DetailScreen(
 
             // === TAB CONTENTS ===
             when (currentTabTitle) {
-                // --- EPISODES: compact rows (thumbnail + title + 2-line synopsis), lazily composed ---
+                // --- EPISODES: rich 16:9 cards with swipe-up 3D scroll effect, lazily composed ---
                 "Episodes" -> {
                     item(key = "ep_controls") {
                         Column(
@@ -1199,6 +1233,11 @@ fun DetailScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(46.dp)
+                                            .pressable(0.88f) {
+                                                selectedEpisode = epNum
+                                                if (anime.id <= 0) showMissingAnilistDialog = true
+                                                else onPlay(anime.id, epNum, selectedProvider)
+                                            }
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(
                                                 if (isCurrent) Color.White
@@ -1213,12 +1252,7 @@ fun DetailScreen(
                                                 else if (isEpMixed) Color(0x60818CF8)
                                                 else Color(0x25FFFFFF),
                                                 RoundedCornerShape(10.dp)
-                                            )
-                                            .clickable {
-                                                selectedEpisode = epNum
-                                                if (anime.id <= 0) showMissingAnilistDialog = true
-                                                else onPlay(anime.id, epNum, selectedProvider)
-                                            },
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -1245,14 +1279,18 @@ fun DetailScreen(
                             }
                         }
                     } else {
-                        items(pageEpisodes, key = { "ep_$it" }) { epNum ->
+                        itemsIndexed(pageEpisodes, key = { _, ep -> "ep_$ep" }) { epIdx, epNum ->
                             val still = tmdbEpisodes[epNum]
                             val isDownloaded = vm.isAnimeEpisodeDownloaded(anime.id, epNum)
                             val isDownloading = activeAnimeTasks.containsKey("${anime.id}:$epNum")
                             val savedPos = vm.getSavedPosition(anime.id, epNum)
                             val durMs = (anime.duration ?: 24) * 60 * 1000L
                             val progressRatio = if (durMs > 0 && savedPos > 0) (savedPos.toFloat() / durMs.toFloat()).coerceIn(0f, 1f) else 0f
-                            EpisodeRow(
+                            RichEpisodeCard(
+                                index = epIdx,
+                                seen = seen,
+                                topLimitPx = episodeTopLimitPx,
+                                fallbackThumb = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
                                 epNum = epNum,
                                 title = still?.name ?: "Episode $epNum",
                                 overview = still?.overview?.takeIf { it.isNotBlank() }
@@ -1327,8 +1365,8 @@ fun DetailScreen(
                                 )
                             }
                         }
-                        itemsIndexed(shownCharacters, key = { i, c -> "ch_${c.id}_$i" }) { _, c ->
-                            CharacterRow(char = c, glassOn = glassOn)
+                        itemsIndexed(shownCharacters, key = { i, c -> "ch_${c.id}_$i" }) { i, c ->
+                            Box(Modifier.staggerIn(i, seen, "ch_$i")) { CharacterRow(char = c, glassOn = glassOn) }
                         }
                     }
                 }
@@ -1343,14 +1381,18 @@ fun DetailScreen(
                         itemsIndexed(
                             staffList.map { Triple(it.name, it.image, it.role) }.chunked(3),
                             key = { i, _ -> "staff_$i" }
-                        ) { _, row -> PeopleRow(row, glassOn) }
+                        ) { i, row ->
+                            Box(Modifier.staggerIn(i, seen, "pp_${row.firstOrNull()?.first}_$i")) { PeopleRow(row, glassOn) }
+                        }
                     }
                     if (tmdbCast.isNotEmpty()) {
                         item(key = "cast_h") { SectionHeader("VOICE CAST (TMDB)", tmdbCast.size) }
                         itemsIndexed(
                             tmdbCast.map { Triple(it.name, it.profileUrl, it.character) }.chunked(3),
                             key = { i, _ -> "cast_$i" }
-                        ) { _, row -> PeopleRow(row, glassOn) }
+                        ) { i, row ->
+                            Box(Modifier.staggerIn(i, seen, "pp_${row.firstOrNull()?.first}_$i")) { PeopleRow(row, glassOn) }
+                        }
                     }
                 }
 
@@ -1360,12 +1402,14 @@ fun DetailScreen(
                         item(key = "vid_empty") { EmptyNote("No videos or trailers available.") }
                     } else {
                         itemsIndexed(allVideos, key = { i, v -> "vid_${v.key}_$i" }) { i, video ->
-                            VideoItem(
-                                video = video,
-                                featured = i == 0,
-                                glassOn = glassOn,
-                                onClick = { openYoutube(context, video.key) }
-                            )
+                            Box(Modifier.staggerIn(i, seen, "vid_$i")) {
+                                VideoItem(
+                                    video = video,
+                                    featured = i == 0,
+                                    glassOn = glassOn,
+                                    onClick = { openYoutube(context, video.key) }
+                                )
+                            }
                         }
                     }
                 }
@@ -1377,8 +1421,10 @@ fun DetailScreen(
                     } else {
                         relationGroups.forEach { (groupTitle, list) ->
                             item(key = "rel_h_$groupTitle") { SectionHeader(groupTitle, list.size) }
-                            itemsIndexed(list, key = { i, r -> "rel_${groupTitle}_${r.id}_$i" }) { _, rel ->
-                                RelationRow(rel = rel, glassOn = glassOn, vm = vm)
+                            itemsIndexed(list, key = { i, r -> "rel_${groupTitle}_${r.id}_$i" }) { ri, rel ->
+                                Box(Modifier.staggerIn(ri, seen, "rel_${rel.id}_$ri")) {
+                                    RelationRow(rel = rel, glassOn = glassOn, vm = vm)
+                                }
                             }
                         }
                     }
@@ -1389,15 +1435,15 @@ fun DetailScreen(
                     if (recs.isEmpty()) {
                         item(key = "rec_empty") { EmptyNote("No recommendations found.") }
                     } else {
-                        itemsIndexed(recs.chunked(3), key = { i, _ -> "rec_row_$i" }) { _, row ->
+                        itemsIndexed(recs.chunked(3), key = { i, _ -> "rec_row_$i" }) { rowIdx, row ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 18.dp),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                row.forEach { rec ->
-                                    Box(modifier = Modifier.weight(1f)) {
+                                row.forEachIndexed { colIdx, rec ->
+                                    Box(modifier = Modifier.weight(1f).staggerIn(rowIdx + colIdx, seen, "rec_${rec.id}")) {
                                         RecommendationPosterItem(rec = rec, onClick = { vm.openDetail(rec.id) })
                                     }
                                 }
@@ -1782,9 +1828,16 @@ private fun MiniChip(text: String, color: Color = Color(0xFFCBD5E1), bg: Color =
     }
 }
 
-/** Compact episode row: ~6 fit on a phone screen instead of 2 big 16:9 cards. */
+/**
+ * Rich 16:9 episode card. Slides up + tilts in on first appearance, grows toward you as it scrolls up,
+ * then tilts/fades away under the pinned tabs (the "swipe-up deck" feel). Has Share + Download on the thumbnail.
+ */
 @Composable
-private fun EpisodeRow(
+private fun RichEpisodeCard(
+    index: Int,
+    seen: MutableSet<String>,
+    topLimitPx: Float,
+    fallbackThumb: String?,
     epNum: Int,
     title: String,
     overview: String,
@@ -1801,61 +1854,264 @@ private fun EpisodeRow(
     onShare: () -> Unit,
     onDownload: () -> Unit
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    Row(
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(18.dp)
+    val seenKey = "ep_$epNum"
+
+    // Entrance: one progress value drives alpha, scale, tilt and rise (plays once per card).
+    var entered by remember { mutableStateOf(seenKey in seen) }
+    LaunchedEffect(Unit) {
+        if (!entered) {
+            entered = true
+            seen.add(seenKey)
+        }
+    }
+    val enter by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = 420, delayMillis = (index * 35).coerceAtMost(280), easing = FastOutSlowInEasing),
+        label = "epEnter"
+    )
+
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.965f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "epPress"
+    )
+    val playScale by animateFloatAsState(
+        targetValue = if (pressed) 1.25f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "epPlayPress"
+    )
+
+    // Selected episode breathes. Only the selected card runs the infinite transition.
+    val glow: State<Float> = if (isSelected) {
+        rememberInfiniteTransition(label = "epGlow").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "epGlowV"
+        )
+    } else remember { mutableStateOf(0f) }
+
+    // Window position, read only inside graphicsLayer lambdas so scrolling never recomposes the card.
+    var topPx by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    var hPx by remember { mutableFloatStateOf(1f) }
+
+    Column(
         modifier = Modifier
             .padding(horizontal = 18.dp)
             .fillMaxWidth()
+            .onGloballyPositioned { c ->
+                topPx = c.boundsInWindow().top
+                hPx = c.size.height.toFloat()
+            }
+            .graphicsLayer {
+                var sc = (0.92f + 0.08f * enter) * pressScale
+                var rx = (1f - enter) * 14f
+                var a = enter
+                var ty = (1f - enter) * 36.dp.toPx()
+                val h = hPx.coerceAtLeast(1f)
+                if (topPx < topLimitPx) {
+                    // Sliding away under the tabs
+                    val p = ((topLimitPx - topPx) / (h * 0.7f)).coerceIn(0f, 1f)
+                    sc *= 1f - p * 0.12f
+                    rx += p * 15f
+                    a *= (1f - p * 0.85f)
+                    ty -= p * 22.dp.toPx()
+                } else {
+                    val zoomZone = topLimitPx + h * 0.9f
+                    if (topPx < zoomZone) {
+                        // Swiping up into focus
+                        val f = ((zoomZone - topPx) / (h * 0.9f)).coerceIn(0f, 1f)
+                        sc *= 0.95f + f * 0.05f
+                        rx -= (1f - f) * 4f
+                    } else {
+                        sc *= 0.95f
+                    }
+                }
+                scaleX = sc
+                scaleY = sc
+                rotationX = rx
+                alpha = a.coerceIn(0f, 1f)
+                translationY = ty
+                cameraDistance = 12f * density
+            }
             .clip(shape)
-            .background(
-                if (isSelected) Color(0x26FFFFFF)
-                else if (glassOn) Color(0x12FFFFFF)
-                else Color(0xFF0D1017)
+            .then(
+                if (glassOn) Modifier
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                if (isSelected) Color(0x34FFFFFF) else Color(0x24FFFFFF),
+                                Color(0x0DFFFFFF)
+                            )
+                        ),
+                        shape
+                    )
+                    .border(1.dp, Brush.verticalGradient(listOf(Color(0x44FFFFFF), Color(0x0FFFFFFF))), shape)
+                else Modifier
+                    .background(if (isSelected) Color(0xFF171B26) else Color(0xFF0D1017))
+                    .border(1.dp, Color(0x18FFFFFF), shape)
             )
-            .border(1.dp, if (isSelected) Color(0xCCFFFFFF) else Color(0x18FFFFFF), shape)
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            .then(
+                if (isSelected) Modifier.drawWithContent {
+                    drawContent()
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.35f + 0.55f * glow.value),
+                        style = Stroke(width = 1.5.dp.toPx()),
+                        cornerRadius = CornerRadius(18.dp.toPx())
+                    )
+                } else Modifier
+            )
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            }
+            .padding(12.dp)
     ) {
         Box(
             modifier = Modifier
-                .width(132.dp)
+                .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFF141722))
         ) {
-            // ponytail: plain AsyncImage (no shimmer/error subcompose) for scroll smoothness; add SubcomposeAsyncImage back if you want placeholders.
-            AsyncImage(
+            // Thumbnail drifts slightly against the scroll for depth.
+            SubcomposeAsyncImage(
                 model = thumb,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentDescription = title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = 1.14f
+                        scaleY = 1.14f
+                        val p = ((topPx - topLimitPx) / 1400f).coerceIn(0f, 1f)
+                        translationY = (p - 0.5f) * size.height * 0.12f
+                    },
+                contentScale = ContentScale.Crop,
+                loading = { ShimmerBox(modifier = Modifier.fillMaxSize()) },
+                error = {
+                    AsyncImage(
+                        model = fallbackThumb,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             )
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(6.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(Color(0xCC000000))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(text = "EP $epNum", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            }
+
+            // Play badge (pulses on the selected episode, pops on press)
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(28.dp)
+                    .size(44.dp)
+                    .graphicsLayer {
+                        val s = playScale * (1f + 0.08f * glow.value)
+                        scaleX = s
+                        scaleY = s
+                    }
                     .clip(CircleShape)
-                    .background(Color(0x66000000)),
+                    .background(if (glassOn) Color(0x40FFFFFF) else Color(0x60000000))
+                    .border(1.dp, Color(0x50FFFFFF), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
             }
+
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White)
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = if (progress > 0.05f) "CONTINUE" else "SELECTED",
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.6.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            // Episode badge (+ filler/mixed) bottom-left
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xCC000000))
+                        .border(0.6.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(text = "Episode $epNum", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                if (isFiller || isMixed) EpisodeFillerBadge(isMixed = isMixed)
+            }
+
+            // Duration bottom-right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Text(text = "${runMin}m", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xDDFFFFFF))
+            }
+
+            // Share + Download, top-right
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .pressable(0.82f, onClick = onShare)
+                        .clip(CircleShape)
+                        .background(Color(0x99101420))
+                        .border(1.dp, Color(0x38FFFFFF), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share episode $epNum", tint = Color.White, modifier = Modifier.size(15.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .pressable(0.82f, haptic = false, onClick = onDownload) // onDownload already ticks
+                        .clip(CircleShape)
+                        .background(Color(0x99101420))
+                        .border(1.dp, Color(0x38FFFFFF), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                        isDownloading -> Icon(Icons.Default.Downloading, contentDescription = "Downloading", tint = OttAccentGold, modifier = Modifier.size(16.dp))
+                        else -> Icon(Icons.Default.Download, contentDescription = "Download episode $epNum", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
             if (progress > 0.05f) {
                 LinearProgressIndicator(
                     progress = { progress },
@@ -1869,59 +2125,24 @@ private fun EpisodeRow(
             }
         }
 
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(text = "${runMin}m", fontSize = 11.sp, color = OttTextMuted)
-                if (isFiller || isMixed) EpisodeFillerBadge(isMixed = isMixed)
-            }
-            Text(
-                text = overview,
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-                color = OttTextSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            IconButton(
-                onClick = onShare,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x1AFFFFFF))
-            ) {
-                Icon(Icons.Default.Share, contentDescription = "Share episode $epNum", tint = Color.White, modifier = Modifier.size(14.dp))
-            }
-            IconButton(
-                onClick = onDownload,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x1AFFFFFF))
-            ) {
-                when {
-                    isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
-                    isDownloading -> Icon(Icons.Default.Downloading, contentDescription = "Downloading", tint = OttAccentGold, modifier = Modifier.size(15.dp))
-                    else -> Icon(Icons.Default.Download, contentDescription = "Download episode $epNum", tint = Color.White, modifier = Modifier.size(15.dp))
-                }
-            }
-        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = overview,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = OttTextSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -2211,12 +2432,12 @@ private fun RelationRow(rel: MediaRelation, glassOn: Boolean, vm: MainViewModel)
         modifier = Modifier
             .padding(horizontal = 18.dp)
             .fillMaxWidth()
-            .cardSurface(glassOn, 14.dp)
-            .clickable {
+            .pressable(0.97f) {
                 if (isNovel) vm.openNovelDetail(rel.title)
                 else if (isManga) vm.openMangaDetail(rel.id.toString(), rel.title)
                 else vm.openDetail(rel.id)
             }
+            .cardSurface(glassOn, 14.dp)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -2265,8 +2486,8 @@ private fun RecommendationPosterItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .pressable(0.94f, onClick = onClick)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
@@ -2719,9 +2940,17 @@ private fun SlidingPillTabs(
                         animationSpec = tween(180),
                         label = "tabText"
                     )
+                    val pillSource = remember { MutableInteractionSource() }
+                    val pillPressed by pillSource.collectIsPressedAsState()
+                    val pillScale by animateFloatAsState(
+                        targetValue = if (pillPressed) 0.92f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                        label = "pillPress"
+                    )
                     Box(
                         modifier = Modifier
                             .height(tabHeight)
+                            .graphicsLayer { scaleX = pillScale; scaleY = pillScale }
                             .onGloballyPositioned { c ->
                                 val x = c.positionInParent().x.roundToInt()
                                 val w = c.size.width
@@ -2735,7 +2964,7 @@ private fun SlidingPillTabs(
                             .background(if (isSel) Color.Transparent else Color(0x14FFFFFF))
                             .border(1.dp, if (isSel) Color.Transparent else Color(0x2EFFFFFF), CircleShape)
                             .semantics { selected = isSel }
-                            .clickable(role = Role.Tab) { onSelect(i) },
+                            .clickable(interactionSource = pillSource, indication = null, role = Role.Tab) { onSelect(i) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -2751,4 +2980,176 @@ private fun SlidingPillTabs(
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Interaction helpers
+// ---------------------------------------------------------------------------------------------
+
+/** Bouncy press-in feedback + haptic tick. Use instead of clickable on cards/buttons; put it BEFORE clip/background so the whole surface scales. */
+private fun Modifier.pressable(
+    pressedScale: Float = 0.96f,
+    haptic: Boolean = true,
+    onClick: () -> Unit
+): Modifier = composed {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val s by animateFloatAsState(
+        targetValue = if (pressed) pressedScale else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "pressScale"
+    )
+    this
+        .graphicsLayer {
+            scaleX = s
+            scaleY = s
+        }
+        .clickable(interactionSource = source, indication = null) {
+            if (haptic) com.nyyrox.aniverse.util.AppHaptics.tick(context)
+            onClick()
+        }
+}
+
+/** Rise + fade + settle entrance with a small per-index delay. Plays once per [key] (tracked in [seen]). */
+private fun Modifier.staggerIn(index: Int, seen: MutableSet<String>, key: String): Modifier = composed {
+    val p = remember(key) { Animatable(if (key in seen) 1f else 0f) }
+    LaunchedEffect(key) {
+        if (p.value < 1f) {
+            delay((index * 50L).coerceAtMost(350L))
+            p.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 260f))
+            seen.add(key)
+        }
+    }
+    graphicsLayer {
+        val v = p.value
+        alpha = v.coerceIn(0f, 1f)
+        translationY = (1f - v) * 32.dp.toPx()
+        val sc = 0.94f + 0.06f * v
+        scaleX = sc
+        scaleY = sc
+    }
+}
+
+/** Primary play pill: idle glow + light sweep, bouncy press, label slides when the episode changes. */
+@Composable
+private fun HeroPlayButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val inf = rememberInfiniteTransition(label = "playFx")
+    val sweep by inf.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)),
+        label = "playSweep"
+    )
+    val glow by inf.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "playGlow"
+    )
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val iconScale by animateFloatAsState(
+        targetValue = if (pressed) 1.3f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "playIcon"
+    )
+    Row(
+        modifier = modifier
+            .height(50.dp)
+            .pressable(0.95f, onClick = onClick)
+            .drawBehind {
+                val pad = 5.dp.toPx()
+                drawRoundRect(
+                    color = Color.White.copy(alpha = glow * 0.5f),
+                    topLeft = Offset(-pad, -pad),
+                    size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
+                    cornerRadius = CornerRadius(size.height / 2f + pad)
+                )
+            }
+            .clip(CircleShape)
+            .background(Color.White)
+            .drawWithContent {
+                drawContent()
+                // Soft reflection band that glides across, then rests.
+                if (sweep < 0.6f) {
+                    val w = size.width
+                    val x = -w * 0.4f + (sweep / 0.6f) * w * 1.8f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color.Transparent, Color(0x26000000), Color.Transparent),
+                            startX = x,
+                            endX = x + w * 0.4f
+                        )
+                    )
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+    ) {
+        Icon(
+            Icons.Default.PlayArrow,
+            contentDescription = null,
+            tint = Color.Black,
+            modifier = Modifier
+                .size(24.dp)
+                .graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                }
+        )
+        AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                (slideInVertically { it / 2 } + fadeIn(tween(180))) togetherWith
+                    (slideOutVertically { -it / 2 } + fadeOut(tween(120)))
+            },
+            label = "playLabel"
+        ) { text ->
+            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1)
+        }
+    }
+}
+
+/** Pops its content and fires an expanding ring whenever [trigger] flips (skips the first composition). */
+@Composable
+private fun PopOnChange(trigger: Boolean, content: @Composable () -> Unit) {
+    val pop = remember { Animatable(1f) }
+    val ring = remember { Animatable(0f) }
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(trigger) {
+        if (first) {
+            first = false
+            return@LaunchedEffect
+        }
+        launch {
+            pop.snapTo(0.55f)
+            pop.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium))
+        }
+        ring.snapTo(0f)
+        ring.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+        ring.snapTo(0f)
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .drawBehind {
+                val r = ring.value
+                if (r > 0f) {
+                    drawCircle(
+                        color = Color(0xFFFFD166).copy(alpha = (1f - r) * 0.85f),
+                        radius = size.minDimension / 2f * (1f + r * 1.1f),
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
+            .graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+            }
+    ) { content() }
 }
