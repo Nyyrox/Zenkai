@@ -1,5 +1,18 @@
 package com.nyyrox.aniverse.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalOverscrollFactory
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -174,6 +187,18 @@ fun DownloadAnimeOptionsSheet(
         )
     }
 
+    // Sheet drag distance in px (0 when fully open). Read only inside graphicsLayer lambdas, so no recomposition per frame.
+    val density = LocalDensity.current
+    val base = remember { floatArrayOf(Float.NaN) }
+    val dragPx: () -> Float = {
+        val off = runCatching { sheetState.requireOffset() }.getOrNull()
+        if (off == null) 0f else {
+            if (base[0].isNaN() || off < base[0]) base[0] = off
+            off - base[0]
+        }
+    }
+    val dragRange = with(density) { 420.dp.toPx() }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -190,8 +215,17 @@ fun DownloadAnimeOptionsSheet(
             )
         }
     ) {
+        // Stretch overscroll fights the sheet's own drag (the down-up-down-up jitter), so it is off inside the sheet.
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
         Column(
             modifier = Modifier
+                .graphicsLayer {
+                    val p = (dragPx() / dragRange).coerceIn(0f, 1f)
+                    transformOrigin = TransformOrigin(0.5f, 0f)
+                    scaleX = 1f - 0.05f * p
+                    scaleY = 1f - 0.05f * p
+                    alpha = 1f - 0.45f * p
+                }
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 12.dp)
@@ -199,13 +233,21 @@ fun DownloadAnimeOptionsSheet(
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             // Header
+            val bobT = rememberInfiniteTransition(label = "bob")
+            val bob by bobT.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "bobY"
+            )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().floatIn(0, dragPx),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
                     modifier = Modifier
+                        .graphicsLayer { translationY = (bob - 0.5f) * 5.dp.toPx() }
                         .size(42.dp)
                         .clip(CircleShape)
                         .background(Color(0x14FFFFFF))
@@ -248,7 +290,7 @@ fun DownloadAnimeOptionsSheet(
             }
 
             // Audio
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.floatIn(1, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("AUDIO TRACK")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("SUB" to "Subbed", "DUB" to "Dubbed", "MULTI" to "Multi").forEach { (key, sub) ->
@@ -269,7 +311,7 @@ fun DownloadAnimeOptionsSheet(
             }
 
             // Quality
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.floatIn(2, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("VIDEO QUALITY")
                 LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(QUALITY_OPTIONS) { opt ->
@@ -293,7 +335,7 @@ fun DownloadAnimeOptionsSheet(
             }
 
             // Servers (outer column already scrolls, so no nested fixed-height scroller)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.floatIn(3, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("DOWNLOAD SERVER · ${availableProviders.size} AVAILABLE")
                 availableProviders.forEach { prov ->
                     val sel = selectedProvider.id == prov.id
@@ -353,6 +395,7 @@ fun DownloadAnimeOptionsSheet(
             // Captions banner
             Row(
                 modifier = Modifier
+                    .floatIn(4, dragPx)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0x0DFFFFFF))
@@ -378,6 +421,7 @@ fun DownloadAnimeOptionsSheet(
             )
             Row(
                 modifier = Modifier
+                    .floatIn(5, dragPx)
                     .fillMaxWidth()
                     .height(52.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
@@ -405,6 +449,7 @@ fun DownloadAnimeOptionsSheet(
                     maxLines = 1
                 )
             }
+        }
         }
     }
 }
@@ -440,13 +485,18 @@ private fun GlassOption(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
         label = "optPress"
     )
+    val pop by animateFloatAsState(
+        targetValue = if (selected) 1.03f else 1f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 380f),
+        label = "optPop"
+    )
     val fill = if (selected) Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
     else Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
     val edge = if (selected) Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
     else Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)))
     Box(
         modifier = modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer { scaleX = scale * pop; scaleY = scale * pop }
             .clip(shape)
             .background(fill)
             .border(edgeWidth, edge, shape)
@@ -455,4 +505,18 @@ private fun GlassOption(
         contentAlignment = contentAlignment,
         content = content
     )
+}
+
+/** Staggered spring entrance; lower sections also trail slightly behind while the sheet is dragged down. */
+@Composable
+private fun Modifier.floatIn(index: Int, dragPx: () -> Float): Modifier {
+    val p = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(80L + index * 55L)
+        p.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 240f))
+    }
+    return this.graphicsLayer {
+        alpha = p.value.coerceIn(0f, 1f)
+        translationY = (1f - p.value) * 56.dp.toPx() - dragPx() * 0.035f * index
+    }
 }
