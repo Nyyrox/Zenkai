@@ -35,6 +35,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nyyrox.aniverse.data.StorageManager
 import com.nyyrox.aniverse.data.supabase.AuthState
 import com.nyyrox.aniverse.ui.components.CompulsoryUsernameDialog
 import com.nyyrox.aniverse.ui.components.OttBottomDock
