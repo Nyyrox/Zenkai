@@ -5334,7 +5334,7 @@ private fun PlayerSettingsModal(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     val newVal = !glassEnabled
                                     glassEnabled = newVal
@@ -5349,20 +5349,32 @@ private fun PlayerSettingsModal(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Liquid Glassmorphism",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Text(
-                                    text = if (glassEnabled) "AGSL refraction & blur enabled" else "Optimized flat render (Fast)",
-                                    color = OttSecondary,
-                                    fontSize = 11.5.sp
-                                )
+                                Column {
+                                    Text(
+                                        text = "Liquid Glassmorphism",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (glassEnabled) "AGSL refraction & blur enabled" else "Optimized flat render (Fast)",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
                             }
-                            Switch(
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
                                 checked = glassEnabled,
                                 onCheckedChange = { newVal ->
                                     glassEnabled = newVal
@@ -5372,13 +5384,7 @@ private fun PlayerSettingsModal(
                                         val cur = sm.getThemeSettings()
                                         sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
                                     } catch (_: Throwable) {}
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color(0x33FFFFFF)
-                                )
+                                }
                             )
                         }
 
@@ -5394,34 +5400,40 @@ private fun PlayerSettingsModal(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable { onToggleAutoPlayNext(!autoPlayNextEnabled) }
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Auto-Play Next",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Text(
-                                    text = if (autoPlayNextEnabled) "Plays next episode" else "Pause at end",
-                                    color = OttSecondary,
-                                    fontSize = 11.sp
-                                )
+                                Column {
+                                    Text(
+                                        text = "Auto-Play Next",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (autoPlayNextEnabled) "Plays next episode" else "Pause at end",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
                             }
-                            Switch(
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
                                 checked = autoPlayNextEnabled,
-                                onCheckedChange = { onToggleAutoPlayNext(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF34C759),
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = Color(0x40FFFFFF)
-                                )
+                                onCheckedChange = { onToggleAutoPlayNext(it) }
                             )
                         }
 
@@ -5429,34 +5441,40 @@ private fun PlayerSettingsModal(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable { onToggleAutoSkipIntroOutro(!autoSkipIntroOutroEnabled) }
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Auto-Skip Intro & Outro",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FastForward,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Text(
-                                    text = if (autoSkipIntroOutroEnabled) "Auto skip theme songs" else "Manual skip button",
-                                    color = OttSecondary,
-                                    fontSize = 11.sp
-                                )
+                                Column {
+                                    Text(
+                                        text = "Auto-Skip Intro & Outro",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (autoSkipIntroOutroEnabled) "Auto skip theme songs" else "Manual skip button",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
                             }
-                            Switch(
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
                                 checked = autoSkipIntroOutroEnabled,
-                                onCheckedChange = { onToggleAutoSkipIntroOutro(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF34C759),
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = Color(0x40FFFFFF)
-                                )
+                                onCheckedChange = { onToggleAutoSkipIntroOutro(it) }
                             )
                         }
 

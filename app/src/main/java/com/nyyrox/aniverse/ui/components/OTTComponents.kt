@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -187,7 +188,7 @@ fun OttTopBar(
     }
 }
 
-/** Premium liquid glass icon button with spring press haptics and backdrop refraction. */
+/** Premium liquid glass icon button with spring press haptics and glass gradient refraction. */
 @Composable
 fun OttGlassIconButton(
     onClick: () -> Unit,
@@ -203,52 +204,26 @@ fun OttGlassIconButton(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "ottBtnPress"
     )
-    val backdrop = com.styropyr0.prismal.LocalPrismalBackdrop.current
-    val isGlassEnabled = LocalThemeSettings.current.isGlassmorphismEnabled
 
     Box(
         modifier = modifier
             .size(size)
             .scale(pressScale)
             .clip(CircleShape)
-            .then(
-                if (isGlassEnabled && backdrop != null) {
-                    val density = androidx.compose.ui.platform.LocalDensity.current
-                    Modifier.drawPrismalGlass(
-                        backdrop = backdrop,
-                        shape = { CircleShape },
-                        effects = {
-                            applyPrismalGlassEffects(
-                                density = density,
-                                adaptiveLuminance = false,
-                                luminance = 0.5f,
-                                blurRadiusPx = with(density) { 16.dp.toPx() },
-                                refractionHeightPx = with(density) { 12.dp.toPx() },
-                                refractionAmountPx = with(density) { 16.dp.toPx() },
-                                useVibrancy = true,
-                                saturation = 1.3f
-                            )
-                        },
-                        specular = {
-                            com.styropyr0.prismal.specular.PrismalSpecular.Default.copy(
-                                alpha = if (isPressed) 1f else 0.8f
-                            )
-                        },
-                        depthShadow = {
-                            com.styropyr0.prismal.depth.PrismalDepthShadow(radius = 4.dp, alpha = 0.6f)
-                        },
-                        onDrawSurface = {
-                            drawRect(Color(0x28FFFFFF))
-                            if (isPressed) drawRect(Color(0x33FFFFFF))
-                        }
-                    )
-                } else {
-                    Modifier
-                        .background(Color(0x28FFFFFF))
-                        .then(if (isPressed) Modifier.background(Color(0x33FFFFFF)) else Modifier)
-                }
+            .background(
+                Brush.verticalGradient(
+                    colors = if (isPressed) {
+                        listOf(Color(0x48FFFFFF), Color(0x32FFFFFF))
+                    } else {
+                        listOf(Color(0x30FFFFFF), Color(0x18FFFFFF))
+                    }
+                )
             )
-            .border(1.dp, Color(0x40FFFFFF), CircleShape)
+            .border(
+                1.dp,
+                if (isPressed) Color(0x60FFFFFF) else Color(0x38FFFFFF),
+                CircleShape
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -260,6 +235,127 @@ fun OttGlassIconButton(
         contentAlignment = Alignment.Center
     ) {
         content()
+    }
+}
+
+/**
+ * Premium Liquid Glass Toggle Switch inspired by Prismal AGSL toggle physics.
+ * Features spring animated thumb, damped drag/press scale, velocity elongation,
+ * smooth color lerp, and specular highlights.
+ */
+@Composable
+fun LiquidGlassSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    activeColor: Color = Color(0xFF34C759),
+    inactiveColor: Color = Color(0x38FFFFFF),
+    enabled: Boolean = true
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    // Smooth spring animation for switch position (0f = off, 1f = on)
+    val positionFraction by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "switchPosition"
+    )
+
+    // Damped press / hold scale animation (expanding thumb slightly while interacting)
+    val pressProgress by animateFloatAsState(
+        targetValue = if (isPressed) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "switchPress"
+    )
+
+    // Animated track background color
+    val trackBgColor by animateColorAsState(
+        targetValue = if (checked) activeColor else inactiveColor,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "switchTrackBg"
+    )
+
+    val trackWidth = 52.dp
+    val trackHeight = 30.dp
+    val thumbSize = 24.dp
+    val maxTravelPx = with(density) { (trackWidth - thumbSize - 6.dp).toPx() }
+    val startPaddingPx = with(density) { 3.dp.toPx() }
+
+    Box(
+        modifier = modifier
+            .size(trackWidth, trackHeight)
+            .clip(RoundedCornerShape(999.dp))
+            .background(trackBgColor)
+            .border(
+                1.dp,
+                if (checked) Color(0x60FFFFFF) else Color(0x28FFFFFF),
+                RoundedCornerShape(999.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled
+            ) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onCheckedChange(!checked)
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        // Subtle inner glow / highlight on track
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0x25FFFFFF), Color.Transparent)
+                    )
+                )
+        )
+
+        // Refracting liquid glass thumb with velocity squash/stretch and specular rim
+        val currentThumbX = startPaddingPx + (maxTravelPx * positionFraction)
+        val thumbScaleX = 1f + (pressProgress * 0.28f)
+        val thumbScaleY = 1f - (pressProgress * 0.12f)
+
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
+                    translationX = currentThumbX
+                    scaleX = thumbScaleX
+                    scaleY = thumbScaleY
+                }
+                .size(thumbSize)
+                .shadow(elevation = if (isPressed) 4.dp else 2.dp, shape = CircleShape)
+                .clip(CircleShape)
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (isPressed) {
+                            listOf(Color.White, Color(0xFFF1F5F9))
+                        } else {
+                            listOf(Color.White, Color(0xFFE2E8F0))
+                        }
+                    )
+                )
+                .border(0.8.dp, Color(0x50FFFFFF), CircleShape)
+        ) {
+            // Subtle glass specular top-shine
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                    .background(Color(0x33FFFFFF))
+            )
+        }
     }
 }
 
@@ -1248,29 +1344,41 @@ fun OttEpisodeCardItem(
         )
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "epCardPress"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp)
-            .clip(OttCardShape)
-            .background(bgBrush)
-            .border(1.dp, borderBrush, OttCardShape)
-            .clickable(onClick = onClick)
-            .padding(12.dp),
+            .scale(pressScale)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (isSelected) Color(0x321E2335) else Color(0x16131824))
+            .border(
+                1.dp,
+                if (isSelected) Color(0x55FFFFFF) else Color(0x18FFFFFF),
+                RoundedCornerShape(18.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Thumbnail with EP badge — 16dp global card radius
+        // 1. Episode Still Thumbnail (player_design_2.jpg)
         Box(
             modifier = Modifier
-                .size(105.dp, 68.dp)
-                .clip(OttCardShape)
-                .border(
-                    0.8.dp,
-                    Brush.verticalGradient(
-                        listOf(Color(0x40FFFFFF), Color(0x10FFFFFF))
-                    ),
-                    OttCardShape
-                )
+                .size(118.dp, 66.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0x18FFFFFF))
+                .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp))
         ) {
             AsyncImage(
                 model = episodeStill?.takeIf { it.isNotBlank() } ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
@@ -1281,183 +1389,122 @@ fun OttEpisodeCardItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0x44000000))
-            )
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(if (isSelected) Color.White else Color(0xCC000000))
-                    .border(
-                        1.dp,
-                        if (isSelected) Color.White else Color(0x40FFFFFF),
-                        CircleShape
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.40f))
+                        )
                     )
-                    .align(Alignment.Center),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = if (isSelected) Color.Black else Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            )
         }
 
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+        // 2. Title, Episode Info & Downloaded Status (Middle Column)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             val mainTitle = episodeTitle?.takeIf { it.isNotBlank() } ?: "Episode $episode"
-            val subLabel = if (episodeTitle.isNullOrBlank()) {
-                anime.duration?.let { "$it mins" } ?: "24 mins"
-            } else {
-                "Episode $episode · ${anime.duration?.let { "$it mins" } ?: "24 mins"}"
-            }
+            val subLabel = "Episode $episode · ${anime.duration ?: 24} min"
+
             Text(
                 text = mainTitle,
-                fontSize = 13.5.sp,
+                fontSize = 14.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isSelected) Color.White else OttTextPrimary,
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(3.dp))
+
             Text(
                 text = subLabel,
-                fontSize = 11.sp,
-                color = OttTextSecondary,
+                fontSize = 12.sp,
+                color = Color(0xFF94A3B8),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
 
-        // Optional Download Action / Status
-        if (onDownload != null) {
-            if (isDownloading) {
-                val status = downloadTask?.status ?: DownloadStatus.DOWNLOADING
+            // Status: Green checkmark Downloaded (or downloading / download action)
+            if (isDownloaded) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Downloaded",
+                        tint = Color(0xFF34D399),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "Downloaded",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF34D399)
+                    )
+                }
+            } else if (isDownloading) {
                 val progress = downloadTask?.progress ?: 0f
                 val percent = (progress * 100).toInt()
-                val isQueued = status == DownloadStatus.QUEUED
-                val isConnecting = !isQueued && (progress <= 0.02f || downloadTask?.speedFormatted?.contains("Connecting", ignoreCase = true) == true)
-
+                val isQueued = downloadTask?.status == DownloadStatus.QUEUED
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0x22FFFFFF))
-                        .border(0.8.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp))
-                        .clickable(onClick = onDownload)
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    if (isQueued) {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = "Queued",
-                            tint = Color(0xFFFBBF24),
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = "Queued",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFBBF24)
-                        )
-                    } else if (isConnecting) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(12.dp),
-                            color = OttPrimary,
-                            strokeWidth = 1.8.dp
-                        )
-                        Text(
-                            text = "Connecting",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFCBD5E1)
-                        )
-                    } else {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(15.dp)
-                        ) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                progress = { if (progress > 0f) progress else 0.05f },
-                                modifier = Modifier.fillMaxSize(),
-                                color = OttPrimary,
-                                trackColor = Color(0x33FFFFFF),
-                                strokeWidth = 2.dp
-                            )
-                        }
-                        Text(
-                            text = "$percent%",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
+                    androidx.compose.material3.CircularProgressIndicator(
+                        progress = { if (progress > 0f) progress else 0.05f },
+                        modifier = Modifier.size(12.dp),
+                        color = OttPrimary,
+                        trackColor = Color(0x33FFFFFF),
+                        strokeWidth = 1.8.dp
+                    )
+                    Text(
+                        text = if (isQueued) "Queued" else "Downloading: $percent%",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isQueued) Color(0xFFFBBF24) else Color.White
+                    )
                 }
-                Spacer(Modifier.width(6.dp))
-            } else {
-                IconButton(
-                    onClick = onDownload,
-                    modifier = Modifier.size(32.dp)
+            } else if (onDownload != null) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(onClick = onDownload)
+                        .padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    if (isDownloaded) {
-                        Icon(
-                            Icons.Default.DownloadDone,
-                            contentDescription = "Downloaded",
-                            tint = Color(0xFF10B981),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = "Download",
-                            tint = Color(0xAAFFFFFF),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = "Download",
+                        fontSize = 11.5.sp,
+                        color = Color(0xFF94A3B8)
+                    )
                 }
-                Spacer(Modifier.width(6.dp))
             }
         }
 
-        // Status badge — unified chip shape (8dp radius, matches metadata chips)
+        Spacer(Modifier.width(10.dp))
+
+        // 3. Circular Play Button (player_design_2.jpg)
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(
-                    if (isSelected) {
-                        Brush.verticalGradient(
-                            listOf(Color(0xFF1A1A2E), Color(0xFF12121C))
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(Color(0x18FFFFFF), Color(0x0AFFFFFF))
-                        )
-                    }
-                )
-                .border(
-                    1.dp,
-                    if (isSelected) {
-                        Brush.verticalGradient(
-                            listOf(Color(0xFFFF1E27), Color(0x80FF1E27))
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(Color(0x25FFFFFF), Color(0x0AFFFFFF))
-                        )
-                    },
-                    RoundedCornerShape(8.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 5.dp)
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(if (isSelected) OttPrimary else Color.White)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = if (isSelected) "PLAYING" else "EP $episode",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                color = if (isSelected) Color(0xFFFF1E27) else OttTextSecondary
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Play Episode $episode",
+                tint = if (isSelected) Color.White else Color.Black,
+                modifier = Modifier.size(20.dp)
             )
         }
     }

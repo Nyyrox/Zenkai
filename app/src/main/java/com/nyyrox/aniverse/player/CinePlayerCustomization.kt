@@ -23,6 +23,7 @@ import com.styropyr0.prismal.effects.applyPrismalGlassEffects
 import com.styropyr0.prismal.specular.PrismalSpecular
 import com.styropyr0.prismal.specular.PrismalSpecularStyle
 import com.styropyr0.prismal.depth.PrismalDepthShadow
+import com.styropyr0.prismal.depth.PrismalDepthInset
 import com.styropyr0.prismal.LocalPrismalBackdrop
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import androidx.compose.ui.util.lerp
@@ -1085,8 +1086,8 @@ fun CineSeekbarRenderer(
                                             adaptiveLuminance = false,
                                             luminance = 0.5f,
                                             blurRadiusPx = with(density) { 14.dp.toPx() } * (1f - pressProgress * 0.5f),
-                                            refractionHeightPx = with(density) { 10.dp.toPx() } * pressProgress,
-                                            refractionAmountPx = with(density) { 16.dp.toPx() } * pressProgress,
+                                            refractionHeightPx = with(density) { 12.dp.toPx() } * pressProgress,
+                                            refractionAmountPx = with(density) { 18.dp.toPx() } * pressProgress,
                                             chromaticAberration = 1f,
                                             useVibrancy = true,
                                             saturation = 1.35f
@@ -1100,8 +1101,12 @@ fun CineSeekbarRenderer(
                                     depthShadow = {
                                         PrismalDepthShadow(radius = 6.dp * pressProgress, alpha = 0.8f)
                                     },
+                                    depthInset = {
+                                        PrismalDepthInset(radius = 4.dp * pressProgress, alpha = pressProgress)
+                                    },
                                     onDrawSurface = {
-                                        drawRect(accentColor.copy(alpha = 0.85f))
+                                        val solidAlpha = (1f - pressProgress * 0.75f).coerceIn(0.18f, 1f)
+                                        drawRect(accentColor.copy(alpha = solidAlpha))
                                     }
                                 )
                             } else {
@@ -1111,7 +1116,11 @@ fun CineSeekbarRenderer(
                                     .background(accentColor)
                             }
                         )
-                        .border(1.5.dp, accentColor.copy(alpha = 0.85f), CircleShape)
+                        .border(
+                            1.2.dp,
+                            if (pressProgress > 0.1f) Color(0x75FFFFFF) else accentColor.copy(alpha = 0.85f),
+                            CircleShape
+                        )
                 )
             }
 
