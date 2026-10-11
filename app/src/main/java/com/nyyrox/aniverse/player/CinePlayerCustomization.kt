@@ -24,6 +24,7 @@ import com.styropyr0.prismal.specular.PrismalSpecular
 import com.styropyr0.prismal.specular.PrismalSpecularStyle
 import com.styropyr0.prismal.depth.PrismalDepthShadow
 import com.styropyr0.prismal.LocalPrismalBackdrop
+import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import androidx.compose.ui.util.lerp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
