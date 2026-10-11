@@ -480,7 +480,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                             push("manga_reader:$cm:$cc")
                                         },
                                         onNovelClick = { vm.openNovelDetail(it) },
-                                        onNovelReadClick = { nSlug, chSlug -> push("novel_reader:$nSlug:$chSlug") }
+                                        onNovelReadClick = { nSlug, chSlug -> push("novel_reader:$nSlug:$chSlug") },
+                                        onDownloadsClick = { push("downloads") }
                                     )
                                 }
 

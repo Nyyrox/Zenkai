@@ -43,9 +43,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.nyyrox.aniverse.ui.components.iosGlass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,6 +84,14 @@ import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 
+data class DeleteConfirmationTarget(
+    val title: String,
+    val subtitle: String,
+    val itemType: String,
+    val sizeFormatted: String? = null,
+    val onConfirm: () -> Unit
+)
+
 @Composable
 fun DownloadsScreen(
     vm: MainViewModel,
@@ -100,6 +113,7 @@ fun DownloadsScreen(
         allTasks.filter { it.status == DownloadStatus.FAILED }
     }
     var retrySheetTask by remember { mutableStateOf<DownloadTaskInfo?>(null) }
+    var deleteConfirmation by remember { mutableStateOf<DeleteConfirmationTarget?>(null) }
     var isDownloadingExpanded by remember { mutableStateOf(true) }
     var isFailedExpanded by remember { mutableStateOf(false) }
 
@@ -508,7 +522,8 @@ fun DownloadsScreen(
                                 DownloadedAnimeCard(
                                     anime = anime,
                                     vm = vm,
-                                    onPlayEpisode = { ep -> onPlayAnimeEpisode(anime.animeId, ep) }
+                                    onPlayEpisode = { ep -> onPlayAnimeEpisode(anime.animeId, ep) },
+                                    onDeleteRequest = { deleteConfirmation = it }
                                 )
                             }
                         }
@@ -527,7 +542,8 @@ fun DownloadsScreen(
                                 DownloadedMangaCard(
                                     manga = manga,
                                     vm = vm,
-                                    onReadChapter = { chId -> onReadMangaChapter(manga.mangaId, chId) }
+                                    onReadChapter = { chId -> onReadMangaChapter(manga.mangaId, chId) },
+                                    onDeleteRequest = { deleteConfirmation = it }
                                 )
                             }
                         }
@@ -546,7 +562,8 @@ fun DownloadsScreen(
                                 DownloadedNovelCard(
                                     novel = novel,
                                     vm = vm,
-                                    onReadChapter = { chSlug -> onReadNovelChapter(novel.novelSlug, chSlug) }
+                                    onReadChapter = { chSlug -> onReadNovelChapter(novel.novelSlug, chSlug) },
+                                    onDeleteRequest = { deleteConfirmation = it }
                                 )
                             }
                         }
@@ -589,13 +606,21 @@ fun DownloadsScreen(
             }
         )
     }
+
+    deleteConfirmation?.let { target ->
+        IosDeleteConfirmationDialog(
+            target = target,
+            onDismiss = { deleteConfirmation = null }
+        )
+    }
 }
 
 @Composable
 private fun DownloadedAnimeCard(
     anime: DownloadedAnime,
     vm: MainViewModel,
-    onPlayEpisode: (episode: Int) -> Unit
+    onPlayEpisode: (episode: Int) -> Unit,
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val episodes = remember(expanded) {
@@ -653,7 +678,17 @@ private fun DownloadedAnimeCard(
                     tint = Color.White
                 )
             }
-            IconButton(onClick = { vm.deleteDownloadedAnime(anime.animeId) }) {
+            IconButton(onClick = {
+                onDeleteRequest(
+                    DeleteConfirmationTarget(
+                        title = "Delete ${anime.title}?",
+                        subtitle = "This will permanently delete all ${anime.episodesCount} downloaded episode(s) and free up storage on your device.",
+                        itemType = "Anime",
+                        sizeFormatted = formatBytes(anime.totalSizeBytes),
+                        onConfirm = { vm.deleteDownloadedAnime(anime.animeId) }
+                    )
+                )
+            }) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = "Delete",
@@ -723,7 +758,17 @@ private fun DownloadedAnimeCard(
                             }
 
                             IconButton(
-                                onClick = { vm.deleteDownloadedAnimeEpisode(anime.animeId, ep.episode) },
+                                onClick = {
+                                    onDeleteRequest(
+                                        DeleteConfirmationTarget(
+                                            title = "Delete Episode ${ep.episode}?",
+                                            subtitle = "Remove '${ep.episodeTitle?.ifBlank { "Episode ${ep.episode}" } ?: "Episode ${ep.episode}"}' from offline storage?",
+                                            itemType = "Episode",
+                                            sizeFormatted = formatBytes(ep.sizeBytes),
+                                            onConfirm = { vm.deleteDownloadedAnimeEpisode(anime.animeId, ep.episode) }
+                                        )
+                                    )
+                                },
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
@@ -746,7 +791,8 @@ private fun DownloadedAnimeCard(
 private fun DownloadedNovelCard(
     novel: DownloadedNovel,
     vm: MainViewModel,
-    onReadChapter: (chapterSlug: String) -> Unit
+    onReadChapter: (chapterSlug: String) -> Unit,
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val chapters = remember(expanded) {
@@ -804,7 +850,17 @@ private fun DownloadedNovelCard(
                     tint = Color.White
                 )
             }
-            IconButton(onClick = { vm.downloadManager.deleteDownloadedNovel(novel.novelSlug) }) {
+            IconButton(onClick = {
+                onDeleteRequest(
+                    DeleteConfirmationTarget(
+                        title = "Delete ${novel.title}?",
+                        subtitle = "This will permanently remove all ${novel.chaptersCount} downloaded chapter(s) from offline storage.",
+                        itemType = "Novel",
+                        sizeFormatted = formatBytes(novel.totalSizeBytes),
+                        onConfirm = { vm.downloadManager.deleteDownloadedNovel(novel.novelSlug) }
+                    )
+                )
+            }) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = "Delete",
@@ -851,7 +907,17 @@ private fun DownloadedNovelCard(
                             )
                         }
                         IconButton(
-                            onClick = { vm.downloadManager.deleteDownloadedNovelChapter(novel.novelSlug, ch.chapterSlug) },
+                            onClick = {
+                                onDeleteRequest(
+                                    DeleteConfirmationTarget(
+                                        title = "Delete Chapter?",
+                                        subtitle = "Remove '${ch.title}' from offline reading?",
+                                        itemType = "Chapter",
+                                        sizeFormatted = formatBytes(ch.sizeBytes),
+                                        onConfirm = { vm.downloadManager.deleteDownloadedNovelChapter(novel.novelSlug, ch.chapterSlug) }
+                                    )
+                                )
+                            },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
@@ -872,7 +938,8 @@ private fun DownloadedNovelCard(
 private fun DownloadedMangaCard(
     manga: DownloadedManga,
     vm: MainViewModel,
-    onReadChapter: (chapterId: String) -> Unit
+    onReadChapter: (chapterId: String) -> Unit,
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val chapters = remember(expanded) {
@@ -924,7 +991,17 @@ private fun DownloadedMangaCard(
                     tint = Color.White
                 )
             }
-            IconButton(onClick = { vm.downloadManager.deleteDownloadedManga(manga.mangaId) }) {
+            IconButton(onClick = {
+                onDeleteRequest(
+                    DeleteConfirmationTarget(
+                        title = "Delete ${manga.title}?",
+                        subtitle = "This will permanently remove all ${manga.chaptersCount} downloaded chapter(s) from offline storage.",
+                        itemType = "Manga",
+                        sizeFormatted = formatBytes(manga.totalSizeBytes),
+                        onConfirm = { vm.downloadManager.deleteDownloadedManga(manga.mangaId) }
+                    )
+                )
+            }) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = "Delete",
@@ -971,7 +1048,17 @@ private fun DownloadedMangaCard(
                             )
                         }
                         IconButton(
-                            onClick = { vm.downloadManager.deleteDownloadedMangaChapter(manga.mangaId, ch.chapterId) },
+                            onClick = {
+                                onDeleteRequest(
+                                    DeleteConfirmationTarget(
+                                        title = "Delete Chapter ${ch.chapterNumber}?",
+                                        subtitle = "Remove '${ch.chapterTitle?.ifBlank { "Chapter ${ch.chapterNumber}" } ?: "Chapter ${ch.chapterNumber}"}' from offline reading?",
+                                        itemType = "Chapter",
+                                        sizeFormatted = formatBytes(ch.sizeBytes),
+                                        onConfirm = { vm.downloadManager.deleteDownloadedMangaChapter(manga.mangaId, ch.chapterId) }
+                                    )
+                                )
+                            },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
@@ -1244,4 +1331,171 @@ private fun formatBytes(bytes: Long): String {
     if (mb < 1024) return String.format("%.1f MB", mb)
     val gb = mb / 1024.0
     return String.format("%.2f GB", gb)
+}
+
+@Composable
+fun IosDeleteConfirmationDialog(
+    target: DeleteConfirmationTarget,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x75000000))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .fillMaxWidth(0.86f)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
+                    .iosGlass(
+                        shape = RoundedCornerShape(22.dp),
+                        backgroundColor = Color(0xE81C1D24),
+                        borderWidth = 1.dp
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.height(20.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x22FF453A))
+                        .border(1.dp, Color(0x40FF453A), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = Color(0xFFFF453A),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Text(
+                    text = target.title,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    text = target.subtitle,
+                    fontSize = 13.sp,
+                    color = Color(0xCCFFFFFF),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+
+                if (!target.sizeFormatted.isNullOrBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x18FFFFFF))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Storage,
+                            contentDescription = null,
+                            tint = Color(0xFF60A5FA),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "Frees up ${target.sizeFormatted}",
+                            color = Color(0xFF93C5FD),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                // Hairline Divider
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(0.6.dp)
+                        .background(Color(0x28FFFFFF))
+                )
+
+                // iOS 2-action buttons row (Cancel & Delete)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = Color(0xEEFFFFFF),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .width(0.6.dp)
+                            .fillMaxSize()
+                            .background(Color(0x28FFFFFF))
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .clickable {
+                                onDismiss()
+                                target.onConfirm()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Delete",
+                            color = Color(0xFFFF453A),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

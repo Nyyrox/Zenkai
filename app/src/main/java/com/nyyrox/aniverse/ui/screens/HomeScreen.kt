@@ -32,10 +32,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +46,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import com.nyyrox.aniverse.ui.components.iosGlass
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -101,7 +106,8 @@ fun HomeScreen(
     onMangaClick: (String) -> Unit = { vm.openMangaDetail(it) },
     onMangaReadClick: (mangaId: String, chapterId: String) -> Unit = { _, _ -> },
     onNovelClick: (String) -> Unit = {},
-    onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit = { _, _ -> }
+    onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit = { _, _ -> },
+    onDownloadsClick: () -> Unit = {}
 ) {
     LaunchedEffect(Unit) {
         if (vm.mangaHome.trending.isEmpty() && vm.mangaHome.latest.isEmpty()) {
@@ -134,42 +140,17 @@ fun HomeScreen(
             return@Box
         }
 
-        if (vm.homeError != null && vm.trending.isEmpty() && vm.popular.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Connection Issue",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = vm.homeError ?: "Unable to fetch trending anime.",
-                        fontSize = 13.sp,
-                        color = OttTextSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = { vm.loadHome() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        ),
-                        shape = OttPillShape
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+        if (vm.trending.isEmpty() && vm.popular.isEmpty() && (vm.homeError != null || !vm.homeLoading)) {
+            OfflineHomeScreenContent(
+                vm = vm,
+                onAnimeClick = onAnimeClick,
+                onPlayClick = onPlayClick,
+                onMangaClick = onMangaClick,
+                onMangaReadClick = onMangaReadClick,
+                onNovelClick = onNovelClick,
+                onNovelReadClick = onNovelReadClick,
+                onDownloadsClick = onDownloadsClick
+            )
             return@Box
         }
 
@@ -1092,4 +1073,491 @@ fun YouTubeStyleEpisodeCard(
         }
     }
 }
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0L) return "0 MB"
+    val mb = bytes / (1024.0 * 1024.0)
+    if (mb < 1024.0) return String.format("%.1f MB", mb)
+    val gb = mb / 1024.0
+    return String.format("%.2f GB", gb)
+}
+
+@Composable
+fun OfflineHomeScreenContent(
+    vm: MainViewModel,
+    onAnimeClick: (Int) -> Unit,
+    onPlayClick: (animeId: Int, episode: Int) -> Unit,
+    onMangaClick: (String) -> Unit,
+    onMangaReadClick: (mangaId: String, chapterId: String) -> Unit,
+    onNovelClick: (String) -> Unit,
+    onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit,
+    onDownloadsClick: () -> Unit
+) {
+    val downloadedAnime by vm.downloadManager.downloadedAnime.collectAsState()
+    val downloadedManga by vm.downloadManager.downloadedManga.collectAsState()
+    val downloadedNovels by vm.downloadManager.downloadedNovels.collectAsState()
+
+    val totalDownloadsCount = downloadedAnime.size + downloadedManga.size + downloadedNovels.size
+    val totalDownloadedBytes = remember(downloadedAnime, downloadedManga, downloadedNovels) {
+        downloadedAnime.sumOf { it.totalSizeBytes } +
+            downloadedManga.sumOf { it.totalSizeBytes } +
+            downloadedNovels.sumOf { it.totalSizeBytes }
+    }
+    val hasAnyHistory = vm.history.isNotEmpty() || vm.mangaHistory.isNotEmpty() || vm.novelHistoryList.isNotEmpty()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp)
+    ) {
+        // Hero Offline Status Card
+        item(key = "offline_hero_banner") {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .iosGlass(
+                        shape = RoundedCornerShape(22.dp),
+                        backgroundColor = Color(0xD81C1D24),
+                        borderWidth = 1.dp
+                    )
+                    .padding(20.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x26F59E0B))
+                                    .border(1.dp, Color(0x4DF59E0B), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Downloading,
+                                    contentDescription = "Offline",
+                                    tint = Color(0xFFFBBF24),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Column {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0x28F59E0B))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "OFFLINE MODE",
+                                        color = Color(0xFFFBBF24),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    text = "You're Offline",
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Text(
+                        text = if (totalDownloadsCount > 0) {
+                            "No internet connection detected. You have $totalDownloadsCount downloaded title(s) (${formatBytes(totalDownloadedBytes)}) ready to watch and read offline."
+                        } else {
+                            "No internet connection detected. Connect to Wi-Fi or mobile data to explore trending shows, or browse your downloaded library."
+                        },
+                        color = Color(0xCCFFFFFF),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = onDownloadsClick,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black
+                            ),
+                            shape = OttPillShape,
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                            modifier = Modifier.weight(1.2f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Storage,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Explore Downloads",
+                                color = Color.Black,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Button(
+                            onClick = { vm.loadHome() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0x28FFFFFF),
+                                contentColor = Color.White
+                            ),
+                            shape = OttPillShape,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.weight(0.8f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                text = "Retry",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Continue Watching & Reading Row (if history exists)
+        if (hasAnyHistory) {
+            item(key = "offline_continue_watching") {
+                OttUnifiedContinueWatchingRow(
+                    animeHistory = vm.history,
+                    mangaHistory = vm.mangaHistory,
+                    novelHistory = vm.novelHistoryList,
+                    tmdbEpisodeStills = vm.tmdbEpisodeStills,
+                    onLoadEpisodeStill = { id, ep -> vm.loadHistoryEpisodeStill(id, ep) },
+                    onPlayAnime = onPlayClick,
+                    onReadManga = onMangaReadClick,
+                    onReadNovel = onNovelReadClick,
+                    onRemoveAnime = { vm.removeHistory(it) },
+                    onRemoveManga = { vm.removeMangaHistory(it) },
+                    onRemoveNovel = { vm.removeNovelHistory(it) }
+                )
+            }
+        }
+
+        // Downloaded Anime Shelf
+        if (downloadedAnime.isNotEmpty()) {
+            item(key = "offline_downloaded_anime_header") {
+                OttSectionHeader(
+                    title = "Downloaded Anime",
+                    subtitle = "${downloadedAnime.size} title(s) • ${formatBytes(downloadedAnime.sumOf { it.totalSizeBytes })}",
+                    onSeeAllClick = onDownloadsClick
+                )
+            }
+            item(key = "offline_downloaded_anime_row") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(downloadedAnime, key = { "offline_anime_${it.animeId}" }) { anime ->
+                        OfflineMediaCard(
+                            title = anime.title,
+                            coverUrl = anime.cover,
+                            countBadge = "${anime.episodesCount} EPS",
+                            sizeBytes = anime.totalSizeBytes,
+                            badgeColor = Color(0xFF60A5FA),
+                            onClick = { onAnimeClick(anime.animeId) },
+                            onDirectAction = { onPlayClick(anime.animeId, 1) },
+                            directActionIcon = Icons.Default.PlayArrow
+                        )
+                    }
+                }
+            }
+        }
+
+        // Downloaded Manga Shelf
+        if (downloadedManga.isNotEmpty()) {
+            item(key = "offline_downloaded_manga_header") {
+                OttSectionHeader(
+                    title = "Downloaded Manga",
+                    subtitle = "${downloadedManga.size} series • ${formatBytes(downloadedManga.sumOf { it.totalSizeBytes })}",
+                    onSeeAllClick = onDownloadsClick
+                )
+            }
+            item(key = "offline_downloaded_manga_row") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(downloadedManga, key = { "offline_manga_${it.mangaId}" }) { manga ->
+                        OfflineMediaCard(
+                            title = manga.title,
+                            coverUrl = manga.poster,
+                            countBadge = "${manga.chaptersCount} CH",
+                            sizeBytes = manga.totalSizeBytes,
+                            badgeColor = Color(0xFF34D399),
+                            onClick = { onMangaClick(manga.mangaId) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Downloaded Novels Shelf
+        if (downloadedNovels.isNotEmpty()) {
+            item(key = "offline_downloaded_novels_header") {
+                OttSectionHeader(
+                    title = "Downloaded Novels",
+                    subtitle = "${downloadedNovels.size} light novel(s) • ${formatBytes(downloadedNovels.sumOf { it.totalSizeBytes })}",
+                    onSeeAllClick = onDownloadsClick
+                )
+            }
+            item(key = "offline_downloaded_novels_row") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(downloadedNovels, key = { "offline_novel_${it.novelSlug}" }) { novel ->
+                        OfflineMediaCard(
+                            title = novel.title,
+                            coverUrl = novel.cover,
+                            countBadge = "${novel.chaptersCount} CH",
+                            sizeBytes = novel.totalSizeBytes,
+                            badgeColor = Color(0xFFF472B6),
+                            onClick = { onNovelClick(novel.novelSlug) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Empty state when user has 0 downloads and 0 history
+        if (totalDownloadsCount == 0 && !hasAnyHistory) {
+            item(key = "offline_empty_state") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .iosGlass(
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = Color(0xD81C1D24),
+                            borderWidth = 1.dp
+                        )
+                        .padding(vertical = 32.dp, horizontal = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x1FFFFFFF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Storage,
+                                contentDescription = null,
+                                tint = Color(0xAAFFFFFF),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Text(
+                            text = "No Downloaded Titles Yet",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "Download anime episodes, manga chapters, and novel chapters while connected so you can enjoy them anywhere without internet.",
+                            fontSize = 13.sp,
+                            color = Color(0x99FFFFFF),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp
+                        )
+
+                        Spacer(Modifier.height(6.dp))
+
+                        Button(
+                            onClick = onDownloadsClick,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black
+                            ),
+                            shape = OttPillShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Storage,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Open Downloads Hub",
+                                color = Color.Black,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineMediaCard(
+    title: String,
+    coverUrl: String?,
+    countBadge: String,
+    sizeBytes: Long,
+    badgeColor: Color,
+    onClick: () -> Unit,
+    onDirectAction: (() -> Unit)? = null,
+    directActionIcon: androidx.compose.ui.graphics.vector.ImageVector? = null
+) {
+    Column(
+        modifier = Modifier
+            .width(135.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(14.dp))
+                .background(Color(0x18FFFFFF))
+        ) {
+            SubcomposeAsyncImage(
+                model = coverUrl,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                loading = { ShimmerBox(modifier = Modifier.fillMaxSize()) },
+                error = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0x28FFFFFF)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Movie,
+                            contentDescription = null,
+                            tint = Color(0x60FFFFFF),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Scrim overlay at bottom
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            1f to Color(0xCC000000)
+                        )
+                    )
+            )
+
+            // Top badge: count badge (e.g. "12 eps" / "45 ch")
+            Box(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .align(Alignment.TopStart)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xD90F1015))
+                    .border(0.8.dp, badgeColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = countBadge,
+                    color = badgeColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Direct play or action button (if provided)
+            if (onDirectAction != null && directActionIcon != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .align(Alignment.TopEnd)
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xCCFFFFFF))
+                        .clickable(onClick = onDirectAction),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = directActionIcon,
+                        contentDescription = "Action",
+                        tint = Color.Black,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Bottom size badge
+            if (sizeBytes > 0L) {
+                Text(
+                    text = formatBytes(sizeBytes),
+                    color = Color(0xCCFFFFFF),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .align(Alignment.BottomEnd)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = title,
+            color = OttTextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 
