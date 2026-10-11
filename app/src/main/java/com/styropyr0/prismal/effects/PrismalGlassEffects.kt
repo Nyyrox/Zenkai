@@ -33,8 +33,8 @@ import kotlin.math.sign
  */
 fun PrismalGlassEffectProvider.applyPrismalGlassEffects(
     density: Density,
-    adaptiveLuminance: Boolean,
-    luminance: Float,
+    adaptiveLuminance: Boolean = false,
+    luminance: Float = 0.5f,
     blurRadiusPx: Float,
     refractionHeightPx: Float,
     refractionAmountPx: Float,

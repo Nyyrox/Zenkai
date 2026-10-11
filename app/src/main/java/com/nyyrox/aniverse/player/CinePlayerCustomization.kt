@@ -1350,6 +1350,8 @@ fun Modifier.glassSurface(
             effects = {
                 applyPrismalGlassEffects(
                     density = density,
+                    adaptiveLuminance = false,
+                    luminance = 0.5f,
                     blurRadiusPx = with(density) { 20.dp.toPx() },
                     refractionHeightPx = with(density) { 14.dp.toPx() },
                     refractionAmountPx = with(density) { 20.dp.toPx() },
@@ -1691,6 +1693,8 @@ fun Modifier.glassPanel(radius: Dp = 28.dp): Modifier = composed {
             effects = {
                 applyPrismalGlassEffects(
                     density = density,
+                    adaptiveLuminance = false,
+                    luminance = 0.5f,
                     blurRadiusPx = with(density) { 24.dp.toPx() },
                     refractionHeightPx = with(density) { 16.dp.toPx() },
                     refractionAmountPx = with(density) { 24.dp.toPx() },
