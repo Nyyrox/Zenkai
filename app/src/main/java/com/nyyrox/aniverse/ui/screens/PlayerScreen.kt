@@ -100,6 +100,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.nyyrox.aniverse.data.filler.AnimeFillerInfo
 import com.nyyrox.aniverse.data.filler.AnimeFillerRepository
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
+import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import androidx.compose.runtime.Composable
@@ -768,7 +769,9 @@ fun PlayerScreen(
         android.os.Build.VERSION.SDK_INT >= 33 &&
             context.getSystemService(android.app.ActivityManager::class.java)?.isLowRamDevice != true
     }
-    val backdrop = if (liquidGlass && glassOk) glassLayer else null
+    // Follows Profile > Liquid Glassmorphism, same switch the details page uses.
+    val glassSetting = LocalThemeSettings.current.isGlassmorphismEnabled
+    val backdrop = if (liquidGlass && glassSetting && glassOk) glassLayer else null
 
     val progress = dragProgress.value
     val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
@@ -2283,6 +2286,7 @@ fun PlayerScreen(
                                         android.widget.Toast.makeText(context, "Ep $epNum is already downloaded", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 },
+                                glass = backdrop != null,
                                 onClick = {
                                     com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                     currentEpisode = epNum
@@ -2694,7 +2698,8 @@ fun PlayerEpisodeRow(
     isMixed: Boolean,
     onDownload: () -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    glass: Boolean = true // false = flat AMOLED card, same as playerGlass(null)
 ) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -2704,15 +2709,21 @@ fun PlayerEpisodeRow(
         label = "rowPress"
     )
     val shape = RoundedCornerShape(20.dp)
-    val fill = if (isSelected) {
-        Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
-    } else {
-        Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
+    val fill = when {
+        !glass -> {
+            val c = if (isSelected) Color(0xFF16161F) else Color(0xFF0B0B10)
+            Brush.linearGradient(listOf(c, c))
+        }
+        isSelected -> Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
+        else -> Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
     }
-    val edge = if (isSelected) {
-        Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
-    } else {
-        Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)))
+    val edge = when {
+        !glass -> {
+            val c = if (isSelected) Color(0x80FFFFFF) else Color(0x1FFFFFFF)
+            Brush.linearGradient(listOf(c, c))
+        }
+        isSelected -> Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
+        else -> Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)))
     }
 
     Row(

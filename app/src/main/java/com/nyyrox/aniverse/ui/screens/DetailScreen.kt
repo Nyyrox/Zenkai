@@ -924,6 +924,7 @@ fun DetailScreen(
                     ) {
                         HeroPlayButton(
                             label = playLabel,
+                            backdrop = backdrop,
                             modifier = Modifier.weight(1f)
                         ) {
                             if (anime.id <= 0) showMissingAnilistDialog = true
@@ -1179,32 +1180,27 @@ fun DetailScreen(
 
                                     val curStart = selectedPage * pageSize + 1
                                     val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
-                                    val dlAllInteraction = remember { MutableInteractionSource() }
-                                    val dlAllPressed by dlAllInteraction.collectIsPressedAsState()
-                                    val dlAllScale by animateFloatAsState(
-                                        targetValue = if (dlAllPressed) 0.91f else 1f,
-                                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                                        label = "dlAllScale"
-                                    )
-                                    Row(
-                                        modifier = Modifier
-                                            .scale(dlAllScale)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x30FFFFFF))
-                                            .border(1.dp, Color(0x48FFFFFF), RoundedCornerShape(8.dp))
-                                            .clickable(
-                                                interactionSource = dlAllInteraction,
-                                                indication = null
-                                            ) {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                showDownloadRangeSheet = curStart..curEnd
-                                            }
-                                            .padding(horizontal = 9.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    PlayerGlassButton(
+                                        backdrop = backdrop,
+                                        onClick = {
+                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                            showDownloadRangeSheet = curStart..curEnd
+                                        }
                                     ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                        Text("Download All", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = "Download All",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Download All",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
                                     }
                                 }
                             }
@@ -3031,9 +3027,68 @@ private fun Modifier.staggerIn(index: Int, seen: MutableSet<String>, key: String
     }
 }
 
-/** Primary play pill: idle glow + light sweep, bouncy press, label slides when the episode changes. */
+/** Primary play button: liquid glass pill (same as the player page buttons) when glass is on, white pill when off. */
 @Composable
 private fun HeroPlayButton(
+    label: String,
+    backdrop: PrismalGlassLayer?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    if (backdrop != null) GlassPlayButton(label, backdrop, modifier, onClick)
+    else FlatPlayButton(label, modifier, onClick)
+}
+
+/** Glass play pill with a soft breathing halo; label slides when the episode changes. */
+@Composable
+private fun GlassPlayButton(
+    label: String,
+    backdrop: PrismalGlassLayer,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val inf = rememberInfiniteTransition(label = "glassPlayFx")
+    val halo by inf.animateFloat(
+        initialValue = 0.10f,
+        targetValue = 0.34f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "glassPlayHalo"
+    )
+    PlayerGlassButton(
+        backdrop = backdrop,
+        onClick = {
+            com.nyyrox.aniverse.util.AppHaptics.tick(context)
+            onClick()
+        },
+        modifier = modifier.drawBehind {
+            val pad = 4.dp.toPx()
+            drawRoundRect(
+                color = Color.White.copy(alpha = halo * 0.45f),
+                topLeft = Offset(-pad, -pad),
+                size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
+                cornerRadius = CornerRadius(size.height / 2f + pad)
+            )
+        },
+        height = 50.dp
+    ) {
+        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+        AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                (slideInVertically { it / 2 } + fadeIn(tween(180))) togetherWith
+                    (slideOutVertically { -it / 2 } + fadeOut(tween(120)))
+            },
+            label = "glassPlayLabel"
+        ) { text ->
+            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, softWrap = false)
+        }
+    }
+}
+
+/** Flat white play pill (glass off): idle glow + light sweep, bouncy press. */
+@Composable
+private fun FlatPlayButton(
     label: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
