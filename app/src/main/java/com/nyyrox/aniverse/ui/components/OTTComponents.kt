@@ -1299,6 +1299,44 @@ fun AniverseLogo(
 }
 
 @Composable
+fun EpisodeFillerBadge(
+    modifier: Modifier = Modifier,
+    isMixed: Boolean = false
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(if (isMixed) Color(0x356366F1) else Color(0x35F59E0B))
+            .border(
+                0.7.dp,
+                if (isMixed) Color(0x70818CF8) else Color(0x75FBBF24),
+                RoundedCornerShape(5.dp)
+            )
+            .padding(horizontal = 5.5.dp, vertical = 1.5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(4.dp)
+                    .clip(CircleShape)
+                    .background(if (isMixed) Color(0xFFA5B4FC) else Color(0xFFFDE68A))
+            )
+            Text(
+                text = if (isMixed) "MIXED" else "FILLER",
+                color = if (isMixed) Color(0xFFC7D2FE) else Color(0xFFFDE68A),
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.6.sp
+            )
+        }
+    }
+}
+
+@Composable
 fun OttEpisodeCardItem(
     anime: Anime,
     episode: Int,
@@ -1308,6 +1346,8 @@ fun OttEpisodeCardItem(
     isDownloaded: Boolean = false,
     isDownloading: Boolean = false,
     downloadTask: AnimeDownloadTask? = null,
+    isFiller: Boolean = false,
+    isMixed: Boolean = false,
     onDownload: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -1395,6 +1435,29 @@ fun OttEpisodeCardItem(
                         )
                     )
             )
+            if (isFiller || isMixed) {
+                Box(
+                    modifier = Modifier
+                        .padding(5.dp)
+                        .align(Alignment.TopStart)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isMixed) Color(0xD04338CA) else Color(0xD0B45309))
+                        .border(
+                            0.6.dp,
+                            if (isMixed) Color(0x90A5B4FC) else Color(0x90FDE68A),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 4.5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (isMixed) "MIXED" else "FILLER",
+                        color = if (isMixed) Color(0xFFE0E7FF) else Color(0xFFFEF3C7),
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.width(12.dp))
@@ -1416,13 +1479,21 @@ fun OttEpisodeCardItem(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Text(
-                text = subLabel,
-                fontSize = 12.sp,
-                color = Color(0xFF94A3B8),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = subLabel,
+                    fontSize = 12.sp,
+                    color = Color(0xFF94A3B8),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isFiller || isMixed) {
+                    EpisodeFillerBadge(isMixed = isMixed)
+                }
+            }
 
             // Status: Green checkmark Downloaded (or downloading / download action)
             if (isDownloaded) {

@@ -149,7 +149,10 @@ import com.nyyrox.aniverse.data.tmdb.TmdbVideo
 import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedTransitionPhase
+import com.nyyrox.aniverse.data.filler.AnimeFillerInfo
+import com.nyyrox.aniverse.data.filler.AnimeFillerRepository
 import com.nyyrox.aniverse.ui.components.DetailScreenSkeleton
+import com.nyyrox.aniverse.ui.components.EpisodeFillerBadge
 import com.nyyrox.aniverse.ui.components.OttPosterCard
 import com.nyyrox.aniverse.ui.components.ShimmerBox
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
@@ -355,6 +358,13 @@ fun DetailScreen(
     var selectedPage by remember(anime.id) { mutableIntStateOf(((initialEpisode - 1) / pageSize).coerceIn(0, maxOf(0, pageCount - 1))) }
     var selectedEpisode by remember(anime.id) { mutableIntStateOf(initialEpisode) }
     var showMissingAnilistDialog by remember { mutableStateOf(false) }
+
+    var fillerInfo by remember(anime.id) {
+        mutableStateOf(AnimeFillerRepository.getCachedFillerInfo(anime.id) ?: AnimeFillerInfo(anime.id))
+    }
+    LaunchedEffect(anime.id, anime.title) {
+        fillerInfo = AnimeFillerRepository.getFillerInfo(anime.id, anime.title, anime.romajiTitle)
+    }
 
     val downloadedAnimeList by vm.downloadManager.downloadedAnime.collectAsState()
     val activeAnimeTasks by vm.downloadManager.animeTasks.collectAsState()
@@ -1182,13 +1192,27 @@ fun DetailScreen(
                                     ) {
                                         row.forEach { epNum ->
                                             val isCurrent = epNum == selectedEpisode
+                                            val isEpFiller = fillerInfo.isFiller(epNum)
+                                            val isEpMixed = fillerInfo.isMixed(epNum)
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .height(46.dp)
                                                     .clip(RoundedCornerShape(10.dp))
-                                                    .background(if (isCurrent) Color.White else Color(0x18FFFFFF))
-                                                    .border(1.dp, if (isCurrent) Color.White else Color(0x25FFFFFF), RoundedCornerShape(10.dp))
+                                                    .background(
+                                                        if (isCurrent) Color.White
+                                                        else if (isEpFiller) Color(0x24F59E0B)
+                                                        else if (isEpMixed) Color(0x246366F1)
+                                                        else Color(0x18FFFFFF)
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        if (isCurrent) Color.White
+                                                        else if (isEpFiller) Color(0x60FBBF24)
+                                                        else if (isEpMixed) Color(0x60818CF8)
+                                                        else Color(0x25FFFFFF),
+                                                        RoundedCornerShape(10.dp)
+                                                    )
                                                 .clickable {
                                                     selectedEpisode = epNum
                                                     if (anime.id <= 0) showMissingAnilistDialog = true
@@ -1200,8 +1224,18 @@ fun DetailScreen(
                                                     text = "$epNum",
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = if (isCurrent) Color.Black else Color.White
+                                                    color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else Color.White
                                                 )
+                                                if (isEpFiller || isEpMixed) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .padding(4.dp)
+                                                            .size(5.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (isEpMixed) Color(0xFFA5B4FC) else Color(0xFFFBBF24))
+                                                    )
+                                                }
                                             }
                                         }
                                         repeat(5 - row.size) {
@@ -1365,21 +1399,33 @@ fun DetailScreen(
                                             }
 
                                             // Episode Badge Bottom Left (e.g. Episode 1)
-                                            Box(
+                                            val isEpFiller = fillerInfo.isFiller(epNum)
+                                            val isEpMixed = fillerInfo.isMixed(epNum)
+                                            Row(
                                                 modifier = Modifier
                                                     .align(Alignment.BottomStart)
-                                                    .padding(8.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(Color(0xCC000000))
-                                                    .border(0.6.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .padding(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
-                                                Text(
-                                                    text = "Episode $epNum",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(Color(0xCC000000))
+                                                        .border(0.6.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Episode $epNum",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White
+                                                    )
+                                                }
+
+                                                if (isEpFiller || isEpMixed) {
+                                                    EpisodeFillerBadge(isMixed = isEpMixed)
+                                                }
                                             }
 
                                             // Duration Bottom Right (e.g. 24m)

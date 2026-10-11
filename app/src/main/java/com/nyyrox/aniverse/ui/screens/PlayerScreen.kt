@@ -82,6 +82,9 @@ import androidx.compose.material3.TextButton
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.nyyrox.aniverse.data.filler.AnimeFillerInfo
+import com.nyyrox.aniverse.data.filler.AnimeFillerRepository
+import com.nyyrox.aniverse.ui.components.EpisodeFillerBadge
 import com.nyyrox.aniverse.ui.components.OttEpisodeCardItem
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import androidx.compose.ui.layout.ContentScale
@@ -245,6 +248,13 @@ fun PlayerScreen(
 
     val maxEpisode = maxOf(anime.episodes ?: 1, anime.nextEpisode ?: 1)
     var currentEpisode by remember(animeId, initialEpisode) { mutableIntStateOf(initialEpisode) }
+
+    var fillerInfo by remember(anime.id) {
+        mutableStateOf(AnimeFillerRepository.getCachedFillerInfo(anime.id) ?: AnimeFillerInfo(anime.id))
+    }
+    LaunchedEffect(anime.id, anime.title) {
+        fillerInfo = AnimeFillerRepository.getFillerInfo(anime.id, anime.title, anime.romajiTitle)
+    }
 
     LaunchedEffect(anime.title, currentEpisode) {
         val title = anime.title ?: "Anime"
@@ -1274,6 +1284,13 @@ fun PlayerScreen(
                                         )
                                     }
 
+                                    // Filler Badge
+                                    val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
+                                    val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
+                                    if (isCurrentFiller || isCurrentMixed) {
+                                        EpisodeFillerBadge(isMixed = isCurrentMixed)
+                                    }
+
                                     // Embed Toggle Chip
                                     Box(
                                         modifier = Modifier
@@ -2258,15 +2275,25 @@ fun PlayerScreen(
                                     ) {
                                         row.forEach { epNum ->
                                             val isCurrent = epNum == currentEpisode
+                                            val isEpFiller = fillerInfo.isFiller(epNum)
+                                            val isEpMixed = fillerInfo.isMixed(epNum)
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .height(46.dp)
                                                     .clip(RoundedCornerShape(10.dp))
-                                                    .background(if (isCurrent) Color.White else OttSurface)
+                                                    .background(
+                                                        if (isCurrent) Color.White
+                                                        else if (isEpFiller) Color(0x24F59E0B)
+                                                        else if (isEpMixed) Color(0x246366F1)
+                                                        else OttSurface
+                                                    )
                                                     .border(
                                                         1.dp,
-                                                        if (isCurrent) Color.White else OttSurfaceBorder,
+                                                        if (isCurrent) Color.White
+                                                        else if (isEpFiller) Color(0x60FBBF24)
+                                                        else if (isEpMixed) Color(0x60818CF8)
+                                                        else OttSurfaceBorder,
                                                         RoundedCornerShape(10.dp)
                                                     )
                                                     .clickable {
@@ -2279,8 +2306,18 @@ fun PlayerScreen(
                                                     text = "$epNum",
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = if (isCurrent) Color.Black else OttTextPrimary
+                                                    color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else OttTextPrimary
                                                 )
+                                                if (isEpFiller || isEpMixed) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .padding(4.dp)
+                                                            .size(5.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (isEpMixed) Color(0xFFA5B4FC) else Color(0xFFFBBF24))
+                                                    )
+                                                }
                                             }
                                         }
                                         repeat(5 - row.size) {
@@ -2312,6 +2349,8 @@ fun PlayerScreen(
                                 isDownloaded = isEpDl,
                                 isDownloading = isEpDling,
                                 downloadTask = activeAnimeTasks["${anime.id}:$epNum"],
+                                isFiller = fillerInfo.isFiller(epNum),
+                                isMixed = fillerInfo.isMixed(epNum),
                                 onDownload = {
                                     if (!isEpDl && !isEpDling) {
                                         showDownloadSheetEpisode = epNum to epStillInfo?.name
