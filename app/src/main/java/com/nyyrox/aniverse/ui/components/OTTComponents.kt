@@ -198,6 +198,7 @@ fun OttBottomDock(
     userAvatarUrl: String? = null,
     avatarDecorationId: String? = null,
     avatarFrameId: String? = null,
+    backdrop: com.styropyr0.prismal.PrismalBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
     val themeColors = LocalThemeColors.current
@@ -214,163 +215,36 @@ fun OttBottomDock(
     }
 
     val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.let { if (it >= 0) it else 0 }
-
-    // Fluid Liquid Pill Spring Animation (respects Reduced Motion)
-    val animatedIndex by animateFloatAsState(
-        targetValue = activeIndex.toFloat(),
-        animationSpec = if (themeSettings.isReducedMotionEnabled) {
-            spring(stiffness = Spring.StiffnessHigh)
-        } else {
-            spring(
-                dampingRatio = 0.65f, // Bouncy liquid spring feel
-                stiffness = Spring.StiffnessMediumLow
-            )
-        },
-        label = "liquid_pill_spring"
-    )
-
     val isGlassEnabled = themeSettings.isGlassmorphismEnabled
 
-    // Floating Glassmorphism Pill Navigation Dock
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .shadow(
-                elevation = if (isGlassEnabled) 20.dp else 4.dp,
-                shape = RoundedCornerShape(32.dp),
-                ambientColor = Color(0x80000000),
-                spotColor = Color(0xB3000000)
-            )
-            .clip(RoundedCornerShape(32.dp))
-            .background(
-                if (isGlassEnabled) {
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xEB0A0B0E),
-                            Color(0xF5060709)
-                        )
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF0F121C),
-                            Color(0xFF0B0D14)
-                        )
-                    )
-                }
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    if (isGlassEnabled) {
-                        listOf(
-                            Color(0x40FFFFFF),
-                            Color(0x14FFFFFF),
-                            Color(0x10FFFFFF)
-                        )
-                    } else {
-                        listOf(
-                            Color(0x22FFFFFF),
-                            Color(0x11FFFFFF)
-                        )
-                    }
-                ),
-                shape = RoundedCornerShape(32.dp)
-            )
-            .padding(horizontal = 6.dp, vertical = 6.dp)
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth()
+    if (isGlassEnabled) {
+        val ambientBackdrop = backdrop ?: com.styropyr0.prismal.LocalPrismalBackdrop.current ?: com.styropyr0.prismal.sources.emptyGlassSource()
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
         ) {
-            val totalWidth = maxWidth
-            val itemWidth = totalWidth / tabs.size
-            val pillPaddingH = 3.dp
-            val pillWidth = itemWidth - (pillPaddingH * 2)
-
-            // Glassmorphism Highlight Active Pill Indicator
-            Box(
-                modifier = Modifier
-                    .offset(x = (itemWidth * animatedIndex) + pillPaddingH)
-                    .width(pillWidth)
-                    .height(46.dp)
-                    .shadow(if (isGlassEnabled) 8.dp else 2.dp, RoundedCornerShape(24.dp), spotColor = Color(0x50000000), ambientColor = Color(0x20FFFFFF))
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        if (isGlassEnabled) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x2AFFFFFF),
-                                    Color(0x14FFFFFF),
-                                    Color(0x1EFFFFFF)
-                                )
-                            )
-                        } else {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x30FFFFFF),
-                                    Color(0x18FFFFFF)
-                                )
-                            )
-                        }
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(
-                            if (isGlassEnabled) {
-                                listOf(
-                                    Color(0x80FFFFFF),
-                                    Color(0x40FFFFFF),
-                                    Color(0x12FFFFFF)
-                                )
-                            } else {
-                                listOf(
-                                    Color(0x38FFFFFF),
-                                    Color(0x18FFFFFF)
-                                )
-                            }
-                        ),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-            )
-
-            // Interactive Navigation Tabs Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            com.styropyr0.prismal.components.PrismalGlassBottomTabs(
+                selectedTabIndex = { activeIndex },
+                onTabSelected = { idx ->
+                    if (idx in tabs.indices) {
+                        onNavigate(tabs[idx].route)
+                    }
+                },
+                backdrop = ambientBackdrop,
+                tabsCount = tabs.size,
+                specular = { com.styropyr0.prismal.specular.PrismalSpecular.Default },
+                dropletContentTint = themeColors.primary,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 tabs.forEachIndexed { index, tab ->
-                    val isActive = index == activeIndex
-                    val iconColor by animateColorAsState(
-                        targetValue = if (isActive) Color.White else Color(0x80A0A5B0),
-                        label = "tab_icon_color"
-                    )
-                    val textColor by animateColorAsState(
-                        targetValue = if (isActive) Color.White else Color(0x80A0A5B0),
-                        label = "tab_text_color"
-                    )
-                    val scale by animateFloatAsState(
-                        targetValue = if (isActive) 1.15f else 1.0f,
-                        animationSpec = spring(
-                            dampingRatio = 0.7f,
-                            stiffness = 300f
-                        ),
-                        label = "tab_scale"
-                    )
+                    val highlightedIndex = com.styropyr0.prismal.components.LocalPrismalBottomTabHighlightedIndex.current()
+                    val isSelected = highlightedIndex() == index
 
-                    Column(
-                        modifier = Modifier
-                            .width(itemWidth)
-                            .height(46.dp)
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            }
-                            .clip(RoundedCornerShape(24.dp))
-                            .clickable { onNavigate(tab.route) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    com.styropyr0.prismal.components.PrismalGlassBottomTab(
+                        onClick = { onNavigate(tab.route) }
                     ) {
                         if (tab.route == "profile") {
                             AvatarDecorationRenderer(
@@ -386,8 +260,8 @@ fun OttBottomDock(
                                             .fillMaxSize()
                                             .clip(CircleShape)
                                             .border(
-                                                width = if (isActive) 1.5.dp else 0.5.dp,
-                                                color = if (isActive) Color.White else Color(0x66FFFFFF),
+                                                width = if (isSelected) 1.5.dp else 0.5.dp,
+                                                color = if (isSelected) Color.White else Color(0x66FFFFFF),
                                                 shape = CircleShape
                                             ),
                                         contentScale = ContentScale.Crop
@@ -396,7 +270,7 @@ fun OttBottomDock(
                                     Icon(
                                         imageVector = tab.icon,
                                         contentDescription = tab.label,
-                                        tint = iconColor,
+                                        tint = if (isSelected) Color.White else Color(0x80A0A5B0),
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -405,7 +279,7 @@ fun OttBottomDock(
                             Icon(
                                 imageVector = tab.icon,
                                 contentDescription = tab.label,
-                                tint = iconColor,
+                                tint = if (isSelected) Color.White else Color(0x80A0A5B0),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -413,9 +287,119 @@ fun OttBottomDock(
                         Text(
                             text = tab.label,
                             fontSize = 10.5.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                            color = textColor
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else Color(0x80A0A5B0),
+                            maxLines = 1
                         )
+                    }
+                }
+            }
+        }
+    } else {
+        // Flat, optimized high-performance dock when glassmorphism is disabled in settings
+        val animatedIndex by animateFloatAsState(
+            targetValue = activeIndex.toFloat(),
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            label = "flat_dock_spring"
+        )
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .shadow(4.dp, RoundedCornerShape(32.dp))
+                .clip(RoundedCornerShape(32.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF0F121C),
+                            Color(0xFF0B0D14)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    color = Color(0x22FFFFFF),
+                    shape = RoundedCornerShape(32.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+        ) {
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val totalWidth = maxWidth
+                val itemWidth = totalWidth / tabs.size
+                val pillPaddingH = 3.dp
+                val pillWidth = itemWidth - (pillPaddingH * 2)
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = (itemWidth * animatedIndex) + pillPaddingH)
+                        .width(pillWidth)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0x30FFFFFF))
+                        .border(1.dp, Color(0x38FFFFFF), RoundedCornerShape(24.dp))
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        val isActive = index == activeIndex
+                        Column(
+                            modifier = Modifier
+                                .width(itemWidth)
+                                .height(46.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .clickable { onNavigate(tab.route) },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (tab.route == "profile") {
+                                AvatarDecorationRenderer(
+                                    decorationId = avatarDecorationId,
+                                    frameId = avatarFrameId,
+                                    size = 22.dp
+                                ) {
+                                    if (!userAvatarUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = userAvatarUrl,
+                                            contentDescription = tab.label,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape)
+                                                .border(
+                                                    width = if (isActive) 1.5.dp else 0.5.dp,
+                                                    color = if (isActive) Color.White else Color(0x66FFFFFF),
+                                                    shape = CircleShape
+                                                ),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = tab.label,
+                                            tint = if (isActive) Color.White else Color(0x80A0A5B0),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = if (isActive) Color.White else Color(0x80A0A5B0),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = tab.label,
+                                fontSize = 10.5.sp,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isActive) Color.White else Color(0x80A0A5B0)
+                            )
+                        }
                     }
                 }
             }

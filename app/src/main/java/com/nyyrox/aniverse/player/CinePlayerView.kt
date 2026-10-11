@@ -450,7 +450,7 @@ private fun DoubleTapSeekOverlay(
     val infiniteTransition = rememberInfiniteTransition(label = "seekTransition")
     val animPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 3f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(650, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
@@ -458,127 +458,91 @@ private fun DoubleTapSeekOverlay(
         label = "phase"
     )
 
-    val scaleAnim = remember { Animatable(1.2f) }
+    val scaleAnim = remember { Animatable(1.18f) }
     LaunchedEffect(triggerKey) {
-        scaleAnim.snapTo(1.2f)
+        scaleAnim.snapTo(1.22f)
         scaleAnim.animateTo(
             targetValue = 1.0f,
-            animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f)
+            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
         )
+    }
+
+    // Elegant curved tap zone arc that fills the tapped side
+    val arcShape = if (isForward) {
+        RoundedCornerShape(topStartPercent = 100, bottomStartPercent = 100)
+    } else {
+        RoundedCornerShape(topEndPercent = 100, bottomEndPercent = 100)
     }
 
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .fillMaxWidth(0.42f),
+            .fillMaxWidth(0.45f)
+            .clip(arcShape)
+            .background(
+                Brush.horizontalGradient(
+                    if (isForward) listOf(Color.Transparent, Color(0x33FFFFFF))
+                    else listOf(Color(0x33FFFFFF), Color.Transparent)
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
+        // Unified Liquid Glass Seek Pod
+        val podShape = RoundedCornerShape(26.dp)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.scale(scaleAnim.value)
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .scale(scaleAnim.value)
+                .shadow(16.dp, podShape, ambientColor = Color(0x66000000), spotColor = Color(0x80000000))
+                .clip(podShape)
+                .background(Color(0xB8101420))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(Color(0x80FFFFFF), Color(0x28FFFFFF), Color(0x0EFFFFFF))
+                    ),
+                    shape = podShape
+                )
+                .padding(horizontal = 22.dp, vertical = 14.dp)
         ) {
-            when (transitionStyle) {
-                SeekTransitionStyle.CYBER_PULSE -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val pulseAlpha = (0.50f + (animPhase % 1f) * 0.35f).coerceIn(0.2f, 0.85f)
-                        Icon(
-                            imageVector = if (isForward) Icons.Default.FastForward else Icons.Default.FastRewind,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = pulseAlpha),
-                            modifier = Modifier.size(34.dp)
-                        )
-                    }
-                }
-                SeekTransitionStyle.BLADE_SLASH -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy((-6).dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.rotate(if (isForward) 8f else -8f)
-                    ) {
-                        for (i in 0..2) {
-                            val idx = if (isForward) i else (2 - i)
-                            val chevronAlpha = ((animPhase - idx).coerceIn(0.2f, 0.85f))
-                            Icon(
-                                imageVector = if (isForward) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = chevronAlpha),
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                }
-                SeekTransitionStyle.PIXEL_STEP -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        for (i in 0..2) {
-                            val idx = if (isForward) i else (2 - i)
-                            val stepAlpha = if (animPhase.toInt() % 3 == idx) 0.85f else 0.30f
-                            Icon(
-                                imageVector = if (isForward) Icons.Default.PlayArrow else Icons.Default.ChevronLeft,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = stepAlpha),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
-                SeekTransitionStyle.MINIMAL_DOT -> {
-                    val smoothAlpha = (0.50f + (animPhase % 1f) * 0.35f).coerceIn(0.2f, 0.85f)
+            // Animated Chevrons with smooth sine wave pulse
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(1.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                for (i in 0..2) {
+                    val idx = if (isForward) i else (2 - i)
+                    val waveOffset = idx * 0.28f
+                    val waveNorm = (animPhase + waveOffset) % 1f
+                    val alpha = 0.25f + 0.75f * kotlin.math.sin(waveNorm * Math.PI.toFloat()).coerceAtLeast(0f)
+
                     Icon(
                         imageVector = if (isForward) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
                         contentDescription = null,
-                        tint = Color.White.copy(alpha = smoothAlpha),
-                        modifier = Modifier.size(36.dp)
+                        tint = Color.White.copy(alpha = alpha),
+                        modifier = Modifier.size(24.dp)
                     )
-                }
-                else -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy((-4).dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isForward) {
-                            for (i in 0..2) {
-                                val chevronAlpha = ((animPhase - i).coerceIn(0.25f, 0.85f))
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = chevronAlpha),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        } else {
-                            for (i in 2 downTo 0) {
-                                val chevronAlpha = ((animPhase - (2 - i)).coerceIn(0.25f, 0.85f))
-                                Icon(
-                                    imageVector = Icons.Default.ChevronLeft,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = chevronAlpha),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-                    }
                 }
             }
 
-            GlassPill(
-                modifier = Modifier.padding(top = 4.dp)
-            ) {
-                Text(
-                    text = "${if (isForward) "+" else "-"}$accumulatedSeconds sec",
-                    color = Color.White,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                )
-            }
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = "${if (isForward) "+" else "-"}${accumulatedSeconds}s",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.5.sp
+            )
+
+            Text(
+                text = if (isForward) "FORWARD" else "REWIND",
+                color = Color.White.copy(alpha = 0.65f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            )
         }
     }
 }
@@ -1892,12 +1856,16 @@ fun CinePlayerView(
             }
 
             PlayerEngineMode.NATIVE_EXO -> {
+                val playerPrismalBackdrop = com.styropyr0.prismal.sources.rememberPrismalGlassLayer()
                 var exoSurfaceCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-                // ExoPlayer Surface Container
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .onGloballyPositioned { exoSurfaceCoordinates = it }
+                CompositionLocalProvider(
+                    com.styropyr0.prismal.LocalPrismalBackdrop provides playerPrismalBackdrop
+                ) {
+                    // ExoPlayer Surface Container
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { exoSurfaceCoordinates = it }
                         .pointerInput(isScreenLocked, isInPip) {
                             var lastTapTime = 0L
                             var lastTapX = 0f
@@ -2245,7 +2213,8 @@ fun CinePlayerView(
                         modifier = Modifier
                             .fillMaxSize()
                             .onSizeChanged { glassBackdrop.hostWidth = it.width }
-                            .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier),
+                            .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier)
+                            .then(if (com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) Modifier.com.styropyr0.prismal.sources.prismalGlassLayer(playerPrismalBackdrop) else Modifier),
                         factory = { ctx ->
                             (LayoutInflater.from(ctx).inflate(com.nyyrox.aniverse.R.layout.cine_player_texture, null, false) as PlayerView).apply {
                                 useController = false
@@ -3568,6 +3537,7 @@ fun CinePlayerView(
                     ) {
                         YtBottomLoadingBar(accentColor = playerCustomization.accentColor.color)
                     }
+                }
                 }
             }
 

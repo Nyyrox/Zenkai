@@ -44,3 +44,9 @@ interface PrismalBackdrop {
         layerBlock: (GraphicsLayerScope.() -> Unit)? = null
     )
 }
+
+/**
+ * CompositionLocal providing ambient [PrismalBackdrop] for glass surfaces.
+ */
+val LocalPrismalBackdrop = androidx.compose.runtime.compositionLocalOf<PrismalBackdrop?> { null }
+

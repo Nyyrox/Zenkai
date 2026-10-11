@@ -360,10 +360,12 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     ThemeEngineProvider(settings = vm.themeSettings) {
         val currentThemeColors = getThemeColors(vm.themeSettings.theme)
         val isReducedMotion = vm.themeSettings.isReducedMotionEnabled
+        val appBackdropLayer = com.styropyr0.prismal.sources.rememberPrismalGlassLayer()
 
         CompositionLocalProvider(
             LocalOverscrollConfiguration provides null,
-            LocalSharedPosterCoordinator provides sharedPosterCoordinator
+            LocalSharedPosterCoordinator provides sharedPosterCoordinator,
+            com.styropyr0.prismal.LocalPrismalBackdrop provides appBackdropLayer
         ) {
             AniverseTheme {
                 Surface(
@@ -376,7 +378,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
 
                     // Main View Screen Container (Edge-to-edge behind status bar)
                     Box(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .com.styropyr0.prismal.sources.prismalGlassLayer(appBackdropLayer)
                     ) {
                         AnimatedContent(
                             targetState = currentRoute,
@@ -844,6 +848,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             userAvatarUrl = vm.userProfile.avatarUrl,
                             avatarDecorationId = vm.userProfile.avatarDecorationId,
                             avatarFrameId = vm.userProfile.avatarFrameId,
+                            backdrop = appBackdropLayer,
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
