@@ -1,6 +1,14 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.nyyrox.aniverse.ui.screens
 
 import com.nyyrox.aniverse.player.CineStreamLoader
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.text.TextStyle
+import com.styropyr0.prismal.components.PrismalHorizontalSelector
+import com.styropyr0.prismal.components.PrismalSegmentedControl
+import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import android.annotation.SuppressLint
@@ -84,8 +92,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.nyyrox.aniverse.data.filler.AnimeFillerInfo
 import com.nyyrox.aniverse.data.filler.AnimeFillerRepository
-import com.nyyrox.aniverse.ui.components.EpisodeFillerBadge
-import com.nyyrox.aniverse.ui.components.OttEpisodeCardItem
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -131,7 +137,25 @@ import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import com.nyyrox.aniverse.data.download.DownloadStatus
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.unit.Dp
+import com.styropyr0.prismal.components.PrismalGlassButton
+import com.styropyr0.prismal.drawPrismalGlass
+import com.styropyr0.prismal.prismalGlassEffects
+import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
+import com.styropyr0.prismal.sources.PrismalGlassLayer
+import com.styropyr0.prismal.sources.prismalGlassLayer
 
+@OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun PlayerScreen(
@@ -139,7 +163,8 @@ fun PlayerScreen(
     animeId: Int,
     initialEpisode: Int,
     initialProviderId: String?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    liquidGlass: Boolean = true // wire to your settings toggle; false = flat AMOLED cards
 ) {
     val context = LocalContext.current
 
@@ -728,13 +753,17 @@ fun PlayerScreen(
         }
     }
 
+    // One backdrop (ambient artwork) sampled by every glass surface. null = glass off.
+    val glassLayer = rememberPrismalGlassLayer()
+    val backdrop = if (liquidGlass) glassLayer else null
+
     val progress = dragProgress.value
     val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isFullscreen) Color.Black else OttBg.copy(alpha = bgAlpha))
+            .background(if (isFullscreen) Color.Black else Color.Black.copy(alpha = bgAlpha))
             .then(if (!isFullscreen) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
     ) {
         Column(
@@ -1003,9 +1032,14 @@ fun PlayerScreen(
                         }
                     }
             ) {
+                PlayerAmbientArt(
+                    layer = backdrop,
+                    model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
+                    modifier = Modifier.fillMaxSize()
+                )
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(top = 6.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                 // Zenkai Player / Embed Mode Toggle Bar (Option down below the player with proper spacing)
@@ -1172,11 +1206,9 @@ fun PlayerScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF0F121C))
-                                .border(0.8.dp, Color(0x20FFFFFF), RoundedCornerShape(14.dp))
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                .playerGlass(backdrop, radius = 24.dp)
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
                             verticalAlignment = Alignment.Top
                         ) {
                             // High-Res Episode Still with 16:9 Aspect Ratio
@@ -1226,7 +1258,7 @@ fun PlayerScreen(
                             // Details of the video properly beside the image!
                             Column(
                                 modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // Episode Title (Shown ONCE here!)
                                 val customEpName = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
@@ -1244,92 +1276,20 @@ fun PlayerScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                // Badges row beside the image
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                // Badges wrap instead of squeezing a chip ("Dire/ct"). The Embed/Direct chip is gone:
+                                // the DIRECT/EMBED switch in the server card does the same job.
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    // Episode Number badge
                                     if (!isMovie) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
-                                                .background(Color.White.copy(alpha = 0.12f))
-                                                .border(0.8.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(5.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = "EP $currentEpisode / $maxEpisode",
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White
-                                            )
-                                        }
+                                        TagChip("EP $currentEpisode / $maxEpisode", Color.White, Color(0x1FFFFFFF), Color(0x38FFFFFF))
                                     }
-
-                                    // Audio Badge
                                     val audioLabel = if (currentProvider.isDub || selectedCategory == "DUB") "DUB" else "SUB"
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(5.dp))
-                                            .background(Color(0x18FFFFFF))
-                                            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(5.dp))
-                                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = audioLabel,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = 0.85f)
-                                        )
-                                    }
-
-                                    // Filler Badge
+                                    TagChip(audioLabel, Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
                                     val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
                                     val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
-                                    if (isCurrentFiller || isCurrentMixed) {
-                                        EpisodeFillerBadge(isMixed = isCurrentMixed)
-                                    }
-
-                                    // Embed Toggle Chip
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(if (vm.isPlayEmbed) Color.White.copy(alpha = 0.2f) else Color(0x18FFFFFF))
-                                            .border(0.8.dp, if (vm.isPlayEmbed) Color.White else Color(0x28FFFFFF), OttPillShape)
-                                            .clickable {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                val targetEmbed = !vm.isPlayEmbed
-                                                vm.setPlayEmbed(targetEmbed)
-                                                if (targetEmbed) {
-                                                    selectedSourceMode = "EMBED"
-                                                    val embedList = when (selectedCategory) {
-                                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                                    }
-                                                    val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                } else {
-                                                    selectedSourceMode = "DIRECT"
-                                                    if (selectedCategory == "MULTI") selectedCategory = "SUB"
-                                                    val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-                                                    availableDirectServers = nextDirect
-                                                    val prov = nextDirect.first()
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                }
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = if (vm.isPlayEmbed) "Embed" else "Direct",
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                    }
+                                    if (isCurrentFiller || isCurrentMixed) FillerTag(isCurrentMixed)
                                 }
 
                                 // Synopsis text
@@ -1549,10 +1509,8 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp)
-                            .clip(OttCardShape)
-                            .background(Color(0xFF0F1117))
-                            .border(1.dp, Color(0x22FFFFFF), OttCardShape)
-                            .padding(14.dp)
+                            .playerGlass(backdrop, radius = 26.dp)
+                            .padding(16.dp)
                     ) {
                         if (isPlayingOffline) {
                             Row(
@@ -1658,56 +1616,74 @@ fun PlayerScreen(
 
                             Spacer(Modifier.weight(1f))
 
-                            // DIRECT vs EMBED Clean Mode Toggle Pill
-                            Row(
-                                modifier = Modifier
-                                    .clip(OttPillShape)
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x22FFFFFF), OttPillShape)
-                                    .padding(3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                listOf("DIRECT" to "DIRECT", "EMBED" to "EMBED").forEach { (modeKey, label) ->
-                                    val isModeSelected = selectedSourceMode == modeKey
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(if (isModeSelected) Color.White else Color.Transparent)
-                                            .clickable {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                if (selectedSourceMode != modeKey) {
-                                                    selectedSourceMode = modeKey
-                                                    if (modeKey == "DIRECT") {
-                                                        vm.setPlayEmbed(false)
-                                                        if (selectedCategory == "MULTI") {
-                                                            selectedCategory = "SUB"
-                                                        }
-                                                        val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-                                                        availableDirectServers = nextDirect
-                                                        val prov = nextDirect.first()
-                                                        currentProvider = prov
-                                                        vm.setPreferredServer(prov.id)
-                                                    } else {
-                                                        vm.setPlayEmbed(true)
-                                                        val embedList = when (selectedCategory) {
-                                                            "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                                            "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                                            else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                                        }
-                                                        val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                                        currentProvider = prov
-                                                        vm.setPreferredServer(prov.id)
-                                                    }
-                                                }
-                                            }
-                                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                                    ) {
-                                        Text(
-                                            text = label,
-                                            fontSize = 10.5.sp,
-                                            fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isModeSelected) Color.Black else Color(0xFF94A3B8)
-                                        )
+                            // DIRECT vs EMBED switch (liquid glass droplet when glass is on)
+                            val onModeSelect: (String) -> Unit = { modeKey ->
+                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                if (selectedSourceMode != modeKey) {
+                                    selectedSourceMode = modeKey
+                                    if (modeKey == "DIRECT") {
+                                        vm.setPlayEmbed(false)
+                                        if (selectedCategory == "MULTI") {
+                                            selectedCategory = "SUB"
+                                        }
+                                        val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
+                                        availableDirectServers = nextDirect
+                                        val prov = nextDirect.first()
+                                        currentProvider = prov
+                                        vm.setPreferredServer(prov.id)
+                                    } else {
+                                        vm.setPlayEmbed(true)
+                                        val embedList = when (selectedCategory) {
+                                            "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                                            "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                                            else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                        }
+                                        val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+                                        currentProvider = prov
+                                        vm.setPreferredServer(prov.id)
+                                    }
+                                }
+                            }
+                            if (backdrop != null) {
+                                PrismalSegmentedControl(
+                                    labels = listOf("DIRECT", "EMBED"),
+                                    selectedIndex = if (selectedSourceMode == "DIRECT") 0 else 1,
+                                    onSelected = { onModeSelect(if (it == 0) "DIRECT" else "EMBED") },
+                                    backdrop = backdrop,
+                                    modifier = Modifier
+                                        .width(188.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0x59000000))
+                                        .border(1.dp, Color(0x1FFFFFFF), CircleShape),
+                                    textStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                                    textColor = Color.White,
+                                    height = 40.dp
+                                )
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(OttPillShape)
+                                        .background(Color(0x18FFFFFF))
+                                        .border(1.dp, Color(0x22FFFFFF), OttPillShape)
+                                        .padding(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    listOf("DIRECT", "EMBED").forEach { modeKey ->
+                                        val isModeSelected = selectedSourceMode == modeKey
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(OttPillShape)
+                                                .background(if (isModeSelected) Color.White else Color.Transparent)
+                                                .clickable { onModeSelect(modeKey) }
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = modeKey,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isModeSelected) Color.Black else Color(0xFF94A3B8)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1715,70 +1691,81 @@ fun PlayerScreen(
 
                         Spacer(Modifier.height(10.dp))
 
-                        // SUB / DUB / MULTI-AUDIO Selection Bar (Direct mode only shows SUB / DUB)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x14FFFFFF))
-                                .padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            val audioCategories = if (selectedSourceMode == "DIRECT") {
-                                listOf(
-                                    "SUB" to "SUB",
-                                    "DUB" to "DUB"
-                                )
-                            } else {
-                                listOf(
-                                    "SUB" to "SUB",
-                                    "DUB" to "DUB",
-                                    "MULTI" to "MULTI-AUDIO"
-                                )
+                        // SUB / DUB / MULTI-AUDIO (Direct mode only shows SUB / DUB)
+                        val audioCategories = if (selectedSourceMode == "DIRECT") {
+                            listOf("SUB" to "SUB", "DUB" to "DUB")
+                        } else {
+                            listOf("SUB" to "SUB", "DUB" to "DUB", "MULTI" to "MULTI-AUDIO")
+                        }
+                        val onCategorySelect: (String) -> Unit = { catKey ->
+                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                            if (selectedCategory != catKey) {
+                                selectedCategory = catKey
+                                if (selectedSourceMode == "DIRECT") {
+                                    val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey)
+                                    availableDirectServers = nextDirect
+                                    val newProv = nextDirect.first()
+                                    currentProvider = newProv
+                                    vm.setPreferredServer(newProv.id)
+                                } else {
+                                    val embedServers = when (catKey) {
+                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                    }
+                                    val newProv = embedServers.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+                                    currentProvider = newProv
+                                    vm.setPreferredServer(newProv.id)
+                                }
                             }
-                            audioCategories.forEach { (catKey, label) ->
-                                val isCatSelected = selectedCategory == catKey
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isCatSelected) Color.White else Color.Transparent)
-                                        .clickable {
-                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                            if (selectedCategory != catKey) {
-                                                selectedCategory = catKey
-                                                if (selectedSourceMode == "DIRECT") {
-                                                    val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey)
-                                                    availableDirectServers = nextDirect
-                                                    val newProv = nextDirect.first()
-                                                    currentProvider = newProv
-                                                    vm.setPreferredServer(newProv.id)
-                                                } else {
-                                                    val embedServers = when (catKey) {
-                                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                                    }
-                                                    val newProv = embedServers.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                                    currentProvider = newProv
-                                                    vm.setPreferredServer(newProv.id)
-                                                }
-                                            }
-                                        }
-                                        .padding(vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isCatSelected) Color.Black else Color(0xFF94A3B8)
-                                    )
+                        }
+                        if (backdrop != null) {
+                            PrismalSegmentedControl(
+                                labels = audioCategories.map { it.second },
+                                selectedIndex = audioCategories.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0),
+                                onSelected = { onCategorySelect(audioCategories[it].first) },
+                                backdrop = backdrop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(CircleShape)
+                                    .background(Color(0x59000000))
+                                    .border(1.dp, Color(0x1FFFFFFF), CircleShape),
+                                textStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                                textColor = Color.White,
+                                height = 44.dp
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0x14FFFFFF))
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                audioCategories.forEach { (catKey, label) ->
+                                    val isCatSelected = selectedCategory == catKey
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isCatSelected) Color.White else Color.Transparent)
+                                            .clickable { onCategorySelect(catKey) }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isCatSelected) Color.Black else Color(0xFF94A3B8)
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(14.dp))
 
                         // Clean Server Dropdown Trigger Selector Button
                         Box(modifier = Modifier.fillMaxWidth()) {
@@ -1789,7 +1776,7 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF161922))
+                                    .background(Color(0x59000000))
                                     .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                                     .clickable { isServerDropdownExpanded = true }
                                     .padding(horizontal = 16.dp, vertical = 13.dp),
@@ -2153,104 +2140,116 @@ fun PlayerScreen(
                     }
                 } else {
                     // EPISODE SECTION FOR SERIES
-                    // Range Selector Pills & View Toggle
+                    // Range selector (liquid glass droplet) on its own row, actions below it
                     item {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            if (pageCount > 1) {
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    items(pageCount) { page ->
-                                        val pStart = page * pageSize + 1
-                                        val pEnd = minOf(pStart + pageSize - 1, maxEpisode)
-                                        val isSelected = selectedPage == page
-
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(OttPillShape)
-                                                .background(if (isSelected) Color.White else Color(0x14FFFFFF))
-                                                .border(
-                                                    1.dp,
-                                                    if (isSelected) Color.White else Color(0x22FFFFFF),
-                                                    OttPillShape
-                                                )
-                                                .clickable { selectedPage = page }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "$pStart–$pEnd",
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) Color.Black else OttTextSecondary
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                Text(
-                                    text = "Episodes 1 – $maxEpisode",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            Spacer(Modifier.width(8.dp))
-
                             val curStart = selectedPage * pageSize + 1
                             val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
 
-                            // Download All in active page range (e.g. 1-25, 26-50)
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.12f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        showDownloadRangeSheet = curStart..curEnd
+                            if (pageCount > 1) {
+                                if (backdrop != null) {
+                                    val rangeLabels = remember(pageCount, pageSize, maxEpisode) {
+                                        List(pageCount) { p ->
+                                            val s = p * pageSize + 1
+                                            "$s–${minOf(s + pageSize - 1, maxEpisode)}"
+                                        }
                                     }
-                                    .padding(horizontal = 9.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Download,
-                                    contentDescription = "Download All",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Text(
-                                    text = "Download All",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                    PrismalHorizontalSelector(
+                                        labels = rangeLabels,
+                                        selectedIndex = selectedPage,
+                                        onSelected = { selectedPage = it },
+                                        backdrop = backdrop,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .background(Color(0x59000000))
+                                            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(24.dp)),
+                                        textStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                                        textColor = Color.White
+                                    )
+                                } else {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(pageCount) { page ->
+                                            val pStart = page * pageSize + 1
+                                            val pEnd = minOf(pStart + pageSize - 1, maxEpisode)
+                                            val isSelected = selectedPage == page
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(OttPillShape)
+                                                    .background(if (isSelected) Color.White else Color(0x14FFFFFF))
+                                                    .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), OttPillShape)
+                                                    .clickable { selectedPage = page }
+                                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "$pStart–$pEnd",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) Color.Black else OttTextSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
-                            Spacer(Modifier.width(6.dp))
-
-                            // View Toggle (Grid vs Cards)
-                            IconButton(
-                                onClick = { isEpisodeGridView = !isEpisodeGridView },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x25FFFFFF), CircleShape)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
-                                    contentDescription = "Toggle Episode View",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Episodes",
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "$curStart–$curEnd of $maxEpisode",
+                                        fontSize = 11.5.sp,
+                                        color = OttTextMuted
+                                    )
+                                }
+                                PlayerGlassButton(
+                                    backdrop = backdrop,
+                                    onClick = { showDownloadRangeSheet = curStart..curEnd }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = "Download All",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Download All",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                PlayerGlassButton(
+                                    backdrop = backdrop,
+                                    onClick = { isEpisodeGridView = !isEpisodeGridView },
+                                    circle = true
+                                ) {
+                                    Icon(
+                                        imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
+                                        contentDescription = "Toggle Episode View",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -2337,18 +2336,18 @@ fun PlayerScreen(
                             val isEpDling = remember(anime.id, epNum, activeAnimeTasks) {
                                 activeAnimeTasks.containsKey("${anime.id}:$epNum")
                             }
-                            OttEpisodeCardItem(
-                                anime = anime,
+                            PlayerEpisodeRow(
                                 episode = epNum,
-                                isSelected = epNum == currentEpisode,
-                                episodeStill = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                                title = epStillInfo?.name,
+                                still = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
                                     ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
                                     ?: anime.banner?.takeIf { it.isNotBlank() }
                                     ?: anime.cover,
-                                episodeTitle = epStillInfo?.name,
+                                durationLabel = anime.duration?.let { "$it min" } ?: "24 min",
+                                isSelected = epNum == currentEpisode,
                                 isDownloaded = isEpDl,
                                 isDownloading = isEpDling,
-                                downloadTask = activeAnimeTasks["${anime.id}:$epNum"],
+                                downloadProgress = activeAnimeTasks["${anime.id}:$epNum"]?.progress,
                                 isFiller = fillerInfo.isFiller(epNum),
                                 isMixed = fillerInfo.isMixed(epNum),
                                 onDownload = {
@@ -2558,5 +2557,349 @@ private fun GlassmorphicControlChip(
                 .clip(CircleShape)
                 .background(if (isActive) Color.Black else Color(0x35FFFFFF))
         )
+    }
+}
+
+
+// ───────── Player glass UI helpers (merged from PlayerGlass.kt) ─────────
+
+private val Amoled = Color(0xFF050507)
+private val Muted = Color(0xFF8E94A3)
+
+/**
+ * Liquid glass surface. [backdrop] == null means glass is switched off: a flat AMOLED card is drawn instead,
+ * so every call site works in both modes.
+ */
+@Composable
+fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modifier {
+    val shape = RoundedCornerShape(radius)
+    if (backdrop == null) {
+        return this
+            .clip(shape)
+            .background(Color(0xFF0B0B10))
+            .border(1.dp, Color(0x1FFFFFFF), shape)
+    }
+    val density = LocalDensity.current
+    val effects = remember(density) { prismalGlassEffects(density) }
+    return this.drawPrismalGlass(
+        backdrop = backdrop,
+        shape = { PrismalRoundedRectangle(radius) },
+        effects = effects,
+        // ponytail: dark scrim keeps the glass AMOLED-black instead of washing out
+        onDrawSurface = { drawRect(Color.Black.copy(alpha = 0.42f)) }
+    )
+}
+
+/** Dim, blurred artwork behind the list. It is the pixel source every glass surface samples. */
+@Composable
+fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
+    if (layer == null) return
+    Box(modifier.prismalGlassLayer(layer).background(Color.Black)) {
+        AsyncImage(
+            model = model,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(36.dp)
+                .alpha(0.36f)
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.8f), Color.Black)
+                    )
+                )
+        )
+    }
+}
+
+
+/** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. */
+@Composable
+fun PlayerGlassButton(
+    backdrop: PrismalGlassLayer?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 40.dp,
+    circle: Boolean = false,
+    content: @Composable RowScope.() -> Unit
+) {
+    val sized = if (circle) modifier.width(height) else modifier
+    val pad = if (circle) PaddingValues(0.dp) else PaddingValues(horizontal = 14.dp)
+    if (backdrop != null) {
+        PrismalGlassButton(
+            onClick = onClick,
+            backdrop = backdrop,
+            modifier = sized,
+            height = height,
+            surfaceColor = Color.Black.copy(alpha = 0.3f),
+            contentPadding = pad,
+            content = content
+        )
+    } else {
+        val source = remember { MutableInteractionSource() }
+        val pressed by source.collectIsPressedAsState()
+        val scale by animateFloatAsState(
+            targetValue = if (pressed) 0.94f else 1f,
+            animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+            label = "btnPress"
+        )
+        Row(
+            modifier = sized
+                .height(height)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(CircleShape)
+                .background(Color(0x14FFFFFF))
+                .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                .clickable(interactionSource = source, indication = null, onClick = onClick)
+                .padding(pad),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+            content = content
+        )
+    }
+}
+
+/** Single-line chip. Never wraps its text, so "Direct" can't break into "Dire / ct" again. */
+@Composable
+fun TagChip(
+    text: String,
+    fg: Color,
+    bg: Color,
+    border: Color,
+    modifier: Modifier = Modifier,
+    dot: Boolean = false
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(bg)
+            .border(0.8.dp, border, shape)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        if (dot) Box(Modifier.size(5.dp).clip(CircleShape).background(fg))
+        Text(
+            text = text,
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.3.sp,
+            color = fg,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+/** The one and only filler/mixed tag. Used by the hero card and the episode rows. */
+@Composable
+fun FillerTag(isMixed: Boolean, modifier: Modifier = Modifier) {
+    if (isMixed) {
+        TagChip("MIXED", Color(0xFFC7D2FE), Color(0x266366F1), Color(0x66818CF8), modifier, dot = true)
+    } else {
+        TagChip("FILLER", Color(0xFFFDE68A), Color(0x26F59E0B), Color(0x66FBBF24), modifier, dot = true)
+    }
+}
+
+@Composable
+private fun Equalizer(color: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "eq")
+    Row(
+        modifier = modifier.height(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        listOf(420, 560, 360).forEachIndexed { i, ms ->
+            val h by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(ms, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "bar$i"
+            )
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .fillMaxHeight(h)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(color)
+            )
+        }
+    }
+}
+
+/**
+ * Episode row for the player list. Replaces OttEpisodeCardItem here:
+ * one filler tag (not two), a clearly lit "now playing" state, even spacing, spring press depth.
+ * Plain Compose glass on purpose: a shader per row would make the list stutter.
+ */
+@Composable
+fun PlayerEpisodeRow(
+    episode: Int,
+    title: String?,
+    still: Any?,
+    durationLabel: String,
+    isSelected: Boolean,
+    isDownloaded: Boolean,
+    isDownloading: Boolean,
+    downloadProgress: Float?,
+    isFiller: Boolean,
+    isMixed: Boolean,
+    onDownload: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+        label = "rowPress"
+    )
+    val shape = RoundedCornerShape(20.dp)
+    val fill = if (isSelected) {
+        Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
+    } else {
+        Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
+    }
+    val edge = if (isSelected) {
+        Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
+    } else {
+        Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)))
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .background(Amoled)
+            .background(fill)
+            .border(if (isSelected) 1.2.dp else 1.dp, edge, shape)
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .width(120.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(13.dp))
+                .background(Color(0x14FFFFFF))
+        ) {
+            AsyncImage(
+                model = still,
+                contentDescription = "Episode $episode",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = if (isSelected) 0.7f else 0.5f))
+                        )
+                    )
+            )
+            Text(
+                text = "$episode",
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            if (isSelected) {
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .border(1.dp, Color(0x55FFFFFF), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Equalizer(Color.White, Modifier.width(16.dp))
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x66000000))
+                        .padding(3.dp)
+                )
+            }
+            if (isDownloading && downloadProgress != null) {
+                LinearProgressIndicator(
+                    progress = { downloadProgress.coerceIn(0f, 1f) },
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                    color = Color.White,
+                    trackColor = Color(0x33FFFFFF)
+                )
+            }
+        }
+
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = title?.takeIf { it.isNotBlank() } ?: "Episode $episode",
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Ep $episode · $durationLabel",
+                    modifier = Modifier.padding(vertical = 3.dp),
+                    fontSize = 11.5.sp,
+                    color = Muted
+                )
+                if (isSelected) TagChip("NOW PLAYING", Color.Black, Color.White, Color.White)
+                if (isFiller || isMixed) FillerTag(isMixed)
+            }
+            when {
+                isDownloaded -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF34D399), modifier = Modifier.size(14.dp))
+                    Text("Downloaded", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF34D399))
+                }
+                isDownloading -> Text(
+                    text = "Downloading ${((downloadProgress ?: 0f) * 100).toInt()}%",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+                else -> Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onDownload)
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(Icons.Default.Download, null, tint = Muted, modifier = Modifier.size(14.dp))
+                    Text("Download", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Muted)
+                }
+            }
+        }
     }
 }
