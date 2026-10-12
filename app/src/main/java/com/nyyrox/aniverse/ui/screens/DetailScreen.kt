@@ -263,6 +263,8 @@ fun DetailScreen(
 
     var tmdbEpisodes by remember(animeId) { mutableStateOf<Map<Int, TmdbEpisodeStill>>(emptyMap()) }
     var tmdbDetails by remember(animeId) { mutableStateOf<TmdbDetails?>(null) }
+    var tmdbGrace by remember(animeId) { mutableStateOf(false) }
+    LaunchedEffect(animeId) { delay(500L); tmdbGrace = true }
     var isTmdbSettled by remember(animeId) { mutableStateOf(false) }
 
     LaunchedEffect(animeId) {
@@ -397,7 +399,7 @@ fun DetailScreen(
     }
 
     val isAniListReady = anime != null && !vm.detailLoading
-    val isReady = isAniListReady && isTmdbSettled
+    val isReady = isAniListReady && (isTmdbSettled || tmdbGrace)
 
     if (!isReady || anime == null) {
         DetailLoadingCard(
@@ -729,22 +731,17 @@ fun DetailScreen(
     // Opening: if the loading card was on screen, the page rises + settles in while the card zooms away over it.
     val open = remember(anime.id) { Animatable(if (loaderShown) 0f else 1f) }
     LaunchedEffect(anime.id) {
-        if (open.value < 1f) open.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 170f))
+        if (open.value < 1f) open.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(OttBg)
             .graphicsLayer {
-                val o = open.value
-                alpha = revealAlpha * o.coerceIn(0f, 1f) *
+                alpha = revealAlpha *
                     (if (coordinator?.phase == SharedTransitionPhase.BACKWARD) coordinator.progress.value else 1f)
-                val sc = 0.94f + 0.06f * o
-                scaleX = sc
-                scaleY = sc
-                translationY = (1f - o) * 24.dp.toPx()
             }
+            .background(OttBg) // after graphicsLayer so the bg fades too (else it blacks out Home on back)
     ) {
         // Live ambient backdrop: only the small glass controls sample it. Draws nothing when glass is off.
         PlayerAmbientArt(layer = backdrop, model = heroImageUrl, modifier = Modifier.fillMaxSize())
@@ -790,7 +787,7 @@ fun DetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val s = heroScaleState?.value ?: 1f
+                            val s = (heroScaleState?.value ?: 1f) * (1.12f - 0.12f * open.value)
                             scaleX = s
                             scaleY = s
                         },
@@ -849,6 +846,7 @@ fun DetailScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 val logoUrl = tmdbDetails?.logoUrl?.takeIf { it.isNotBlank() }
+                                Crossfade(targetState = logoUrl, animationSpec = tween(400), label = "heroLogo") { logoUrl ->
                                 if (logoUrl != null) {
                                     AsyncImage(
                                         model = logoUrl,
@@ -869,6 +867,7 @@ fun DetailScreen(
                                         lineHeight = 28.sp,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                }
                                 }
                             }
                         }
@@ -2595,10 +2594,9 @@ private fun RecommendationPosterItem(
 }
 
 /**
- * Loading screen: the title's own media card floats centre-stage over its blurred artwork while details load,
- * with a shimmer sweep, a breathing glow, cycling status text and a tap-to-squish. Replaces the old skeleton.
- *
- * [exit] (0→1) plays the opening: the card zooms through the screen and the whole layer dissolves into the real page.
+ * Loading screen: the poster rests over its own blurred artwork (slow light sweep, breathing glow) while
+ * skeleton placeholders hint at the page that's about to appear. No spinner, no status text.
+ * [exit] (0→1) plays the opening: the card zooms through the screen and the layer dissolves into the real page.
  * The overlay copy used for that ([showBack] / [reportBounds] false) never touches the back button or shared-poster bounds.
  */
 @Composable
@@ -2616,63 +2614,25 @@ private fun DetailLoadingCard(
     LaunchedEffect(Unit) { onShown() }
 
     val fx = rememberInfiniteTransition(label = "detailLoaderFx")
-    val sweep by fx.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
-        label = "loaderSweep"
-    )
-    val drift by fx.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "loaderDrift"
-    )
-    val glow by fx.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.55f,
-        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "loaderGlow"
-    )
+    val sweep by fx.animateFloat(0f, 1f, infiniteRepeatable(tween(2000, easing = LinearEasing)), label = "sweep")
+    val glow by fx.animateFloat(0.25f, 0.6f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "glow")
+    val drift by fx.animateFloat(-1f, 1f, infiniteRepeatable(tween(6000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "drift")
 
     val enter = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 190f)) }
-
-    val messages = remember { listOf("Opening details", "Fetching episodes", "Matching artwork", "Almost there") }
-    var msgIdx by remember { mutableIntStateOf(0) }
-    var dots by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1600L)
-            msgIdx = (msgIdx + 1) % messages.size
-        }
-    }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(380L)
-            dots = (dots + 1) % 4
-        }
-    }
-
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "loaderPress"
-    )
+    LaunchedEffect(Unit) { enter.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
+    // The overlay poster lands on this card's full-size bounds, so don't start it shrunken.
+    val flown = remember { reportBounds && coordinator?.phase == SharedTransitionPhase.FORWARD }
     val cardShape = RoundedCornerShape(28.dp)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(OttBg)
             .graphicsLayer {
                 alpha = if (coordinator?.phase == SharedTransitionPhase.BACKWARD) coordinator.progress.value
                 else (1f - exit).coerceIn(0f, 1f)
             }
+            .background(OttBg) // after graphicsLayer so the bg dissolves with the curtain
     ) {
-        // Ambient artwork, drifting slowly
         if (!cachedPoster.isNullOrBlank()) {
             AsyncImage(
                 model = cachedPoster,
@@ -2702,7 +2662,7 @@ private fun DetailLoadingCard(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── The media card ──
+            // ── Poster card ──
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.62f)
@@ -2713,21 +2673,15 @@ private fun DetailLoadingCard(
                         } else Modifier
                     )
                     .graphicsLayer {
-                        val e = enter.value.coerceIn(0f, 1.2f)
-                        val s = (0.8f + 0.2f * e) * pressScale * (1f + 0.9f * exit)
+                        val s = (if (flown) 1f else 0.9f + 0.1f * enter.value) * (1f + 0.9f * exit)
                         scaleX = s
                         scaleY = s
-                        val calm = 1f - exit
-                        translationY = drift * 6.dp.toPx() * calm
-                        rotationY = drift * 4f * calm
-                        rotationX = -drift * 2f * calm
-                        cameraDistance = 14f * density
-                        alpha = enter.value.coerceIn(0f, 1f)
+                        alpha = enter.value
                     }
                     .drawBehind {
                         val pad = 18.dp.toPx()
                         drawRoundRect(
-                            color = Color.White.copy(alpha = glow * 0.16f),
+                            color = Color.White.copy(alpha = glow * 0.14f),
                             topLeft = Offset(-pad, -pad),
                             size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx() + pad)
@@ -2735,7 +2689,6 @@ private fun DetailLoadingCard(
                     }
                     .clip(cardShape)
                     .background(Color(0xFF141822))
-                    .clickable(interactionSource = source, indication = null) { }
             ) {
                 if (!cachedPoster.isNullOrBlank()) {
                     AsyncImage(
@@ -2763,7 +2716,7 @@ private fun DetailLoadingCard(
                             val x = -w + sweep * w * 3f
                             drawRect(
                                 brush = Brush.linearGradient(
-                                    colors = listOf(Color.Transparent, Color(0x38FFFFFF), Color.Transparent),
+                                    colors = listOf(Color.Transparent, Color(0x30FFFFFF), Color.Transparent),
                                     start = Offset(x, 0f),
                                     end = Offset(x + w * 0.7f, size.height * 0.6f)
                                 )
@@ -2782,89 +2735,53 @@ private fun DetailLoadingCard(
                 )
             }
 
-            Spacer(Modifier.height(26.dp))
-
-            // ── Title / meta ──
-            if (!title.isNullOrBlank()) {
-                Text(
-                    text = title,
-                    fontSize = 22.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.3).sp,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer { alpha = enter.value.coerceIn(0f, 1f) }
-                )
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.5f)
-                        .height(22.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0x22FFFFFF))
-                )
-            }
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = meta.joinToString("  •  "),
-                    fontSize = 12.5.sp,
-                    color = OttTextSecondary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
-            }
-
-            Spacer(Modifier.height(22.dp))
-
-            // ── Status line ──
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                AnimatedContent(
-                    targetState = msgIdx,
-                    transitionSpec = {
-                        (slideInVertically { it / 2 } + fadeIn(tween(220))) togetherWith
-                            (slideOutVertically { -it / 2 } + fadeOut(tween(160)))
-                    },
-                    label = "loaderMsg"
-                ) { idx ->
+            // ── Title, meta and page skeleton: leaves first on exit, rises in on enter ──
+            Column(
+                modifier = Modifier.graphicsLayer {
+                    alpha = (enter.value * (1f - exit * 3.5f)).coerceIn(0f, 1f)
+                    translationY = (1f - enter.value) * 12.dp.toPx()
+                },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.height(24.dp))
+                if (!title.isNullOrBlank()) {
                     Text(
-                        text = messages[idx],
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xCCFFFFFF)
+                        text = title,
+                        fontSize = 22.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.3).sp,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    SkeletonBar(Modifier.fillMaxWidth(0.5f).height(22.dp), sweep)
+                }
+                if (meta.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = meta.joinToString("  •  "),
+                        fontSize = 12.5.sp,
+                        color = OttTextSecondary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
                     )
                 }
-                Text(
-                    text = ".".repeat(dots),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xCCFFFFFF),
-                    modifier = Modifier.width(18.dp)
-                )
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SkeletonBar(Modifier.width(64.dp).height(22.dp), sweep)
+                    SkeletonBar(Modifier.width(48.dp).height(22.dp), sweep)
+                    SkeletonBar(Modifier.width(72.dp).height(22.dp), sweep)
+                }
+                Spacer(Modifier.height(14.dp))
+                SkeletonBar(Modifier.fillMaxWidth().height(44.dp), sweep)
+                Spacer(Modifier.height(14.dp))
+                SkeletonBar(Modifier.fillMaxWidth(0.9f).height(10.dp), sweep)
+                Spacer(Modifier.height(8.dp))
+                SkeletonBar(Modifier.fillMaxWidth(0.65f).height(10.dp), sweep)
             }
-            Spacer(Modifier.height(12.dp))
-
-            // Indeterminate progress sliver
-            Box(
-                Modifier
-                    .width(150.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x22FFFFFF))
-                    .drawBehind {
-                        val seg = size.width * 0.38f
-                        val x = (size.width + seg) * sweep - seg
-                        drawRoundRect(
-                            color = Color.White,
-                            topLeft = Offset(x, 0f),
-                            size = androidx.compose.ui.geometry.Size(seg, size.height),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
-                        )
-                    }
-            )
         }
 
         if (showBack) {
@@ -2889,6 +2806,27 @@ private fun DetailLoadingCard(
             }
         }
     }
+}
+
+/** Pill placeholder with a soft light sweep, driven by the loader's shared [sweep] (0→1). */
+@Composable
+private fun SkeletonBar(modifier: Modifier, sweep: Float) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color(0x14FFFFFF))
+            .drawBehind {
+                val w = size.width
+                val x = -w + sweep * w * 2.5f
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color.Transparent, Color(0x22FFFFFF), Color.Transparent),
+                        Offset(x, 0f),
+                        Offset(x + w * 0.6f, 0f)
+                    )
+                )
+            }
+    )
 }
 
 
