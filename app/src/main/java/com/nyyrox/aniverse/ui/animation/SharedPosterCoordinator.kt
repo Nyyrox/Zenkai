@@ -1,7 +1,7 @@
 package com.nyyrox.aniverse.ui.animation
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -36,6 +36,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+// Material 3 emphasized curves: fast launch, long soft landing (out) / quick tuck (back).
+private val EmphasizedOut = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+private val EmphasizedBack = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
 enum class SharedTransitionPhase {
     IDLE,
     FORWARD,
@@ -66,6 +70,9 @@ class SharedPosterCoordinator(
         private set
 
     val progress = Animatable(0f)
+
+    // 1→0 after landing: overlay dissolves over the real screen instead of vanishing (no handoff pop).
+    val settle = Animatable(0f)
 
     val isTransitioning: Boolean
         get() = phase == SharedTransitionPhase.FORWARD || phase == SharedTransitionPhase.BACKWARD
@@ -103,11 +110,13 @@ class SharedPosterCoordinator(
             progress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
-                    durationMillis = 520,
-                    easing = FastOutSlowInEasing
+                    durationMillis = 500,
+                    easing = EmphasizedOut
                 )
             )
+            settle.snapTo(1f)
             phase = SharedTransitionPhase.PRESENTED
+            settle.animateTo(0f, tween(180))
         }
     }
 
@@ -129,7 +138,7 @@ class SharedPosterCoordinator(
 
     fun updateTargetBounds(bounds: Rect) {
         if (bounds.width > 0 && bounds.height > 0) {
-            if (targetBounds == null || phase == SharedTransitionPhase.FORWARD) {
+            if (targetBounds == null || (phase == SharedTransitionPhase.FORWARD && progress.value < 0.05f)) {
                 targetBounds = bounds
             }
         }
@@ -151,11 +160,12 @@ class SharedPosterCoordinator(
 
         phase = SharedTransitionPhase.BACKWARD
         scope.launch {
+            settle.snapTo(0f)
             progress.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(
-                    durationMillis = 400,
-                    easing = FastOutSlowInEasing
+                    durationMillis = 380,
+                    easing = EmphasizedBack
                 )
             )
             reset()
@@ -171,6 +181,7 @@ class SharedPosterCoordinator(
         targetBounds = null
         scope.launch {
             progress.snapTo(0f)
+            settle.snapTo(0f)
         }
     }
 }
@@ -195,7 +206,7 @@ fun SharedPosterOverlay(
     coordinator: SharedPosterCoordinator,
     modifier: Modifier = Modifier
 ) {
-    if (!coordinator.isTransitioning) return
+    if (!coordinator.isTransitioning && coordinator.settle.value <= 0f) return
 
     val src = coordinator.sourceBounds ?: return
     val posterUrl = coordinator.activePosterUrl ?: return
@@ -224,12 +235,21 @@ fun SharedPosterOverlay(
     val currentTop = src.top + (tgt.top - src.top) * p
     val currentWidth = (src.width + (tgt.width - src.width) * p).coerceAtLeast(1f)
     val currentHeight = (src.height + (tgt.height - src.height) * p).coerceAtLeast(1f)
-    val currentCornerRadius = if (isMediaCard) 14f else (12f * (1f - p)).coerceAtLeast(0f)
+    val tgtRadius = if (isMediaCard) 14f else if (tgt.height > tgt.width) 28f else 0f // loader card vs hero
+    val currentCornerRadius = (12f + (tgtRadius - 12f) * p).coerceAtLeast(0f)
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .zIndex(100f)
+            .graphicsLayer {
+                alpha = when (coordinator.phase) {
+                    SharedTransitionPhase.PRESENTED -> coordinator.settle.value
+                    // fade in as it leaves the hero so the poster doesn't pop over the banner
+                    SharedTransitionPhase.BACKWARD -> ((1f - coordinator.progress.value) / 0.2f).coerceIn(0f, 1f)
+                    else -> 1f
+                }
+            }
     ) {
         Box(
             modifier = Modifier
