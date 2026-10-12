@@ -59,6 +59,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.scale
 import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.draw.blur
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.State
@@ -244,6 +246,21 @@ fun DetailScreen(
         else vm.findKnownAnime(animeId)?.cover
     }
 
+    // Loading card: title/meta come from whatever the app already knows about this show.
+    val knownAnime = remember(animeId) { vm.findKnownAnime(animeId) }
+    val knownTitle = knownAnime?.displayTitle
+    val knownMeta = remember(knownAnime) {
+        knownAnime?.let {
+            listOfNotNull(
+                it.score?.let { s -> "★ $s%" },
+                it.displayFormat,
+                it.displayYear?.takeIf { y -> y.isNotBlank() }
+            )
+        }.orEmpty()
+    }
+    var loaderShown by remember(animeId) { mutableStateOf(false) }
+    var curtainDone by remember(animeId) { mutableStateOf(false) }
+
     var tmdbEpisodes by remember(animeId) { mutableStateOf<Map<Int, TmdbEpisodeStill>>(emptyMap()) }
     var tmdbDetails by remember(animeId) { mutableStateOf<TmdbDetails?>(null) }
     var isTmdbSettled by remember(animeId) { mutableStateOf(false) }
@@ -383,10 +400,13 @@ fun DetailScreen(
     val isReady = isAniListReady && isTmdbSettled
 
     if (!isReady || anime == null) {
-        DetailWaveOscillatingSkeleton(
+        DetailLoadingCard(
             cachedPoster = cachedPoster,
+            title = knownTitle,
+            meta = knownMeta,
             onBack = handleBack,
-            coordinator = coordinator
+            coordinator = coordinator,
+            onShown = { loaderShown = true }
         )
         return
     }
@@ -706,13 +726,24 @@ fun DetailScreen(
         }
     }
 
+    // Opening: if the loading card was on screen, the page rises + settles in while the card zooms away over it.
+    val open = remember(anime.id) { Animatable(if (loaderShown) 0f else 1f) }
+    LaunchedEffect(anime.id) {
+        if (open.value < 1f) open.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 170f))
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(OttBg)
             .graphicsLayer {
-                alpha = revealAlpha * (if (coordinator?.phase == SharedTransitionPhase.BACKWARD) coordinator.progress.value else 1f)
-                translationY = (1f - revealAlpha) * 16f
+                val o = open.value
+                alpha = revealAlpha * o.coerceIn(0f, 1f) *
+                    (if (coordinator?.phase == SharedTransitionPhase.BACKWARD) coordinator.progress.value else 1f)
+                val sc = 0.94f + 0.06f * o
+                scaleX = sc
+                scaleY = sc
+                translationY = (1f - o) * 24.dp.toPx()
             }
     ) {
         // Live ambient backdrop: only the small glass controls sample it. Draws nothing when glass is off.
@@ -1563,6 +1594,26 @@ fun DetailScreen(
                     Spacer(Modifier.weight(1f))
                 }
             }
+        }
+
+        // Opening curtain: the loading card zooms through the screen and dissolves into the page.
+        if (loaderShown && !curtainDone) {
+            val exit = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                delay(60L)
+                exit.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
+                curtainDone = true
+            }
+            DetailLoadingCard(
+                cachedPoster = cachedPoster,
+                title = knownTitle,
+                meta = knownMeta,
+                onBack = handleBack,
+                coordinator = coordinator,
+                exit = exit.value,
+                showBack = false,
+                reportBounds = false
+            )
         }
     }
     // === DIALOGS & BOTTOM SHEETS ===
@@ -2544,268 +2595,301 @@ private fun RecommendationPosterItem(
 }
 
 /**
- * Oscillating wave skeleton placeholder for the Detail screen media card.
- * Slowly oscillates like a wave with gentle scale/breathing animations while AniList & TMDB data load.
+ * Loading screen: the title's own media card floats centre-stage over its blurred artwork while details load,
+ * with a shimmer sweep, a breathing glow, cycling status text and a tap-to-squish. Replaces the old skeleton.
+ *
+ * [exit] (0→1) plays the opening: the card zooms through the screen and the whole layer dissolves into the real page.
+ * The overlay copy used for that ([showBack] / [reportBounds] false) never touches the back button or shared-poster bounds.
  */
 @Composable
-private fun DetailWaveOscillatingSkeleton(
+private fun DetailLoadingCard(
     cachedPoster: String?,
+    title: String?,
+    meta: List<String>,
     onBack: () -> Unit,
-    coordinator: SharedPosterCoordinator?
+    coordinator: SharedPosterCoordinator?,
+    exit: Float = 0f,
+    showBack: Boolean = true,
+    reportBounds: Boolean = true,
+    onShown: () -> Unit = {}
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "detailWaveTransition")
+    LaunchedEffect(Unit) { onShown() }
 
-    // Slow wave phase translation across the media card
-    val wavePhase by infiniteTransition.animateFloat(
+    val fx = rememberInfiniteTransition(label = "detailLoaderFx")
+    val sweep by fx.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "wavePhase"
+        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
+        label = "loaderSweep"
+    )
+    val drift by fx.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "loaderDrift"
+    )
+    val glow by fx.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.55f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "loaderGlow"
     )
 
-    // Gentle wave breathing / alpha oscillation
-    val waveBreathe by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.82f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "waveBreathe"
-    )
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 190f)) }
 
-    // Subtle fluid wave scale oscillation
-    val waveScale by infiniteTransition.animateFloat(
-        initialValue = 0.990f,
-        targetValue = 1.010f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "waveScale"
-    )
+    val messages = remember { listOf("Opening details", "Fetching episodes", "Matching artwork", "Almost there") }
+    var msgIdx by remember { mutableIntStateOf(0) }
+    var dots by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1600L)
+            msgIdx = (msgIdx + 1) % messages.size
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(380L)
+            dots = (dots + 1) % 4
+        }
+    }
 
-    val waveBrush = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF131722).copy(alpha = 0.65f),
-            Color(0xFF1E2638).copy(alpha = 0.85f),
-            Color(0xFF323F58).copy(alpha = 0.95f),
-            Color(0xFF1E2638).copy(alpha = 0.85f),
-            Color(0xFF131722).copy(alpha = 0.65f),
-        ),
-        start = Offset((wavePhase * 1600f) - 600f, (wavePhase * 600f) - 200f),
-        end = Offset((wavePhase * 1600f) + 400f, (wavePhase * 600f) + 400f)
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "loaderPress"
     )
+    val cardShape = RoundedCornerShape(28.dp)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(OttBg)
-            .then(
-                if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
-                    Modifier.graphicsLayer { alpha = coordinator.progress.value }
-                } else Modifier
-            )
+            .graphicsLayer {
+                alpha = if (coordinator?.phase == SharedTransitionPhase.BACKWARD) coordinator.progress.value
+                else (1f - exit).coerceIn(0f, 1f)
+            }
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = false,
-            contentPadding = PaddingValues(bottom = 80.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        // Ambient artwork, drifting slowly
+        if (!cachedPoster.isNullOrBlank()) {
+            AsyncImage(
+                model = cachedPoster,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(40.dp)
+                    .graphicsLayer {
+                        scaleX = 1.4f
+                        scaleY = 1.4f
+                        translationX = drift * 40f
+                        alpha = 0.5f
+                    }
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(Color(0x66000000), Color(0xCC000000), OttBg)))
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Hero Media Card oscillating like a wave
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(410.dp)
-                        .graphicsLayer {
-                            scaleX = waveScale
-                            scaleY = waveScale
-                        }
-                        .onGloballyPositioned { coords ->
+            // ── The media card ──
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.62f)
+                    .aspectRatio(2f / 3f)
+                    .then(
+                        if (reportBounds) Modifier.onGloballyPositioned { coords ->
                             coordinator?.updateTargetBounds(coords.boundsInWindow())
-                        }
-                ) {
-                    if (!cachedPoster.isNullOrBlank()) {
-                        AsyncImage(
-                            model = cachedPoster,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    alpha = if (coordinator?.phase == SharedTransitionPhase.FORWARD) 0f else 1f
-                                },
-                            contentScale = ContentScale.Crop
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(OttHeroGradient)
-                        )
-                        // Translucent oscillating wave overlay
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { alpha = waveBreathe * 0.45f }
-                                .background(waveBrush)
-                        )
-                    } else {
-                        // Media card silhouette with wave brush
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(waveBrush)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(OttHeroGradient)
+                        } else Modifier
+                    )
+                    .graphicsLayer {
+                        val e = enter.value.coerceIn(0f, 1.2f)
+                        val s = (0.8f + 0.2f * e) * pressScale * (1f + 0.9f * exit)
+                        scaleX = s
+                        scaleY = s
+                        val calm = 1f - exit
+                        translationY = drift * 6.dp.toPx() * calm
+                        rotationY = drift * 4f * calm
+                        rotationX = -drift * 2f * calm
+                        cameraDistance = 14f * density
+                        alpha = enter.value.coerceIn(0f, 1f)
+                    }
+                    .drawBehind {
+                        val pad = 18.dp.toPx()
+                        drawRoundRect(
+                            color = Color.White.copy(alpha = glow * 0.16f),
+                            topLeft = Offset(-pad, -pad),
+                            size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx() + pad)
                         )
                     }
-
-                    // Bottom overlays of Hero Card: Title skeleton, subtitle, and Play button
-                    Box(
+                    .clip(cardShape)
+                    .background(Color(0xFF141822))
+                    .clickable(interactionSource = source, indication = null) { }
+            ) {
+                if (!cachedPoster.isNullOrBlank()) {
+                    AsyncImage(
+                        model = cachedPoster,
+                        contentDescription = title,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.BottomStart)
-                            .padding(horizontal = 18.dp, vertical = 14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.72f)
-                                        .height(26.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(waveBrush)
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.45f)
-                                        .height(14.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(waveBrush)
-                                )
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = if (coordinator?.phase == SharedTransitionPhase.FORWARD && reportBounds) 0f else 1f
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(CircleShape)
-                                    .background(waveBrush)
+                    )
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0xAA000000)))
+                )
+                // Light sweep
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .drawBehind {
+                            val w = size.width
+                            val x = -w + sweep * w * 3f
+                            drawRect(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color.Transparent, Color(0x38FFFFFF), Color.Transparent),
+                                    start = Offset(x, 0f),
+                                    end = Offset(x + w * 0.7f, size.height * 0.6f)
+                                )
                             )
                         }
+                )
+                // Rim light
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .border(
+                            1.dp,
+                            Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x08FFFFFF), Color(0x40FFFFFF))),
+                            cardShape
+                        )
+                )
+            }
+
+            Spacer(Modifier.height(26.dp))
+
+            // ── Title / meta ──
+            if (!title.isNullOrBlank()) {
+                Text(
+                    text = title,
+                    fontSize = 22.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.3).sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.graphicsLayer { alpha = enter.value.coerceIn(0f, 1f) }
+                )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxWidth(0.5f)
+                        .height(22.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0x22FFFFFF))
+                )
+            }
+            if (meta.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = meta.joinToString("  •  "),
+                    fontSize = 12.5.sp,
+                    color = OttTextSecondary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
+
+            Spacer(Modifier.height(22.dp))
+
+            // ── Status line ──
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                AnimatedContent(
+                    targetState = msgIdx,
+                    transitionSpec = {
+                        (slideInVertically { it / 2 } + fadeIn(tween(220))) togetherWith
+                            (slideOutVertically { -it / 2 } + fadeOut(tween(160)))
+                    },
+                    label = "loaderMsg"
+                ) { idx ->
+                    Text(
+                        text = messages[idx],
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xCCFFFFFF)
+                    )
+                }
+                Text(
+                    text = ".".repeat(dots),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xCCFFFFFF),
+                    modifier = Modifier.width(18.dp)
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Indeterminate progress sliver
+            Box(
+                Modifier
+                    .width(150.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x22FFFFFF))
+                    .drawBehind {
+                        val seg = size.width * 0.38f
+                        val x = (size.width + seg) * sweep - seg
+                        drawRoundRect(
+                            color = Color.White,
+                            topLeft = Offset(x, 0f),
+                            size = androidx.compose.ui.geometry.Size(seg, size.height),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+                        )
                     }
-                }
-            }
-
-            // 2. Metadata Chips Row
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(modifier = Modifier.size(56.dp, 24.dp).clip(OttPillShape).background(waveBrush))
-                    Box(modifier = Modifier.size(68.dp, 24.dp).clip(OttPillShape).background(waveBrush))
-                    Box(modifier = Modifier.size(60.dp, 24.dp).clip(OttPillShape).background(waveBrush))
-                    Box(modifier = Modifier.size(52.dp, 24.dp).clip(OttPillShape).background(waveBrush))
-                }
-            }
-
-            // 3. Action Buttons Row
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(modifier = Modifier.weight(1f).height(46.dp).clip(OttPillShape).background(waveBrush))
-                    Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(waveBrush))
-                    Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(waveBrush))
-                    Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(waveBrush))
-                }
-            }
-
-            // 4. Synopsis Skeleton Lines
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
-                    Box(modifier = Modifier.fillMaxWidth(0.88f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
-                    Box(modifier = Modifier.fillMaxWidth(0.60f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
-                }
-            }
-
-            // 5. Episode Tabs & Preview Cards
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(modifier = Modifier.size(80.dp, 28.dp).clip(OttPillShape).background(waveBrush))
-                        Box(modifier = Modifier.size(80.dp, 28.dp).clip(OttPillShape).background(waveBrush))
-                        Box(modifier = Modifier.size(80.dp, 28.dp).clip(OttPillShape).background(waveBrush))
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(modifier = Modifier.size(120.dp, 68.dp).clip(OttCardShape).background(waveBrush))
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
-                            Box(modifier = Modifier.fillMaxWidth(0.9f).height(12.dp).clip(RoundedCornerShape(4.dp)).background(waveBrush))
-                        }
-                    }
-                }
-            }
+            )
         }
 
-        // Top Back Button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(44.dp)
+        if (showBack) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
 }
-
 
 
 // ponytail: reads the Profile toggle directly; AGSL glass needs API 33+. Move to a shared file if other screens need it.
