@@ -1,30 +1,41 @@
 package com.nyyrox.aniverse.ui.screens
 
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Book
@@ -45,14 +56,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.nyyrox.aniverse.ui.components.iosGlass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -62,29 +67,47 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.nyyrox.aniverse.data.download.DownloadStatus
 import com.nyyrox.aniverse.data.download.DownloadTaskInfo
 import com.nyyrox.aniverse.data.download.DownloadType
 import com.nyyrox.aniverse.data.download.DownloadedAnime
-import com.nyyrox.aniverse.data.download.DownloadedAnimeEpisode
 import com.nyyrox.aniverse.data.download.DownloadedManga
 import com.nyyrox.aniverse.data.download.DownloadedNovel
+import com.nyyrox.aniverse.ui.components.iosGlass
+import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.theme.OttBg
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
+import com.nyyrox.aniverse.ui.theme.OttSecondary
 import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+import com.styropyr0.prismal.sources.PrismalGlassLayer
+import com.styropyr0.prismal.sources.prismalGlassLayer
+import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 
 data class DeleteConfirmationTarget(
     val title: String,
@@ -94,7 +117,17 @@ data class DeleteConfirmationTarget(
     val onConfirm: () -> Unit
 )
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private val AnimeAccent = OttPrimary
+private val MangaAccent = Color(0xFFF59E0B)
+private val NovelAccent = Color(0xFF60A5FA)
+private val DangerRed = Color(0xFFFF6B6B)
+private val ItemPad = Modifier.padding(horizontal = 16.dp)
+
+/**
+ * Follows Settings > Liquid Glassmorphism (AGSL glass needs API 33+), same rule as the detail page.
+ * Glass is kept for the small header controls; cards are cheap translucent surfaces (on) or solid AMOLED (off).
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DownloadsScreen(
     vm: MainViewModel,
@@ -112,24 +145,26 @@ fun DownloadsScreen(
     val activeTasks = remember(allTasks) {
         allTasks.filter { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
     }
-    val failedTasks = remember(allTasks) {
-        allTasks.filter { it.status == DownloadStatus.FAILED }
-    }
+    val failedTasks = remember(allTasks) { allTasks.filter { it.status == DownloadStatus.FAILED } }
     var retrySheetTask by remember { mutableStateOf<DownloadTaskInfo?>(null) }
     var deleteConfirmation by remember { mutableStateOf<DeleteConfirmationTarget?>(null) }
     var isDownloadingExpanded by remember { mutableStateOf(true) }
     var isFailedExpanded by remember { mutableStateOf(false) }
     var showDownloadSettingsSheet by remember { mutableStateOf(false) }
 
-    val totalStorageBytes = remember(downloadedAnime, downloadedNovels, downloadedManga) {
-        val aSize = downloadedAnime.sumOf { it.totalSizeBytes }
-        val nSize = downloadedNovels.sumOf { it.totalSizeBytes }
-        val mSize = downloadedManga.sumOf { it.totalSizeBytes }
-        aSize + nSize + mSize
-    }
+    val animeBytes = remember(downloadedAnime) { downloadedAnime.sumOf { it.totalSizeBytes } }
+    val mangaBytes = remember(downloadedManga) { downloadedManga.sumOf { it.totalSizeBytes } }
+    val novelBytes = remember(downloadedNovels) { downloadedNovels.sumOf { it.totalSizeBytes } }
+    val totalItems = downloadedAnime.size + downloadedManga.size + downloadedNovels.size
 
-    val formattedTotalStorage = remember(totalStorageBytes) {
-        formatBytes(totalStorageBytes)
+    val glassOn = LocalThemeSettings.current.isGlassmorphismEnabled && Build.VERSION.SDK_INT >= 33
+    val glassLayer = rememberPrismalGlassLayer()
+    val backdrop = if (glassOn) glassLayer else null // null = flat AMOLED controls
+    val context = LocalContext.current
+    val ambient = when (selectedTab) {
+        0 -> downloadedAnime.firstOrNull()?.cover
+        1 -> downloadedManga.firstOrNull()?.poster
+        else -> downloadedNovels.firstOrNull()?.cover
     }
 
     Box(
@@ -137,256 +172,118 @@ fun DownloadsScreen(
             .fillMaxSize()
             .background(OttBg)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-        ) {
-            // Header with Download Logo Badge
+        if (glassOn) {
+            // What the glass controls refract: accent wash + blurred artwork of the current tab.
+            Box(Modifier.fillMaxSize().prismalGlassLayer(glassLayer)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(listOf(OttPrimary.copy(alpha = 0.35f), OttSecondary.copy(alpha = 0.18f), Color.Transparent)))
+                )
+                if (!ambient.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ambient,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .blur(50.dp)
+                            .graphicsLayer {
+                                alpha = 0.55f
+                                scaleX = 1.3f
+                                scaleY = 1.3f
+                            }
+                    )
+                }
+            }
+            // Keeps text readable over the art.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(OttBg.copy(alpha = 0.55f), OttBg.copy(alpha = 0.94f))))
+            )
+        }
+
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            // ── Header ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x18FFFFFF))
-                        .border(1.dp, Color(0x28FFFFFF), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
+                PlayerGlassButton(backdrop, onClick = onBack, height = 40.dp, circle = true) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
-
-                Spacer(Modifier.width(10.dp))
-
-                // Prominent Download Logo
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DownloadDone,
-                        contentDescription = "Downloads",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(10.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
                         text = "Offline Library",
                         color = OttTextPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Black
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = (-0.3).sp
                     )
                     Text(
-                        text = "$formattedTotalStorage used across device",
+                        text = if (totalItems == 0) "Nothing saved yet" else "$totalItems title${if (totalItems == 1) "" else "s"} saved on this device",
                         color = OttTextSecondary,
-                        fontSize = 11.5.sp
+                        fontSize = 12.sp
                     )
                 }
-
-                Box(
-                    modifier = Modifier
-                        .clip(OttPillShape)
-                        .background(Color(0x14FFFFFF))
-                        .border(1.dp, Color(0x22FFFFFF), OttPillShape)
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Storage,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = formattedTotalStorage,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = { showDownloadSettingsSheet = true },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x18FFFFFF))
-                        .border(1.dp, Color(0x28FFFFFF), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Download Settings",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
+                PlayerGlassButton(backdrop, onClick = { showDownloadSettingsSheet = true }, height = 40.dp, circle = true) {
+                    Icon(Icons.Default.Tune, contentDescription = "Download settings", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
 
-            // Active Downloads Banner
-            if (activeTasks.isNotEmpty()) {
-                val avgProgress = remember(activeTasks) {
-                    if (activeTasks.isNotEmpty()) activeTasks.map { it.progress }.average().toFloat() else 0f
+            // One scrolling list so banners never squeeze the library on small screens; tabs stay pinned.
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item(key = "storage") {
+                    StorageCard(glassOn, animeBytes, mangaBytes, novelBytes, ItemPad)
                 }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clip(OttCardShape)
-                        .background(Color(0x12FFFFFF))
-                        .border(1.dp, Color(0x25FFFFFF), OttCardShape)
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isDownloadingExpanded = !isDownloadingExpanded },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Downloading,
-                                contentDescription = null,
-                                tint = OttPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "Downloading (${activeTasks.size})",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            if (!isDownloadingExpanded) {
-                                LinearProgressIndicator(
-                                    progress = { avgProgress.coerceIn(0f, 1f) },
-                                    modifier = Modifier
-                                        .width(70.dp)
-                                        .height(5.dp)
-                                        .clip(RoundedCornerShape(3.dp)),
-                                    color = OttPrimary,
-                                    trackColor = Color(0x28FFFFFF)
-                                )
-                                Text(
-                                    text = "${(avgProgress * 100).toInt()}%",
-                                    color = OttTextSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                if (activeTasks.isNotEmpty()) {
+                    item(key = "active") {
+                        val avg = activeTasks.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
+                        TaskGroupCard(
+                            glass = glassOn,
+                            title = "Downloading (${activeTasks.size})",
+                            icon = Icons.Default.Downloading,
+                            accent = OttPrimary,
+                            expanded = isDownloadingExpanded,
+                            onToggle = { isDownloadingExpanded = !isDownloadingExpanded },
+                            modifier = ItemPad,
+                            collapsedHint = {
+                                ProgressBar(avg, Modifier.width(70.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("${(avg * 100).toInt()}%", color = OttTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(6.dp))
                             }
-                            Icon(
-                                imageVector = if (isDownloadingExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (isDownloadingExpanded) "Minimize" else "Expand",
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    if (isDownloadingExpanded) {
-                        Spacer(Modifier.height(8.dp))
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 240.dp)
-                                .verticalScroll(rememberScrollState())
                         ) {
                             activeTasks.forEach { task ->
                                 ActiveDownloadTaskRow(
                                     task = task,
                                     onCancel = { vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId) }
                                 )
-                                Spacer(Modifier.height(8.dp))
                             }
                         }
                     }
                 }
-            }
 
-            // Failed Downloads Banner / Issue Resolution Card
-            if (failedTasks.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clip(OttCardShape)
-                        .background(Color(0x18F44336))
-                        .border(1.dp, Color(0x45F44336), OttCardShape)
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isFailedExpanded = !isFailedExpanded },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ErrorOutline,
-                                contentDescription = null,
-                                tint = Color(0xFFFF5252),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "Failed Downloads (${failedTasks.size})",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Icon(
-                            imageVector = if (isFailedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (isFailedExpanded) "Minimize" else "Expand",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    if (isFailedExpanded) {
-                        Spacer(Modifier.height(8.dp))
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 200.dp)
-                                .verticalScroll(rememberScrollState())
+                if (failedTasks.isNotEmpty()) {
+                    item(key = "failed") {
+                        TaskGroupCard(
+                            glass = glassOn,
+                            title = "Failed Downloads (${failedTasks.size})",
+                            icon = Icons.Default.ErrorOutline,
+                            accent = Color(0xFFFF5252),
+                            expanded = isFailedExpanded,
+                            onToggle = { isFailedExpanded = !isFailedExpanded },
+                            tint = if (glassOn) Color(0x18F44336) else Color(0xFF1A0F11),
+                            modifier = ItemPad
                         ) {
                             failedTasks.forEach { task ->
                                 FailedDownloadTaskRow(
@@ -414,180 +311,81 @@ fun DownloadsScreen(
                                         }
                                     },
                                     onChangeServer = {
-                                        if (task.type == DownloadType.ANIME) {
-                                            retrySheetTask = task
-                                        } else {
-                                            vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
-                                        }
+                                        if (task.type == DownloadType.ANIME) retrySheetTask = task
+                                        else vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
                                     },
-                                    onDismiss = {
-                                        vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
-                                    }
-                                )
-                                Spacer(Modifier.height(8.dp))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Tabs (Anime vs Manga vs Novels)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(OttPillShape)
-                    .background(Color(0x12FFFFFF))
-                    .border(1.dp, Color(0x1EFFFFFF), OttPillShape)
-                    .padding(4.dp)
-            ) {
-                // Tab 0: Anime
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(OttPillShape)
-                        .background(if (selectedTab == 0) Color.White else Color.Transparent)
-                        .clickable { selectedTab = 0 }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Movie,
-                            contentDescription = null,
-                            tint = if (selectedTab == 0) Color.Black else OttTextSecondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = "Anime (${downloadedAnime.size})",
-                            color = if (selectedTab == 0) Color.Black else OttTextSecondary,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                // Tab 1: Manga
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(OttPillShape)
-                        .background(if (selectedTab == 1) Color.White else Color.Transparent)
-                        .clickable { selectedTab = 1 }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Book,
-                            contentDescription = null,
-                            tint = if (selectedTab == 1) Color.Black else OttTextSecondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = "Manga (${downloadedManga.size})",
-                            color = if (selectedTab == 1) Color.Black else OttTextSecondary,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                // Tab 2: Novels
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(OttPillShape)
-                        .background(if (selectedTab == 2) Color.White else Color.Transparent)
-                        .clickable { selectedTab = 2 }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MenuBook,
-                            contentDescription = null,
-                            tint = if (selectedTab == 2) Color.Black else OttTextSecondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = "Novels (${downloadedNovels.size})",
-                            color = if (selectedTab == 2) Color.Black else OttTextSecondary,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Content List
-            when (selectedTab) {
-                0 -> {
-                    // Anime List
-                    if (downloadedAnime.isEmpty()) {
-                        EmptyDownloadsView(type = "anime")
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(downloadedAnime, key = { it.animeId }) { anime ->
-                                DownloadedAnimeCard(
-                                    anime = anime,
-                                    vm = vm,
-                                    onPlayEpisode = { ep -> onPlayAnimeEpisode(anime.animeId, ep) },
-                                    onDeleteRequest = { deleteConfirmation = it }
+                                    onDismiss = { vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId) }
                                 )
                             }
                         }
                     }
                 }
-                1 -> {
-                    // Manga List
-                    if (downloadedManga.isEmpty()) {
-                        EmptyDownloadsView(type = "manga")
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(downloadedManga, key = { it.mangaId }) { manga ->
-                                DownloadedMangaCard(
-                                    manga = manga,
-                                    vm = vm,
-                                    onReadChapter = { chId -> onReadMangaChapter(manga.mangaId, chId) },
-                                    onDeleteRequest = { deleteConfirmation = it }
-                                )
-                            }
-                        }
+
+                stickyHeader(key = "tabs") {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Brush.verticalGradient(listOf(OttBg.copy(alpha = 0.96f), OttBg.copy(alpha = 0.96f), Color.Transparent)))
+                            .padding(top = 4.dp, bottom = 10.dp)
+                    ) {
+                        DownloadTabs(
+                            glass = glassOn,
+                            selected = selectedTab,
+                            tabs = listOf(
+                                Triple(Icons.Default.Movie, "Anime", downloadedAnime.size),
+                                Triple(Icons.Default.Book, "Manga", downloadedManga.size),
+                                Triple(Icons.Default.MenuBook, "Novels", downloadedNovels.size)
+                            ),
+                            onSelect = {
+                                if (it != selectedTab) com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                selectedTab = it
+                            },
+                            modifier = ItemPad
+                        )
                     }
                 }
-                2 -> {
-                    // Novels List
-                    if (downloadedNovels.isEmpty()) {
-                        EmptyDownloadsView(type = "novels")
+
+                when (selectedTab) {
+                    0 -> if (downloadedAnime.isEmpty()) {
+                        item(key = "empty_anime") { EmptyDownloadsView("anime", glassOn) }
                     } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(downloadedNovels, key = { it.novelSlug }) { novel ->
-                                DownloadedNovelCard(
-                                    novel = novel,
-                                    vm = vm,
-                                    onReadChapter = { chSlug -> onReadNovelChapter(novel.novelSlug, chSlug) },
-                                    onDeleteRequest = { deleteConfirmation = it }
-                                )
-                            }
+                        items(downloadedAnime, key = { "anime_${it.animeId}" }) { anime ->
+                            DownloadedAnimeCard(
+                                anime = anime,
+                                vm = vm,
+                                glass = glassOn,
+                                onPlayEpisode = { ep -> onPlayAnimeEpisode(anime.animeId, ep) },
+                                onDeleteRequest = { deleteConfirmation = it },
+                                modifier = ItemPad
+                            )
+                        }
+                    }
+                    1 -> if (downloadedManga.isEmpty()) {
+                        item(key = "empty_manga") { EmptyDownloadsView("manga", glassOn) }
+                    } else {
+                        items(downloadedManga, key = { "manga_${it.mangaId}" }) { manga ->
+                            DownloadedMangaCard(
+                                manga = manga,
+                                vm = vm,
+                                glass = glassOn,
+                                onReadChapter = { chId -> onReadMangaChapter(manga.mangaId, chId) },
+                                onDeleteRequest = { deleteConfirmation = it },
+                                modifier = ItemPad
+                            )
+                        }
+                    }
+                    else -> if (downloadedNovels.isEmpty()) {
+                        item(key = "empty_novels") { EmptyDownloadsView("novels", glassOn) }
+                    } else {
+                        items(downloadedNovels, key = { "novel_${it.novelSlug}" }) { novel ->
+                            DownloadedNovelCard(
+                                novel = novel,
+                                vm = vm,
+                                glass = glassOn,
+                                onReadChapter = { chSlug -> onReadNovelChapter(novel.novelSlug, chSlug) },
+                                onDeleteRequest = { deleteConfirmation = it },
+                                modifier = ItemPad
+                            )
                         }
                     }
                 }
@@ -630,10 +428,7 @@ fun DownloadsScreen(
     }
 
     deleteConfirmation?.let { target ->
-        IosDeleteConfirmationDialog(
-            target = target,
-            onDismiss = { deleteConfirmation = null }
-        )
+        IosDeleteConfirmationDialog(target = target, onDismiss = { deleteConfirmation = null })
     }
 
     if (showDownloadSettingsSheet) {
@@ -643,174 +438,315 @@ fun DownloadsScreen(
     }
 }
 
+// ── Shared surfaces ─────────────────────────────────────────────────────────────
+
+/** Glass on: faint translucent fill + lit rim. Glass off: solid AMOLED card + flat hairline. */
+private fun Modifier.surface(glass: Boolean, shape: Shape = OttCardShape, tint: Color? = null): Modifier = this
+    .clip(shape)
+    .background(tint ?: if (glass) Color(0x14FFFFFF) else Color(0xFF0D1017))
+    .border(
+        1.dp,
+        if (glass) Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x0DFFFFFF))) else SolidColor(Color(0x1AFFFFFF)),
+        shape
+    )
+
 @Composable
-private fun DownloadedAnimeCard(
-    anime: DownloadedAnime,
-    vm: MainViewModel,
-    onPlayEpisode: (episode: Int) -> Unit,
-    onDeleteRequest: (DeleteConfirmationTarget) -> Unit
+private fun ProgressBar(progress: Float, modifier: Modifier = Modifier) {
+    Box(modifier.height(5.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .background(Brush.horizontalGradient(listOf(OttPrimary, Color.White)))
+        )
+    }
+}
+
+@Composable
+private fun StorageCard(glass: Boolean, anime: Long, manga: Long, novels: Long, modifier: Modifier = Modifier) {
+    val total = anime + manga + novels
+    val parts = listOf(
+        Triple("Anime", anime, AnimeAccent),
+        Triple("Manga", manga, MangaAccent),
+        Triple("Novels", novels, NovelAccent)
+    )
+    Column(modifier.fillMaxWidth().surface(glass).padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("STORAGE USED", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = Color(0xFF8E94A3))
+                Text(formatBytes(total), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
+            }
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(Color(0x14FFFFFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Storage, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(Color(0x1AFFFFFF)),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            parts.forEach { (_, size, color) ->
+                if (size > 0) Box(Modifier.weight(size.toFloat()).fillMaxHeight().background(color))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            parts.forEach { (label, size, color) ->
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+                    Spacer(Modifier.width(5.dp))
+                    Text("$label ${formatBytes(size)}", color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+/** Collapsible card for the Downloading / Failed groups. */
+@Composable
+private fun TaskGroupCard(
+    glass: Boolean,
+    title: String,
+    icon: ImageVector,
+    accent: Color,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color? = null,
+    collapsedHint: @Composable RowScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(modifier.fillMaxWidth().animateContentSize().surface(glass, tint = tint).padding(12.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onToggle),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            if (!expanded) collapsedHint()
+            Icon(
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Minimize" else "Expand",
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(10.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content
+            )
+        }
+    }
+}
+
+/** Segmented control with a sliding pill. */
+@Composable
+private fun DownloadTabs(
+    glass: Boolean,
+    selected: Int,
+    tabs: List<Triple<ImageVector, String, Int>>,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val pos by animateFloatAsState(selected.toFloat(), spring(dampingRatio = 0.8f, stiffness = 400f), label = "tabPos")
+    Row(
+        modifier
+            .fillMaxWidth()
+            .surface(glass, OttPillShape)
+            .drawBehind {
+                val pad = 4.dp.toPx()
+                val w = (size.width - pad * 2) / tabs.size
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(pad + pos * w, pad),
+                    size = Size(w, size.height - pad * 2),
+                    cornerRadius = CornerRadius(size.height)
+                )
+            }
+            .padding(4.dp)
+    ) {
+        tabs.forEachIndexed { i, (icon, label, count) ->
+            val tint by animateColorAsState(if (i == selected) Color.Black else OttTextSecondary, tween(200), label = "tabTint")
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(OttPillShape)
+                    .clickable { onSelect(i) }
+                    .padding(vertical = 9.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("$label ($count)", color = tint, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
+    }
+}
+
+// ── Library cards (one layout, three data types) ───────────────────────────────
+
+@Composable
+private fun LibraryItemCard(
+    glass: Boolean,
+    cover: String?,
+    title: String,
+    meta: String,
+    badge: String,
+    accent: Color,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    children: @Composable ColumnScope.() -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val episodes = remember(expanded) {
-        if (expanded) vm.downloadManager.getDownloadedEpisodesForAnime(anime.animeId) else emptyList()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(OttCardShape)
-            .background(Color(0x10FFFFFF))
-            .border(1.dp, Color(0x1EFFFFFF), OttCardShape)
-            .padding(12.dp)
-    ) {
+    Column(modifier.fillMaxWidth().surface(glass).padding(12.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = anime.cover,
-                contentDescription = anime.title,
+                model = cover,
+                contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(width = 54.dp, height = 76.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Color(0x20FFFFFF))
             )
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = anime.title,
-                    color = OttTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "${anime.episodesCount} episodes • ${formatBytes(anime.totalSizeBytes)}",
-                    color = OttTextSecondary,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "Offline Video Storage",
-                    color = Color(0xFF10B981),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            Column(Modifier.weight(1f)) {
+                Text(title, color = OttTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(3.dp))
+                Text(meta, color = OttTextSecondary, fontSize = 12.sp)
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.clip(OttPillShape).background(accent.copy(alpha = 0.14f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(5.dp).clip(CircleShape).background(accent))
+                    Spacer(Modifier.width(5.dp))
+                    Text(badge, color = accent, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
-            IconButton(onClick = { expanded = !expanded }) {
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Expand",
-                    tint = Color.White
-                )
-            }
-            IconButton(onClick = {
-                onDeleteRequest(
-                    DeleteConfirmationTarget(
-                        title = "Delete ${anime.title}?",
-                        subtitle = "This will permanently delete all ${anime.episodesCount} downloaded episode(s) and free up storage on your device.",
-                        itemType = "Anime",
-                        sizeFormatted = formatBytes(anime.totalSizeBytes),
-                        onConfirm = { vm.deleteDownloadedAnime(anime.animeId) }
-                    )
-                )
-            }) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete",
-                    tint = Color(0xFFFF6B6B)
-                )
+            Icon(
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = "Expand",
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = DangerRed)
             }
         }
 
         AnimatedVisibility(visible = expanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(Color(0x18FFFFFF))
-                )
+            Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
                 Spacer(Modifier.height(8.dp))
-                episodes.forEach { ep ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0x0AFFFFFF))
-                            .border(0.8.dp, Color(0x18FFFFFF), RoundedCornerShape(10.dp))
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Episode ${ep.episode}${if (!ep.episodeTitle.isNullOrBlank()) ": ${ep.episodeTitle}" else ""}",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "${formatBytes(ep.sizeBytes)}${if (ep.providerName.isNotBlank()) " • ${ep.providerName}" else ""}",
-                                color = OttTextSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Button(
-                                onClick = { onPlayEpisode(ep.episode) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier.height(34.dp)
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Play", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    onDeleteRequest(
-                                        DeleteConfirmationTarget(
-                                            title = "Delete Episode ${ep.episode}?",
-                                            subtitle = "Remove '${ep.episodeTitle?.ifBlank { "Episode ${ep.episode}" } ?: "Episode ${ep.episode}"}' from offline storage?",
-                                            itemType = "Episode",
-                                            sizeFormatted = formatBytes(ep.sizeBytes),
-                                            onConfirm = { vm.deleteDownloadedAnimeEpisode(anime.animeId, ep.episode) }
-                                        )
-                                    )
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete",
-                                    tint = Color(0xFFFF6B6B),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                }
+                // Composed only while expanded, so children are read lazily; keyed by the parent's counts on the caller side.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), content = children)
             }
+        }
+    }
+}
+
+/** Episode / chapter row: tap anywhere to open, trash to delete. */
+@Composable
+private fun ChildRow(
+    title: String,
+    subtitle: String,
+    action: String,
+    actionIcon: ImageVector,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0x0DFFFFFF))
+            .clickable(onClick = onOpen)
+            .padding(start = 10.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            Text(subtitle, color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Row(
+            Modifier.padding(horizontal = 6.dp).clip(OttPillShape).background(Color.White).padding(horizontal = 11.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(actionIcon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(action, color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = DangerRed, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun DownloadedAnimeCard(
+    anime: DownloadedAnime,
+    vm: MainViewModel,
+    glass: Boolean,
+    onPlayEpisode: (episode: Int) -> Unit,
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LibraryItemCard(
+        glass = glass,
+        cover = anime.cover,
+        title = anime.title,
+        meta = "${anime.episodesCount} episodes • ${formatBytes(anime.totalSizeBytes)}",
+        badge = "Offline video",
+        accent = AnimeAccent,
+        modifier = modifier,
+        onDelete = {
+            onDeleteRequest(
+                DeleteConfirmationTarget(
+                    title = "Delete ${anime.title}?",
+                    subtitle = "This will permanently delete all ${anime.episodesCount} downloaded episode(s) and free up storage on your device.",
+                    itemType = "Anime",
+                    sizeFormatted = formatBytes(anime.totalSizeBytes),
+                    onConfirm = { vm.deleteDownloadedAnime(anime.animeId) }
+                )
+            )
+        }
+    ) {
+        // Keyed on the counts: deleting an episode refreshes the open list instead of leaving a stale row.
+        val episodes = remember(anime.animeId, anime.episodesCount, anime.totalSizeBytes) {
+            vm.downloadManager.getDownloadedEpisodesForAnime(anime.animeId)
+        }
+        episodes.forEach { ep ->
+            ChildRow(
+                title = "Episode ${ep.episode}${if (!ep.episodeTitle.isNullOrBlank()) ": ${ep.episodeTitle}" else ""}",
+                subtitle = "${formatBytes(ep.sizeBytes)}${if (ep.providerName.isNotBlank()) " • ${ep.providerName}" else ""}",
+                action = "Play",
+                actionIcon = Icons.Default.PlayArrow,
+                onOpen = { onPlayEpisode(ep.episode) },
+                onDelete = {
+                    onDeleteRequest(
+                        DeleteConfirmationTarget(
+                            title = "Delete Episode ${ep.episode}?",
+                            subtitle = "Remove '${ep.episodeTitle?.ifBlank { "Episode ${ep.episode}" } ?: "Episode ${ep.episode}"}' from offline storage?",
+                            itemType = "Episode",
+                            sizeFormatted = formatBytes(ep.sizeBytes),
+                            onConfirm = { vm.deleteDownloadedAnimeEpisode(anime.animeId, ep.episode) }
+                        )
+                    )
+                }
+            )
         }
     }
 }
@@ -819,145 +755,53 @@ private fun DownloadedAnimeCard(
 private fun DownloadedNovelCard(
     novel: DownloadedNovel,
     vm: MainViewModel,
+    glass: Boolean,
     onReadChapter: (chapterSlug: String) -> Unit,
-    onDeleteRequest: (DeleteConfirmationTarget) -> Unit
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val chapters = remember(expanded) {
-        if (expanded) vm.downloadManager.getDownloadedChaptersForNovel(novel.novelSlug) else emptyList()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(OttCardShape)
-            .background(Color(0x10FFFFFF))
-            .border(1.dp, Color(0x1EFFFFFF), OttCardShape)
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = novel.cover,
-                contentDescription = novel.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 54.dp, height = 76.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x20FFFFFF))
+    LibraryItemCard(
+        glass = glass,
+        cover = novel.cover,
+        title = novel.title,
+        meta = "${novel.chaptersCount} chapters • ${formatBytes(novel.totalSizeBytes)}",
+        badge = novel.source.replaceFirstChar { it.uppercase() },
+        accent = NovelAccent,
+        modifier = modifier,
+        onDelete = {
+            onDeleteRequest(
+                DeleteConfirmationTarget(
+                    title = "Delete ${novel.title}?",
+                    subtitle = "This will permanently remove all ${novel.chaptersCount} downloaded chapter(s) from offline storage.",
+                    itemType = "Novel",
+                    sizeFormatted = formatBytes(novel.totalSizeBytes),
+                    onConfirm = { vm.downloadManager.deleteDownloadedNovel(novel.novelSlug) }
+                )
             )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = novel.title,
-                    color = OttTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "${novel.chaptersCount} chapters • ${formatBytes(novel.totalSizeBytes)}",
-                    color = OttTextSecondary,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "Source: ${novel.source.replaceFirstChar { it.uppercase() }}",
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            IconButton(onClick = { expanded = !expanded }) {
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Expand",
-                    tint = Color.White
-                )
-            }
-            IconButton(onClick = {
-                onDeleteRequest(
-                    DeleteConfirmationTarget(
-                        title = "Delete ${novel.title}?",
-                        subtitle = "This will permanently remove all ${novel.chaptersCount} downloaded chapter(s) from offline storage.",
-                        itemType = "Novel",
-                        sizeFormatted = formatBytes(novel.totalSizeBytes),
-                        onConfirm = { vm.downloadManager.deleteDownloadedNovel(novel.novelSlug) }
-                    )
-                )
-            }) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete",
-                    tint = Color(0xFFFF6B6B)
-                )
-            }
         }
-
-        AnimatedVisibility(visible = expanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(Color(0x18FFFFFF))
-                )
-                Spacer(Modifier.height(8.dp))
-                chapters.forEach { ch ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onReadChapter(ch.chapterSlug) }
-                            .padding(vertical = 8.dp, horizontal = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = ch.title,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = formatBytes(ch.sizeBytes),
-                                color = OttTextSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                onDeleteRequest(
-                                    DeleteConfirmationTarget(
-                                        title = "Delete Chapter?",
-                                        subtitle = "Remove '${ch.title}' from offline reading?",
-                                        itemType = "Chapter",
-                                        sizeFormatted = formatBytes(ch.sizeBytes),
-                                        onConfirm = { vm.downloadManager.deleteDownloadedNovelChapter(novel.novelSlug, ch.chapterSlug) }
-                                    )
-                                )
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = "Delete",
-                                tint = Color(0xFFFF6B6B),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+    ) {
+        val chapters = remember(novel.novelSlug, novel.chaptersCount, novel.totalSizeBytes) {
+            vm.downloadManager.getDownloadedChaptersForNovel(novel.novelSlug)
+        }
+        chapters.forEach { ch ->
+            ChildRow(
+                title = ch.title,
+                subtitle = formatBytes(ch.sizeBytes),
+                action = "Read",
+                actionIcon = Icons.Default.MenuBook,
+                onOpen = { onReadChapter(ch.chapterSlug) },
+                onDelete = {
+                    onDeleteRequest(
+                        DeleteConfirmationTarget(
+                            title = "Delete Chapter?",
+                            subtitle = "Remove '${ch.title}' from offline reading?",
+                            itemType = "Chapter",
+                            sizeFormatted = formatBytes(ch.sizeBytes),
+                            onConfirm = { vm.downloadManager.deleteDownloadedNovelChapter(novel.novelSlug, ch.chapterSlug) }
+                        )
+                    )
                 }
-            }
+            )
         }
     }
 }
@@ -966,172 +810,83 @@ private fun DownloadedNovelCard(
 private fun DownloadedMangaCard(
     manga: DownloadedManga,
     vm: MainViewModel,
+    glass: Boolean,
     onReadChapter: (chapterId: String) -> Unit,
-    onDeleteRequest: (DeleteConfirmationTarget) -> Unit
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val chapters = remember(expanded) {
-        if (expanded) vm.downloadManager.getDownloadedChaptersForManga(manga.mangaId) else emptyList()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(OttCardShape)
-            .background(Color(0x10FFFFFF))
-            .border(1.dp, Color(0x1EFFFFFF), OttCardShape)
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = manga.poster,
-                contentDescription = manga.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 54.dp, height = 76.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x20FFFFFF))
+    LibraryItemCard(
+        glass = glass,
+        cover = manga.poster,
+        title = manga.title,
+        meta = "${manga.chaptersCount} chapters • ${formatBytes(manga.totalSizeBytes)}",
+        badge = "Offline manga",
+        accent = MangaAccent,
+        modifier = modifier,
+        onDelete = {
+            onDeleteRequest(
+                DeleteConfirmationTarget(
+                    title = "Delete ${manga.title}?",
+                    subtitle = "This will permanently remove all ${manga.chaptersCount} downloaded chapter(s) from offline storage.",
+                    itemType = "Manga",
+                    sizeFormatted = formatBytes(manga.totalSizeBytes),
+                    onConfirm = { vm.downloadManager.deleteDownloadedManga(manga.mangaId) }
+                )
             )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = manga.title,
-                    color = OttTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "${manga.chaptersCount} chapters • ${formatBytes(manga.totalSizeBytes)}",
-                    color = OttTextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-            IconButton(onClick = { expanded = !expanded }) {
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Expand",
-                    tint = Color.White
-                )
-            }
-            IconButton(onClick = {
-                onDeleteRequest(
-                    DeleteConfirmationTarget(
-                        title = "Delete ${manga.title}?",
-                        subtitle = "This will permanently remove all ${manga.chaptersCount} downloaded chapter(s) from offline storage.",
-                        itemType = "Manga",
-                        sizeFormatted = formatBytes(manga.totalSizeBytes),
-                        onConfirm = { vm.downloadManager.deleteDownloadedManga(manga.mangaId) }
-                    )
-                )
-            }) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete",
-                    tint = Color(0xFFFF6B6B)
-                )
-            }
         }
-
-        AnimatedVisibility(visible = expanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(Color(0x18FFFFFF))
-                )
-                Spacer(Modifier.height(8.dp))
-                chapters.forEach { ch ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onReadChapter(ch.chapterId) }
-                            .padding(vertical = 8.dp, horizontal = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Chapter ${ch.chapterNumber}${if (!ch.chapterTitle.isNullOrBlank()) ": ${ch.chapterTitle}" else ""}",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${ch.pageCount} pages • ${formatBytes(ch.sizeBytes)}",
-                                color = OttTextSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                onDeleteRequest(
-                                    DeleteConfirmationTarget(
-                                        title = "Delete Chapter ${ch.chapterNumber}?",
-                                        subtitle = "Remove '${ch.chapterTitle?.ifBlank { "Chapter ${ch.chapterNumber}" } ?: "Chapter ${ch.chapterNumber}"}' from offline reading?",
-                                        itemType = "Chapter",
-                                        sizeFormatted = formatBytes(ch.sizeBytes),
-                                        onConfirm = { vm.downloadManager.deleteDownloadedMangaChapter(manga.mangaId, ch.chapterId) }
-                                    )
-                                )
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = "Delete",
-                                tint = Color(0xFFFF6B6B),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+    ) {
+        val chapters = remember(manga.mangaId, manga.chaptersCount, manga.totalSizeBytes) {
+            vm.downloadManager.getDownloadedChaptersForManga(manga.mangaId)
+        }
+        chapters.forEach { ch ->
+            ChildRow(
+                title = "Chapter ${ch.chapterNumber}${if (!ch.chapterTitle.isNullOrBlank()) ": ${ch.chapterTitle}" else ""}",
+                subtitle = "${ch.pageCount} pages • ${formatBytes(ch.sizeBytes)}",
+                action = "Read",
+                actionIcon = Icons.Default.MenuBook,
+                onOpen = { onReadChapter(ch.chapterId) },
+                onDelete = {
+                    onDeleteRequest(
+                        DeleteConfirmationTarget(
+                            title = "Delete Chapter ${ch.chapterNumber}?",
+                            subtitle = "Remove '${ch.chapterTitle?.ifBlank { "Chapter ${ch.chapterNumber}" } ?: "Chapter ${ch.chapterNumber}"}' from offline reading?",
+                            itemType = "Chapter",
+                            sizeFormatted = formatBytes(ch.sizeBytes),
+                            onConfirm = { vm.downloadManager.deleteDownloadedMangaChapter(manga.mangaId, ch.chapterId) }
+                        )
+                    )
                 }
-            }
+            )
         }
     }
 }
 
+// ── Task rows ───────────────────────────────────────────────────────────────────
+
+private val TaskRowShape = RoundedCornerShape(14.dp)
+
 @Composable
-private fun ActiveDownloadTaskRow(
-    task: DownloadTaskInfo,
-    onCancel: () -> Unit
-) {
+private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) {
+    val progress by animateFloatAsState(task.progress.coerceIn(0f, 1f), tween(400), label = "dlProgress")
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0x14000000))
-            .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(10.dp))
+            .clip(TaskRowShape)
+            .background(Color(0x26000000))
+            .border(1.dp, Color(0x14FFFFFF), TaskRowShape)
             .padding(10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             if (!task.cover.isNullOrBlank()) {
                 AsyncImage(
                     model = task.cover,
                     contentDescription = task.itemTitle,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 36.dp, height = 48.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                    modifier = Modifier.size(width = 36.dp, height = 48.dp).clip(RoundedCornerShape(8.dp))
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = "${if (task.itemTitle.isNotBlank()) "${task.itemTitle} • " else ""}${task.title}",
                     color = Color.White,
@@ -1141,57 +896,28 @@ private fun ActiveDownloadTaskRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val statusText = if (task.type == DownloadType.ANIME) {
-                        val sizeInfo = if (task.totalBytes > 0L) " • ${formatBytes(task.downloadedBytes)} / ${formatBytes(task.totalBytes)}" else if (task.downloadedBytes > 0L) " • ${formatBytes(task.downloadedBytes)}" else ""
-                        if (task.speed.isNotBlank()) "${task.speed}$sizeInfo" else "Downloading...$sizeInfo"
-                    } else if (task.type == DownloadType.MANGA && task.totalCount > 0) {
-                        "${task.downloadedCount}/${task.totalCount} pages"
-                    } else if (task.status == DownloadStatus.QUEUED) {
-                        "Queued..."
-                    } else {
-                        "Downloading..."
-                    }
-                    Text(
-                        text = statusText,
-                        color = OttTextSecondary,
-                        fontSize = 11.sp
-                    )
-                    Text(
-                        text = "${task.percentage}%",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                val statusText = if (task.type == DownloadType.ANIME) {
+                    val sizeInfo = if (task.totalBytes > 0L) " • ${formatBytes(task.downloadedBytes)} / ${formatBytes(task.totalBytes)}" else if (task.downloadedBytes > 0L) " • ${formatBytes(task.downloadedBytes)}" else ""
+                    if (task.speed.isNotBlank()) "${task.speed}$sizeInfo" else "Downloading...$sizeInfo"
+                } else if (task.type == DownloadType.MANGA && task.totalCount > 0) {
+                    "${task.downloadedCount}/${task.totalCount} pages"
+                } else if (task.status == DownloadStatus.QUEUED) {
+                    "Queued..."
+                } else {
+                    "Downloading..."
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(statusText, color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    Text("${task.percentage}%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            IconButton(
-                onClick = onCancel,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Cancel",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
+            IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
             }
         }
-
-        Spacer(Modifier.height(6.dp))
-
-        LinearProgressIndicator(
-            progress = { task.progress.coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .clip(CircleShape),
-            color = Color.White,
-            trackColor = Color(0x22FFFFFF)
-        )
+        Spacer(Modifier.height(8.dp))
+        ProgressBar(progress, Modifier.fillMaxWidth())
     }
 }
 
@@ -1203,29 +929,24 @@ private fun FailedDownloadTaskRow(
     onDismiss: () -> Unit
 ) {
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0x22000000))
-            .border(1.dp, Color(0x35F44336), RoundedCornerShape(10.dp))
+            .clip(TaskRowShape)
+            .background(Color(0x26000000))
+            .border(1.dp, Color(0x35F44336), TaskRowShape)
             .padding(10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             if (!task.cover.isNullOrBlank()) {
                 AsyncImage(
                     model = task.cover,
                     contentDescription = task.itemTitle,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 36.dp, height = 48.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                    modifier = Modifier.size(width = 36.dp, height = 48.dp).clip(RoundedCornerShape(8.dp))
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = "${if (task.itemTitle.isNotBlank()) "${task.itemTitle} • " else ""}${task.title}",
                     color = Color.White,
@@ -1243,111 +964,59 @@ private fun FailedDownloadTaskRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Dismiss",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
             }
         }
-
         Spacer(Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             TextButton(
                 onClick = onChangeServer,
-                modifier = Modifier.height(32.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                modifier = Modifier.height(34.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
             ) {
-                Text(
-                    text = "Change Server",
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Text("Change Server", color = Color.White.copy(alpha = 0.75f), fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             Button(
                 onClick = onRetrySameServer,
                 colors = ButtonDefaults.buttonColors(containerColor = OttPrimary),
                 shape = OttPillShape,
-                modifier = Modifier.height(32.dp),
+                modifier = Modifier.height(34.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = Color.White
-                )
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "Retry",
-                    color = Color.White,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Retry", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun EmptyDownloadsView(type: String) {
-    Box(
+private fun EmptyDownloadsView(type: String, glass: Boolean) {
+    val (icon, accent, hint) = when (type) {
+        "anime" -> Triple(Icons.Default.Movie, AnimeAccent, "Episodes you save offline will appear here and play without an internet connection.")
+        "manga" -> Triple(Icons.Default.Book, MangaAccent, "Chapters you save offline will appear here and open without an internet connection.")
+        else -> Triple(Icons.Default.MenuBook, NovelAccent, "Chapters you save offline will appear here and read without an internet connection.")
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier
-            .fillMaxSize()
-            .padding(28.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .fillMaxWidth()
+            .surface(glass, RoundedCornerShape(24.dp))
+            .padding(horizontal = 24.dp, vertical = 36.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0x0CFFFFFF))
-                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(20.dp))
-                .padding(horizontal = 24.dp, vertical = 36.dp)
+        Box(
+            Modifier.size(68.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)).border(1.dp, accent.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(68.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x18FFFFFF))
-                    .border(1.dp, Color(0x35FFFFFF), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DownloadDone,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(34.dp)
-                )
-            }
-            Text(
-                text = "No Downloaded ${type.replaceFirstChar { it.uppercase() }}",
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Episodes or chapters you save offline will appear here for viewing anytime without an internet connection.",
-                color = OttTextSecondary,
-                fontSize = 12.5.sp,
-                lineHeight = 18.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(32.dp))
         }
+        Text("No Downloaded ${type.replaceFirstChar { it.uppercase() }}", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text(hint, color = OttTextSecondary, fontSize = 12.5.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
     }
 }
 
