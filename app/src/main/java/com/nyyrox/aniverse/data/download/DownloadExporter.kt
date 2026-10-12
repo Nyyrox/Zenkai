@@ -3,6 +3,10 @@ package com.nyyrox.aniverse.data.download
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -14,6 +18,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import java.nio.ByteBuffer
 import java.io.InputStream
 import java.io.OutputStream
 import javax.crypto.Cipher
@@ -86,30 +91,37 @@ object DownloadExporter {
      * Blocking: call from an IO coroutine. Returns a human label of the destination.
      * [tree] != null -> that folder; null -> Movies/Zenkai.
      */
-    fun export(context: Context, finalFile: File, displayName: String, tree: Uri?): String {
-        val ext = containerFor(finalFile)
-        val mime = if (ext == "mp4") "video/mp4" else "video/mp2t"
-        val safe = displayName.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "episode" }
-        val fileName = "$safe.$ext"
+    fun export(context: Context, originalFile: File, displayName: String, tree: Uri?): String {
+        // If the episode has separate audio tracks, merge them with the video into one MP4 first.
+        val muxed = prepareMuxed(context, originalFile)
+        try {
+            val finalFile = muxed ?: originalFile
+            val ext = if (muxed != null) "mp4" else containerFor(finalFile)
+            val mime = if (ext == "mp4") "video/mp4" else "video/mp2t"
+            val safe = displayName.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "episode" }
+            val fileName = "$safe.$ext"
 
-        return if (tree != null) {
-            val root = DocumentFile.fromTreeUri(context, tree)
-                ?: error("Can't open the chosen folder")
-            check(root.canWrite()) { "No write access to the chosen folder, pick it again" }
-            root.findFile(fileName)?.delete()
-            val doc = root.createFile(mime, fileName) ?: error("Can't create file in the chosen folder")
-            // Some providers append/rename extensions; force the exact name.
-            if (doc.name != fileName) doc.renameTo(fileName)
-            try {
-                context.contentResolver.openOutputStream(doc.uri, "w")!!.use { writeSingleFile(finalFile, it) }
-            } catch (e: Exception) {
-                doc.delete() // never leave a broken 0-byte file
-                throw e
+            return if (tree != null) {
+                val root = DocumentFile.fromTreeUri(context, tree)
+                    ?: error("Can't open the chosen folder")
+                check(root.canWrite()) { "No write access to the chosen folder, pick it again" }
+                root.findFile(fileName)?.delete()
+                val doc = root.createFile(mime, fileName) ?: error("Can't create file in the chosen folder")
+                // Some providers append/rename extensions; force the exact name.
+                if (doc.name != fileName) doc.renameTo(fileName)
+                try {
+                    context.contentResolver.openOutputStream(doc.uri, "w")!!.use { writeSingleFile(finalFile, it) }
+                } catch (e: Exception) {
+                    doc.delete() // never leave a broken 0-byte file
+                    throw e
+                }
+                "${root.name ?: "chosen folder"}/$fileName"
+            } else {
+                exportToMovies(context, finalFile, fileName, mime)
+                "Movies/Zenkai/$fileName"
             }
-            "${root.name ?: "chosen folder"}/$fileName"
-        } else {
-            exportToMovies(context, finalFile, fileName, mime)
-            "Movies/Zenkai/$fileName"
+        } finally {
+            muxed?.delete()
         }
     }
 
@@ -211,6 +223,125 @@ object DownloadExporter {
 
         initFile?.inputStream()?.use { it.copyTo(out, 256 * 1024) }
         for (s in segs) openSeg(s).use { it.copyTo(out, 256 * 1024) }
+    }
+
+    // ── Audio mux ───────────────────────────────────────────────────────────────
+    // The downloader saves video as video.ts/mp4 and each audio track as its own segments
+    // (listed in audio_playlist_N.m3u8). Copying video.ts alone gives a file with NO audio.
+    // This builds one MP4 (video + all audio tracks) in cacheDir, then export() copies it out.
+
+    private class AudioSrc(val file: File, val isDefault: Boolean)
+
+    /** Returns a muxed MP4 in cacheDir, or null when there is no separate audio / muxing failed. */
+    private fun prepareMuxed(context: Context, videoFile: File): File? {
+        val temps = mutableListOf<File>()
+        try {
+            if (videoFile.extension.equals("m3u8", true)) return null
+            val dir = videoFile.parentFile ?: return null
+            val master = File(dir, "playlist.m3u8")
+            if (!master.exists()) return null
+
+            val audios = mutableListOf<AudioSrc>()
+            for (raw in master.readLines()) {
+                val line = raw.trim()
+                if (!line.startsWith("#EXT-X-MEDIA:") || attr(line, "TYPE") != "AUDIO") continue
+                val uri = attr(line, "URI") ?: continue
+                val plFile = resolve(dir, uri) ?: continue
+                val trackIdx = Regex("audio_playlist_(\\d+)").find(plFile.name)?.groupValues?.get(1) ?: continue
+                val isDefault = attr(line, "DEFAULT").equals("YES", true)
+
+                val segFiles = plFile.readLines().map { it.trim() }
+                    .filter { it.isNotEmpty() && !it.startsWith("#") }
+                    .map { resolve(dir, it) ?: error("Missing audio segment: $it") }
+                if (segFiles.isEmpty()) continue
+
+                val initFile = File(dir, "segments/audio_${trackIdx}_init.mp4").takeIf { it.exists() }
+                val isFmp4 = segFiles.first().extension.equals("m4s", true)
+                if (isFmp4 && initFile == null) {
+                    Log.w(TAG, "Audio track $trackIdx is fMP4 but has no init segment (re-download needed)")
+                    continue
+                }
+                val joined = File(context.cacheDir, "export_audio_$trackIdx.${if (isFmp4) "mp4" else "aac"}")
+                temps += joined
+                joined.outputStream().buffered(256 * 1024).use { o ->
+                    initFile?.inputStream()?.use { it.copyTo(o) }
+                    segFiles.forEach { f -> f.inputStream().use { it.copyTo(o) } }
+                }
+                audios += AudioSrc(joined, isDefault)
+            }
+            if (audios.isEmpty()) return null
+
+            // default track first so players pick it
+            val ordered = audios.sortedByDescending { it.isDefault }
+            val out = File(context.cacheDir, "export_muxed.mp4")
+            if (out.exists()) out.delete()
+            try {
+                muxToMp4(videoFile, ordered.map { it.file }, out)
+            } catch (e: Exception) {
+                out.delete()
+                throw e
+            }
+            return out
+        } catch (e: Exception) {
+            Log.e(TAG, "Audio mux failed, exporting video only: ${e.message}", e)
+            toast(context, "Couldn't merge audio (${e.message}). Saving video only.")
+            return null
+        } finally {
+            temps.forEach { it.delete() }
+        }
+    }
+
+    private class MuxTrack(val ex: MediaExtractor, val dst: Int)
+
+    private fun muxToMp4(video: File, audioFiles: List<File>, dest: File) {
+        val muxer = MediaMuxer(dest.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        val extractors = mutableListOf<MediaExtractor>()
+        var started = false
+        try {
+            val tracks = mutableListOf<MuxTrack>()
+
+            fun addFirst(f: File, prefix: String) {
+                val ex = MediaExtractor()
+                extractors += ex
+                ex.setDataSource(f.absolutePath)
+                for (i in 0 until ex.trackCount) {
+                    val fmt = ex.getTrackFormat(i)
+                    if (fmt.getString(MediaFormat.KEY_MIME)?.startsWith(prefix) == true) {
+                        ex.selectTrack(i)
+                        tracks += MuxTrack(ex, muxer.addTrack(fmt))
+                        return
+                    }
+                }
+                error("No $prefix track in ${f.name}")
+            }
+
+            addFirst(video, "video/")
+            audioFiles.forEach { addFirst(it, "audio/") }
+
+            // Keep the relative offset between tracks, just shift everything so the earliest starts at 0.
+            val base = tracks.minOf { maxOf(it.ex.sampleTime, 0L) }
+
+            muxer.start(); started = true
+            val buf = ByteBuffer.allocate(4 * 1024 * 1024)
+            val info = MediaCodec.BufferInfo()
+            val live = tracks.toMutableList()
+            while (live.isNotEmpty()) {
+                val t = live.minByOrNull { val st = it.ex.sampleTime; if (st < 0) Long.MAX_VALUE else st }!!
+                buf.clear()
+                val size = t.ex.readSampleData(buf, 0)
+                if (size < 0) { live.remove(t); continue }
+                info.set(
+                    0, size, maxOf(t.ex.sampleTime - base, 0L),
+                    if (t.ex.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
+                )
+                muxer.writeSampleData(t.dst, buf, info)
+                t.ex.advance()
+            }
+        } finally {
+            try { if (started) muxer.stop() } catch (_: Exception) {}
+            try { muxer.release() } catch (_: Exception) {}
+            extractors.forEach { try { it.release() } catch (_: Exception) {} }
+        }
     }
 
     private fun openSeg(s: Seg): InputStream {

@@ -166,6 +166,21 @@ class AnimeStreamDownloader(
             }
         }
 
+        // Save each audio track's init segment (fMP4 audio can't be decoded without it, needed for export/mux)
+        audioTracks.forEach { track ->
+            val initUri = track.mediaInfo.initSegmentUri
+            if (!initUri.isNullOrBlank()) {
+                val initFile = File(segmentsDir, "audio_${track.index}_init.mp4")
+                if (!initFile.exists() || initFile.length() < 8L) {
+                    try {
+                        initFile.writeBytes(downloadBytes(initUri, headers))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to download audio init segment: ${e.message}")
+                    }
+                }
+            }
+        }
+
         // Count pre-existing segments and bytes to accurately calculate network download speed on resume
         val preExistingBytes = AtomicLong(0L)
         val preExistingCount = AtomicInteger(0)
