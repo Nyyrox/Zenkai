@@ -96,6 +96,55 @@ import com.nyyrox.aniverse.R
 import com.nyyrox.aniverse.ui.components.ZenkaiCommunityRow
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+import android.os.Build
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
+import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
+import com.styropyr0.prismal.sources.PrismalGlassLayer
+import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 
 @Composable
@@ -197,473 +246,1184 @@ fun HomeScreen(
             }
         }
 
+        // Home-wide glass state (Profile → Liquid Glassmorphism). Ambient art takes its colour from the active hero card.
+        val glassOn = rememberHomeGlass()
+        val glassLayer = rememberPrismalGlassLayer()
+        val backdrop = if (glassOn) glassLayer else null
+        var heroAmbient by remember { mutableStateOf<String?>(null) }
+
+        PlayerAmbientArt(layer = backdrop, model = heroAmbient, modifier = Modifier.fillMaxSize())
+
         LazyColumn(
             state = lazyListState,
-            contentPadding = PaddingValues(bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(bottom = 110.dp),
+            verticalArrangement = Arrangement.spacedBy(30.dp)
         ) {
-        // Inline warning banner when using TMDB fallback data
-        if (vm.homeError != null && vm.trending.isNotEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x18FFD54F))
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = vm.homeError ?: "",
-                        fontSize = 11.5.sp,
-                        color = Color(0xFFFFE082),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
-        // Featured 3D Stacked Hero Banner (10-15 different shows)
-        item(key = "home_hero_banner") {
-            val heroShows = remember(vm.trending, vm.popular) {
-                (vm.trending + vm.popular).distinctBy { it.id }.take(15)
-            }
-            if (heroShows.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .heroScrollParallax(lazyListState)
-                        .staggeredEntrance(index = 0)
-                ) {
-                    OttHeroBanner(
-                        featuredList = heroShows,
-                        tmdbArtworks = vm.tmdbArtworks,
-                        onLoadArtwork = { vm.loadTmdbArtwork(it) },
-                        isInWatchlist = { vm.isInWatchlist(it) },
-                        onToggleWatchlist = { vm.toggleWatchlist(it) },
-                        onAnimeClick = onAnimeClick,
-                        onPlayClick = { onPlayClick(it, 1) },
-                        isVerticalScrollInProgress = lazyListState.isScrollInProgress
-                    )
-                }
-            }
-        }
-
-        // Continue Watching & Reading Row (Unified Anime, Manga & Novel History)
-        val hasAnyHistory = vm.history.isNotEmpty() || vm.mangaHistory.isNotEmpty() || vm.novelHistoryList.isNotEmpty()
-        if (hasAnyHistory) {
-            item(key = "home_continue_watching") {
-                Box(modifier = Modifier.staggeredEntrance(index = 1)) {
-                    OttUnifiedContinueWatchingRow(
-                        animeHistory = vm.history,
-                        mangaHistory = vm.mangaHistory,
-                        novelHistory = vm.novelHistoryList,
-                        tmdbEpisodeStills = vm.tmdbEpisodeStills,
-                        onLoadEpisodeStill = { id, ep -> vm.loadHistoryEpisodeStill(id, ep) },
-                        onPlayAnime = onPlayClick,
-                        onReadManga = onMangaReadClick,
-                        onReadNovel = onNovelReadClick,
-                        onRemoveAnime = { vm.removeHistory(it) },
-                        onRemoveManga = { vm.removeMangaHistory(it) },
-                        onRemoveNovel = { vm.removeNovelHistory(it) }
-                    )
-                }
-            }
-        }
-
-        // Featured Trending & Top Watched YouTube-style Episode Feed
-        if (trendingTopEpisodes.isNotEmpty()) {
-            item(key = "home_trending_episodes_header") {
-                Column(modifier = Modifier.staggeredEntrance(index = 2)) {
-                    OttSectionHeader(
-                        title = "Trending Top Watched",
-                        subtitle = "Popular episodes streaming right now"
-                    )
-                }
-            }
-            itemsIndexed(trendingTopEpisodes, key = { idx, a -> "trending_ep_${a.id}_$idx" }) { idx, anime ->
-                val epStill = vm.tmdbEpisodeStills["${anime.id}_1"]
-                val artwork = vm.tmdbArtworks[anime.id]
-                YouTubeStyleEpisodeCard(
-                    anime = anime,
-                    episodeNumber = 1,
-                    badgeText = if (idx == 0) "MUST WATCH" else "TRENDING NOW",
-                    episodeStill = epStill,
-                    logoUrl = artwork?.logoUrl,
-                    tmdbTitle = artwork?.title,
-                    onLoadStill = { vm.loadTmdbEpisodeStill(anime, 1) },
-                    onLoadArtwork = { vm.loadTmdbArtwork(anime) },
-                    onAnimeClick = onAnimeClick,
-                    onPlayClick = onPlayClick,
-                    modifier = Modifier.staggeredEntrance(index = 2 + idx)
-                )
-            }
-        }
-
-        // Netflix-Style Top 10 in Anime Row
-        if (vm.trending.isNotEmpty()) {
-            item(key = "home_top_10") {
-                Column(modifier = Modifier.staggeredEntrance(index = 2)) {
-                    OttSectionHeader(
-                        title = "Top 10 Today",
-                        subtitle = "Most streamed titles right now"
-                    )
-                    OttTop10Row(
-                        list = vm.trending,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // Popular Series This Season
-        if (vm.popular.isNotEmpty()) {
-            item(key = "home_popular_series") {
-                Column(modifier = Modifier.staggeredEntrance(index = 3)) {
-                    OttSectionHeader(
-                        title = "Popular Series",
-                        subtitle = "Fan favorites and trending hits"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.popular,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // ── Must Watch Spotlight 1 (In Between Popular Series and Critically Acclaimed) ──
-        val spotlight1 = vm.popular.getOrNull(1) ?: vm.trending.getOrNull(2)
-        if (spotlight1 != null) {
-            item(key = "spotlight_popular_${spotlight1.id}") {
-                val artwork = vm.tmdbArtworks[spotlight1.id]
-                val epStill = vm.tmdbEpisodeStills["${spotlight1.id}_1"]
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 4)) {
-                    OttSectionHeader(
-                        title = "Must Watch Spotlight",
-                        subtitle = "Trending worldwide on Zenkai"
-                    )
-                    YouTubeStyleEpisodeCard(
-                        anime = spotlight1,
-                        episodeNumber = 1,
-                        badgeText = "MUST WATCH",
-                        episodeStill = epStill,
-                        logoUrl = artwork?.logoUrl,
-                        tmdbTitle = artwork?.title,
-                        onLoadStill = { vm.loadTmdbEpisodeStill(spotlight1, 1) },
-                        onLoadArtwork = { vm.loadTmdbArtwork(spotlight1) },
-                        onAnimeClick = onAnimeClick,
-                        onPlayClick = onPlayClick
-                    )
-                }
-            }
-        }
-
-        // Top Rated Masterpieces
-        if (vm.topRated.isNotEmpty()) {
-            item(key = "home_top_rated") {
-                Column(modifier = Modifier.staggeredEntrance(index = 4)) {
-                    OttSectionHeader(
-                        title = "Critically Acclaimed",
-                        subtitle = "Highest rated by global community"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.topRated,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // Action & Thrills
-        if (vm.actionAnime.isNotEmpty()) {
-            item(key = "home_action_anime") {
-                Column(modifier = Modifier.staggeredEntrance(index = 5)) {
-                    OttSectionHeader(
-                        title = "Action & High Adrenaline",
-                        subtitle = "Epic fights and supernatural showdowns"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.actionAnime,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // ── Action Spotlight 2 (In Between Action & Fantasy) ──
-        val actionSpotlight = vm.actionAnime.firstOrNull()
-        if (actionSpotlight != null && actionSpotlight.id != spotlight1?.id) {
-            item(key = "spotlight_action_${actionSpotlight.id}") {
-                val artwork = vm.tmdbArtworks[actionSpotlight.id]
-                val epStill = vm.tmdbEpisodeStills["${actionSpotlight.id}_1"]
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 6)) {
-                    OttSectionHeader(
-                        title = "Action Spotlight",
-                        subtitle = "High octane showdowns and epic fights"
-                    )
-                    YouTubeStyleEpisodeCard(
-                        anime = actionSpotlight,
-                        episodeNumber = 1,
-                        badgeText = "MUST WATCH • ACTION",
-                        episodeStill = epStill,
-                        logoUrl = artwork?.logoUrl,
-                        tmdbTitle = artwork?.title,
-                        onLoadStill = { vm.loadTmdbEpisodeStill(actionSpotlight, 1) },
-                        onLoadArtwork = { vm.loadTmdbArtwork(actionSpotlight) },
-                        onAnimeClick = onAnimeClick,
-                        onPlayClick = onPlayClick
-                    )
-                }
-            }
-        }
-
-        // Fantasy & Supernatural
-        if (vm.fantasyAnime.isNotEmpty()) {
-            item(key = "home_fantasy_anime") {
-                Column(modifier = Modifier.staggeredEntrance(index = 6)) {
-                    OttSectionHeader(
-                        title = "Fantasy & Magic",
-                        subtitle = "Immersive worlds and magical adventures"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.fantasyAnime,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // New Releases
-        if (vm.newReleases.isNotEmpty()) {
-            item(key = "home_new_releases") {
-                Column(modifier = Modifier.staggeredEntrance(index = 7)) {
-                    OttSectionHeader(
-                        title = "New Releases",
-                        subtitle = "Freshly airing broadcast episodes"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.newReleases,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // Upcoming Anime
-        if (vm.upcomingAnime.isNotEmpty()) {
-            item(key = "home_upcoming_anime") {
-                Column(modifier = Modifier.staggeredEntrance(index = 8)) {
-                    OttSectionHeader(
-                        title = "Upcoming Shows",
-                        subtitle = "Most anticipated upcoming titles"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.upcomingAnime,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // Sci-Fi & Cyberpunk
-        if (vm.scifiAnime.isNotEmpty()) {
-            item(key = "home_scifi_anime") {
-                Column(modifier = Modifier.staggeredEntrance(index = 9)) {
-                    OttSectionHeader(
-                        title = "Sci-Fi & Cyberpunk",
-                        subtitle = "Futuristic realms and tech thrillers"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.scifiAnime,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // Romance & Drama
-        if (vm.romanceAnime.isNotEmpty()) {
-            item(key = "home_romance_anime") {
-                Column(modifier = Modifier.staggeredEntrance(index = 10)) {
-                    OttSectionHeader(
-                        title = "Romance & Slice of Life",
-                        subtitle = "Heartwarming stories and emotional journeys"
-                    )
-                    OttHorizontalMediaRow(
-                        list = vm.romanceAnime,
-                        onAnimeClick = onAnimeClick
-                    )
-                }
-            }
-        }
-
-        // ── Popular Manga Shelf ──
-        val mangaList = vm.mangaHome.trending.ifEmpty { vm.mangaHome.latest }
-        if (mangaList.isNotEmpty()) {
-            item(key = "home_popular_manga") {
-                Column(modifier = Modifier.staggeredEntrance(index = 10)) {
-                    OttSectionHeader(
-                        title = "Popular Manga",
-                        subtitle = "Trending manga, manhwa & comics"
-                    )
-                    HomeMangaRow(
-                        list = mangaList,
-                        onMangaClick = onMangaClick
-                    )
-                }
-            }
-        }
-
-        // ── Top Light Novels Shelf ──
-        val novelList = vm.novelPopular.ifEmpty { vm.novelLightNovels }
-        if (novelList.isNotEmpty()) {
-            item(key = "home_popular_novels") {
-                Column(modifier = Modifier.staggeredEntrance(index = 11)) {
-                    OttSectionHeader(
-                        title = "Top Light Novels",
-                        subtitle = "Most read novels & web serials"
-                    )
-                    HomeNovelRow(
-                        list = novelList,
-                        onNovelClick = onNovelClick
-                    )
-                }
-            }
-        }
-
-        // ── Featured Spotlight 3 (In Between Novels and Explore Feed) ──
-        val featureSpotlight = vm.scifiAnime.firstOrNull() ?: vm.fantasyAnime.firstOrNull()
-        if (featureSpotlight != null && featureSpotlight.id != spotlight1?.id && featureSpotlight.id != actionSpotlight?.id) {
-            item(key = "spotlight_feature_${featureSpotlight.id}") {
-                val artwork = vm.tmdbArtworks[featureSpotlight.id]
-                val epStill = vm.tmdbEpisodeStills["${featureSpotlight.id}_1"]
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 11)) {
-                    OttSectionHeader(
-                        title = "Featured Spotlight",
-                        subtitle = "Handpicked masterpiece with full episodes"
-                    )
-                    YouTubeStyleEpisodeCard(
-                        anime = featureSpotlight,
-                        episodeNumber = 1,
-                        badgeText = "MUST WATCH",
-                        episodeStill = epStill,
-                        logoUrl = artwork?.logoUrl,
-                        tmdbTitle = artwork?.title,
-                        onLoadStill = { vm.loadTmdbEpisodeStill(featureSpotlight, 1) },
-                        onLoadArtwork = { vm.loadTmdbArtwork(featureSpotlight) },
-                        onAnimeClick = onAnimeClick,
-                        onPlayClick = onPlayClick
-                    )
-                }
-            }
-        }
-
-        // ── 7. Dynamic YouTube-Style Feed: Top Episodes + Random Genre Shelves with Media Cards ───
-        if (exploreList.isNotEmpty()) {
-            item(key = "home_explore_header") {
-                Column(modifier = Modifier.padding(top = 10.dp).staggeredEntrance(index = 12)) {
-                    OttSectionHeader(
-                        title = "Top Episodes & Discover",
-                        subtitle = "Stream top episodes and explore genres"
-                    )
-                }
-            }
-
-            itemsIndexed(
-                items = exploreList,
-                key = { idx, anime -> "explore_yt_feed_${anime.id}_$idx" }
-            ) { index, anime ->
-                val epNum = remember(anime.id, anime.episodes, anime.isMovie) {
-                    if (anime.isMovie || anime.episodes == 1) 1
-                    else {
-                        val maxEp = (anime.episodes ?: 12).coerceAtLeast(1)
-                        ((anime.id % maxEp) + 1).coerceIn(1, maxEp)
-                    }
-                }
-                val badge = remember(index) {
-                    when (index % 5) {
-                        0 -> "MUST WATCH"
-                        1 -> "TOP EPISODE"
-                        2 -> "TOP WATCHED"
-                        3 -> "TRENDING NOW"
-                        else -> "POPULAR PICK"
-                    }
-                }
-                val epStill = vm.tmdbEpisodeStills["${anime.id}_$epNum"]
-                val artwork = vm.tmdbArtworks[anime.id]
-
-                // YouTube-style episode card
-                YouTubeStyleEpisodeCard(
-                    anime = anime,
-                    episodeNumber = epNum,
-                    badgeText = badge,
-                    episodeStill = epStill,
-                    logoUrl = artwork?.logoUrl,
-                    tmdbTitle = artwork?.title,
-                    onLoadStill = { vm.loadTmdbEpisodeStill(anime, epNum) },
-                    onLoadArtwork = { vm.loadTmdbArtwork(anime) },
-                    onAnimeClick = onAnimeClick,
-                    onPlayClick = onPlayClick
-                )
-
-                // Interleave random genre shelf with media cards every 2 episode cards
-                if (genreShelves.isNotEmpty() && (index % 2 == 1)) {
-                    val shelfIdx = (index / 2) % genreShelves.size
-                    val (genreTitle, genreList) = genreShelves[shelfIdx]
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                    ) {
-                        OttSectionHeader(
-                            title = genreTitle,
-                            subtitle = "Top recommended titles in this genre"
-                        )
-                        OttHorizontalMediaRow(
-                            list = genreList,
-                            onAnimeClick = onAnimeClick
-                        )
-                        Spacer(Modifier.height(10.dp))
-                    }
-                }
-            }
-
-            if (vm.homeExploreLoading) {
-                item(key = "home_explore_spinner") {
+            // Inline warning banner when using TMDB fallback data
+            if (vm.homeError != null && vm.trending.isNotEmpty()) {
+                item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(28.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(horizontal = HomeMargin)
+                            .frosted(glassOn, 14.dp, tint = Color(0xFF3A2F00))
+                            .padding(horizontal = 14.dp, vertical = 9.dp)
                     ) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            color = OttPrimary,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(28.dp)
+                        Text(
+                            text = vm.homeError ?: "",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFFFFE082),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                }
+            }
+
+            // Spotlight hero (up to 15 shows)
+            item(key = "home_hero_banner") {
+                val heroShows = remember(vm.trending, vm.popular) {
+                    (vm.trending + vm.popular).distinctBy { it.id }.take(15)
+                }
+                if (heroShows.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .heroScrollParallax(lazyListState)
+                            .staggeredEntrance(index = 0)
+                    ) {
+                        HomeSpotlightHero(
+                            shows = heroShows,
+                            glassOn = glassOn,
+                            backdrop = backdrop,
+                            logoUrlOf = { vm.tmdbArtworks[it]?.logoUrl },
+                            onLoadArtwork = { vm.loadTmdbArtwork(it) },
+                            isInWatchlist = { vm.isInWatchlist(it) },
+                            onToggleWatchlist = { vm.toggleWatchlist(it) },
+                            onAnimeClick = onAnimeClick,
+                            onPlayClick = { onPlayClick(it, 1) },
+                            isVerticalScrollInProgress = lazyListState.isScrollInProgress,
+                            onActiveChanged = { heroAmbient = it.banner?.takeIf { b -> b.isNotBlank() } ?: it.cover }
+                        )
+                    }
+                }
+            }
+
+            // Continue Watching & Reading (unified anime / manga / novel history)
+            val hasAnyHistory = vm.history.isNotEmpty() || vm.mangaHistory.isNotEmpty() || vm.novelHistoryList.isNotEmpty()
+            if (hasAnyHistory) {
+                item(key = "home_continue_watching") {
+                    Box(modifier = Modifier.staggeredEntrance(index = 1)) {
+                        OttUnifiedContinueWatchingRow(
+                            animeHistory = vm.history,
+                            mangaHistory = vm.mangaHistory,
+                            novelHistory = vm.novelHistoryList,
+                            tmdbEpisodeStills = vm.tmdbEpisodeStills,
+                            onLoadEpisodeStill = { id, ep -> vm.loadHistoryEpisodeStill(id, ep) },
+                            onPlayAnime = onPlayClick,
+                            onReadManga = onMangaReadClick,
+                            onReadNovel = onNovelReadClick,
+                            onRemoveAnime = { vm.removeHistory(it) },
+                            onRemoveManga = { vm.removeMangaHistory(it) },
+                            onRemoveNovel = { vm.removeNovelHistory(it) }
+                        )
+                    }
+                }
+            }
+
+            // Trending episodes
+            if (trendingTopEpisodes.isNotEmpty()) {
+                item(key = "home_trending_episodes") {
+                    HomeSection(
+                        title = "Trending Top Watched",
+                        subtitle = "Popular episodes streaming right now",
+                        modifier = Modifier.staggeredEntrance(index = 2)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                            trendingTopEpisodes.forEachIndexed { idx, anime ->
+                                key(anime.id) {
+                                    val epStill = vm.tmdbEpisodeStills["${anime.id}_1"]
+                                    val artwork = vm.tmdbArtworks[anime.id]
+                                    YouTubeStyleEpisodeCard(
+                                        anime = anime,
+                                        episodeNumber = 1,
+                                        badgeText = if (idx == 0) "MUST WATCH" else "TRENDING NOW",
+                                        episodeStill = epStill,
+                                        logoUrl = artwork?.logoUrl,
+                                        tmdbTitle = artwork?.title,
+                                        onLoadStill = { vm.loadTmdbEpisodeStill(anime, 1) },
+                                        onLoadArtwork = { vm.loadTmdbArtwork(anime) },
+                                        onAnimeClick = onAnimeClick,
+                                        onPlayClick = onPlayClick,
+                                        backdrop = backdrop
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Top 10
+            if (vm.trending.isNotEmpty()) {
+                item(key = "home_top_10") {
+                    HomeSection(
+                        title = "Top 10 Today",
+                        subtitle = "Most streamed titles right now",
+                        modifier = Modifier.staggeredEntrance(index = 2)
+                    ) {
+                        HomeTop10Row(list = vm.trending, glassOn = glassOn, onAnimeClick = onAnimeClick)
+                    }
+                }
+            }
+
+            // Popular
+            if (vm.popular.isNotEmpty()) {
+                item(key = "home_popular_series") {
+                    HomeSection("Popular Series", "Fan favorites and trending hits", Modifier.staggeredEntrance(index = 3)) {
+                        HomePosterRow(vm.popular, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Must-watch spotlight (between Popular and Critically Acclaimed)
+            val spotlight1 = vm.popular.getOrNull(1) ?: vm.trending.getOrNull(2)
+            if (spotlight1 != null) {
+                item(key = "spotlight_popular_${spotlight1.id}") {
+                    val artwork = vm.tmdbArtworks[spotlight1.id]
+                    val epStill = vm.tmdbEpisodeStills["${spotlight1.id}_1"]
+                    HomeSection("Must Watch Spotlight", "Trending worldwide on Zenkai", Modifier.staggeredEntrance(index = 4)) {
+                        YouTubeStyleEpisodeCard(
+                            anime = spotlight1,
+                            episodeNumber = 1,
+                            badgeText = "MUST WATCH",
+                            episodeStill = epStill,
+                            logoUrl = artwork?.logoUrl,
+                            tmdbTitle = artwork?.title,
+                            onLoadStill = { vm.loadTmdbEpisodeStill(spotlight1, 1) },
+                            onLoadArtwork = { vm.loadTmdbArtwork(spotlight1) },
+                            onAnimeClick = onAnimeClick,
+                            onPlayClick = onPlayClick,
+                            backdrop = backdrop
+                        )
+                    }
+                }
+            }
+
+            // Top rated
+            if (vm.topRated.isNotEmpty()) {
+                item(key = "home_top_rated") {
+                    HomeSection("Critically Acclaimed", "Highest rated by global community", Modifier.staggeredEntrance(index = 4)) {
+                        HomePosterRow(vm.topRated, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Action
+            if (vm.actionAnime.isNotEmpty()) {
+                item(key = "home_action_anime") {
+                    HomeSection("Action & High Adrenaline", "Epic fights and supernatural showdowns", Modifier.staggeredEntrance(index = 5)) {
+                        HomePosterRow(vm.actionAnime, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Action spotlight
+            val actionSpotlight = vm.actionAnime.firstOrNull()
+            if (actionSpotlight != null && actionSpotlight.id != spotlight1?.id) {
+                item(key = "spotlight_action_${actionSpotlight.id}") {
+                    val artwork = vm.tmdbArtworks[actionSpotlight.id]
+                    val epStill = vm.tmdbEpisodeStills["${actionSpotlight.id}_1"]
+                    HomeSection("Action Spotlight", "High octane showdowns and epic fights", Modifier.staggeredEntrance(index = 6)) {
+                        YouTubeStyleEpisodeCard(
+                            anime = actionSpotlight,
+                            episodeNumber = 1,
+                            badgeText = "MUST WATCH • ACTION",
+                            episodeStill = epStill,
+                            logoUrl = artwork?.logoUrl,
+                            tmdbTitle = artwork?.title,
+                            onLoadStill = { vm.loadTmdbEpisodeStill(actionSpotlight, 1) },
+                            onLoadArtwork = { vm.loadTmdbArtwork(actionSpotlight) },
+                            onAnimeClick = onAnimeClick,
+                            onPlayClick = onPlayClick,
+                            backdrop = backdrop
+                        )
+                    }
+                }
+            }
+
+            // Fantasy
+            if (vm.fantasyAnime.isNotEmpty()) {
+                item(key = "home_fantasy_anime") {
+                    HomeSection("Fantasy & Magic", "Immersive worlds and magical adventures", Modifier.staggeredEntrance(index = 6)) {
+                        HomePosterRow(vm.fantasyAnime, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // New releases
+            if (vm.newReleases.isNotEmpty()) {
+                item(key = "home_new_releases") {
+                    HomeSection("New Releases", "Freshly airing broadcast episodes", Modifier.staggeredEntrance(index = 7)) {
+                        HomePosterRow(vm.newReleases, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Upcoming
+            if (vm.upcomingAnime.isNotEmpty()) {
+                item(key = "home_upcoming_anime") {
+                    HomeSection("Upcoming Shows", "Most anticipated upcoming titles", Modifier.staggeredEntrance(index = 8)) {
+                        HomePosterRow(vm.upcomingAnime, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Sci-Fi
+            if (vm.scifiAnime.isNotEmpty()) {
+                item(key = "home_scifi_anime") {
+                    HomeSection("Sci-Fi & Cyberpunk", "Futuristic realms and tech thrillers", Modifier.staggeredEntrance(index = 9)) {
+                        HomePosterRow(vm.scifiAnime, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Romance
+            if (vm.romanceAnime.isNotEmpty()) {
+                item(key = "home_romance_anime") {
+                    HomeSection("Romance & Slice of Life", "Heartwarming stories and emotional journeys", Modifier.staggeredEntrance(index = 10)) {
+                        HomePosterRow(vm.romanceAnime, glassOn, onAnimeClick)
+                    }
+                }
+            }
+
+            // Manga
+            val mangaList = vm.mangaHome.trending.ifEmpty { vm.mangaHome.latest }
+            if (mangaList.isNotEmpty()) {
+                item(key = "home_popular_manga") {
+                    HomeSection("Popular Manga", "Trending manga, manhwa & comics", Modifier.staggeredEntrance(index = 10)) {
+                        HomeMangaRow(list = mangaList, glassOn = glassOn, onMangaClick = onMangaClick)
+                    }
+                }
+            }
+
+            // Light novels
+            val novelList = vm.novelPopular.ifEmpty { vm.novelLightNovels }
+            if (novelList.isNotEmpty()) {
+                item(key = "home_popular_novels") {
+                    HomeSection("Top Light Novels", "Most read novels & web serials", Modifier.staggeredEntrance(index = 11)) {
+                        HomeNovelRow(list = novelList, glassOn = glassOn, onNovelClick = onNovelClick)
+                    }
+                }
+            }
+
+            // Featured spotlight (between novels and the explore feed)
+            val featureSpotlight = vm.scifiAnime.firstOrNull() ?: vm.fantasyAnime.firstOrNull()
+            if (featureSpotlight != null && featureSpotlight.id != spotlight1?.id && featureSpotlight.id != actionSpotlight?.id) {
+                item(key = "spotlight_feature_${featureSpotlight.id}") {
+                    val artwork = vm.tmdbArtworks[featureSpotlight.id]
+                    val epStill = vm.tmdbEpisodeStills["${featureSpotlight.id}_1"]
+                    HomeSection("Featured Spotlight", "Handpicked masterpiece with full episodes", Modifier.staggeredEntrance(index = 11)) {
+                        YouTubeStyleEpisodeCard(
+                            anime = featureSpotlight,
+                            episodeNumber = 1,
+                            badgeText = "MUST WATCH",
+                            episodeStill = epStill,
+                            logoUrl = artwork?.logoUrl,
+                            tmdbTitle = artwork?.title,
+                            onLoadStill = { vm.loadTmdbEpisodeStill(featureSpotlight, 1) },
+                            onLoadArtwork = { vm.loadTmdbArtwork(featureSpotlight) },
+                            onAnimeClick = onAnimeClick,
+                            onPlayClick = onPlayClick,
+                            backdrop = backdrop
+                        )
+                    }
+                }
+            }
+
+            // Explore feed: episode cards with a genre shelf woven in every second card
+            if (exploreList.isNotEmpty()) {
+                itemsIndexed(
+                    items = exploreList,
+                    key = { idx, anime -> "explore_yt_feed_${anime.id}_$idx" }
+                ) { index, anime ->
+                    val epNum = remember(anime.id, anime.episodes, anime.isMovie) {
+                        if (anime.isMovie || anime.episodes == 1) 1
+                        else {
+                            val maxEp = (anime.episodes ?: 12).coerceAtLeast(1)
+                            ((anime.id % maxEp) + 1).coerceIn(1, maxEp)
+                        }
+                    }
+                    val badge = remember(index) {
+                        when (index % 5) {
+                            0 -> "MUST WATCH"
+                            1 -> "TOP EPISODE"
+                            2 -> "TOP WATCHED"
+                            3 -> "TRENDING NOW"
+                            else -> "POPULAR PICK"
+                        }
+                    }
+                    val epStill = vm.tmdbEpisodeStills["${anime.id}_$epNum"]
+                    val artwork = vm.tmdbArtworks[anime.id]
+
+                    Column(verticalArrangement = Arrangement.spacedBy(30.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            if (index == 0) {
+                                HomeSectionHeader(
+                                    title = "Top Episodes & Discover",
+                                    subtitle = "Stream top episodes and explore genres"
+                                )
+                            }
+                            YouTubeStyleEpisodeCard(
+                                anime = anime,
+                                episodeNumber = epNum,
+                                badgeText = badge,
+                                episodeStill = epStill,
+                                logoUrl = artwork?.logoUrl,
+                                tmdbTitle = artwork?.title,
+                                onLoadStill = { vm.loadTmdbEpisodeStill(anime, epNum) },
+                                onLoadArtwork = { vm.loadTmdbArtwork(anime) },
+                                onAnimeClick = onAnimeClick,
+                                onPlayClick = onPlayClick,
+                                backdrop = backdrop
+                            )
+                        }
+
+                        if (genreShelves.isNotEmpty() && (index % 2 == 1)) {
+                            val shelfIdx = (index / 2) % genreShelves.size
+                            val (genreTitle, genreList) = genreShelves[shelfIdx]
+                            HomeSection(genreTitle, "Top recommended titles in this genre") {
+                                HomePosterRow(genreList, glassOn, onAnimeClick)
+                            }
+                        }
+                    }
+                }
+
+                if (vm.homeExploreLoading) {
+                    item(key = "home_explore_spinner") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(28.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                color = OttPrimary,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+//  HOME DESIGN SYSTEM
+//  One margin, one rhythm, one surface language. Glass on  = rim-lit frosted surfaces + Prismal
+//  shader buttons over a drifting ambient backdrop. Glass off = flat solid surfaces, same layout.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+private val HomeMargin = 20.dp
+
+/** Same switch as the details/player pages (Profile → Liquid Glassmorphism), gated to Android 13+. */
+@Composable
+private fun rememberHomeGlass(): Boolean =
+    LocalThemeSettings.current.isGlassmorphismEnabled && Build.VERSION.SDK_INT >= 33
+
+/**
+ * Playful press: springy squish, a radial light that blooms from the exact touch point, haptic tick on tap,
+ * optional long-press with a stronger haptic. Clips to [shape] so the glow follows rounded corners.
+ * Place it BEFORE background/border modifiers so everything scales together.
+ */
+private fun Modifier.liquidPress(
+    shape: Shape,
+    pressedScale: Float = 0.96f,
+    onLongTap: (() -> Unit)? = null,
+    onTap: () -> Unit
+): Modifier = composed {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var pressed by remember { mutableStateOf(false) }
+    var glowCenter by remember { mutableStateOf(Offset.Unspecified) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) pressedScale else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "lpScale"
+    )
+    val glow by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(if (pressed) 90 else 420),
+        label = "lpGlow"
+    )
+    val currentTap by rememberUpdatedState(onTap)
+    val currentLong by rememberUpdatedState(onLongTap)
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clip(shape)
+        .drawWithContent {
+            drawContent()
+            if (glow > 0.01f && glowCenter.isSpecified) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.28f * glow), Color.Transparent),
+                        center = glowCenter,
+                        radius = size.maxDimension * 0.7f
+                    )
+                )
+            }
+        }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onPress = { offset ->
+                    glowCenter = offset
+                    pressed = true
+                    tryAwaitRelease()
+                    pressed = false
+                },
+                onLongPress = {
+                    currentLong?.let { action ->
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        action()
+                    }
+                },
+                onTap = {
+                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                    currentTap()
+                }
+            )
+        }
+        .semantics(mergeDescendants = true) {
+            role = Role.Button
+            onClick { currentTap(); true }
+        }
+}
+
+/**
+ * Surface used for every info panel/chip. Glass on: tinted translucent body, top sheen and a rim-light
+ * border (bright top-left, soft bottom-right). Glass off: solid card with a hairline.
+ */
+private fun Modifier.frosted(glassOn: Boolean, radius: Dp, tint: Color = Color(0xFF0B0C10)): Modifier {
+    val shape = RoundedCornerShape(radius)
+    return if (glassOn) {
+        this
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(tint.copy(alpha = 0.52f), tint.copy(alpha = 0.80f))))
+            .background(Brush.linearGradient(listOf(Color(0x22FFFFFF), Color.Transparent)))
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(Color(0x75FFFFFF), Color(0x0FFFFFFF), Color(0x3AFFFFFF))),
+                shape
+            )
+    } else {
+        this
+            .clip(shape)
+            .background(Color(0xF00B0B10))
+            .border(1.dp, Color(0x1FFFFFFF), shape)
+    }
 }
 
 @Composable
-private fun OttHorizontalMediaRow(
+private fun GlassChip(
+    glassOn: Boolean,
+    modifier: Modifier = Modifier,
+    tint: Color = Color.Black,
+    content: @Composable RowScope.() -> Unit
+) {
+    Row(
+        modifier = modifier
+            .frosted(glassOn, 10.dp, tint)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        content = content
+    )
+}
+
+/** Accent bar + title + optional subtitle. Every section on Home starts with this. */
+@Composable
+private fun HomeSectionHeader(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = HomeMargin),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(if (subtitle != null) 36.dp else 22.dp)
+                .clip(CircleShape)
+                .background(Brush.verticalGradient(listOf(Color.White, Color(0x22FFFFFF))))
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                text = title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.3).sp,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (subtitle != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 12.5.sp,
+                    color = OttTextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSection(
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Column(modifier.fillMaxWidth()) {
+        HomeSectionHeader(title, subtitle)
+        Spacer(Modifier.height(14.dp))
+        content()
+    }
+}
+
+/** Pops its content and fires an expanding gold ring when [trigger] flips (skips first composition). */
+@Composable
+private fun HomePop(trigger: Boolean, content: @Composable () -> Unit) {
+    val pop = remember { Animatable(1f) }
+    val ring = remember { Animatable(0f) }
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(trigger) {
+        if (first) {
+            first = false
+            return@LaunchedEffect
+        }
+        launch {
+            pop.snapTo(0.55f)
+            pop.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium))
+        }
+        ring.snapTo(0f)
+        ring.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+        ring.snapTo(0f)
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .drawBehind {
+                val r = ring.value
+                if (r > 0f) {
+                    drawCircle(
+                        color = Color(0xFFFFD166).copy(alpha = (1f - r) * 0.85f),
+                        radius = size.minDimension / 2f * (1f + r * 1.2f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
+            .graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+            }
+    ) { content() }
+}
+
+/** Big bookmark that pops in the middle of a card (long-press watchlist). */
+@Composable
+private fun BookmarkBurst(trigger: Int, added: Boolean, modifier: Modifier = Modifier) {
+    val p = remember { Animatable(0f) }
+    LaunchedEffect(trigger) {
+        if (trigger > 0) {
+            p.snapTo(0f)
+            p.animateTo(1f, tween(800, easing = LinearEasing))
+            p.snapTo(0f)
+        }
+    }
+    val v = p.value
+    if (v > 0f) {
+        val pop = if (v < 0.3f) v / 0.3f * 1.3f else 1.3f - (v - 0.3f) / 0.7f * 0.3f
+        val a = if (v < 0.65f) 1f else ((1f - v) / 0.35f)
+        Box(
+            modifier = modifier
+                .size(96.dp)
+                .graphicsLayer {
+                    scaleX = pop
+                    scaleY = pop
+                    alpha = a.coerceIn(0f, 1f)
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(Color(0x70000000))
+            )
+            Icon(
+                imageVector = if (added) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                contentDescription = null,
+                tint = if (added) OttAccentGold else Color.White,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+//  SPOTLIGHT HERO
+//  A peeking deck of tall cards: the centre card is lit, neighbours tilt and dim, artwork parallaxes
+//  inside each card. Tap = open, long-press = watchlist (with a bookmark burst). Auto-advances with a
+//  progress-filled indicator that pauses while you touch or scroll.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HomeSpotlightHero(
+    shows: List<Anime>,
+    glassOn: Boolean,
+    backdrop: PrismalGlassLayer?,
+    logoUrlOf: (Int) -> String?,
+    onLoadArtwork: (Anime) -> Unit,
+    isInWatchlist: (Int) -> Boolean,
+    onToggleWatchlist: (Anime) -> Unit,
+    onAnimeClick: (Int) -> Unit,
+    onPlayClick: (Int) -> Unit,
+    isVerticalScrollInProgress: Boolean,
+    onActiveChanged: (Anime) -> Unit
+) {
+    val pagerState = rememberPagerState(pageCount = { shows.size })
+    val scope = rememberCoroutineScope()
+    val dragged by pagerState.interactionSource.collectIsDraggedAsState()
+    val progress = remember { Animatable(0f) }
+    val paused = dragged || isVerticalScrollInProgress
+
+    LaunchedEffect(pagerState.settledPage) {
+        shows.getOrNull(pagerState.settledPage)?.let(onActiveChanged)
+    }
+    // Auto-advance: fill the active dot over 6.5s, then slide to the next card. Restarts after touch.
+    LaunchedEffect(pagerState.settledPage, paused, shows.size) {
+        progress.snapTo(0f)
+        if (!paused && shows.size > 1) {
+            progress.animateTo(1f, tween(6500, easing = LinearEasing))
+            pagerState.animateScrollToPage((pagerState.settledPage + 1) % shows.size)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(top = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = HomeMargin),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "SPOTLIGHT",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 3.sp,
+                color = OttTextMuted
+            )
+            Text(
+                text = "%02d / %02d".format(pagerState.currentPage + 1, shows.size),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                color = OttTextMuted
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+
+        HorizontalPager(
+            state = pagerState,
+            contentPadding = PaddingValues(horizontal = 34.dp),
+            pageSpacing = 12.dp,
+            key = { shows[it].id },
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+            val anime = shows[page]
+            LaunchedEffect(anime.id) { onLoadArtwork(anime) }
+            SpotlightCard(
+                anime = anime,
+                page = page,
+                pagerState = pagerState,
+                glassOn = glassOn,
+                backdrop = backdrop,
+                logoUrl = logoUrlOf(anime.id),
+                inWatchlist = isInWatchlist(anime.id),
+                onToggleWatchlist = { onToggleWatchlist(anime) },
+                onOpen = { onAnimeClick(anime.id) },
+                onPlay = { onPlayClick(anime.id) }
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        SpotlightIndicator(
+            count = shows.size,
+            current = pagerState.currentPage,
+            progressProvider = { progress.value },
+            onSelect = { scope.launch { pagerState.animateScrollToPage(it) } }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpotlightCard(
+    anime: Anime,
+    page: Int,
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    glassOn: Boolean,
+    backdrop: PrismalGlassLayer?,
+    logoUrl: String?,
+    inWatchlist: Boolean,
+    onToggleWatchlist: () -> Unit,
+    onOpen: () -> Unit,
+    onPlay: () -> Unit
+) {
+    val shape = RoundedCornerShape(30.dp)
+    var burst by remember { mutableIntStateOf(0) }
+    // Read inside graphicsLayer lambdas only, so swiping never recomposes the card.
+    val offsetOf: () -> Float = { (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.76f)
+            .graphicsLayer {
+                val off = offsetOf()
+                val a = abs(off).coerceIn(0f, 1f)
+                val s = 1f - 0.07f * a
+                scaleX = s
+                scaleY = s
+                alpha = 1f - 0.5f * a
+                rotationY = off * -10f
+                cameraDistance = 14f * density
+                translationY = a * 10.dp.toPx()
+            }
+            .liquidPress(
+                shape = shape,
+                pressedScale = 0.97f,
+                onLongTap = {
+                    onToggleWatchlist()
+                    burst++
+                },
+                onTap = onOpen
+            )
+            .background(Color(0xFF12141C))
+    ) {
+        // Artwork, drifting against the swipe for depth
+        AsyncImage(
+            model = anime.cover,
+            contentDescription = anime.displayTitle,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = 1.2f
+                    scaleY = 1.2f
+                    translationX = offsetOf() * size.width * 0.09f
+                }
+        )
+        // Light falloff: dark at the top for chips, deep at the bottom for the info panel
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color(0x66000000),
+                        0.28f to Color.Transparent,
+                        0.55f to Color(0x22000000),
+                        1f to Color(0xE6000000)
+                    )
+                )
+        )
+        // Rim light around the whole card
+        Box(
+            Modifier
+                .fillMaxSize()
+                .border(
+                    1.dp,
+                    if (glassOn) Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x08FFFFFF), Color(0x40FFFFFF)))
+                    else SolidColor(Color(0x18FFFFFF)),
+                    shape
+                )
+        )
+
+        // Top row
+        GlassChip(
+            glassOn = glassOn,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(14.dp)
+        ) {
+            Icon(Icons.Default.Whatshot, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(13.dp))
+            Text("FEATURED", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = Color.White)
+        }
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp)
+        ) {
+            PlayerGlassButton(
+                backdrop = backdrop,
+                onClick = {
+                    onToggleWatchlist()
+                    burst++
+                },
+                circle = true,
+                height = 40.dp
+            ) {
+                HomePop(inWatchlist) {
+                    Icon(
+                        imageVector = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = "Watchlist",
+                        tint = if (inWatchlist) OttAccentGold else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        // Info panel
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(10.dp)
+                .frosted(glassOn, 24.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (!logoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = logoUrl,
+                    contentDescription = anime.displayTitle,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    modifier = Modifier
+                        .fillMaxWidth(0.72f)
+                        .heightIn(max = 46.dp)
+                )
+            } else {
+                Text(
+                    text = anime.displayTitle,
+                    fontSize = 23.sp,
+                    lineHeight = 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.4).sp,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                anime.score?.let { s ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(13.dp))
+                        Text("$s%", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = OttAccentGold)
+                    }
+                }
+                val meta = listOfNotNull(
+                    if (anime.isMovie) "Movie" else (anime.displayFormat ?: "TV"),
+                    anime.episodes?.takeIf { !anime.isMovie && it > 0 }?.let { "$it eps" },
+                    anime.displayYear?.takeIf { it.isNotBlank() }
+                ).joinToString("  •  ")
+                Text(meta, fontSize = 12.5.sp, color = OttTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+
+            if (anime.genres.isNotEmpty()) {
+                Text(
+                    text = anime.genres.take(3).joinToString("  •  "),
+                    fontSize = 12.sp,
+                    color = OttTextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HomePlayCta(
+                    label = if (anime.isMovie) "Watch Movie" else "Watch Now",
+                    glassOn = glassOn,
+                    backdrop = backdrop,
+                    modifier = Modifier.weight(1f),
+                    onClick = onPlay
+                )
+                PlayerGlassButton(backdrop = backdrop, onClick = onOpen, circle = true, height = 46.dp) {
+                    Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+
+        BookmarkBurst(trigger = burst, added = inWatchlist, modifier = Modifier.align(Alignment.Center))
+    }
+}
+
+/** Primary call-to-action: Prismal glass pill when glass is on, bold white pill when off. */
+@Composable
+private fun HomePlayCta(
+    label: String,
+    glassOn: Boolean,
+    backdrop: PrismalGlassLayer?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    if (glassOn && backdrop != null) {
+        val context = LocalContext.current
+        PlayerGlassButton(
+            backdrop = backdrop,
+            onClick = {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+            modifier = modifier,
+            height = 46.dp
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(23.dp))
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, softWrap = false)
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .height(46.dp)
+                .liquidPress(CircleShape, 0.94f, onTap = onClick)
+                .background(Color.White),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(23.dp))
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1, softWrap = false)
+        }
+    }
+}
+
+/** Dot rail: the active dot stretches into a capsule that fills as the auto-advance timer runs. Tap a dot to jump. */
+@Composable
+private fun SpotlightIndicator(
+    count: Int,
+    current: Int,
+    progressProvider: () -> Float,
+    onSelect: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(count) { i ->
+            val active = i == current
+            val w by animateDpAsState(
+                targetValue = if (active) 28.dp else 6.dp,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                label = "dotW"
+            )
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 2.5.dp)
+                    .height(6.dp)
+                    .width(w)
+                    .clip(CircleShape)
+                    .background(Color(0x33FFFFFF))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onSelect(i) }
+                    .drawBehind {
+                        if (active) {
+                            drawRect(
+                                color = Color.White,
+                                size = androidx.compose.ui.geometry.Size(size.width * progressProvider().coerceIn(0f, 1f), size.height)
+                            )
+                        }
+                    }
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+//  POSTER TILES + SHELVES
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomePosterTile(
+    image: Any?,
+    title: String,
+    subtitle: String?,
+    glassOn: Boolean,
+    modifier: Modifier = Modifier,
+    width: Dp = 128.dp,
+    score: Int? = null,
+    badge: String? = null,
+    badgeColor: Color = Color.White,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(20.dp)
+    Column(modifier.width(width)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .liquidPress(shape, 0.94f, onTap = onClick)
+                .background(Color(0xFF141822))
+        ) {
+            AsyncImage(
+                model = image,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(78.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .border(
+                        1.dp,
+                        if (glassOn) Brush.linearGradient(listOf(Color(0x66FFFFFF), Color(0x08FFFFFF), Color(0x33FFFFFF)))
+                        else SolidColor(Color(0x14FFFFFF)),
+                        shape
+                    )
+            )
+            if (score != null) {
+                GlassChip(
+                    glassOn = glassOn,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(11.dp))
+                    Text("$score", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+            if (!badge.isNullOrBlank()) {
+                GlassChip(
+                    glassOn = glassOn,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = badge,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = badgeColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(9.dp))
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
+        if (!subtitle.isNullOrBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                color = OttTextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomePosterRow(
     list: List<Anime>,
+    glassOn: Boolean,
     onAnimeClick: (Int) -> Unit
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = HomeMargin),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(list, key = { it.id }) { anime ->
-            OttPosterCard(
-                anime = anime,
+            HomePosterTile(
+                image = anime.cover,
+                title = anime.displayTitle,
+                subtitle = listOfNotNull(
+                    anime.genres.firstOrNull(),
+                    if (anime.isMovie) "Movie" else anime.displayFormat
+                ).joinToString("  •  "),
+                glassOn = glassOn,
+                score = anime.score,
                 onClick = { onAnimeClick(anime.id) }
             )
+        }
+    }
+}
+
+/** Big gradient rank numerals tucked behind the posters. */
+@Composable
+private fun HomeTop10Row(
+    list: List<Anime>,
+    glassOn: Boolean,
+    onAnimeClick: (Int) -> Unit
+) {
+    val top = remember(list) { list.take(10) }
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = HomeMargin),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        itemsIndexed(top, key = { _, a -> "top10_${a.id}" }) { i, anime ->
+            Box(Modifier.width(if (i == 9) 196.dp else 170.dp)) {
+                Text(
+                    text = "${i + 1}",
+                    style = TextStyle(
+                        brush = Brush.verticalGradient(listOf(Color.White, Color(0x1FFFFFFF))),
+                        fontSize = 120.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = (-10).sp
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (-2).dp, y = (-26).dp)
+                )
+                HomePosterTile(
+                    image = anime.cover,
+                    title = anime.displayTitle,
+                    subtitle = anime.genres.firstOrNull(),
+                    glassOn = glassOn,
+                    width = 122.dp,
+                    score = anime.score,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    onClick = { onAnimeClick(anime.id) }
+                )
+            }
         }
     }
 }
@@ -671,74 +1431,24 @@ private fun OttHorizontalMediaRow(
 @Composable
 private fun HomeMangaRow(
     list: List<com.nyyrox.aniverse.data.manga.MangaCard>,
+    glassOn: Boolean,
     onMangaClick: (String) -> Unit
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = HomeMargin),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(list, key = { "manga_${it.id}" }) { manga ->
-            Column(
-                modifier = Modifier
-                    .width(118.dp)
-                    .clickable { onMangaClick(manga.id) }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(172.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141822))
-                ) {
-                    AsyncImage(
-                        model = manga.poster,
-                        contentDescription = manga.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color(0xB3000000))
-                                )
-                            )
-                    )
-                    val chText: String = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga")
-                    if (chText.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(6.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x8A000000))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = chText,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = OttAccentGold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = manga.title,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    lineHeight = 16.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            val chText: String = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga")
+            HomePosterTile(
+                image = manga.poster,
+                title = manga.title,
+                subtitle = manga.type?.takeIf { it.isNotBlank() },
+                glassOn = glassOn,
+                badge = chText,
+                badgeColor = OttAccentGold,
+                onClick = { onMangaClick(manga.id) }
+            )
         }
     }
 }
@@ -746,83 +1456,35 @@ private fun HomeMangaRow(
 @Composable
 private fun HomeNovelRow(
     list: List<com.nyyrox.aniverse.data.novel.NovelItem>,
+    glassOn: Boolean,
     onNovelClick: (String) -> Unit
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = HomeMargin),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(list, key = { "novel_${it.slug}" }) { novel ->
-            Column(
-                modifier = Modifier
-                    .width(118.dp)
-                    .clickable { onNovelClick(novel.slug) }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(172.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141822))
-                ) {
-                    AsyncImage(
-                        model = novel.cover,
-                        contentDescription = novel.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color(0xB3000000))
-                                )
-                            )
-                    )
-                    val badge: String = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source)
-                    if (badge.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(6.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x8A000000))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = badge,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = novel.title,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    lineHeight = 16.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            val badge: String = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source)
+            HomePosterTile(
+                image = novel.cover,
+                title = novel.title,
+                subtitle = novel.source.takeIf { it.isNotBlank() },
+                glassOn = glassOn,
+                badge = badge,
+                onClick = { onNovelClick(novel.slug) }
+            )
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────
+//  EPISODE SHOWDOWN CARD
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
 /**
- * YouTube-style episode feed card with 16:9 thumbnail, duration and episode badge,
- * circular channel avatar, title, genres, and quick play action.
- * Supports lazy loading TMDB episode stills with fallback to AniList banner/cover.
- * Subtle frosted glass styling, borderless text boxes, and emoji-free.
+ * Cinematic episode card: full-bleed still, glass info panel docked at the bottom with a Prismal play button.
+ * Tap the artwork to play, tap the title block to open details. Pass [backdrop] (null = flat, glass off).
+ * TMDB stills load lazily with fallback to the AniList banner/cover.
  */
 @Composable
 fun YouTubeStyleEpisodeCard(
@@ -836,239 +1498,158 @@ fun YouTubeStyleEpisodeCard(
     onLoadArtwork: (() -> Unit)? = null,
     onAnimeClick: (Int) -> Unit,
     onPlayClick: (animeId: Int, episode: Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backdrop: PrismalGlassLayer? = null
 ) {
     LaunchedEffect(anime.id, episodeNumber) {
         onLoadStill?.invoke()
         onLoadArtwork?.invoke()
     }
+    val glassOn = backdrop != null
+    val shape = RoundedCornerShape(28.dp)
+    val context = LocalContext.current
 
-    val durationText = remember(anime.duration) {
-        val mins = anime.duration ?: 24
-        "${mins}:00"
-    }
-
-    val displayTitle = anime.displayTitle
-    val preferredTitle = tmdbTitle?.takeIf { it.isNotBlank() } ?: displayTitle
-    val episodeTitle = if (anime.isMovie) "Full Movie" else "Episode $episodeNumber"
-
+    val durationText = remember(anime.duration) { "${anime.duration ?: 24}m" }
+    val preferredTitle = tmdbTitle?.takeIf { it.isNotBlank() } ?: anime.displayTitle
     val thumbnailImage = remember(episodeStill, anime.banner, anime.cover) {
         episodeStill?.takeIf { it.isNotBlank() }
             ?: anime.banner?.takeIf { it.isNotBlank() }
             ?: anime.cover
     }
+    val isMustWatch = badgeText?.contains("MUST WATCH", ignoreCase = true) == true
 
-    Column(
+    Box(
         modifier = modifier
+            .padding(horizontal = HomeMargin)
             .fillMaxWidth()
-            .clickable { onAnimeClick(anime.id) }
-            .padding(bottom = 16.dp)
+            .aspectRatio(16f / 10.5f)
+            .liquidPress(shape, 0.975f, onTap = { onPlayClick(anime.id, episodeNumber) })
+            .background(Color(0xFF131722))
     ) {
-        // 1. YouTube 16:9 Thumbnail Box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF131722))
-                .clickable { onPlayClick(anime.id, episodeNumber) }
-        ) {
-            SubcomposeAsyncImage(
-                model = thumbnailImage,
-                contentDescription = preferredTitle,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                loading = {
-                    ShimmerBox(
-                        modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                },
-                error = {
-                    AsyncImage(
-                        model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
-                        contentDescription = preferredTitle,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            )
-
-            // Gradient darkening (top, center, and deep bottom for text and logo readability)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x60000000),
-                                Color(0x10000000),
-                                Color(0x9A000000)
-                            )
-                        )
-                    )
-            )
-
-            // Top-Left Badge (e.g. "MUST WATCH", "TOP WATCHED", "TRENDING") - Subtle frosted glass (no border)
-            if (!badgeText.isNullOrBlank()) {
-                val isMustWatch = badgeText.contains("MUST WATCH", ignoreCase = true)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isMustWatch) Color(0x95E50914) else Color(0x850E131E))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = badgeText,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
-
-            // TMDB Title Logo PNG Overlay (Overlaid inside thumbnail above bottom badges)
-            if (!logoUrl.isNullOrBlank()) {
+        SubcomposeAsyncImage(
+            model = thumbnailImage,
+            contentDescription = preferredTitle,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), shape = shape) },
+            error = {
                 AsyncImage(
-                    model = logoUrl,
+                    model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
                     contentDescription = preferredTitle,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 12.dp, bottom = 36.dp)
-                        .heightIn(max = 42.dp)
-                        .fillMaxWidth(0.55f),
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.BottomStart
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
             }
-
-            // Center Circular Play Button - Frosted Glass Circle (no border)
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x60000000))
-                    .align(Alignment.Center),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color(0x66000000),
+                        0.3f to Color.Transparent,
+                        1f to Color(0xCC000000)
+                    )
                 )
-            }
-
-            // Bottom-Left Episode Badge (no border)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x8A000000))
-                    .padding(horizontal = 7.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = if (anime.isMovie) "MOVIE" else "EP $episodeNumber",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OttAccentGold
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .border(
+                    1.dp,
+                    if (glassOn) Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x08FFFFFF), Color(0x40FFFFFF)))
+                    else SolidColor(Color(0x18FFFFFF)),
+                    shape
                 )
-            }
+        )
 
-            // Bottom-Right Duration Badge (no border)
-            Box(
+        if (!badgeText.isNullOrBlank()) {
+            GlassChip(
+                glassOn = glassOn,
+                tint = if (isMustWatch) Color(0xFFB00A12) else Color.Black,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x8A000000))
-                    .padding(horizontal = 7.dp, vertical = 3.dp)
+                    .align(Alignment.TopStart)
+                    .padding(14.dp)
             ) {
-                Text(
-                    text = durationText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Text(badgeText, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = Color.White)
             }
         }
+        GlassChip(
+            glassOn = glassOn,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(14.dp)
+        ) {
+            Text(durationText, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
 
-        Spacer(Modifier.height(10.dp))
-
-        // 2. Video Info Row (Avatar on Left, Title + Subtitle in Middle, Play button on Right)
+        // Info dock
         Row(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(10.dp)
+                .frosted(glassOn, 22.dp)
+                .padding(start = 16.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Anime Avatar (YouTube Channel style) - Clean Circle (no border)
-            AsyncImage(
-                model = anime.cover,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .clickable { onAnimeClick(anime.id) },
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(Modifier.width(12.dp))
-
-            // Title + Metadata Column
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onAnimeClick(anime.id) }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                        onAnimeClick(anime.id)
+                    },
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                val headerTitle = if (anime.isMovie) preferredTitle else "$preferredTitle • $episodeTitle"
+                if (!logoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = preferredTitle,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .heightIn(max = 34.dp)
+                    )
+                } else {
+                    Text(
+                        text = preferredTitle,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.2).sp,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                val meta = listOfNotNull(
+                    if (anime.isMovie) "Full Movie" else "Episode $episodeNumber",
+                    anime.genres.take(2).joinToString(" • ").ifBlank { null },
+                    anime.score?.let { "$it% Match" }
+                ).joinToString("  •  ")
                 Text(
-                    text = headerTitle,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 2,
-                    lineHeight = 18.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(Modifier.height(3.dp))
-
-                val genreText = anime.genres.take(2).joinToString(" • ")
-                val scoreText = anime.score?.let { "$it% Match" } ?: "Trending"
-                val formatText = anime.displayFormat ?: "TV"
-
-                Text(
-                    text = listOfNotNull(genreText.ifBlank { null }, formatText, scoreText).joinToString(" • "),
-                    fontSize = 12.sp,
+                    text = meta,
+                    fontSize = 11.5.sp,
                     color = OttTextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
-            Spacer(Modifier.width(8.dp))
-
-            // Play Icon Button (Frosted glass button, no border)
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x1FFFFFFF))
-                    .clickable { onPlayClick(anime.id, episodeNumber) },
-                contentAlignment = Alignment.Center
+            Spacer(Modifier.width(10.dp))
+            PlayerGlassButton(
+                backdrop = backdrop,
+                onClick = {
+                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                    onPlayClick(anime.id, episodeNumber)
+                },
+                circle = true,
+                height = 46.dp
             ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(26.dp))
             }
         }
     }
