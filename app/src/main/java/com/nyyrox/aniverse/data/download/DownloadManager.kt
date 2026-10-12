@@ -36,7 +36,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import android.media.MediaScannerConnection
+import android.net.Uri
 
 class DownloadManager(private val context: Context) {
     companion object {
@@ -57,6 +57,8 @@ class DownloadManager(private val context: Context) {
 
     private val animeDownloader = AnimeStreamDownloader(client)
     private val animeCancellationTokens = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
+    // Folder the user picked for this exact download (kept across Retry, dropped on cancel/success)
+    private val exportTargets = ConcurrentHashMap<String, Uri>()
 
     @Volatile
     private var currentMaxConcurrent = DownloadPreferences.getMaxConcurrentDownloads(context)
@@ -185,6 +187,7 @@ class DownloadManager(private val context: Context) {
             DownloadType.ANIME -> {
                 animeCancellationTokens[taskKey]?.set(true)
                 animeCancellationTokens.remove(taskKey)
+                exportTargets.remove(taskKey)
                 _animeTasks.value = _animeTasks.value - taskKey
                 DownloadNotificationHelper.cancelNotification(context, taskKey)
             }
@@ -388,10 +391,19 @@ class DownloadManager(private val context: Context) {
         provider: Provider,
         episodeTitle: String? = null,
         quality: String = "Auto HD",
-        audio: String = "Default"
+        audio: String = "Default",
+        exportTo: Uri? = null
     ) {
         val taskKey = "${anime.id}:$episode"
-        if (isAnimeEpisodeDownloaded(anime.id, episode)) return
+        if (exportTo != null) exportTargets[taskKey] = exportTo
+        if (isAnimeEpisodeDownloaded(anime.id, episode)) {
+            // Already in the app: don't silently do nothing when the user asked to save it outside.
+            val target = exportTargets.remove(taskKey) ?: exportTo
+            val wantsOutside = target != null ||
+                DownloadPreferences.settings.value.storageLocation == DownloadStorageLocation.EXTERNAL_PUBLIC
+            if (wantsOutside) exportExistingEpisode(anime.id, episode, anime.title, target)
+            return
+        }
 
         val existingTask = _animeTasks.value[taskKey]
         if (existingTask != null && (existingTask.status == DownloadStatus.DOWNLOADING || existingTask.status == DownloadStatus.QUEUED || existingTask.status == DownloadStatus.COMPLETED)) {
@@ -726,6 +738,27 @@ class DownloadManager(private val context: Context) {
                     }
                     epMeta.writeText(epJson.toString())
 
+                    // Save a real, playable copy where other apps can see it (picked folder or Movies/Zenkai)
+                    val exportTree = exportTargets[taskKey] ?: DownloadExporter.defaultTree(context)
+                    val wantsOutside = exportTree != null ||
+                        DownloadPreferences.settings.value.storageLocation == DownloadStorageLocation.EXTERNAL_PUBLIC
+                    if (wantsOutside) {
+                        _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                            providerId = targetProvider.id,
+                            providerName = targetProvider.name,
+                            progress = 1f,
+                            speedFormatted = "Saving to your device...",
+                            status = DownloadStatus.DOWNLOADING
+                        ))
+                        try {
+                            val where = DownloadExporter.export(context, finalFile, "${anime.title} - Episode $episode", exportTree)
+                            DownloadExporter.toast(context, "Saved to $where")
+                        } catch (e: Exception) {
+                            Log.e("DownloadManager", "Export failed: ${e.message}", e)
+                            DownloadExporter.toast(context, "Downloaded, but saving outside the app failed: ${e.message}")
+                        }
+                    }
+                    exportTargets.remove(taskKey)
                     animeCancellationTokens.remove(taskKey)
                     val completedTask = initialTask.copy(
                         providerId = targetProvider.id,
@@ -736,14 +769,6 @@ class DownloadManager(private val context: Context) {
                     )
                     _animeTasks.value = _animeTasks.value + (taskKey to completedTask)
                     DownloadNotificationHelper.showCompleteNotification(context, completedTask)
-                    try {
-                        MediaScannerConnection.scanFile(
-                            context,
-                            arrayOf(finalFile.absolutePath),
-                            arrayOf("video/mp4"),
-                            null
-                        )
-                    } catch (_: Exception) {}
                     refreshDownloadedLists()
                     downloadSucceeded = true
                     break
@@ -771,6 +796,20 @@ class DownloadManager(private val context: Context) {
                 _animeTasks.value = _animeTasks.value + (taskKey to failedTask)
                 DownloadNotificationHelper.showFailedNotification(context, failedTask, lastFailureReason)
             }
+            }
+        }
+    }
+
+    // Episode already downloaded in-app: just write the outside copy (no re-download).
+    private fun exportExistingEpisode(animeId: Int, episode: Int, title: String, tree: Uri?) {
+        scope.launch {
+            try {
+                val ep = getDownloadedAnimeEpisode(animeId, episode) ?: return@launch
+                val where = DownloadExporter.export(context, File(ep.filePath), "$title - Episode $episode", tree)
+                DownloadExporter.toast(context, "Saved to $where")
+            } catch (e: Exception) {
+                Log.e("DownloadManager", "Export failed: ${e.message}", e)
+                DownloadExporter.toast(context, "Saving outside the app failed: ${e.message}")
             }
         }
     }
