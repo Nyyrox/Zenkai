@@ -1056,8 +1056,8 @@ fun PlayerScreen(
                 )
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 6.dp, bottom = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                 // Zenkai Player / Embed Mode Toggle Bar (Option down below the player with proper spacing)
                 val isEmbedModeActive = !isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
@@ -1181,7 +1181,7 @@ fun PlayerScreen(
                     }
                 }
 
-                // 0. Active Episode Details & Header (Spacious, modern OTT design)
+                // 0. Active Episode Details & Header (Tight, authentic design from player_design_1.jpg)
                 item {
                     val currentEpInfo = tmdbEpisodes[currentEpisode]
                     val currentEpTask = if (isCurrentEpDownloading) activeAnimeTasks["${anime.id}:$currentEpisode"] else null
@@ -1189,247 +1189,367 @@ fun PlayerScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(horizontal = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 1. Anime Title & Subtitle Info (Single, clean top header)
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = anime.displayTitle,
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                lineHeight = 24.sp
-                            )
-
-                            val subtitleText = if (isMovie) {
-                                (anime.format ?: "Movie") + (anime.duration?.let { " • $it min" } ?: "") + " • ${currentProvider.name}"
-                            } else {
-                                (anime.format ?: "TV Series") + (anime.duration?.let { " • $it min" } ?: " • 24 min") + (anime.score?.let { " • ★ $it%" } ?: "") + " • ${currentProvider.name}"
-                            }
-                            Text(
-                                text = subtitleText,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = OttTextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        // 2. The Video Showcase Card: Image on left, Details & Episode Info properly beside it!
-                        Row(
+                        // High-Texture Unified Active Episode Card
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .playerGlass(backdrop, radius = 24.dp)
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalAlignment = Alignment.Top
+                                .playerGlass(backdrop, radius = 20.dp)
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // High-Res Episode Still with 16:9 Aspect Ratio
-                            Column(
-                                modifier = Modifier.width(136.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            // Top Row: Thumbnail on Left, Title + Subtitle + Badges + Download Status on Right
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(16f / 9.5f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(10.dp))
-                            ) {
-                                AsyncImage(
-                                    model = currentEpInfo?.stillUrl?.takeIf { it.isNotBlank() }
-                                        ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
-                                        ?: anime.banner?.takeIf { it.isNotBlank() }
-                                        ?: anime.cover,
-                                    contentDescription = "Episode $currentEpisode",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                // 16:9 Episode Thumbnail
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
-                                            )
-                                        )
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(5.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color.Black.copy(alpha = 0.75f))
-                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        .width(124.dp)
+                                        .aspectRatio(16f / 9.5f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0x18FFFFFF))
+                                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(10.dp))
                                 ) {
-                                    Text(
-                                        text = if (isMovie) "MOVIE" else "HD",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                    AsyncImage(
+                                        model = currentEpInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                                            ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                                            ?: anime.banner?.takeIf { it.isNotBlank() }
+                                            ?: anime.cover,
+                                        contentDescription = "Episode $currentEpisode",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
                                     )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
+                                                )
+                                            )
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(4.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color.Black.copy(alpha = 0.75f))
+                                            .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isMovie) "MOVIE" else "1080p",
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+
+                                // Details Column beside Thumbnail
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    // Episode Title
+                                    val customEpName = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
+                                    val epDisplayTitle = when {
+                                        isMovie -> anime.title
+                                        customEpName != null -> customEpName
+                                        else -> "Episode $currentEpisode"
+                                    }
+                                    Text(
+                                        text = epDisplayTitle,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        lineHeight = 19.sp
+                                    )
+
+                                    // Episode Counter Subtitle ("Episode 104 of 170")
+                                    val episodeCounterText = if (isMovie) {
+                                        anime.format ?: "Movie"
+                                    } else {
+                                        "Episode $currentEpisode of $maxEpisode"
+                                    }
+                                    Text(
+                                        text = episodeCounterText,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF94A3B8)
+                                    )
+
+                                    // Badges row: Quality, Audio, Filler
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        // Quality Badge
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(5.dp))
+                                                .background(Color(0x18FFFFFF))
+                                                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(5.dp))
+                                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isMovie) "Movie HD" else "1080p HD",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White.copy(alpha = 0.9f)
+                                            )
+                                        }
+
+                                        // Audio Badge
+                                        val isDubActive = currentProvider.isDub || selectedCategory == "DUB"
+                                        val audioTag = when {
+                                            selectedCategory == "MULTI" -> "Multi Audio"
+                                            isDubActive -> "English Dub"
+                                            else -> "Japanese Sub"
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(5.dp))
+                                                .background(Color(0x18FFFFFF))
+                                                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(5.dp))
+                                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                        ) {
+                                            Text(
+                                                text = audioTag,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White.copy(alpha = 0.9f)
+                                            )
+                                        }
+
+                                        // Filler Badge
+                                        val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
+                                        val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
+                                        if (isCurrentFiller || isCurrentMixed) {
+                                            EpisodeFillerBadge(isMixed = isCurrentMixed)
+                                        }
+                                    }
+
+                                    // Real-time Download Action / Status
+                                    if (isCurrentEpDownloading && currentEpTask != null) {
+                                        val dlProgress = currentEpTask.progress
+                                        val percentInt = (dlProgress * 100).toInt()
+                                        val isQueued = currentEpTask.status == DownloadStatus.QUEUED
+                                        val isConnecting = !isQueued && (dlProgress <= 0.02f || currentEpTask.speedFormatted.contains("Connecting", ignoreCase = true))
+
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0x22FFFFFF))
+                                                .padding(horizontal = 7.dp, vertical = 4.dp),
+                                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = when {
+                                                        isQueued -> "Queued"
+                                                        isConnecting -> "Connecting..."
+                                                        else -> "Downloading: $percentInt%"
+                                                    },
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isQueued) Color(0xFFFBBF24) else Color.White
+                                                )
+                                                if (currentEpTask.speedFormatted.isNotBlank() && !isQueued) {
+                                                    Text(
+                                                        text = currentEpTask.speedFormatted,
+                                                        fontSize = 8.5.sp,
+                                                        color = OttTextSecondary
+                                                    )
+                                                }
+                                            }
+                                            LinearProgressIndicator(
+                                                progress = { if (dlProgress > 0f) dlProgress else 0.05f },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(3.dp)
+                                                    .clip(RoundedCornerShape(2.dp)),
+                                                color = OttPrimary,
+                                                trackColor = Color(0x33FFFFFF)
+                                            )
+                                        }
+                                    } else if (isCurrentEpDownloaded) {
+                                        Row(
+                                            modifier = Modifier
+                                                .clickable {
+                                                    if (!playOfflineMode) playOfflineMode = true
+                                                }
+                                                .padding(vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = "Downloaded",
+                                                tint = Color(0xFF10B981),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = if (playOfflineMode) "Playing Offline" else "Downloaded",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFF10B981)
+                                            )
+                                        }
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0x18FFFFFF))
+                                                .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
+                                                .clickable {
+                                                    showDownloadSheetEpisode = currentEpisode to currentEpInfo?.name
+                                                }
+                                                .padding(horizontal = 7.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Download,
+                                                contentDescription = "Download Episode",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Text(
+                                                text = "Download",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
-                                // Real-time Download Action Container
-                                if (isCurrentEpDownloading && currentEpTask != null) {
-                                    val dlProgress = currentEpTask.progress
-                                    val percentInt = (dlProgress * 100).toInt()
-                                    val isQueued = currentEpTask.status == DownloadStatus.QUEUED
-                                    val isConnecting = !isQueued && (dlProgress <= 0.02f || currentEpTask.speedFormatted.contains("Connecting", ignoreCase = true))
+                            // Middle Section: Full-Width Synopsis Snippet
+                            val epOverview = currentEpInfo?.overview?.takeIf { it.isNotBlank() }
+                                ?: anime.description?.replace(Regex("<[^>]*>"), "")?.trim()?.takeIf { it.isNotBlank() }
+                                ?: "Stream episode in high-definition. Switch servers or download for offline viewing below."
 
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x22FFFFFF))
-                                            .padding(horizontal = 8.dp, vertical = 5.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = when {
-                                                    isQueued -> "Queued"
-                                                    isConnecting -> "Connecting..."
-                                                    else -> "Downloading: $percentInt%"
-                                                },
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isQueued) Color(0xFFFBBF24) else Color.White
-                                            )
-                                            if (currentEpTask.speedFormatted.isNotBlank() && !isQueued) {
-                                                Text(
-                                                    text = currentEpTask.speedFormatted,
-                                                    fontSize = 9.sp,
-                                                    color = OttTextSecondary
-                                                )
-                                            }
-                                        }
-                                        LinearProgressIndicator(
-                                            progress = { if (dlProgress > 0f) dlProgress else 0.05f },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(3.dp)
-                                                .clip(RoundedCornerShape(2.dp)),
-                                            color = OttPrimary,
-                                            trackColor = Color(0x33FFFFFF)
-                                        )
-                                    }
-                                } else if (isCurrentEpDownloaded) {
+                            var isSynopsisExpanded by remember(currentEpisode) { mutableStateOf(false) }
+
+                            Text(
+                                text = epOverview,
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp,
+                                color = Color(0xFFCBD5E1),
+                                maxLines = if (isSynopsisExpanded) 8 else 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                            )
+
+                            // Subtle Divider Line
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(0.8.dp)
+                                    .background(Color(0x18FFFFFF))
+                            )
+
+                            // Bottom Footer: Series Title + Duration on Left, Action on Right
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${anime.displayTitle} · ${anime.duration?.let { "$it min" } ?: "24 min"}",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = OttTextMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+
+                                Spacer(Modifier.width(8.dp))
+
+                                val hasNextEp = currentEpisode < maxEpisode
+                                if (hasNextEp && !isMovie) {
                                     Row(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x1A10B981))
-                                            .border(0.8.dp, Color(0x4010B981), RoundedCornerShape(8.dp))
+                                            .clip(OttPillShape)
+                                            .background(Color.White)
                                             .clickable {
-                                                if (!playOfflineMode) playOfflineMode = true
+                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                currentEpisode += 1
                                             }
-                                            .padding(horizontal = 8.dp, vertical = 7.dp),
+                                            .padding(horizontal = 10.dp, vertical = 4.5.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = "Downloaded",
-                                            tint = Color(0xFF10B981),
-                                            modifier = Modifier.size(13.dp)
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(12.dp)
                                         )
                                         Text(
-                                            text = if (playOfflineMode) "Playing Offline" else "Play Offline",
-                                            fontSize = 10.sp,
+                                            text = "Next Ep",
+                                            fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF10B981)
+                                            color = Color.Black
                                         )
                                     }
                                 } else {
-                                    Row(
+                                    // Toggle Embed / Direct Chip
+                                    Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x18FFFFFF))
-                                            .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
+                                            .clip(OttPillShape)
+                                            .background(if (vm.isPlayEmbed) Color.White.copy(alpha = 0.2f) else Color(0x18FFFFFF))
+                                            .border(0.8.dp, if (vm.isPlayEmbed) Color.White else Color(0x28FFFFFF), OttPillShape)
                                             .clickable {
-                                                showDownloadSheetEpisode = currentEpisode to currentEpInfo?.name
+                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                val targetEmbed = !vm.isPlayEmbed
+                                                vm.setPlayEmbed(targetEmbed)
+                                                if (targetEmbed) {
+                                                    selectedSourceMode = "EMBED"
+                                                    val embedList = when (selectedCategory) {
+                                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                                    }
+                                                    val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+                                                    currentProvider = prov
+                                                    vm.setPreferredServer(prov.id)
+                                                } else {
+                                                    selectedSourceMode = "DIRECT"
+                                                    if (selectedCategory == "MULTI") selectedCategory = "SUB"
+                                                    val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
+                                                    availableDirectServers = nextDirect
+                                                    val prov = nextDirect.first()
+                                                    currentProvider = prov
+                                                    vm.setPreferredServer(prov.id)
+                                                }
                                             }
-                                            .padding(horizontal = 8.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
+                                            .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Download,
-                                            contentDescription = "Download Episode",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(13.dp)
-                                        )
                                         Text(
-                                            text = "Download",
-                                            fontSize = 10.5.sp,
+                                            text = if (vm.isPlayEmbed) "Embed Mode" else "Direct Mode",
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color.White
                                         )
                                     }
                                 }
-                            }
-
-                            // Details of the video properly beside the image!
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Episode Title (Shown ONCE here!)
-                                val customEpName = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
-                                val epDisplayHeading = when {
-                                    isMovie -> anime.title
-                                    customEpName != null -> "$currentEpisode. $customEpName"
-                                    else -> "Episode $currentEpisode"
-                                }
-                                Text(
-                                    text = epDisplayHeading,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                // Badges wrap instead of squeezing a chip ("Dire/ct"). The Embed/Direct chip is gone:
-                                // the DIRECT/EMBED switch in the server card does the same job.
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    if (!isMovie) {
-                                        TagChip("EP $currentEpisode / $maxEpisode", Color.White, Color(0x1FFFFFFF), Color(0x38FFFFFF))
-                                    }
-                                    val audioLabel = if (currentProvider.isDub || selectedCategory == "DUB") "DUB" else "SUB"
-                                    TagChip(audioLabel, Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
-                                    val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
-                                    val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
-                                    if (isCurrentFiller || isCurrentMixed) FillerTag(isCurrentMixed)
-                                }
-
-                                // Synopsis text
-                                val synopsis = currentEpInfo?.overview?.takeIf { it.isNotBlank() }
-                                    ?: "Stream episode in HD. Select download or toggle servers below."
-                                Text(
-                                    text = synopsis,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp,
-                                    color = Color(0xFFCBD5E1),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
                             }
                         }
                     }
@@ -1534,8 +1654,8 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp)
-                            .playerGlass(backdrop, radius = 26.dp)
-                            .padding(16.dp)
+                            .playerGlass(backdrop, radius = 24.dp)
+                            .padding(14.dp)
                     ) {
                         if (isPlayingOffline) {
                             Row(
@@ -1616,7 +1736,7 @@ fun PlayerScreen(
                                         color = Color.White
                                     )
                                 }
-                                Spacer(Modifier.height(10.dp))
+                                Spacer(Modifier.height(8.dp))
                             }
 
                             Row(
@@ -1714,7 +1834,7 @@ fun PlayerScreen(
                             }
                         }
 
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(8.dp))
 
                         // SUB / DUB / MULTI-AUDIO (Direct mode only shows SUB / DUB)
                         val audioCategories = if (selectedSourceMode == "DIRECT") {
@@ -1790,7 +1910,7 @@ fun PlayerScreen(
                             }
                         }
 
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(8.dp))
 
                         // Server selector: trigger + inline expanding list
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -1804,7 +1924,7 @@ fun PlayerScreen(
                                     .background(Color(0x59000000))
                                     .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                                     .clickable { isServerDropdownExpanded = !isServerDropdownExpanded }
-                                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // Clean active status dot (white)

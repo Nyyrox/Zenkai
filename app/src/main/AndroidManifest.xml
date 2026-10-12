@@ -3,10 +3,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Saving manga pages to device gallery -->
+    <!-- Saving manga pages and anime videos to device gallery / external storage -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
@@ -93,6 +94,9 @@
 
         <receiver
             android:name=".notifications.DirectReplyReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".data.download.DownloadNotificationReceiver"
             android:exported="false" />
         <service
             android:name=".service.PlayerNotificationService"

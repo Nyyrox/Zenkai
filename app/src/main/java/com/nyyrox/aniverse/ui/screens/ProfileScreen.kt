@@ -41,8 +41,10 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import com.nyyrox.aniverse.ui.components.DownloadSettingsSheet
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -190,6 +192,7 @@ fun ProfileScreen(
     var showMalSheet by remember { mutableStateOf(false) }
     var showDiscordSheet by remember { mutableStateOf(false) }
     var showChangelogs by remember { mutableStateOf(false) }
+    var showDownloadSettingsSheet by remember { mutableStateOf(false) }
     var selectedAvatarCropUri by remember { mutableStateOf<Uri?>(null) }
     var uploadNoticeMessage by remember { mutableStateOf<String?>(null) }
     val savedMangaList = remember(vm.mangaBookmarks) { vm.mangaBookmarks.distinctBy { it.mangaId } }
@@ -770,6 +773,13 @@ fun ProfileScreen(
                     badgeText = "${vm.novelHistoryList.size} read",
                     badgeColor = Color(0xFF0284C7),
                     onClick = { onOpenNovelHistory?.invoke() ?: onSeeAllWatchlist?.invoke() }
+                )
+                ProfileDivider()
+                ProfileSettingRow(
+                    icon = Icons.Default.Download,
+                    title = "Download & Storage Settings",
+                    subtitle = "Queue concurrency, public Movies folder, notifications",
+                    onClick = { showDownloadSettingsSheet = true }
                 )
             }
         }
@@ -2157,6 +2167,12 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(18.dp))
             }
         }
+    }
+
+    if (showDownloadSettingsSheet) {
+        DownloadSettingsSheet(
+            onDismiss = { showDownloadSettingsSheet = false }
+        )
     }
 
     // ── Dialog: Refresh Rate Selector Modal ──────────────────────────────

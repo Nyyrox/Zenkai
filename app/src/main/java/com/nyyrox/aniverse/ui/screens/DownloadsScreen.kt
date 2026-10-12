@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -117,6 +118,7 @@ fun DownloadsScreen(
     var deleteConfirmation by remember { mutableStateOf<DeleteConfirmationTarget?>(null) }
     var isDownloadingExpanded by remember { mutableStateOf(true) }
     var isFailedExpanded by remember { mutableStateOf(false) }
+    var showDownloadSettingsSheet by remember { mutableStateOf(false) }
 
     val totalStorageBytes = remember(downloadedAnime, downloadedNovels, downloadedManga) {
         val aSize = downloadedAnime.sumOf { it.totalSizeBytes }
@@ -222,6 +224,24 @@ fun DownloadsScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = { showDownloadSettingsSheet = true },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x18FFFFFF))
+                        .border(1.dp, Color(0x28FFFFFF), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Download Settings",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 
@@ -612,6 +632,12 @@ fun DownloadsScreen(
         IosDeleteConfirmationDialog(
             target = target,
             onDismiss = { deleteConfirmation = null }
+        )
+    }
+
+    if (showDownloadSettingsSheet) {
+        com.nyyrox.aniverse.ui.components.DownloadSettingsSheet(
+            onDismiss = { showDownloadSettingsSheet = false }
         )
     }
 }

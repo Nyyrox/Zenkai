@@ -35,8 +35,14 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import android.media.MediaScannerConnection
 
 class DownloadManager(private val context: Context) {
+    companion object {
+        @Volatile
+        var instance: DownloadManager? = null
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client = OkHttpClient.Builder()
         .connectTimeout(25, TimeUnit.SECONDS)
@@ -46,10 +52,30 @@ class DownloadManager(private val context: Context) {
 
     private val animeDownloader = AnimeStreamDownloader(client)
     private val animeCancellationTokens = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
-    private val animeDownloadSemaphore = Semaphore(2)
 
-    private val baseAnimeDir: File
-        get() = File(context.filesDir, "downloads/anime").apply { if (!exists()) mkdirs() }
+    @Volatile
+    private var currentMaxConcurrent = DownloadPreferences.getMaxConcurrentDownloads(context)
+    @Volatile
+    private var animeDownloadSemaphore = Semaphore(currentMaxConcurrent)
+
+    private fun getDownloadSemaphore(): Semaphore {
+        val max = DownloadPreferences.getMaxConcurrentDownloads(context)
+        if (max != currentMaxConcurrent) {
+            synchronized(this) {
+                if (max != currentMaxConcurrent) {
+                    currentMaxConcurrent = max
+                    animeDownloadSemaphore = Semaphore(max)
+                }
+            }
+        }
+        return animeDownloadSemaphore
+    }
+
+    val primaryAnimeDir: File
+        get() = DownloadPreferences.getAnimeDownloadDir(context)
+
+    val allAnimeDirs: List<File>
+        get() = DownloadPreferences.getAllAnimeDownloadDirs(context)
 
     private val baseNovelDir: File
         get() = File(context.filesDir, "downloads/novels").apply { if (!exists()) mkdirs() }
@@ -136,6 +162,7 @@ class DownloadManager(private val context: Context) {
                 animeCancellationTokens[taskKey]?.set(true)
                 animeCancellationTokens.remove(taskKey)
                 _animeTasks.value = _animeTasks.value - taskKey
+                DownloadNotificationHelper.cancelNotification(context, taskKey)
             }
             DownloadType.NOVEL -> {
                 _novelTasks.value = _novelTasks.value - taskKey
@@ -162,6 +189,8 @@ class DownloadManager(private val context: Context) {
     val downloadedManga: StateFlow<List<DownloadedManga>> = _downloadedManga.asStateFlow()
 
     init {
+        instance = this
+        DownloadPreferences.init(context)
         refreshDownloadedLists()
     }
 
@@ -178,111 +207,117 @@ class DownloadManager(private val context: Context) {
     // ========================================================================
 
     fun isAnimeEpisodeDownloaded(animeId: Int, episode: Int): Boolean {
-        val epDir = File(baseAnimeDir, "$animeId/$episode")
-        if (!epDir.exists() || !epDir.isDirectory) return false
-        val videoFile = File(epDir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
-            ?: File(epDir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
-            ?: File(epDir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
-        return videoFile != null
+        for (baseDir in allAnimeDirs) {
+            val epDir = File(baseDir, "$animeId/$episode")
+            if (!epDir.exists() || !epDir.isDirectory) continue
+            val videoFile = File(epDir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                ?: File(epDir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                ?: File(epDir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+            if (videoFile != null) return true
+        }
+        return false
     }
 
     fun getDownloadedAnimeEpisode(animeId: Int, episode: Int): DownloadedAnimeEpisode? {
-        val epDir = File(baseAnimeDir, "$animeId/$episode")
-        if (!epDir.exists() || !epDir.isDirectory) return null
-        val videoFile = File(epDir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
-            ?: File(epDir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
-            ?: File(epDir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
-            ?: return null
+        for (baseDir in allAnimeDirs) {
+            val epDir = File(baseDir, "$animeId/$episode")
+            if (!epDir.exists() || !epDir.isDirectory) continue
+            val videoFile = File(epDir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                ?: File(epDir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                ?: File(epDir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+                ?: continue
 
-        val metaFile = File(epDir, "meta.json")
-        var epTitle: String? = null
-        var animeTitle = ""
-        var animeCover = ""
-        var provId = ""
-        var provName = ""
-        var downloadedAt = videoFile.lastModified()
-        var metaFileSize = 0L
+            val metaFile = File(epDir, "meta.json")
+            var epTitle: String? = null
+            var animeTitle = ""
+            var animeCover = ""
+            var provId = ""
+            var provName = ""
+            var downloadedAt = videoFile.lastModified()
+            var metaFileSize = 0L
 
-        val parsedSubtitles = mutableListOf<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>()
-        if (metaFile.exists()) {
-            try {
-                val json = JSONObject(metaFile.readText())
-                epTitle = json.optString("episodeTitle").takeIf { it.isNotBlank() }
-                animeTitle = json.optString("animeTitle", "")
-                animeCover = json.optString("animeCover", "")
-                provId = json.optString("providerId", "")
-                provName = json.optString("providerName", "")
-                downloadedAt = json.optLong("downloadedAt", downloadedAt)
-                metaFileSize = json.optLong("fileSize", 0L)
+            val parsedSubtitles = mutableListOf<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>()
+            if (metaFile.exists()) {
+                try {
+                    val json = JSONObject(metaFile.readText())
+                    epTitle = json.optString("episodeTitle").takeIf { it.isNotBlank() }
+                    animeTitle = json.optString("animeTitle", "")
+                    animeCover = json.optString("animeCover", "")
+                    provId = json.optString("providerId", "")
+                    provName = json.optString("providerName", "")
+                    downloadedAt = json.optLong("downloadedAt", downloadedAt)
+                    metaFileSize = json.optLong("fileSize", 0L)
 
-                val subArray = json.optJSONArray("subtitles")
-                if (subArray != null) {
-                    for (i in 0 until subArray.length()) {
-                        val sObj = subArray.optJSONObject(i) ?: continue
-                        val sPath = sObj.optString("filePath", "")
-                        val sFile = File(sPath)
-                        if (sFile.exists() && sFile.length() > 0) {
-                            parsedSubtitles.add(
-                                com.nyyrox.aniverse.data.subtitles.SubtitleTrack(
-                                    id = sObj.optString("id", sFile.nameWithoutExtension),
-                                    label = sObj.optString("label", "English"),
-                                    language = sObj.optString("language", "English"),
-                                    url = sFile.absolutePath,
-                                    isDefault = sObj.optBoolean("isDefault", false),
-                                    source = "Downloaded"
+                    val subArray = json.optJSONArray("subtitles")
+                    if (subArray != null) {
+                        for (i in 0 until subArray.length()) {
+                            val sObj = subArray.optJSONObject(i) ?: continue
+                            val sPath = sObj.optString("filePath", "")
+                            val sFile = File(sPath)
+                            if (sFile.exists() && sFile.length() > 0) {
+                                parsedSubtitles.add(
+                                    com.nyyrox.aniverse.data.subtitles.SubtitleTrack(
+                                        id = sObj.optString("id", sFile.nameWithoutExtension),
+                                        label = sObj.optString("label", "English"),
+                                        language = sObj.optString("language", "English"),
+                                        url = sFile.absolutePath,
+                                        isDefault = sObj.optBoolean("isDefault", false),
+                                        source = "Downloaded"
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
-                }
-            } catch (_: Exception) {}
-        }
-
-        // Fallback: If no subtitles parsed from meta, scan epDir for existing .vtt, .srt, .ass files
-        if (parsedSubtitles.isEmpty()) {
-            val subFiles = epDir.listFiles { f ->
-                f.isFile && (f.name.endsWith(".vtt", ignoreCase = true) || f.name.endsWith(".srt", ignoreCase = true) || f.name.endsWith(".ass", ignoreCase = true))
-            } ?: emptyArray()
-            subFiles.forEach { f ->
-                val lang = f.nameWithoutExtension.removePrefix("sub_").replace("_", " ").ifBlank { "English" }
-                parsedSubtitles.add(
-                    com.nyyrox.aniverse.data.subtitles.SubtitleTrack(
-                        id = f.nameWithoutExtension,
-                        label = lang,
-                        language = lang,
-                        url = f.absolutePath,
-                        isDefault = lang.contains("English", ignoreCase = true),
-                        source = "Downloaded"
-                    )
-                )
+                } catch (_: Exception) {}
             }
+
+            // Fallback: If no subtitles parsed from meta, scan epDir for existing .vtt, .srt, .ass files
+            if (parsedSubtitles.isEmpty()) {
+                val subFiles = epDir.listFiles { f ->
+                    f.isFile && (f.name.endsWith(".vtt", ignoreCase = true) || f.name.endsWith(".srt", ignoreCase = true) || f.name.endsWith(".ass", ignoreCase = true))
+                } ?: emptyArray()
+                subFiles.forEach { f ->
+                    val lang = f.nameWithoutExtension.removePrefix("sub_").replace("_", " ").ifBlank { "English" }
+                    parsedSubtitles.add(
+                        com.nyyrox.aniverse.data.subtitles.SubtitleTrack(
+                            id = f.nameWithoutExtension,
+                            label = lang,
+                            language = lang,
+                            url = f.absolutePath,
+                            isDefault = lang.contains("English", ignoreCase = true),
+                            source = "Downloaded"
+                        )
+                    )
+                }
+            }
+
+            // Calculate actual total size on disk for this episode (manifest + all segments + video files + subtitles)
+            val directorySize = try {
+                epDir.walkTopDown().filter { it.isFile && it.name != "meta.json" }.sumOf { it.length() }
+            } catch (_: Exception) { 0L }
+
+            val actualSize = when {
+                directorySize > 0L -> directorySize
+                metaFileSize > 0L -> metaFileSize
+                else -> videoFile.length()
+            }
+
+            return DownloadedAnimeEpisode(
+                animeId = animeId,
+                episode = episode,
+                episodeTitle = epTitle,
+                animeTitle = animeTitle,
+                animeCover = animeCover,
+                providerId = provId,
+                providerName = provName,
+                filePath = videoFile.absolutePath,
+                localUri = videoFile.absolutePath,
+                sizeBytes = actualSize,
+                downloadedAt = downloadedAt,
+                subtitles = parsedSubtitles
+            )
         }
-
-        // Calculate actual total size on disk for this episode (manifest + all segments + video files + subtitles)
-        val directorySize = try {
-            epDir.walkTopDown().filter { it.isFile && it.name != "meta.json" }.sumOf { it.length() }
-        } catch (_: Exception) { 0L }
-
-        val actualSize = when {
-            directorySize > 0L -> directorySize
-            metaFileSize > 0L -> metaFileSize
-            else -> videoFile.length()
-        }
-
-        return DownloadedAnimeEpisode(
-            animeId = animeId,
-            episode = episode,
-            episodeTitle = epTitle,
-            animeTitle = animeTitle,
-            animeCover = animeCover,
-            providerId = provId,
-            providerName = provName,
-            filePath = videoFile.absolutePath,
-            localUri = videoFile.absolutePath,
-            sizeBytes = actualSize,
-            downloadedAt = downloadedAt,
-            subtitles = parsedSubtitles
-        )
+        return null
     }
 
     private fun getCandidateProviders(
@@ -357,11 +392,18 @@ class DownloadManager(private val context: Context) {
             progress = 0f
         )
         _animeTasks.value = _animeTasks.value + (taskKey to initialTask)
+        DownloadNotificationHelper.updateProgressNotification(context, initialTask)
 
         scope.launch {
-            if (cancelToken.get()) return@launch
-            animeDownloadSemaphore.withPermit {
-                if (cancelToken.get()) return@withPermit
+            if (cancelToken.get()) {
+                DownloadNotificationHelper.cancelNotification(context, taskKey)
+                return@launch
+            }
+            getDownloadSemaphore().withPermit {
+                if (cancelToken.get()) {
+                    DownloadNotificationHelper.cancelNotification(context, taskKey)
+                    return@withPermit
+                }
 
                 val isDub = audio.contains("DUB", ignoreCase = true)
                 val isMulti = audio.contains("MULTI", ignoreCase = true)
@@ -397,7 +439,7 @@ class DownloadManager(private val context: Context) {
                 var downloadSucceeded = false
                 var lastFailureReason = "No playable stream found"
 
-                val animeFolder = File(baseAnimeDir, anime.id.toString()).apply { if (!exists()) mkdirs() }
+                val animeFolder = File(primaryAnimeDir, anime.id.toString()).apply { if (!exists()) mkdirs() }
                 val epFolder = File(animeFolder, episode.toString()).apply { if (!exists()) mkdirs() }
 
                 // Save anime-level meta.json
@@ -529,7 +571,7 @@ class DownloadManager(private val context: Context) {
                         preferredAudio = audio,
                         isCancelled = { cancelToken.get() },
                         onProgress = { prog, dlBytes, totBytes, speedStr, compSegs, totSegs ->
-                            _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                            val currentTask = initialTask.copy(
                                 providerId = targetProvider.id,
                                 providerName = targetProvider.name,
                                 progress = prog,
@@ -539,7 +581,9 @@ class DownloadManager(private val context: Context) {
                                 downloadedSegments = compSegs,
                                 totalSegments = totSegs,
                                 status = DownloadStatus.DOWNLOADING
-                            ))
+                            )
+                            _animeTasks.value = _animeTasks.value + (taskKey to currentTask)
+                            DownloadNotificationHelper.updateProgressNotification(context, currentTask)
                         }
                     )
 
@@ -646,13 +690,23 @@ class DownloadManager(private val context: Context) {
                     epMeta.writeText(epJson.toString())
 
                     animeCancellationTokens.remove(taskKey)
-                    _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                    val completedTask = initialTask.copy(
                         providerId = targetProvider.id,
                         providerName = targetProvider.name,
                         status = DownloadStatus.COMPLETED,
                         progress = 1.0f,
                         localFilePath = finalFile.absolutePath
-                    ))
+                    )
+                    _animeTasks.value = _animeTasks.value + (taskKey to completedTask)
+                    DownloadNotificationHelper.showCompleteNotification(context, completedTask)
+                    try {
+                        MediaScannerConnection.scanFile(
+                            context,
+                            arrayOf(finalFile.absolutePath),
+                            arrayOf("video/mp4"),
+                            null
+                        )
+                    } catch (_: Exception) {}
                     refreshDownloadedLists()
                     downloadSucceeded = true
                     break
@@ -671,12 +725,14 @@ class DownloadManager(private val context: Context) {
             if (!downloadSucceeded && !cancelToken.get()) {
                 animeCancellationTokens.remove(taskKey)
                 val userErrorMessage = "Download stopped on ${targetProvider.name} ($lastFailureReason). Tap Retry to resume."
-                _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                val failedTask = initialTask.copy(
                     providerId = targetProvider.id,
                     providerName = targetProvider.name,
                     status = DownloadStatus.FAILED,
                     error = userErrorMessage
-                ))
+                )
+                _animeTasks.value = _animeTasks.value + (taskKey to failedTask)
+                DownloadNotificationHelper.showFailedNotification(context, failedTask, lastFailureReason)
             }
             }
         }
@@ -742,68 +798,94 @@ class DownloadManager(private val context: Context) {
 
     fun deleteDownloadedAnimeEpisode(animeId: Int, episode: Int) {
         scope.launch {
-            val epDir = File(baseAnimeDir, "$animeId/$episode")
-            if (epDir.exists()) epDir.deleteRecursively()
+            for (baseDir in allAnimeDirs) {
+                val epDir = File(baseDir, "$animeId/$episode")
+                if (epDir.exists()) epDir.deleteRecursively()
+            }
             refreshDownloadedLists()
         }
     }
 
     fun deleteDownloadedAnime(animeId: Int) {
         scope.launch {
-            val aDir = File(baseAnimeDir, animeId.toString())
-            if (aDir.exists()) aDir.deleteRecursively()
+            for (baseDir in allAnimeDirs) {
+                val aDir = File(baseDir, animeId.toString())
+                if (aDir.exists()) aDir.deleteRecursively()
+            }
             refreshDownloadedLists()
         }
     }
 
     fun getDownloadedEpisodesForAnime(animeId: Int): List<DownloadedAnimeEpisode> {
-        val aDir = File(baseAnimeDir, animeId.toString())
-        if (!aDir.exists()) return emptyList()
-        val epDirs = aDir.listFiles { f -> f.isDirectory && (File(f, "playlist.m3u8").exists() || File(f, "video.mp4").exists() || File(f, "video.ts").exists()) } ?: return emptyList()
-        return epDirs.mapNotNull { epDir ->
-            val epNum = epDir.name.toIntOrNull() ?: return@mapNotNull null
-            getDownloadedAnimeEpisode(animeId, epNum)
-        }.sortedBy { it.episode }
-    }
-
-    private fun loadDownloadedAnimeFromDisk(): List<DownloadedAnime> {
-        val list = mutableListOf<DownloadedAnime>()
-        val dirs = baseAnimeDir.listFiles() ?: return emptyList()
-        for (dir in dirs) {
-            if (dir.isDirectory) {
-                val animeId = dir.name.toIntOrNull() ?: continue
-                val metaFile = File(dir, "meta.json")
-                var title = "Anime #$animeId"
-                var cover = ""
-                var lastDownloaded = dir.lastModified()
-
-                if (metaFile.exists()) {
-                    try {
-                        val mJson = JSONObject(metaFile.readText())
-                        title = mJson.optString("title", title)
-                        cover = mJson.optString("cover", cover)
-                        lastDownloaded = mJson.optLong("lastDownloadedAt", lastDownloaded)
-                    } catch (_: Exception) {}
-                }
-
-                val epDirs = dir.listFiles { f -> f.isDirectory && (File(f, "playlist.m3u8").exists() || File(f, "video.mp4").exists() || File(f, "video.ts").exists()) } ?: emptyArray()
-                val totalSize = dir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
-
-                if (epDirs.isNotEmpty()) {
-                    list.add(
-                        DownloadedAnime(
-                            animeId = animeId,
-                            title = title,
-                            cover = cover,
-                            episodesCount = epDirs.size,
-                            totalSizeBytes = totalSize,
-                            lastDownloadedAt = lastDownloaded
-                        )
-                    )
+        val episodesMap = mutableMapOf<Int, DownloadedAnimeEpisode>()
+        for (baseDir in allAnimeDirs) {
+            val aDir = File(baseDir, animeId.toString())
+            if (!aDir.exists() || !aDir.isDirectory) continue
+            val epDirs = aDir.listFiles { f -> f.isDirectory && (File(f, "playlist.m3u8").exists() || File(f, "video.mp4").exists() || File(f, "video.ts").exists()) } ?: continue
+            for (epDir in epDirs) {
+                val epNum = epDir.name.toIntOrNull() ?: continue
+                if (!episodesMap.containsKey(epNum)) {
+                    val ep = getDownloadedAnimeEpisode(animeId, epNum)
+                    if (ep != null) {
+                        episodesMap[epNum] = ep
+                    }
                 }
             }
         }
-        return list.sortedByDescending { it.lastDownloadedAt }
+        return episodesMap.values.sortedBy { it.episode }
+    }
+
+    private fun loadDownloadedAnimeFromDisk(): List<DownloadedAnime> {
+        val animeMap = mutableMapOf<Int, DownloadedAnime>()
+        for (baseDir in allAnimeDirs) {
+            val dirs = baseDir.listFiles() ?: continue
+            for (dir in dirs) {
+                if (dir.isDirectory) {
+                    val animeId = dir.name.toIntOrNull() ?: continue
+                    val metaFile = File(dir, "meta.json")
+                    var title = "Anime #$animeId"
+                    var cover = ""
+                    var lastDownloaded = dir.lastModified()
+
+                    if (metaFile.exists()) {
+                        try {
+                            val mJson = JSONObject(metaFile.readText())
+                            title = mJson.optString("title", title)
+                            cover = mJson.optString("cover", cover)
+                            lastDownloaded = mJson.optLong("lastDownloadedAt", lastDownloaded)
+                        } catch (_: Exception) {}
+                    }
+
+                    val epDirs = dir.listFiles { f -> f.isDirectory && (File(f, "playlist.m3u8").exists() || File(f, "video.mp4").exists() || File(f, "video.ts").exists()) } ?: emptyArray()
+                    val totalSize = try {
+                        dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                    } catch (_: Exception) { 0L }
+
+                    if (epDirs.isNotEmpty()) {
+                        val existing = animeMap[animeId]
+                        if (existing != null) {
+                            animeMap[animeId] = existing.copy(
+                                episodesCount = existing.episodesCount + epDirs.size,
+                                totalSizeBytes = existing.totalSizeBytes + totalSize,
+                                lastDownloadedAt = maxOf(existing.lastDownloadedAt, lastDownloaded),
+                                title = if (existing.title.startsWith("Anime #") && !title.startsWith("Anime #")) title else existing.title,
+                                cover = existing.cover.ifBlank { cover }
+                            )
+                        } else {
+                            animeMap[animeId] = DownloadedAnime(
+                                animeId = animeId,
+                                title = title,
+                                cover = cover,
+                                episodesCount = epDirs.size,
+                                totalSizeBytes = totalSize,
+                                lastDownloadedAt = lastDownloaded
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        return animeMap.values.sortedByDescending { it.lastDownloadedAt }
     }
 
     // ========================================================================
