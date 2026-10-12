@@ -14,6 +14,7 @@ import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.data.novel.INovelSourceRepository
 import com.nyyrox.aniverse.data.novel.NovelChapter
 import com.nyyrox.aniverse.data.novel.NovelChapterContent
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,7 +44,11 @@ class DownloadManager(private val context: Context) {
         var instance: DownloadManager? = null
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Safety net: no background download/IO error can ever crash the app
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, e -> Log.e("DownloadManager", "Uncaught: ${e.message}", e) }
+    )
     private val client = OkHttpClient.Builder()
         .connectTimeout(25, TimeUnit.SECONDS)
         .readTimeout(35, TimeUnit.SECONDS)
@@ -71,11 +76,30 @@ class DownloadManager(private val context: Context) {
         return animeDownloadSemaphore
     }
 
-    val primaryAnimeDir: File
-        get() = DownloadPreferences.getAnimeDownloadDir(context)
+    private val fallbackAnimeDir: File
+        get() = File(context.filesDir, "downloads/anime").apply { if (!exists()) mkdirs() }
 
+    // Real write probe: mkdirs()/canWrite() lie on Android 11+ scoped storage
+    private fun isWritableDir(dir: File): Boolean = try {
+        (dir.exists() || dir.mkdirs()) && File(dir, ".probe").run { writeText("ok"); delete() }
+    } catch (_: Exception) { false }
+
+    // Chosen folder if we can really write to it, otherwise app-private storage (never crashes)
+    val primaryAnimeDir: File
+        get() {
+            val chosen = try { DownloadPreferences.getAnimeDownloadDir(context) } catch (_: Exception) { null }
+            if (chosen != null && isWritableDir(chosen)) return chosen
+            Log.w("DownloadManager", "Chosen download folder not writable (${chosen?.absolutePath}); using app storage")
+            return fallbackAnimeDir
+        }
+
+    // Always includes the fallback dir so fallback downloads still list, play and delete
     val allAnimeDirs: List<File>
-        get() = DownloadPreferences.getAllAnimeDownloadDirs(context)
+        get() {
+            val dirs = try { DownloadPreferences.getAllAnimeDownloadDirs(context) } catch (_: Exception) { emptyList() }
+            val fb = fallbackAnimeDir
+            return if (dirs.any { it.absolutePath == fb.absolutePath }) dirs else dirs + fb
+        }
 
     private val baseNovelDir: File
         get() = File(context.filesDir, "downloads/novels").apply { if (!exists()) mkdirs() }
@@ -394,7 +418,19 @@ class DownloadManager(private val context: Context) {
         _animeTasks.value = _animeTasks.value + (taskKey to initialTask)
         DownloadNotificationHelper.updateProgressNotification(context, initialTask)
 
-        scope.launch {
+        // Any error outside the retry loop (storage, resolver, etc.) marks the task FAILED instead of crashing
+        val failHandler = CoroutineExceptionHandler { _, e ->
+            Log.e("DownloadManager", "Anime download failed: ${e.message}", e)
+            animeCancellationTokens.remove(taskKey)
+            val failed = initialTask.copy(
+                status = DownloadStatus.FAILED,
+                error = "Download failed: ${e.message ?: "Storage error"}. Tap Retry."
+            )
+            _animeTasks.value = _animeTasks.value + (taskKey to failed)
+            try { DownloadNotificationHelper.showFailedNotification(context, failed, e.message ?: "Error") } catch (_: Exception) {}
+        }
+
+        scope.launch(failHandler) {
             if (cancelToken.get()) {
                 DownloadNotificationHelper.cancelNotification(context, taskKey)
                 return@launch
@@ -439,8 +475,9 @@ class DownloadManager(private val context: Context) {
                 var downloadSucceeded = false
                 var lastFailureReason = "No playable stream found"
 
-                val animeFolder = File(primaryAnimeDir, anime.id.toString()).apply { if (!exists()) mkdirs() }
-                val epFolder = File(animeFolder, episode.toString()).apply { if (!exists()) mkdirs() }
+                val animeFolder = File(primaryAnimeDir, anime.id.toString())
+                val epFolder = File(animeFolder, episode.toString())
+                check(epFolder.exists() || epFolder.mkdirs()) { "Can't create download folder: ${epFolder.absolutePath}" }
 
                 // Save anime-level meta.json
                 val animeMeta = File(animeFolder, "meta.json")
