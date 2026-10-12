@@ -58,9 +58,9 @@ import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadSettingsSheet(
-    onDismiss: () -> Unit,
-    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    onDismiss: () -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val settings by DownloadPreferences.settings.collectAsState()
 

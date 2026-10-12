@@ -99,6 +99,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.nyyrox.aniverse.data.filler.AnimeFillerInfo
 import com.nyyrox.aniverse.data.filler.AnimeFillerRepository
+import com.nyyrox.aniverse.ui.components.EpisodeFillerBadge
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import androidx.compose.ui.layout.ContentScale

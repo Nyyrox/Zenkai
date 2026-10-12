@@ -94,6 +94,7 @@ data class DeleteConfirmationTarget(
     val onConfirm: () -> Unit
 )
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadsScreen(
     vm: MainViewModel,
