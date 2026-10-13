@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
     splashScreen.setKeepOnScreenCondition { keepSplash }
     super.onCreate(savedInstanceState)
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-    window.decorView.postDelayed({ keepSplash = false }, 700)
+    window.decorView.postDelayed({ keepSplash = false }, 250)
     enableEdgeToEdge()
     applyConfiguredRefreshRate()
 

@@ -126,7 +126,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
         }
     }
 
-    var navStack by remember { mutableStateOf(listOf("splash")) }
+    var navStack by remember { mutableStateOf(listOf("home")) }
     val currentRoute = navStack.last()
     var isDrawerOpen by remember { mutableStateOf(false) }
     val sharedPosterCoordinator = rememberSharedPosterCoordinator()
@@ -463,12 +463,10 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         ) { screen ->
                             when {
                                 screen == "splash" -> {
-                                    ZenkaiSplashScreen(
-                                        onSplashFinished = {
-                                            navStack = listOf("home")
-                                            if (vm.trending.isEmpty()) vm.loadHome()
-                                        }
-                                    )
+                                    LaunchedEffect(Unit) {
+                                        navStack = listOf("home")
+                                        if (vm.trending.isEmpty()) vm.loadHome()
+                                    }
                                 }
 
                                 screen == "home" -> {
