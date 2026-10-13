@@ -25,7 +25,7 @@ Anime, manga & novels — one focused Android experience.
 
 <a href="https://github.com/Nyyrox/Zenkai/releases/latest">Download APK</a>
 &nbsp; · &nbsp;
-<a href="https://zenkai-web.pages.dev/">Web App</a>
+<a href="https://zenkaii.pages.dev/">Web App</a>
 &nbsp; · &nbsp;
 <a href="https://discord.gg/aXTfS6XGg">Discord</a>
 &nbsp; · &nbsp;
@@ -49,7 +49,7 @@ Zenkai brings **anime streaming, manga reading and novel reading** together in o
 
 The Zenkai experience is also available on the web.
 
-**[Open Zenkai Web →](https://zenkai-web.pages.dev/)**
+**[Open Zenkai Web →](https://zenkaii.pages.dev/)**
 
 ---
 
