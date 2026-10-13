@@ -402,6 +402,7 @@ class ComicKRepository(
                     source = source.id
                 )
             )
+        }
         return list.distinctBy { it.id }
     }
 
