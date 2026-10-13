@@ -29,7 +29,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -314,6 +316,7 @@ private fun MangaSearchResults(
             )
         }
     } else {
+        val uniqueResults = remember(results) { results.distinctBy { it.id } }
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
@@ -321,7 +324,7 @@ private fun MangaSearchResults(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(results, key = { it.id }) { card ->
+            itemsIndexed(uniqueResults, key = { idx, card -> "manga_srch_${card.id}_$idx" }) { _, card ->
                 MangaGridItem(card = card, onClick = { onCardClick(card.id) })
             }
         }
@@ -549,11 +552,12 @@ private fun MangaContinueReadingSection(
             )
         }
 
+        val uniqueHistory = remember(history) { history.distinctBy { it.mangaId }.take(10) }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(history.take(10), key = { it.mangaId }) { item ->
+            itemsIndexed(uniqueHistory, key = { idx, item -> "manga_cont_${item.mangaId}_$idx" }) { _, item ->
                 MangaContinueCard(
                     item = item,
                     onClick = { onCardClick(item.mangaId) },
@@ -713,12 +717,12 @@ private fun MangaBookmarksSection(
             )
         }
 
+        val uniqueBookmarks = remember(bookmarks) { bookmarks.distinctBy { it.mangaId } }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            val uniqueBookmarks = bookmarks.distinctBy { it.mangaId }
-            items(uniqueBookmarks, key = { it.mangaId }) { bm ->
+            itemsIndexed(uniqueBookmarks, key = { idx, bm -> "manga_bm_${bm.mangaId}_$idx" }) { _, bm ->
                 MangaCardView(
                     card = MangaCard(
                         id = bm.mangaId,
@@ -868,11 +872,12 @@ private fun MangaHorizontalRail(
             )
         }
 
+        val uniqueCards = remember(cards) { cards.distinctBy { it.id } }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(cards, key = { it.id }) { card ->
+            itemsIndexed(uniqueCards, key = { idx, card -> "manga_rail_${card.id}_$idx" }) { _, card ->
                 MangaCardView(card = card, onClick = { onCardClick(card.id) })
             }
         }

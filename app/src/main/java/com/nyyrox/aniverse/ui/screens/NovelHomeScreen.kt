@@ -641,11 +641,12 @@ private fun NovelHorizontalRow(
     novels: List<NovelItem>,
     onNovelClick: (String) -> Unit
 ) {
+    val uniqueNovels = remember(novels) { novels.distinctBy { it.slug } }
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(novels, key = { it.slug }) { novel ->
+        itemsIndexed(uniqueNovels, key = { idx, novel -> "novel_${novel.slug}_$idx" }) { _, novel ->
             NovelCard(novel = novel, onClick = { onNovelClick(novel.slug) })
         }
     }

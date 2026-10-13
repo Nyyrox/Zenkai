@@ -402,8 +402,7 @@ class ComicKRepository(
                     source = source.id
                 )
             )
-        }
-        return list
+        return list.distinctBy { it.id }
     }
 
     override suspend fun getHome(): MangaHome = coroutineScope {

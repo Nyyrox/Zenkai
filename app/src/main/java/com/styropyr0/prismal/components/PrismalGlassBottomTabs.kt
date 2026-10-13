@@ -16,10 +16,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -117,6 +119,9 @@ fun PrismalGlassBottomTabs(
             }
         }
 
+        val currentOnTabSelected by rememberUpdatedState(onTabSelected)
+        val currentSelectedTabIndex by rememberUpdatedState(selectedTabIndex)
+
         val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
         val animationScope = rememberCoroutineScope()
         var currentIndex by remember(selectedTabIndex) {
@@ -124,6 +129,10 @@ fun PrismalGlassBottomTabs(
         }
         var dragHighlightIndex by remember { mutableStateOf<Int?>(null) }
         val highlightedTabIndex = dragHighlightIndex ?: selectedTabIndex()
+
+        // Track continuous drag position to avoid async targetValue drift and missed frames
+        var currentDragValue by remember { mutableFloatStateOf(selectedTabIndex().toFloat()) }
+
         val dampedDragAnimation = remember(animationScope, tabsCount, tabWidth, isLtr) {
             PrismalSpringMotion(
                 animationScope = animationScope,
@@ -133,14 +142,15 @@ fun PrismalGlassBottomTabs(
                 initialScale = 1f,
                 pressedScale = 78f / 56f,
                 onDragStarted = {
+                    currentDragValue = value
                     dragHighlightIndex = value.fastRoundToInt().coerceIn(0, tabsCount - 1)
                 },
                 onDragStopped = {
-                    val targetIndex = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
-                    dragHighlightIndex = targetIndex
+                    val targetIndex = currentDragValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
+                    dragHighlightIndex = null
                     currentIndex = targetIndex
                     animateToValue(targetIndex.toFloat())
-                    onTabSelected(targetIndex)
+                    currentOnTabSelected(targetIndex)
                     animationScope.launch {
                         offsetAnimation.animateTo(
                             0f,
@@ -149,13 +159,15 @@ fun PrismalGlassBottomTabs(
                     }
                 },
                 onDrag = { _, dragAmount ->
+                    val delta = dragAmount.x / tabWidth * if (isLtr) 1f else -1f
                     val nextValue =
-                        (targetValue + dragAmount.x / tabWidth * if (isLtr) 1f else -1f).fastCoerceIn(
+                        (currentDragValue + delta).fastCoerceIn(
                             0f,
                             (tabsCount - 1).toFloat()
                         )
+                    currentDragValue = nextValue
                     updateValue(nextValue)
-                    dragHighlightIndex = nextValue.fastRoundToInt()
+                    dragHighlightIndex = nextValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
                     animationScope.launch {
                         offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
                     }
@@ -166,6 +178,7 @@ fun PrismalGlassBottomTabs(
         LaunchedEffect(targetTabIndex) {
             dragHighlightIndex = null
             currentIndex = targetTabIndex
+            currentDragValue = targetTabIndex.toFloat()
             if (dampedDragAnimation.targetValue.fastRoundToInt() != targetTabIndex) {
                 dampedDragAnimation.animateToValue(targetTabIndex.toFloat())
             }

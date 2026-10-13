@@ -199,7 +199,10 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     }
 
     fun switchTab(tab: String) {
-        if (currentRoute != tab) {
+        if (vm.activeDetailAnimeId != null) vm.closeAnimeDetail()
+        if (vm.activeDetailMangaId != null) vm.closeMangaDetail()
+        if (vm.activeDetailNovelSlug != null) vm.closeNovelDetail()
+        if (navStack.lastOrNull() != tab) {
             navStack = listOf(tab)
             when (tab) {
                 "home" -> if (vm.trending.isEmpty()) vm.loadHome()
