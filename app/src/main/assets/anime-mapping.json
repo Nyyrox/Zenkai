@@ -1,0 +1,4387 @@
+{
+    "21": [
+        {
+            "saltId": "one-piece",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "one-piece",
+            "season": 20,
+            "startEpisode": 892
+        }
+    ],
+    "20996": [
+        {
+            "saltId": "gintama",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "9969": [
+        {
+            "saltId": "gintama",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "918": [
+        {
+            "saltId": "gintama",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "187989": [
+        {
+            "saltId": "scum-of-the-brave",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "147105": [
+        {
+            "saltId": "witch-hat-atelier",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "186497": [
+        {
+            "saltId": "the-ramparts-of-ice",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "192808": [
+        {
+            "saltId": "an-observation-log-of-my-fiancee-who-calls-herself-a-villainess",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "196144": [
+        {
+            "saltId": "snowball-earth",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "190143": [
+        {
+            "saltId": "agents-of-the-four-seasons-dance-of-spring",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "199547": [
+        {
+            "saltId": "marriage-toxin",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "158036": [
+        {
+            "saltId": "eren-the-southpaw",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "197754": [
+        {
+            "saltId": "liar-game",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182483": [
+        {
+            "saltId": "the-warrior-princess-and-the-barbaric-king",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "195600": [
+        {
+            "saltId": "daemons-of-the-shadow-realm",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "137662": [
+        {
+            "saltId": "release-that-witch",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "156092": [
+        {
+            "saltId": "to-be-hero-x",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "191205": [
+        {
+            "saltId": "easygoing-territory-defense-by-the-optimistic-lord",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "106479": [
+        {
+            "saltId": "bofuri-i-dont-want-to-get-hurt-so-ill-max-out-my-defense-2",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "bofuri-i-dont-want-to-get-hurt-so-ill-max-out-my-defense",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21709": [
+        {
+            "saltId": "yuri-on-ice",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "151040": [
+        {
+            "saltId": "trigun-stampede",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "198374": [
+        {
+            "saltId": "a-misanthrope-teaches-a-class-for-demi-humans",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "191718": [
+        {
+            "saltId": "roll-over-and-die-i-will-fight-for-an-ordinary-life-with-my-love-and-cursed-sword",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "192261": [
+        {
+            "saltId": "an-adventurers-daily-grind-at-age-29",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "186333": [
+        {
+            "saltId": "kunon-the-sorcerer-can-see",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "195515": [
+        {
+            "saltId": "there-was-a-cute-girl-in-the-heros-party-so-i-tried-confessing-to-her",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20605": [
+        {
+            "saltId": "tokyo-ghoul",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "100240": [
+        {
+            "saltId": "tokyo-ghoul",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "167152": [
+        {
+            "saltId": "sentenced-to-be-a-hero",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "184951": [
+        {
+            "saltId": "you-and-i-are-polar-opposites",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "177580": [
+        {
+            "saltId": "hana-kimi",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "181443": [
+        {
+            "saltId": "dark-moon-the-blood-altar",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "104391": [
+        {
+            "saltId": "if-my-favorite-pop-idol-made-it-to-the-budokan-i-would-die",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "108631": [
+        {
+            "saltId": "cells-at-work",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "166710": [
+        {
+            "saltId": "suicide-squad-isekai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "142193": [
+        {
+            "saltId": "reborn-to-master-the-blade-from-hero-king-to-extraordinary-squire-♀",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "157295": [
+        {
+            "saltId": "my-clueless-first-friend",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "187663": [
+        {
+            "saltId": "a-gatherers-adventure-in-isekai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "140960": [
+        {
+            "saltId": "spy-x-family",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "158927": [
+        {
+            "saltId": "spy-x-family",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "177937": [
+        {
+            "saltId": "spy-x-family",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "198188": [
+        {
+            "saltId": "tatsuki-fujimoto-17-26",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "185736": [
+        {
+            "saltId": "my-hero-academia-vigilantes",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "146493": [
+        {
+            "saltId": "ragna-crimson",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "186161": [
+        {
+            "saltId": "with-you-our-love-will-make-it-through",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "169417": [
+        {
+            "saltId": "remonster",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "199342": [
+        {
+            "saltId": "the-summer-hikaru-died-2",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "179992": [
+        {
+            "saltId": "mechanical-marie",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "187464": [
+        {
+            "saltId": "tojima-wants-to-be-a-kamen-rider",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "180523": [
+        {
+            "saltId": "a-wild-last-boss-appeared",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "138459": [
+        {
+            "saltId": "heroines-run-the-show",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "110521": [
+        {
+            "saltId": "girls-frontline",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "185407": [
+        {
+            "saltId": "takopis-original-sin",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20923": [
+        {
+            "saltId": "food-wars-shokugeki-no-soma",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21518": [
+        {
+            "saltId": "food-wars-shokugeki-no-soma",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "99255": [
+        {
+            "saltId": "food-wars-shokugeki-no-soma",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "109963": [
+        {
+            "saltId": "food-wars-shokugeki-no-soma",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "114043": [
+        {
+            "saltId": "food-wars-shokugeki-no-soma",
+            "season": 5,
+            "startEpisode": 1
+        }
+    ],
+    "186794": [
+        {
+            "saltId": "my-status-as-an-assassin-obviously-exceeds-the-heros",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "175019": [
+        {
+            "saltId": "let-this-grieving-soul-retire",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "181447": [
+        {
+            "saltId": "may-i-ask-for-one-final-thing",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "13599": [
+        {
+            "saltId": "roboticsnotes",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "180812": [
+        {
+            "saltId": "i-left-my-a-rank-party-to-help-my-former-students-reach-the-dungeon-depths",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "104115": [
+        {
+            "saltId": "after-school-dice-club",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20776": [
+        {
+            "saltId": "ghost-in-the-shell-arise",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "141775": [
+        {
+            "saltId": "shoot-goal-to-the-future",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "1535": [
+        {
+            "saltId": "death-note",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "162147": [
+        {
+            "saltId": "pokemon-concierge",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "1735": [
+        {
+            "saltId": "naruto-shippuden",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 2,
+            "startEpisode": 33
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 3,
+            "startEpisode": 54
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 4,
+            "startEpisode": 72
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 5,
+            "startEpisode": 89
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 6,
+            "startEpisode": 113
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 7,
+            "startEpisode": 144
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 8,
+            "startEpisode": 152
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 9,
+            "startEpisode": 176
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 10,
+            "startEpisode": 197
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 11,
+            "startEpisode": 221
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 12,
+            "startEpisode": 243
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 13,
+            "startEpisode": 276
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 14,
+            "startEpisode": 296
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 15,
+            "startEpisode": 321
+        },
+        {
+            "saltId": "naruto-shippuden",
+            "season": 16,
+            "startEpisode": 349
+        }
+    ],
+    "124080": [
+        {
+            "saltId": "horimiya",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "163132": [
+        {
+            "saltId": "horimiya",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "137667": [
+        {
+            "saltId": "lord-of-mysteries",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "4264": [
+        {
+            "saltId": "ultraviolet-code-044",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "5505": [
+        {
+            "saltId": "vipers-creed",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "130706": [
+        {
+            "saltId": "akuma-kun",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "5039": [
+        {
+            "saltId": "kurozuka",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "5041": [
+        {
+            "saltId": "guin-saga",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "5507": [
+        {
+            "saltId": "valkyria-chronicles",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "177709": [
+        {
+            "saltId": "sakamoto-days",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "184237": [
+        {
+            "saltId": "sakamoto-days",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "177106": [
+        {
+            "saltId": "garouden-the-way-of-the-lone-wolf",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178548": [
+        {
+            "saltId": "even-given-the-worthless-appraiser-class-im-actually-the-strongest",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20665": [
+        {
+            "saltId": "your-lie-in-april",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "177887": [
+        {
+            "saltId": "leviathan",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178025": [
+        {
+            "saltId": "gachiakuta",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "185544": [
+        {
+            "saltId": "welcome-to-the-outcasts-restaurant",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178869": [
+        {
+            "saltId": "clevatess",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "150077": [
+        {
+            "saltId": "paradox-live-the-animation",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "98659": [
+        {
+            "saltId": "classroom-of-the-elite",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "145545": [
+        {
+            "saltId": "classroom-of-the-elite",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "146066": [
+        {
+            "saltId": "classroom-of-the-elite",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "21507": [
+        {
+            "saltId": "mob-psycho-100",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176702": [
+        {
+            "saltId": "teogonia",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21087": [
+        {
+            "saltId": "one-punch-man",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "97668": [
+        {
+            "saltId": "one-punch-man",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "153800": [
+        {
+            "saltId": "one-punch-man",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "174802": [
+        {
+            "saltId": "the-shiunji-family-children",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182060": [
+        {
+            "saltId": "the-gorilla-gods-go-to-girl",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170695": [
+        {
+            "saltId": "i-parry-everything",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20832": [
+        {
+            "saltId": "overlord",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "98437": [
+        {
+            "saltId": "overlord",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "101474": [
+        {
+            "saltId": "overlord",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "133844": [
+        {
+            "saltId": "overlord",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "184279": [
+        {
+            "saltId": "catch-me-at-the-ballpark",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178701": [
+        {
+            "saltId": "once-upon-a-witchs-death",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "185213": [
+        {
+            "saltId": "mobile-suit-gundam-gquuuuuux",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "666": [
+        {
+            "saltId": "jojos-bizarre-adventure",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20799": [
+        {
+            "saltId": "jojos-bizarre-adventure",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "1726": [
+        {
+            "saltId": "devil-may-cry",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "183161": [
+        {
+            "saltId": "the-beginning-after-the-end",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "183133": [
+        {
+            "saltId": "the-unaware-atelier-meister",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170938": [
+        {
+            "saltId": "the-magical-girl-and-the-evil-lieutenant-used-to-be-archenemies",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "162804": [
+        {
+            "saltId": "alya-sometimes-hides-her-feelings-in-russian",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "116006": [
+        {
+            "saltId": "the-god-of-high-school",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "164702": [
+        {
+            "saltId": "as-a-reincarnated-aristocrat-ill-use-my-appraisal-skill-to-rise-in-the-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178434": [
+        {
+            "saltId": "as-a-reincarnated-aristocrat-ill-use-my-appraisal-skill-to-rise-in-the-world",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "149326": [
+        {
+            "saltId": "the-maid-i-hired-recently-is-mysterious",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "153518": [
+        {
+            "saltId": "delicious-in-dungeon",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "169935": [
+        {
+            "saltId": "the-strongest-tanks-labyrinth-raids-a-tank-with-a-rare-9999-resistance-skill-got-kicked-from-the-heros-party",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21355": [
+        {
+            "saltId": "re-zero-starting-life-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "108632": [
+        {
+            "saltId": "re-zero-starting-life-in-another-world",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "163134": [
+        {
+            "saltId": "re-zero-starting-life-in-another-world",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "16498": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20958": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "99147": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "104578": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 3,
+            "startEpisode": 13
+        }
+    ],
+    "110277": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "131681": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 4,
+            "startEpisode": 17
+        }
+    ],
+    "146984": [
+        {
+            "saltId": "attack-on-titan",
+            "season": 4,
+            "startEpisode": 29
+        },
+        {
+            "saltId": "konosuba-gods-blessing-on-this-wonderful-world",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "134732": [
+        {
+            "saltId": "aoashi",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170130": [
+        {
+            "saltId": "chillin-in-another-world-with-level-2-super-cheat-powers",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "119056": [
+        {
+            "saltId": "she-professed-herself-pupil-of-the-wise-man",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "143338": [
+        {
+            "saltId": "the-angel-next-door-spoils-me-rotten",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170019": [
+        {
+            "saltId": "the-angel-next-door-spoils-me-rotten",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "129201": [
+        {
+            "saltId": "summer-time-rendering",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "141949": [
+        {
+            "saltId": "more-than-a-married-couple-but-not-lovers",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "99940": [
+        {
+            "saltId": "junji-ito-collection",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "139274": [
+        {
+            "saltId": "mobile-suit-gundam-the-witch-from-mercury",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "155158": [
+        {
+            "saltId": "mobile-suit-gundam-the-witch-from-mercury",
+            "season": 1,
+            "startEpisode": 13
+        }
+    ],
+    "163076": [
+        {
+            "saltId": "villainess-level-99-i-may-be-the-hidden-boss-but-im-not-the-demon-lord",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "113813": [
+        {
+            "saltId": "rent-a-girlfriend",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "124410": [
+        {
+            "saltId": "rent-a-girlfriend",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "154745": [
+        {
+            "saltId": "rent-a-girlfriend",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "179344": [
+        {
+            "saltId": "rent-a-girlfriend",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "166715": [
+        {
+            "saltId": "black-butler",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "179054": [
+        {
+            "saltId": "black-butler",
+            "season": 5,
+            "startEpisode": 1
+        }
+    ],
+    "147103": [
+        {
+            "saltId": "my-happy-marriage",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "169441": [
+        {
+            "saltId": "my-happy-marriage",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "139303": [
+        {
+            "saltId": "black-rock-shooter-dawn-fall",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "116674": [
+        {
+            "saltId": "bleach-thousand-year-blood-war",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "159322": [
+        {
+            "saltId": "bleach-thousand-year-blood-war",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "169755": [
+        {
+            "saltId": "bleach-thousand-year-blood-war",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "176642": [
+        {
+            "saltId": "ameku-m-d-doctor-detective",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "1575": [
+        {
+            "saltId": "code-geass-lelouch-of-the-rebellion",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "148048": [
+        {
+            "saltId": "kamikatsu-working-for-god-in-a-godless-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "155907": [
+        {
+            "saltId": "buddy-daddies",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "144092": [
+        {
+            "saltId": "handyman-saitou-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "153845": [
+        {
+            "saltId": "i-got-a-cheat-skill-in-another-world-and-became-unrivaled-in-the-real-world-too",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "116566": [
+        {
+            "saltId": "akudama-drive",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "11061": [
+        {
+            "saltId": "hunter-x-hunter",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "hunter-x-hunter",
+            "season": 2,
+            "startEpisode": 27
+        },
+        {
+            "saltId": "hunter-x-hunter",
+            "season": 3,
+            "startEpisode": 39
+        }
+    ],
+    "156039": [
+        {
+            "saltId": "berserk-of-gluttony",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "166828": [
+        {
+            "saltId": "a-salad-bowl-of-eccentrics",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "132052": [
+        {
+            "saltId": "a-couple-of-cuckoos",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "179828": [
+        {
+            "saltId": "a-couple-of-cuckoos",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "146234": [
+        {
+            "saltId": "my-one-hit-kill-sister",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "142598": [
+        {
+            "saltId": "reign-of-the-seven-spellblades",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "159831": [
+        {
+            "saltId": "zom-100-bucket-list-of-the-dead",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "146953": [
+        {
+            "saltId": "masamune-kuns-revenge",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "131646": [
+        {
+            "saltId": "the-case-study-of-vanitas",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "135136": [
+        {
+            "saltId": "the-case-study-of-vanitas",
+            "season": 1,
+            "startEpisode": 13
+        }
+    ],
+    "151806": [
+        {
+            "saltId": "tomo-chan-is-a-girl",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "154965": [
+        {
+            "saltId": "my-love-story-with-yamada-kun-at-lv999",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "158704": [
+        {
+            "saltId": "im-in-love-with-the-villainess",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "142074": [
+        {
+            "saltId": "trapped-in-a-dating-sim-the-world-of-otome-games-is-tough-for-mobs",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "6702": [
+        {
+            "saltId": "fairy-tail",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "fairy-tail",
+            "season": 2,
+            "startEpisode": 49
+        },
+        {
+            "saltId": "fairy-tail",
+            "season": 3,
+            "startEpisode": 73
+        }
+    ],
+    "137908": [
+        {
+            "saltId": "the-wrong-way-to-use-healing-magic",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "139095": [
+        {
+            "saltId": "fairy-tail-100-years-quest",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "129898": [
+        {
+            "saltId": "the-worlds-finest-assassin-gets-reincarnated-in-another-world-as-an-aristocrat",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21049": [
+        {
+            "saltId": "relife",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "153452": [
+        {
+            "saltId": "ranking-of-kings-the-treasure-chest-of-courage",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "113717": [
+        {
+            "saltId": "ranking-of-kings",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170068": [
+        {
+            "saltId": "frieren-beyond-journeys-end",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182255": [
+        {
+            "saltId": "frieren-beyond-journeys-end",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "101024": [
+        {
+            "saltId": "radiant",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "180052": [
+        {
+            "saltId": "the-red-ranger-becomes-an-adventurer-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "151807": [
+        {
+            "saltId": "solo-leveling",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176496": [
+        {
+            "saltId": "solo-leveling",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "178462": [
+        {
+            "saltId": "im-getting-married-to-a-girl-i-hate-in-my-class",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "177506": [
+        {
+            "saltId": "possibly-the-greatest-alchemist-of-all-time",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170604": [
+        {
+            "saltId": "vampire-dormitory",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "144553": [
+        {
+            "saltId": "the-reincarnation-of-the-strongest-exorcist-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "159039": [
+        {
+            "saltId": "the-many-sides-of-voice-actor-radio",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "101280": [
+        {
+            "saltId": "that-time-i-got-reincarnated-as-a-slime",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "108511": [
+        {
+            "saltId": "that-time-i-got-reincarnated-as-a-slime",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "116742": [
+        {
+            "saltId": "that-time-i-got-reincarnated-as-a-slime",
+            "season": 2,
+            "startEpisode": 13
+        }
+    ],
+    "156822": [
+        {
+            "saltId": "that-time-i-got-reincarnated-as-a-slime",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "182205": [
+        {
+            "saltId": "that-time-i-got-reincarnated-as-a-slime",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "21459": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21856": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "100166": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "104276": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "117193": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 5,
+            "startEpisode": 1
+        }
+    ],
+    "139630": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 6,
+            "startEpisode": 1
+        }
+    ],
+    "163139": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 7,
+            "startEpisode": 1
+        }
+    ],
+    "182896": [
+        {
+            "saltId": "my-hero-academia",
+            "season": 8,
+            "startEpisode": 1
+        }
+    ],
+    "101922": [
+        {
+            "saltId": "demon-slayer",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "112151": [
+        {
+            "saltId": "demon-slayer",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "142329": [
+        {
+            "saltId": "demon-slayer",
+            "season": 2,
+            "startEpisode": 8
+        }
+    ],
+    "145139": [
+        {
+            "saltId": "demon-slayer",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "166240": [
+        {
+            "saltId": "demon-slayer",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "813": [
+        {
+            "saltId": "dragon-ball-z",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 2,
+            "startEpisode": 40
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 3,
+            "startEpisode": 75
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 4,
+            "startEpisode": 108
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 5,
+            "startEpisode": 140
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 6,
+            "startEpisode": 166
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 7,
+            "startEpisode": 195
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 8,
+            "startEpisode": 220
+        },
+        {
+            "saltId": "dragon-ball-z",
+            "season": 9,
+            "startEpisode": 254
+        }
+    ],
+    "21175": [
+        {
+            "saltId": "dragon-ball-super",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "dragon-ball-super",
+            "season": 2,
+            "startEpisode": 19
+        },
+        {
+            "saltId": "dragon-ball-super",
+            "season": 3,
+            "startEpisode": 28
+        },
+        {
+            "saltId": "dragon-ball-super",
+            "season": 4,
+            "startEpisode": 47
+        },
+        {
+            "saltId": "dragon-ball-super",
+            "season": 5,
+            "startEpisode": 77
+        }
+    ],
+    "21236": [
+        {
+            "saltId": "beyblade-burst",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "98289": [
+        {
+            "saltId": "beyblade-burst",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "101115": [
+        {
+            "saltId": "beyblade-burst",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "108853": [
+        {
+            "saltId": "beyblade-burst",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "116786": [
+        {
+            "saltId": "beyblade-burst",
+            "season": 5,
+            "startEpisode": 1
+        }
+    ],
+    "5962": [
+        {
+            "saltId": "beyblade-metal-saga",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "8410": [
+        {
+            "saltId": "beyblade-metal-saga",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "10370": [
+        {
+            "saltId": "beyblade-metal-saga",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "137822": [
+        {
+            "saltId": "blue-lock",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "163146": [
+        {
+            "saltId": "blue-lock",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "115230": [
+        {
+            "saltId": "tower-of-god",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "153406": [
+        {
+            "saltId": "tower-of-god",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "131548": [
+        {
+            "saltId": "akebis-sailor-uniform",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "144176": [
+        {
+            "saltId": "gods-games-we-play",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "153288": [
+        {
+            "saltId": "kaiju-no-8",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178754": [
+        {
+            "saltId": "kaiju-no-8",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "6033": [
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 2,
+            "startEpisode": 19
+        },
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 3,
+            "startEpisode": 55
+        },
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 4,
+            "startEpisode": 83
+        }
+    ],
+    "11359": [
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 4,
+            "startEpisode": 98
+        }
+    ],
+    "20635": [
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 5,
+            "startEpisode": 99
+        },
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 6,
+            "startEpisode": 123
+        },
+        {
+            "saltId": "dragon-ball-z-kai",
+            "season": 7,
+            "startEpisode": 141
+        }
+    ],
+    "113415": [
+        {
+            "saltId": "jujutsu-kaisen",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "145064": [
+        {
+            "saltId": "jujutsu-kaisen",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "172463": [
+        {
+            "saltId": "jujutsu-kaisen",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "126213": [
+        {
+            "saltId": "banished-from-the-heros-party-i-decided-to-live-a-quiet-life-in-the-countryside",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "156131": [
+        {
+            "saltId": "banished-from-the-heros-party-i-decided-to-live-a-quiet-life-in-the-countryside",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "97940": [
+        {
+            "saltId": "black-clover",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "173584": [
+        {
+            "saltId": "the-strongest-magician-in-the-demon-lords-army-was-a-human",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "157371": [
+        {
+            "saltId": "bye-bye-earth",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "181078": [
+        {
+            "saltId": "bye-bye-earth",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "20": [
+        {
+            "saltId": "naruto",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "naruto",
+            "season": 2,
+            "startEpisode": 58
+        },
+        {
+            "saltId": "naruto",
+            "season": 3,
+            "startEpisode": 101
+        },
+        {
+            "saltId": "naruto",
+            "season": 4,
+            "startEpisode": 142
+        },
+        {
+            "saltId": "naruto",
+            "season": 5,
+            "startEpisode": 184
+        }
+    ],
+    "152681": [
+        {
+            "saltId": "days-with-my-stepsister",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "166700": [
+        {
+            "saltId": "twilight-out-of-focus",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "162896": [
+        {
+            "saltId": "the-elusive-samurai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "171457": [
+        {
+            "saltId": "makeine-too-many-losing-heroines",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "167419": [
+        {
+            "saltId": "why-does-nobody-remember-me-in-this-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "174576": [
+        {
+            "saltId": "wistoria-wand-and-sword",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182300": [
+        {
+            "saltId": "wistoria-wand-and-sword",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "160488": [
+        {
+            "saltId": "vtuber-legend-how-i-went-viral-after-forgetting-to-turn-off-my-stream",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "152137": [
+        {
+            "saltId": "no-longer-allowed-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "101348": [
+        {
+            "saltId": "vinland-saga",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "136430": [
+        {
+            "saltId": "vinland-saga",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "17265": [
+        {
+            "saltId": "log-horizon",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20671": [
+        {
+            "saltId": "log-horizon",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "223": [
+        {
+            "saltId": "dragon-ball",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20464": [
+        {
+            "saltId": "haikyu",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20992": [
+        {
+            "saltId": "haikyu",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "21698": [
+        {
+            "saltId": "haikyu",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "106625": [
+        {
+            "saltId": "haikyu",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "113538": [
+        {
+            "saltId": "haikyu",
+            "season": 4,
+            "startEpisode": 14
+        }
+    ],
+    "127230": [
+        {
+            "saltId": "chainsaw-man",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "99423": [
+        {
+            "saltId": "darling-in-the-franxx",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "171038": [
+        {
+            "saltId": "nina-the-starry-bride",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "164172": [
+        {
+            "saltId": "tying-the-knot-with-an-amagami-sister",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "168139": [
+        {
+            "saltId": "ill-become-a-villainess-who-goes-down-in-history",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20755": [
+        {
+            "saltId": "assassination-classroom",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21170": [
+        {
+            "saltId": "assassination-classroom",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "171018": [
+        {
+            "saltId": "dan-da-dan",
+            "season": 1,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "bleach-thousand-year-blood-war",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "185660": [
+        {
+            "saltId": "dan-da-dan",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "165790": [
+        {
+            "saltId": "365-days-to-the-wedding",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176053": [
+        {
+            "saltId": "good-bye-dragon-life",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "169315": [
+        {
+            "saltId": "trillion-game",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "158539": [
+        {
+            "saltId": "lookism",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "151970": [
+        {
+            "saltId": "shangri-la-frontier",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176508": [
+        {
+            "saltId": "shangri-la-frontier",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "104252": [
+        {
+            "saltId": "demon-lord-retry",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "168500": [
+        {
+            "saltId": "demon-lord-retry",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "172190": [
+        {
+            "saltId": "you-are-ms-servant",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "14837": [
+        {
+            "saltId": "dragon-ball-z-battle-of-gods",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "108465": [
+        {
+            "saltId": "mushoku-tensei-jobless-reincarnation",
+            "season": 1,
+            "startEpisode": 1,
+            "episodeOffset": 0
+        }
+    ],
+    "127720": [
+        {
+            "saltId": "mushoku-tensei-jobless-reincarnation",
+            "season": 1,
+            "startEpisode": 1,
+            "episodeOffset": 11
+        }
+    ],
+    "141534": [
+        {
+            "saltId": "mushoku-tensei-jobless-reincarnation",
+            "season": 1,
+            "startEpisode": 1,
+            "episodeOffset": 23
+        }
+    ],
+    "146065": [
+        {
+            "saltId": "mushoku-tensei-jobless-reincarnation",
+            "season": 2,
+            "startEpisode": 1,
+            "episodeOffset": 0
+        }
+    ],
+    "166873": [
+        {
+            "saltId": "mushoku-tensei-jobless-reincarnation",
+            "season": 2,
+            "startEpisode": 1,
+            "episodeOffset": 13
+        }
+    ],
+    "178533": [
+        {
+            "saltId": "ranma-½-2024",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "185731": [
+        {
+            "saltId": "ranma-½-2024",
+            "season": 2,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "ranma-%c2%bd-2024",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "142877": [
+        {
+            "saltId": "rurouni-kenshin-2023",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "171637": [
+        {
+            "saltId": "rurouni-kenshin-2023",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "170083": [
+        {
+            "saltId": "dragon-ball-daima",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "11757": [
+        {
+            "saltId": "sword-art-online",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20594  ": [
+        {
+            "saltId": "sword-art-online",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "114121": [
+        {
+            "saltId": "the-daily-life-of-the-immortal-king",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "126357": [
+        {
+            "saltId": "the-daily-life-of-the-immortal-king",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "141852": [
+        {
+            "saltId": "the-daily-life-of-the-immortal-king",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "156110": [
+        {
+            "saltId": "the-daily-life-of-the-immortal-king",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "185857": [
+        {
+            "saltId": "the-daily-life-of-the-immortal-king",
+            "season": 5,
+            "startEpisode": 1
+        }
+    ],
+    "100183": [
+        {
+            "saltId": "sword-art-online-alternative-gun-gale-online",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "156067": [
+        {
+            "saltId": "campfire-cooking-in-another-world-with-my-absurd-skill",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170577": [
+        {
+            "saltId": "campfire-cooking-in-another-world-with-my-absurd-skill",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "120120": [
+        {
+            "saltId": "tokyo-revengers",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "105310": [
+        {
+            "saltId": "fire-force",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "114236": [
+        {
+            "saltId": "fire-force",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "149118": [
+        {
+            "saltId": "fire-force",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "179062": [
+        {
+            "saltId": "fire-force",
+            "season": 3,
+            "startEpisode": 13
+        }
+    ],
+    "125206": [
+        {
+            "saltId": "tsukimichi-moonlit-fantasy",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "139518": [
+        {
+            "saltId": "tsukimichi-moonlit-fantasy",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "163270": [
+        {
+            "saltId": "wind-breaker",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178680": [
+        {
+            "saltId": "wind-breaker",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "174653": [
+        {
+            "saltId": "viral-hit",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "148116": [
+        {
+            "saltId": "the-iceblade-sorcerer-shall-rule-the-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "165254": [
+        {
+            "saltId": "bucchigiri",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "155963": [
+        {
+            "saltId": "hokkaido-gals-are-super-adorable",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "151801": [
+        {
+            "saltId": "mashle-magic-and-muscles",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "166610": [
+        {
+            "saltId": "mashle-magic-and-muscles",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "156891": [
+        {
+            "saltId": "the-weakest-tamer-began-a-journey-to-pick-up-trash",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "136428": [
+        {
+            "saltId": "miss-kuroitsu-from-the-monster-development-department",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "140643": [
+        {
+            "saltId": "tokyo-24th-ward",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "165855": [
+        {
+            "saltId": "a-condition-called-love",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "179297": [
+        {
+            "saltId": "magic-maker-how-to-make-magic-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176273": [
+        {
+            "saltId": "zenshu",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "105333": [
+        {
+            "saltId": "dr-stone",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "113936": [
+        {
+            "saltId": "dr-stone",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "131518": [
+        {
+            "saltId": "dr-stone",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "162670": [
+        {
+            "saltId": "dr-stone",
+            "season": 3,
+            "startEpisode": 12
+        }
+    ],
+    "172019": [
+        {
+            "saltId": "dr-stone",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "189117": [
+        {
+            "saltId": "dr-stone",
+            "season": 4,
+            "startEpisode": 13
+        }
+    ],
+    "199221": [
+        {
+            "saltId": "dr-stone",
+            "season": 4,
+            "startEpisode": 25
+        }
+    ],
+    "155890": [
+        {
+            "saltId": "bartender-glass-of-god",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "152184": [
+        {
+            "saltId": "true-beauty",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "162985": [
+        {
+            "saltId": "metallic-rouge",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "155730": [
+        {
+            "saltId": "my-tiny-senpai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "148465": [
+        {
+            "saltId": "my-unique-skill-makes-me-op-even-at-level-1",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "151847": [
+        {
+            "saltId": "why-raeliana-ended-up-at-the-dukes-mansion",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "156023": [
+        {
+            "saltId": "an-archdemons-dilemma-how-to-love-your-elf-bride",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "157198": [
+        {
+            "saltId": "dead-mount-death-play",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "107693": [
+        {
+            "saltId": "welcome-to-demon-school-iruma-kun",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "98436": [
+        {
+            "saltId": "the-ancient-magus-bride",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "130713": [
+        {
+            "saltId": "the-ancient-magus-bride",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "161645": [
+        {
+            "saltId": "the-apothecary-diaries",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176301": [
+        {
+            "saltId": "the-apothecary-diaries",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "128712": [
+        {
+            "saltId": "the-detective-is-already-dead",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "155418": [
+        {
+            "saltId": "the-great-cleric",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "112608": [
+        {
+            "saltId": "ive-been-killing-slimes-for-300-years-and-maxed-out-my-level",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "143337": [
+        {
+            "saltId": "ive-been-killing-slimes-for-300-years-and-maxed-out-my-level",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "124195": [
+        {
+            "saltId": "baki-hanma",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "146646": [
+        {
+            "saltId": "baki-hanma",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "177476": [
+        {
+            "saltId": "yaiba-samurai-legend",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "108463": [
+        {
+            "saltId": "toilet-bound-hanako-kun",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170892": [
+        {
+            "saltId": "toilet-bound-hanako-kun",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "189326": [
+        {
+            "saltId": "toilet-bound-hanako-kun",
+            "season": 2,
+            "startEpisode": 13
+        }
+    ],
+    "184574": [
+        {
+            "saltId": "dekin-no-mogura-the-earthbound-mole",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "132405": [
+        {
+            "saltId": "my-dress-up-darling",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "154768": [
+        {
+            "saltId": "my-dress-up-darling",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "155838": [
+        {
+            "saltId": "new-saga",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "153360": [
+        {
+            "saltId": "reborn-as-a-vending-machine-i-now-wander-the-dungeon",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "169440": [
+        {
+            "saltId": "reborn-as-a-vending-machine-i-now-wander-the-dungeon",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "198939": [
+        {
+            "saltId": "reborn-as-a-vending-machine-i-now-wander-the-dungeon",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "109639": [
+        {
+            "saltId": "dino-girl-gauko",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "115794": [
+        {
+            "saltId": "dino-girl-gauko",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "21519": [
+        {
+            "saltId": "your-name",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "106286": [
+        {
+            "saltId": "weathering-with-you",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "148080": [
+        {
+            "saltId": "my-oni-girl",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1670": [
+        {
+            "saltId": "beyblade-the-movie-fierce-battle",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2759": [
+        {
+            "saltId": "evangelion-1-0-you-are-not-alone",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "3784": [
+        {
+            "saltId": "evangelion-2-0-you-can-not-advance",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "3785": [
+        {
+            "saltId": "evangelion-3-0-you-can-not-redo",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "3786": [
+        {
+            "saltId": "evangelion-3-01-0-thrice-upon-a-time",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "122575": [
+        {
+            "saltId": "stand-by-me-doraemon-2",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "10740": [
+        {
+            "saltId": "pokemon-the-movie-black-victini-and-reshiram",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "6178": [
+        {
+            "saltId": "pokemon-arceus-and-the-jewel-of-life",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "20644": [
+        {
+            "saltId": "pokemon-the-movie-diancie-and-the-cocoon-of-destruction",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2847": [
+        {
+            "saltId": "pokemon-the-rise-of-darkrai",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1122": [
+        {
+            "saltId": "pokemon-destiny-deoxys",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "16680": [
+        {
+            "saltId": "pokemon-the-movie-genesect-and-the-legend-awakened",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "100658": [
+        {
+            "saltId": "sinbad-night-at-high-noon-and-the-wonder-gate",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "431": [
+        {
+            "saltId": "howls-moving-castle",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "523": [
+        {
+            "saltId": "my-neighbor-totoro",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "199": [
+        {
+            "saltId": "spirited-away",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1119": [
+        {
+            "saltId": "pokemon-4ever",
+            "season": null,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "pokemon-heroes",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "131680": [
+        {
+            "saltId": "black-clover-sword-of-the-wizard-king",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "133898": [
+        {
+            "saltId": "dragon-ball-super-super-hero",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "174788": [
+        {
+            "saltId": "look-back",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "158928": [
+        {
+            "saltId": "spy-x-family-movie-code-white",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "151117": [
+        {
+            "saltId": "mononoke-the-movie-the-phantom-in-the-rain",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "142770": [
+        {
+            "saltId": "suzume",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "131573": [
+        {
+            "saltId": "jujutsu-kaisen-0",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "171627": [
+        {
+            "saltId": "chainsaw-man-the-movie-reze-arc",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "153658": [
+        {
+            "saltId": "haikyu-the-dumpster-battle",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "178788": [
+        {
+            "saltId": "demon-slayer-kimetsu-no-yaiba-infinity-castle",
+            "season": null,
+            "startEpisode": 1
+        },
+        {
+            "saltId": "ranma-%c2%bd-2024",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "192002": [
+        {
+            "saltId": "lost-in-starlight",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "179852": [
+        {
+            "saltId": "mononoke-the-movie-chapter-ii-the-ashes-of-rage",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "150672": [
+        {
+            "saltId": "%e3%80%90oshi-no-ko%e3%80%91",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "166531": [
+        {
+            "saltId": "%e3%80%90oshi-no-ko%e3%80%91",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "182256": [
+        {
+            "saltId": "%e3%80%90oshi-no-ko%e3%80%91",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "114446": [
+        {
+            "saltId": "bleach-thousand-year-blood-war",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "189851": [
+        {
+            "saltId": "bleach-thousand-year-blood-war",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "116047": [
+        {
+            "saltId": "bofuri-i-dont-want-to-get-hurt-so-ill-max-out-my-defense",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "100668": [
+        {
+            "saltId": "arifureta-from-commonplace-to-worlds-strongest",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "112323": [
+        {
+            "saltId": "arifureta-from-commonplace-to-worlds-strongest",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "154085": [
+        {
+            "saltId": "arifureta-from-commonplace-to-worlds-strongest",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "105334": [
+        {
+            "saltId": "fruits-basket",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "101165": [
+        {
+            "saltId": "goblin-slayer",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "14713": [
+        {
+            "saltId": "kamisama-kiss",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20739": [
+        {
+            "saltId": "kamisama-kiss",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "99263": [
+        {
+            "saltId": "the-rising-of-the-shield-hero",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "111321": [
+        {
+            "saltId": "the-rising-of-the-shield-hero",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "111322": [
+        {
+            "saltId": "the-rising-of-the-shield-hero",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "173739": [
+        {
+            "saltId": "the-rising-of-the-shield-hero",
+            "season": 4,
+            "startEpisode": 1
+        }
+    ],
+    "116242": [
+        {
+            "saltId": "im-standing-on-a-million-lives",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "128544": [
+        {
+            "saltId": "im-standing-on-a-million-lives",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "5114": [
+        {
+            "saltId": "fullmetal-alchemist-brotherhood",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "121": [
+        {
+            "saltId": "fullmetal-alchemist",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20613": [
+        {
+            "saltId": "akame-ga-kill",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "97888": [
+        {
+            "saltId": "baki",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "176045": [
+        {
+            "saltId": "baki-dou-the-invincible-samurai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170942": [
+        {
+            "saltId": "blue-box",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "170769": [
+        {
+            "saltId": "blue-eye-samurai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "97938": [
+        {
+            "saltId": "boruto-naruto-next-generations",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "139369": [
+        {
+            "saltId": "case-closed-the-culprit-hanzawa",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "139368": [
+        {
+            "saltId": "case-closed-zeros-tea-time",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "98444": [
+        {
+            "saltId": "castlevania",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "152062": [
+        {
+            "saltId": "castlevania-nocturne",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "117533": [
+        {
+            "saltId": "cells-at-work-code-black",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "552": [
+        {
+            "saltId": "digimon-adventure",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "8624": [
+        {
+            "saltId": "digimon-fusion",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "2528": [
+        {
+            "saltId": "dinosaur-king",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "2471": [
+        {
+            "saltId": "doraemon",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "8687": [
+        {
+            "saltId": "doraemon-2005",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "105228": [
+        {
+            "saltId": "dorohedoro",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "146860": [
+        {
+            "saltId": "farming-life-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "384": [
+        {
+            "saltId": "gantz",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "467": [
+        {
+            "saltId": "ghost-in-the-shell-stand-alone-complex",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "106130": [
+        {
+            "saltId": "ghost-in-the-shell-sac_2045",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "100922": [
+        {
+            "saltId": "grand-blue-dreaming",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "113265": [
+        {
+            "saltId": "heaven-officials-blessing",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "139433": [
+        {
+            "saltId": "heaven-officials-blessing",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "101921": [
+        {
+            "saltId": "kaguya-sama-love-is-war",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "112641": [
+        {
+            "saltId": "kaguya-sama-love-is-war",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "125367": [
+        {
+            "saltId": "kaguya-sama-love-is-war",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "21202": [
+        {
+            "saltId": "konosuba-gods-blessing-on-this-wonderful-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21699": [
+        {
+            "saltId": "konosuba-gods-blessing-on-this-wonderful-world",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "11771": [
+        {
+            "saltId": "kurokos-basketball",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "16894": [
+        {
+            "saltId": "kurokos-basketball",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "20589": [
+        {
+            "saltId": "kurokos-basketball",
+            "season": 3,
+            "startEpisode": 1
+        }
+    ],
+    "144004": [
+        {
+            "saltId": "mf-ghost",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "173740": [
+        {
+            "saltId": "mf-ghost",
+            "season": 2,
+            "startEpisode": 1
+        }
+    ],
+    "4936": [
+        {
+            "saltId": "ninja-hattori-1981",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "14439": [
+        {
+            "saltId": "ninja-hattori-returns",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "2735": [
+        {
+            "saltId": "shinchan",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "4041": [
+        {
+            "saltId": "kiteretsu-daihyakka",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "3545": [
+        {
+            "saltId": "kochikame",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "100745": [
+        {
+            "saltId": "captain-tsubasa",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "2774": [
+        {
+            "saltId": "bakugan-battle-brawlers",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "527": [
+        {
+            "saltId": "pokemon-the-series-the-beginning",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20159": [
+        {
+            "saltId": "pokemon-the-series-gold-and-silver",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "1565": [
+        {
+            "saltId": "pokemon-the-series-ruby-and-sapphire",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "1564": [
+        {
+            "saltId": "pokemon-the-series-diamond-and-pearl",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "9107": [
+        {
+            "saltId": "pokemon-the-series-black-white",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "19291": [
+        {
+            "saltId": "pokemon-the-series-xy",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "97634": [
+        {
+            "saltId": "pokemon-the-series-sun-moon",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "112153": [
+        {
+            "saltId": "pokemon-journeys-the-series",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "160914": [
+        {
+            "saltId": "pokemon-horizons-the-series",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "101291": [
+        {
+            "saltId": "rascal-does-not-dream-of-bunny-girl-senpai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "124153": [
+        {
+            "saltId": "sk8-the-infinity",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "132474": [
+        {
+            "saltId": "skeleton-knight-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20661": [
+        {
+            "saltId": "terror-in-resonance",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178125": [
+        {
+            "saltId": "the-summer-hikaru-died",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "19383": [
+        {
+            "saltId": "theatre-of-darkness-yamishibai",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "142279": [
+        {
+            "saltId": "reborn-to-master-the-blade-from-hero-king-to-extraordinary-squire-%e2%99%80",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "163242": [
+        {
+            "saltId": "quality-assurance-in-another-world",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "156415": [
+        {
+            "saltId": "i-was-reincarnated-as-the-7th-prince-so-i-can-take-my-time-perfecting-my-magical-ability",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "161992": [
+        {
+            "saltId": "i-shall-survive-using-potions",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "188688": [
+        {
+            "saltId": "i-became-a-legend-after-my-10-year-long-last-stand",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "180516": [
+        {
+            "saltId": "the-exiled-heavy-knight-knows-how-to-game-the-system",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "180518": [
+        {
+            "saltId": "watari-kuns-is-about-to-collapse",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "189037": [
+        {
+            "saltId": "yowayowa-sensei",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "189036": [
+        {
+            "saltId": "thunder-3",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "189035": [
+        {
+            "saltId": "hanaori-san-still-wants-to-fight-in-the-next-life",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182570": [
+        {
+            "saltId": "adams-sweet-agony",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182571": [
+        {
+            "saltId": "taisho-era-contract-marriage-the-substitute-bride-and-a-soldiers-fierce-love",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "182572": [
+        {
+            "saltId": "the-share-houses-secret-rule",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "186596": [
+        {
+            "saltId": "smoking-behind-the-supermarket-with-you",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "178789": [
+        {
+            "saltId": "mushoku-tensei-jobless-reincarnation",
+            "season": 3,
+            "startEpisode": 1,
+            "episodeOffset": 0
+        }
+    ],
+    "139414": [
+        {
+            "saltId": "sword-of-the-demon-hunter",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "128038": [
+        {
+            "saltId": "star-wars-visions",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "108420": [
+        {
+            "saltId": "super-shiro",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "145610": [
+        {
+            "saltId": "scott-pilgrim-takes-off",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "113417": [
+        {
+            "saltId": "overflow",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "155700": [
+        {
+            "saltId": "onimusha",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "105786": [
+        {
+            "saltId": "pacific-rim-the-black",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "136368": [
+        {
+            "saltId": "the-grimm-variations",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "4367": [
+        {
+            "saltId": "the-gutsy-frog",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "20617": [
+        {
+            "saltId": "ronja-the-robbers-daughter",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "6875": [
+        {
+            "saltId": "iron-man",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "9563": [
+        {
+            "saltId": "blade",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "98606": [
+        {
+            "saltId": "future-avengers",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "104036": [
+        {
+            "saltId": "cinderella-chef",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "122485": [
+        {
+            "saltId": "a-mortals-journey-to-immortality",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "198129": [
+        {
+            "saltId": "black-torch",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "180517": [
+        {
+            "saltId": "karna-the-guardian",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "185012": [
+        {
+            "saltId": "nippon-sangoku-the-three-nations-of-the-crimson-sun",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "21873": [
+        {
+            "saltId": "crayon-shin-chan-spin-off",
+            "season": 1,
+            "startEpisode": 1
+        }
+    ],
+    "578": [
+        {
+            "saltId": "grave-of-the-fireflies",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "512": [
+        {
+            "saltId": "kikis-delivery-service",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2890": [
+        {
+            "saltId": "ponyo",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "164": [
+        {
+            "saltId": "princess-mononoke",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "16782": [
+        {
+            "saltId": "the-garden-of-words",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1983": [
+        {
+            "saltId": "paprika",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "10408": [
+        {
+            "saltId": "hotarubi-no-mori-e",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "100723": [
+        {
+            "saltId": "my-hero-academia-two-heroes",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "126656": [
+        {
+            "saltId": "my-hero-academia-world-heroes-mission",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "167732": [
+        {
+            "saltId": "my-hero-academia-youre-next",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "901": [
+        {
+            "saltId": "dragon-ball-z-broly-the-legendary-super-saiyan",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "20766": [
+        {
+            "saltId": "digimon-adventure-tri-part-1-reunion",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "21440": [
+        {
+            "saltId": "digimon-adventure-tri-part-2-determination",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "20612": [
+        {
+            "saltId": "ghost-in-the-shell-the-new-movie",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "100049": [
+        {
+            "saltId": "rezero-starting-life-in-another-world-memory-snow",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "104825": [
+        {
+            "saltId": "rezero-starting-life-in-another-world-the-frozen-bond",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "8649": [
+        {
+            "saltId": "metal-fight-beyblade-vs-the-sun-sol-blaze-the-scorching-hot-invader",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "8846": [
+        {
+            "saltId": "buddha-the-great-departure",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "14093": [
+        {
+            "saltId": "buddha-2-the-endless-journey",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "6882": [
+        {
+            "saltId": "the-rebirth-of-buddha",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "180126": [
+        {
+            "saltId": "the-glassworker",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "114841": [
+        {
+            "saltId": "the-witcher-nightmare-of-the-wolf",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "528": [
+        {
+            "saltId": "pokemon-the-first-movie",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1117": [
+        {
+            "saltId": "pokemon-the-movie-2000",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1118": [
+        {
+            "saltId": "pokemon-3-the-movie",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1526": [
+        {
+            "saltId": "pokemon-jirachi-wish-maker",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1525": [
+        {
+            "saltId": "pokemon-lucario-and-the-mystery-of-mew",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "1782": [
+        {
+            "saltId": "pokemon-ranger-and-the-temple-of-the-sea",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "4026": [
+        {
+            "saltId": "pokemon-giratina-and-the-sky-warrior",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "7664": [
+        {
+            "saltId": "pokemon-zoroark-master-of-illusions",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "12485": [
+        {
+            "saltId": "pokemon-the-movie-kyurem-vs-the-sword-of-justice",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "20937": [
+        {
+            "saltId": "pokemon-the-movie-hoopa-and-the-clash-of-ages",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "21415": [
+        {
+            "saltId": "pokemon-the-movie-volcanion-and-the-mechanical-marvel",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "98080": [
+        {
+            "saltId": "pokemon-the-movie-i-choose-you",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "100806": [
+        {
+            "saltId": "pokemon-the-movie-the-power-of-us",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "104868": [
+        {
+            "saltId": "pokemon-the-movie-mewtwo-strikes-back-evolution",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "113941": [
+        {
+            "saltId": "pokemon-the-movie-secrets-of-the-jungle",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2736": [
+        {
+            "saltId": "shinchan-movie-action-kamen-vs-higure-rakshas",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2737": [
+        {
+            "saltId": "shinchan-movie-treasures-of-the-buri-buri-kingdom",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2739": [
+        {
+            "saltId": "shinchan-movie-adventures-in-henderland",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2740": [
+        {
+            "saltId": "shinchan-movie-dark-tama-tama-thrilling-chase",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2741": [
+        {
+            "saltId": "shinchan-movie-blitzkrieg-pigs-hoofs-secret-mission",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2743": [
+        {
+            "saltId": "shinchan-movie-bungle-in-the-jungle",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2744": [
+        {
+            "saltId": "shinchan-movie-mr-smellys-ambition",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2746": [
+        {
+            "saltId": "shinchan-movie-the-spicy-kasukabe-dancers",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "4270": [
+        {
+            "saltId": "shinchan-movie-the-golden-sword",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "12497": [
+        {
+            "saltId": "shinchan-movie-himawari-banegi-rajkumari",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "17088": [
+        {
+            "saltId": "shinchan-movie-very-very-tasty-tasty",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "21008": [
+        {
+            "saltId": "shinchan-movie-masala-story",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "21422": [
+        {
+            "saltId": "shinchan-movie-the-dreaming-world",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "111812": [
+        {
+            "saltId": "shinchan-movie-rakuga-kingdom",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "127419": [
+        {
+            "saltId": "shinchan-movie-the-mystery-of-tenkasu-academy",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "142270": [
+        {
+            "saltId": "shinchan-movie-the-legends-of-ninja-mononoke",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "159495": [
+        {
+            "saltId": "shinchan-movie-new-dimension-battle-of-supernatural-powers",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "172464": [
+        {
+            "saltId": "crayon-shin-chan-the-movie-our-dinosaur-diary",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2472": [
+        {
+            "saltId": "doraemon-nobitas-dinosaur",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2387": [
+        {
+            "saltId": "doraemon-nobitas-new-great-adventure-into-the-underworld-the-seven-magic-users",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2659": [
+        {
+            "saltId": "doraemon-nobita-and-the-spiral-city",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2660": [
+        {
+            "saltId": "doraemon-nobita-and-the-galaxy-super-express",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2661": [
+        {
+            "saltId": "doraemon-nobitas-diary-on-the-creation-of-the-world",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2662": [
+        {
+            "saltId": "doraemon-nobitas-three-visionary-swordsmen",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2663": [
+        {
+            "saltId": "doraemon-nobita-and-the-tin-labyrinth",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2664": [
+        {
+            "saltId": "doraemon-nobita-and-the-kingdom-of-clouds",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2665": [
+        {
+            "saltId": "doraemon-nobitas-dorabian-nights",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2666": [
+        {
+            "saltId": "doraemon-nobita-and-the-birth-of-japan",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2667": [
+        {
+            "saltId": "doraemon-nobita-and-the-animal-planet",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2668": [
+        {
+            "saltId": "doraemon-nobita-and-the-knights-on-dinosaurs",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2670": [
+        {
+            "saltId": "doraemon-nobitas-little-star-wars",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2672": [
+        {
+            "saltId": "doraemon-nobita-and-the-castle-of-the-undersea-devil",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2673": [
+        {
+            "saltId": "doraemon-the-record-of-nobitas-parallel-journey-to-the-west",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2675": [
+        {
+            "saltId": "doraemon-nobitas-great-adventure-in-the-south-seas",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2676": [
+        {
+            "saltId": "doraemon-nobita-drifts-in-the-universe",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2677": [
+        {
+            "saltId": "doraemon-nobita-and-the-legend-of-the-sun-king",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2678": [
+        {
+            "saltId": "doraemon-nobita-and-the-winged-braves",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2679": [
+        {
+            "saltId": "doraemon-nobita-and-the-robot-kingdom",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2680": [
+        {
+            "saltId": "doraemon-nobita-and-the-windmasters",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "2681": [
+        {
+            "saltId": "doraemon-nobita-in-the-wan-nyan-spacetime-odyssey",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "3661": [
+        {
+            "saltId": "doraemon-nobita-and-the-green-giant-legend",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "5249": [
+        {
+            "saltId": "doraemon-the-new-record-of-nobitas-spaceblazer",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "9846": [
+        {
+            "saltId": "doraemon-nobita-and-the-new-steel-troops-winged-angels",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "11075": [
+        {
+            "saltId": "doraemon-nobita-and-the-island-of-miracles-animal-adventure",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "14729": [
+        {
+            "saltId": "doraemon-nobitas-secret-gadget-museum",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "19811": [
+        {
+            "saltId": "doraemon-new-nobitas-great-demon-peko-and-the-exploration-party-of-five",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "20743": [
+        {
+            "saltId": "doraemon-nobita-and-the-space-heroes",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "87522": [
+        {
+            "saltId": "doraemon-nobitas-great-adventure-in-the-antarctic-kachi-kochi",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "98762": [
+        {
+            "saltId": "doraemon-nobitas-treasure-island",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "104688": [
+        {
+            "saltId": "doraemon-nobitas-chronicle-of-the-moon-exploration",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "110777": [
+        {
+            "saltId": "doraemon-nobitas-new-dinosaur",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "151608": [
+        {
+            "saltId": "doraemon-the-movie-nobitas-sky-utopia",
+            "season": null,
+            "startEpisode": 1
+        }
+    ],
+    "167733": [
+        {
+            "saltId": "doraemon-the-movie-nobitas-earth-symphony",
+            "season": null,
+            "startEpisode": 1
+        }
+    ]
+}

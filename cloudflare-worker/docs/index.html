@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Anivexa API — Docs</title>
+  <meta name="description" content="Anivexa API documentation — a unified anime streaming aggregator API with 14 providers, exact-match identity resolution via AniList IDs."/>
+  <link rel="icon" type="image/svg+xml" href="logo.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="cursor-dot"  id="cursorDot"  aria-hidden="true"></div>
+<div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+<div class="bg-orbs" aria-hidden="true">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="topbar">
+  <img src="logo.svg" alt="Anivexa"/>
+  <span class="topbar-title">Anivexa</span>
+  <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
+</div>
+
+<nav class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.svg" alt="Anivexa"/>
+      <span class="logo-text">Anivexa API</span>
+      <span class="logo-version">v2.2</span>
+    </div>
+    <div class="nav">
+      <div class="nav-section">
+        <div class="nav-label">Getting Started</div>
+        <a class="nav-item" href="#overview">Overview</a>
+        <a class="nav-item" href="#base-url">Base URL</a>
+        <a class="nav-item" href="#providers-ref">Providers</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Core</div>
+        <a class="nav-item" href="#ep-info"><span class="method">GET</span>API Info</a>
+        <a class="nav-item" href="#ep-map"><span class="method">GET</span>Map IDs</a>
+        <a class="nav-item" href="#ep-episodes"><span class="method">GET</span>Episodes</a>
+        <a class="nav-item" href="#ep-episodes-filtered"><span class="method">GET</span>Episodes (Filtered)</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Watch</div>
+        <a class="nav-item" href="#watch-mkissa"><span class="method">GET</span>MKissa</a>
+        <a class="nav-item" href="#watch-reanime"><span class="method">GET</span>Reanime</a>
+        <a class="nav-item" href="#watch-anikoto"><span class="method">GET</span>Anikoto</a>
+        <a class="nav-item" href="#watch-animegg"><span class="method">GET</span>AnimeGG</a>
+        <a class="nav-item" href="#watch-anineko"><span class="method">GET</span>AniNeko</a>
+        <a class="nav-item" href="#watch-anidbapp"><span class="method">GET</span>AniDBApp</a>
+        <a class="nav-item" href="#watch-2dhive"><span class="method">GET</span>2DHive</a>
+        <a class="nav-item" href="#watch-animenosub"><span class="method">GET</span>AnimeNoSub</a>
+        <a class="nav-item" href="#watch-anizone"><span class="method">GET</span>AniZone</a>
+        <a class="nav-item" href="#watch-aniwaves"><span class="method">GET</span>AniWaves</a>
+        <a class="nav-item" href="#watch-anibd"><span class="method">GET</span>AniBD</a>
+        <a class="nav-item" href="#watch-senshi"><span class="method">GET</span>Senshi</a>
+        <a class="nav-item" href="#watch-kaa"><span class="method">GET</span>KickAssAnime</a>
+        <a class="nav-item" href="#watch-animedunya"><span class="method">GET</span>AnimeDunya</a>
+      </div>
+    </div>
+  </nav>
+
+<div class="layout">
+
+  <main class="main">
+
+    <section class="section section-hero" id="overview">
+      <img src="logo.svg" alt="Anivexa" class="hero-logo"/>
+      <h1>Anivexa API</h1>
+      <p>A unified anime streaming aggregator API. Resolve episode lists and stream sources across 14 providers using a single AniList ID — no scraping, no guessing, exact-match identity resolution.</p>
+      <div class="callout">
+        <span class="callout-icon">💡</span>
+        <span>All endpoints are read-only. No authentication required. All responses are JSON with CORS headers included.</span>
+      </div>
+    </section>
+
+    <section class="section" id="base-url">
+      <h2>Base URL</h2>
+      <p>All requests are made to the root of the server. When running locally:</p>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">BASE</span>
+          <span class="endpoint-path">http://localhost:4000</span>
+        </div>
+      </div>
+      <p>Replace with your deployed URL when in production. Every response includes <code>Access-Control-Allow-Origin: *</code>.</p>
+    </section>
+
+    <section class="section" id="providers-ref">
+      <h2>Providers</h2>
+      <p>Fourteen providers are available. Each uses exact-match identity resolution via AniList or MAL IDs — no blind fuzzy matching.</p>
+      <div class="provider-grid">
+        <div class="provider-card" style="--i:0"><div class="provider-name">mkissa</div><div class="provider-meta">MKissa</div></div>
+        <div class="provider-card" style="--i:1"><div class="provider-name">reanime</div><div class="provider-meta">Reanime</div></div>
+        <div class="provider-card" style="--i:2"><div class="provider-name">anikoto</div><div class="provider-meta">Anikoto</div></div>
+        <div class="provider-card" style="--i:3"><div class="provider-name">animegg</div><div class="provider-meta">AnimeGG</div></div>
+        <div class="provider-card" style="--i:4"><div class="provider-name">anineko</div><div class="provider-meta">AniNeko</div></div>
+        <div class="provider-card" style="--i:5"><div class="provider-name">anidbapp</div><div class="provider-meta">AniDBApp</div></div>
+        <div class="provider-card" style="--i:6"><div class="provider-name">2dhive</div><div class="provider-meta">2DHive</div></div>
+        <div class="provider-card" style="--i:7"><div class="provider-name">animenosub</div><div class="provider-meta">AnimeNoSub</div></div>
+        <div class="provider-card" style="--i:8"><div class="provider-name">anizone</div><div class="provider-meta">AniZone</div></div>
+        <div class="provider-card" style="--i:9"><div class="provider-name">aniwaves</div><div class="provider-meta">AniWaves</div></div>
+        <div class="provider-card" style="--i:10"><div class="provider-name">anibd</div><div class="provider-meta">AniBD</div></div>
+        <div class="provider-card" style="--i:11"><div class="provider-name">senshi</div><div class="provider-meta">Senshi</div></div>
+        <div class="provider-card" style="--i:12"><div class="provider-name">kaa</div><div class="provider-meta">KickAssAnime</div></div>
+        <div class="provider-card" style="--i:13"><div class="provider-name">animedunya</div><div class="provider-meta">AnimeDunya</div></div>
+      </div>
+    </section>
+
+    <hr class="divider"/>
+
+    <section class="section" id="ep-info">
+      <h2>API Info</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/</span>
+          <a class="try-btn" href="/" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns API metadata: version, cache status, list of active providers, and all registered routes.</p>
+        </div>
+        <div class="code-label">Response</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"name"</span><span class="p">:</span> <span class="s">"Anivexa API 2.2.1"</span><span class="p">,</span>
+  <span class="n">"cache"</span><span class="p">:</span> <span class="b">false</span><span class="p">,</span>
+  <span class="n">"providers"</span><span class="p">: [</span><span class="s">"mkissa"</span><span class="p">,</span> <span class="s">"reanime"</span><span class="p">,</span> <span class="s">"..."</span><span class="p">],</span>
+  <span class="n">"routes"</span><span class="p">: [</span><span class="s">"/map/:anilistId"</span><span class="p">,</span> <span class="s">"..."</span><span class="p">]</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="ep-map">
+      <h2>Map IDs</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/map/<span class="param">:anilistId</span></span>
+          <a class="try-btn" href="/map/16498" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Resolves an AniList ID to its equivalents across other databases (MAL, Kitsu, etc.).</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:anilistId</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Example — /map/16498</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"anilistId"</span><span class="p">:</span> <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"malId"</span><span class="p">:</span> <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"kitsuId"</span><span class="p">:</span> <span class="b">7442</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="ep-episodes">
+      <h2>Episodes</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/episodes/<span class="param">:anilistId</span></span>
+          <a class="try-btn" href="/episodes/16498" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Fetches episode lists from all providers in parallel for the given AniList ID. Each provider key contains either its episode data or an error object if unavailable.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:anilistId</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Response shape</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"reanime"</span><span class="p">: {</span>
+    <span class="n">"meta"</span><span class="p">: {</span> <span class="n">"title"</span><span class="p">:</span> <span class="s">"Attack on Titan"</span><span class="p">,</span> <span class="n">"malId"</span><span class="p">:</span> <span class="b">16498</span> <span class="p">},</span>
+    <span class="n">"episodes"</span><span class="p">: {</span>
+      <span class="n">"sub"</span><span class="p">: [</span>
+        <span class="p">{</span>
+          <span class="n">"id"</span><span class="p">:</span>     <span class="s">"watch/reanime/16498/sub/reanime-1"</span><span class="p">,</span>
+          <span class="n">"number"</span><span class="p">:</span> <span class="b">1</span><span class="p">,</span>
+          <span class="n">"title"</span><span class="p">:</span>  <span class="s">"To You, 2,000 Years in the Future"</span><span class="p">,</span>
+          <span class="n">"filler"</span><span class="p">:</span> <span class="b">false</span><span class="p">,</span>
+          <span class="n">"audio"</span><span class="p">:</span>  <span class="s">"sub"</span>
+        <span class="p">}</span>
+      <span class="p">],</span>
+      <span class="n">"dub"</span><span class="p">: [</span> <span class="s">"..."</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">},</span>
+  <span class="n">"senshi"</span><span class="p">: {</span> <span class="s">"..."</span> <span class="p">},</span>
+  <span class="n">"anibd"</span><span class="p">:</span>  <span class="p">{</span> <span class="n">"error"</span><span class="p">:</span> <span class="s">"..."</span> <span class="p">}</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="ep-episodes-filtered">
+      <h2>Episodes (Filtered)</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/episodes/<span class="param">:provider</span>/<span class="param">:anilistId</span></span>
+          <a class="try-btn" href="/episodes/reanime/16498" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Fetch episode data from one or more specific providers. Chain multiple provider names in the path. Use <code>?map=false</code> to skip the ID map lookup.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:provider</td><td class="param-type">string</td><td class="param-desc">One or more provider slugs separated by <code>/</code></td></tr>
+              <tr><td class="param-name">:anilistId</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">?map</td><td class="param-type">boolean</td><td class="param-desc">Include ID map in response (default: <code>true</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Examples</div>
+        <pre><code><span class="k">GET</span> /episodes/reanime/16498
+<span class="k">GET</span> /episodes/reanime/senshi/16498
+<span class="k">GET</span> /episodes/reanime/senshi/anibd/16498<span class="p">?map=false</span></code></pre>
+      </div>
+    </section>
+
+    <hr class="divider"/>
+
+    <section class="section" id="watch-mkissa">
+      <h2>MKissa</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/mkissa/<span class="param">:id</span>/<span class="param">sub|dub</span>/mkissa-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/mkissa/16498/sub/mkissa-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources for the given MKissa episode. The episode ID comes directly from the <code>id</code> field in the episodes list response.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Response</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"anilistId"</span><span class="p">:</span> <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"episode"</span><span class="p">:</span>   <span class="b">1</span><span class="p">,</span>
+  <span class="n">"audio"</span><span class="p">:</span>     <span class="s">"sub"</span><span class="p">,</span>
+  <span class="n">"streams"</span><span class="p">: [</span>
+    <span class="p">{</span>
+      <span class="n">"url"</span><span class="p">:</span>      <span class="s">"https://..."</span><span class="p">,</span>
+      <span class="n">"type"</span><span class="p">:</span>     <span class="s">"hls"</span><span class="p">,</span>
+      <span class="n">"server"</span><span class="p">:</span>   <span class="s">"Server Name"</span><span class="p">,</span>
+      <span class="n">"referer"</span><span class="p">:</span>  <span class="s">"https://..."</span><span class="p">,</span>
+      <span class="n">"priority"</span><span class="p">:</span> <span class="b">5</span><span class="p">,</span>
+      <span class="n">"isActive"</span><span class="p">:</span> <span class="b">true</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="watch-reanime">
+      <h2>Reanime</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/reanime/<span class="param">:id</span>/<span class="param">sub|dub</span>/reanime-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/reanime/16498/sub/reanime-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Resolves stream sources from Reanime using AniList ID confirmation via cover image CDN URLs and detail endpoint matching. Returns decrypted HLS streams.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/stream/reanime/<span class="param">:id</span>/<span class="param">sub|dub</span>/<span class="param">:ep</span></span>
+          <a class="try-btn" href="/stream/reanime/16498/sub/1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Direct stream variant — returns the raw stream response without the watch wrapper. Useful for direct playback.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-anikoto">
+      <h2>Anikoto</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/anikoto/<span class="param">:id</span>/<span class="param">sub|dub</span>/anikoto-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/anikoto/16498/sub/anikoto-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from Anikoto for the specified episode.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-animegg">
+      <h2>AnimeGG</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/animegg/<span class="param">:id</span>/<span class="param">sub|dub</span>/animegg-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/animegg/16498/sub/animegg-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AnimeGG for the specified episode.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-anineko">
+      <h2>AniNeko</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/anineko/<span class="param">:id</span>/<span class="param">sub|dub</span>/anineko-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/anineko/16498/sub/anineko-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AniNeko for the specified episode.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-anidbapp">
+      <h2>AniDBApp</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/anidbapp/<span class="param">:id</span>/<span class="param">sub|dub</span>/anidbapp-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/anidbapp/16498/sub/anidbapp-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AniDBApp. Uses exact AniList ID confirmation after fuzzy title search before resolving streams.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-2dhive">
+      <h2>2DHive</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/2dhive/<span class="param">:id</span>/<span class="param">sub|dub</span>/2dhive-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/2dhive/16498/sub/2dhive-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from 2DHive.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/stream/2dhive/<span class="param">:id</span>/<span class="param">sub|dub</span>/<span class="param">:ep</span></span>
+          <a class="try-btn" href="/stream/2dhive/16498/sub/1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Direct stream variant for 2DHive.</p>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/stream/2dhive/download/<span class="param">:id</span>/<span class="param">sub|dub</span>/<span class="param">:ep</span></span>
+          <a class="try-btn" href="/stream/2dhive/download/16498/sub/1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Download variant — returns a direct downloadable stream URL from 2DHive.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-animenosub">
+      <h2>AnimeNoSub</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/animenosub/<span class="param">:id</span>/<span class="param">sub|dub</span>/animenosub-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/animenosub/199547/sub/animenosub-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AnimeNoSub for the specified episode.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-anizone">
+      <h2>AniZone</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/anizone/<span class="param">:id</span>/<span class="param">sub|dub</span>/anizone-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/anizone/199547/sub/anizone-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AniZone for the specified episode.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-aniwaves">
+      <h2>AniWaves</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/aniwaves/<span class="param">:id</span>/<span class="param">sub|dub</span>/aniwaves-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/aniwaves/16498/sub/aniwaves-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns AniWaves stream sources for the specified episode, including direct HLS from Vidplay, MyCloud, and BYFMS, DATASV quality MP4 sources, and embed fallbacks.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-anibd">
+      <h2>AniBD</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/anibd/<span class="param">:id</span>/<span class="param">sub|dub</span>/anibd-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/anibd/16498/sub/anibd-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AniBD. Resolves the player link, then extracts and returns the HLS URL directly.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="watch-senshi">
+      <h2>Senshi</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/senshi/<span class="param">:id</span>/<span class="param">sub|dub</span>/senshi-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/senshi/16498/sub/senshi-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from Senshi. Uses MAL ID directly — no slug resolution. Returns all available sources including HLS, alternate servers, FileMoon embeds, and download links when present.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Response</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"anilistId"</span><span class="p">:</span>  <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"malId"</span><span class="p">:</span>      <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"episode"</span><span class="p">:</span>    <span class="b">1</span><span class="p">,</span>
+  <span class="n">"audio"</span><span class="p">:</span>      <span class="s">"sub"</span><span class="p">,</span>
+  <span class="n">"intro"</span><span class="p">:</span>      <span class="p">{</span> <span class="n">"start"</span><span class="p">:</span> <span class="b">123</span><span class="p">,</span> <span class="n">"end"</span><span class="p">:</span> <span class="b">215</span> <span class="p">},</span>
+  <span class="n">"outro"</span><span class="p">:</span>      <span class="p">{</span> <span class="n">"start"</span><span class="p">:</span> <span class="b">1435</span><span class="p">,</span> <span class="n">"end"</span><span class="p">:</span> <span class="b">1525</span> <span class="p">},</span>
+  <span class="n">"streams"</span><span class="p">: [</span>
+    <span class="p">{</span> <span class="n">"url"</span><span class="p">:</span> <span class="s">"https://ninstream.com/.../playlist.m3u8"</span><span class="p">,</span> <span class="n">"type"</span><span class="p">:</span> <span class="s">"hls"</span><span class="p">,</span>   <span class="n">"server"</span><span class="p">:</span> <span class="s">"Senshi"</span><span class="p">,</span>   <span class="n">"priority"</span><span class="p">:</span> <span class="b">5</span><span class="p">,</span> <span class="n">"isActive"</span><span class="p">:</span> <span class="b">true</span>  <span class="p">},</span>
+    <span class="p">{</span> <span class="n">"url"</span><span class="p">:</span> <span class="s">"https://streamnin.xyz/d/..."</span><span class="p">,</span>              <span class="n">"type"</span><span class="p">:</span> <span class="s">"embed"</span><span class="p">,</span> <span class="n">"server"</span><span class="p">:</span> <span class="s">"StreamNin"</span><span class="p">,</span> <span class="n">"priority"</span><span class="p">:</span> <span class="b">3</span><span class="p">,</span> <span class="n">"isActive"</span><span class="p">:</span> <span class="b">false</span> <span class="p">},</span>
+    <span class="p">{</span> <span class="n">"url"</span><span class="p">:</span> <span class="s">"https://bysesayeveum.com/e/..."</span><span class="p">,</span>             <span class="n">"type"</span><span class="p">:</span> <span class="s">"embed"</span><span class="p">,</span> <span class="n">"server"</span><span class="p">:</span> <span class="s">"FileMoon"</span><span class="p">,</span>  <span class="n">"priority"</span><span class="p">:</span> <span class="b">2</span><span class="p">,</span> <span class="n">"isActive"</span><span class="p">:</span> <span class="b">false</span> <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="n">"downloads"</span><span class="p">: [</span>
+    <span class="p">{</span> <span class="n">"url"</span><span class="p">:</span> <span class="s">"https://bzzhr.to/..."</span><span class="p">,</span> <span class="n">"label"</span><span class="p">:</span> <span class="s">"Download"</span> <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="watch-kaa">
+      <h2>KickAssAnime</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/kaa/<span class="param">:id</span>/<span class="param">sub|dub</span>/kaa-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/kaa/21/sub/kaa-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from KickAssAnime for the specified episode. Streams are served via CatStream (HLS) and require the included <code>Referer</code> header for playback.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Response</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"anilistId"</span><span class="p">:</span> <span class="b">21</span><span class="p">,</span>
+  <span class="n">"episode"</span><span class="p">:</span>   <span class="b">1</span><span class="p">,</span>
+  <span class="n">"audio"</span><span class="p">:</span>     <span class="s">"sub"</span><span class="p">,</span>
+  <span class="n">"streams"</span><span class="p">: [</span>
+    <span class="p">{</span>
+      <span class="n">"url"</span><span class="p">:</span>      <span class="s">"https://hls.krussdomi.com/manifest/.../master.m3u8"</span><span class="p">,</span>
+      <span class="n">"type"</span><span class="p">:</span>     <span class="s">"hls"</span><span class="p">,</span>
+      <span class="n">"server"</span><span class="p">:</span>   <span class="s">"CatStream"</span><span class="p">,</span>
+      <span class="n">"headers"</span><span class="p">: {</span> <span class="n">"Referer"</span><span class="p">:</span> <span class="s">"https://krussdomi.com/"</span> <span class="p">},</span>
+      <span class="n">"priority"</span><span class="p">:</span> <span class="b">1</span><span class="p">,</span>
+      <span class="n">"isActive"</span><span class="p">:</span> <span class="b">true</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="watch-animedunya">
+      <h2>AnimeDunya</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method-pill get">GET</span>
+          <span class="endpoint-path">/watch/animedunya/<span class="param">:id</span>/<span class="param">sub|dub</span>/animedunya-<span class="param">:ep</span></span>
+          <a class="try-btn" href="/watch/animedunya/16498/sub/animedunya-1" target="_blank">Try it ↗</a>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns stream sources from AnimeDunya for the specified episode. Streams are served as direct HLS playlists with multiple subtitle tracks included.</p>
+          <table class="params-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">:id</td><td class="param-type">integer</td><td class="param-desc">AniList media ID</td></tr>
+              <tr><td class="param-name">sub|dub</td><td class="param-type">string</td><td class="param-desc">Audio track preference</td></tr>
+              <tr><td class="param-name">:ep</td><td class="param-type">integer</td><td class="param-desc">Episode number</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-label">Response</div>
+        <pre><code><span class="p">{</span>
+  <span class="n">"anilistId"</span><span class="p">:</span> <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"malId"</span><span class="p">:</span>     <span class="b">16498</span><span class="p">,</span>
+  <span class="n">"episode"</span><span class="p">:</span>   <span class="b">1</span><span class="p">,</span>
+  <span class="n">"audio"</span><span class="p">:</span>     <span class="s">"sub"</span><span class="p">,</span>
+  <span class="n">"streams"</span><span class="p">: [</span>
+    <span class="p">{</span>
+      <span class="n">"url"</span><span class="p">:</span>       <span class="s">"https://fs2c.anime-dunya.com/files/.../master.m3u8"</span><span class="p">,</span>
+      <span class="n">"type"</span><span class="p">:</span>      <span class="s">"hls"</span><span class="p">,</span>
+      <span class="n">"server"</span><span class="p">:</span>    <span class="s">"AnimeDunya"</span><span class="p">,</span>
+      <span class="n">"referer"</span><span class="p">:</span>   <span class="s">"https://anime-dunya.com/"</span><span class="p">,</span>
+      <span class="n">"subtitles"</span><span class="p">: [</span>
+        <span class="p">{</span> <span class="n">"url"</span><span class="p">:</span> <span class="s">"https://fs2c.anime-dunya.com/.../en.vtt"</span><span class="p">,</span> <span class="n">"label"</span><span class="p">:</span> <span class="s">"EN"</span><span class="p">,</span> <span class="n">"srclang"</span><span class="p">:</span> <span class="s">"en"</span><span class="p">,</span> <span class="n">"default"</span><span class="p">:</span> <span class="b">true</span> <span class="p">}</span>
+      <span class="p">],</span>
+      <span class="n">"priority"</span><span class="p">:</span>  <span class="b">5</span><span class="p">,</span>
+      <span class="n">"isActive"</span><span class="p">:</span>  <span class="b">true</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></code></pre>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const menuBtn = document.getElementById('menuBtn');
+
+  const openSidebar = () => {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+    menuBtn.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  const closeSidebar = () => {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    menuBtn.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  menuBtn.addEventListener('click', () =>
+    sidebar.classList.contains('open') ? closeSidebar() : openSidebar()
+  );
+  overlay.addEventListener('click', closeSidebar);
+  sidebar.querySelectorAll('.nav-item').forEach(l =>
+    l.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); })
+  );
+
+  const navItems = sidebar.querySelectorAll('.nav-item[href^="#"]');
+  const navObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navItems.forEach(n => n.classList.remove('active'));
+        const a = sidebar.querySelector(`.nav-item[href="#${e.target.id}"]`);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('.section[id]').forEach(s => navObs.observe(s));
+
+  const revealObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        revealObs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.07, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.section').forEach(s => revealObs.observe(s));
+
+  const tiltables = document.querySelectorAll('.provider-card, .endpoint');
+  tiltables.forEach(el => {
+    let raf = null;
+    el.addEventListener('mousemove', e => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const r = el.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width  - 0.5;
+        const y = (e.clientY - r.top)  / r.height - 0.5;
+        const maxDeg = el.classList.contains('provider-card') ? 10 : 5;
+        el.style.setProperty('--rx', `${(-y * maxDeg).toFixed(2)}deg`);
+        el.style.setProperty('--ry', `${( x * maxDeg).toFixed(2)}deg`);
+        raf = null;
+      });
+    }, { passive: true });
+    el.addEventListener('mouseleave', () => {
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      el.style.setProperty('--rx', '0deg');
+      el.style.setProperty('--ry', '0deg');
+    }, { passive: true });
+  });
+
+  (function () {
+    const dot  = document.getElementById('cursorDot');
+    const ring = document.getElementById('cursorRing');
+    if (!dot || !ring) return;
+
+    let mx = -200, my = -200;
+    let rx = -200, ry = -200;
+    let visible = false;
+
+    const LERP = 0.22;
+    const INTERACTIVES = 'a, button, .provider-card, .nav-item, .try-btn, .copy-btn, label, [role="button"]';
+
+    function tick() {
+      rx += (mx - rx) * LERP;
+      ry += (my - ry) * LERP;
+      dot.style.transform  = `translate(${mx}px,${my}px)`;
+      ring.style.transform = `translate(${Math.round(rx * 10) / 10}px,${Math.round(ry * 10) / 10}px)`;
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      if (!visible) {
+        visible = true;
+        dot.classList.remove('is-hidden');
+        ring.classList.remove('is-hidden');
+        rx = mx; ry = my;
+      }
+    }, { passive: true });
+
+    document.addEventListener('mouseleave', () => {
+      dot.classList.add('is-hidden');
+      ring.classList.add('is-hidden');
+      visible = false;
+    }, { passive: true });
+
+    document.addEventListener('mouseenter', () => {
+      dot.classList.remove('is-hidden');
+      ring.classList.remove('is-hidden');
+      visible = true;
+    }, { passive: true });
+
+    document.addEventListener('mousedown', () => {
+      ring.classList.add('is-clicking');
+      ring.classList.remove('is-hovering');
+    }, { passive: true });
+
+    document.addEventListener('mouseup', () => {
+      ring.classList.remove('is-clicking');
+    }, { passive: true });
+
+    document.addEventListener('mouseover', e => {
+      if (e.target.closest(INTERACTIVES)) {
+        dot.classList.add('is-hovering');
+        ring.classList.add('is-hovering');
+      }
+    }, { passive: true });
+
+    document.addEventListener('mouseout', e => {
+      if (e.target.closest(INTERACTIVES)) {
+        dot.classList.remove('is-hovering');
+        ring.classList.remove('is-hovering');
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchstart', () => {
+      dot.style.display  = 'none';
+      ring.style.display = 'none';
+      document.body.style.cursor = '';
+    }, { once: true, passive: true });
+  })();
+
+  document.querySelectorAll('pre').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      const text = pre.innerText.replace(/\nCopy$/, '').replace(/\nCopied!$/, '').trim();
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+      }).catch(() => {});
+    });
+    pre.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>
