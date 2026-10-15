@@ -134,6 +134,7 @@ import com.nyyrox.aniverse.data.DUB_PROVIDERS
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.SUB_PROVIDERS
 import com.nyyrox.aniverse.ui.theme.OttBg
+import com.nyyrox.aniverse.ui.theme.OttInk
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
@@ -2627,8 +2628,7 @@ fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modi
     if (backdrop == null) {
         return this
             .clip(shape)
-            .background(Color(0xFF0B0B10))
-            .border(1.dp, Color(0x1FFFFFFF), shape)
+            .background(OttInk(0.06f))
     }
     val density = LocalDensity.current
     val effects = remember(density) { prismalGlassEffects(density) }
@@ -2655,7 +2655,7 @@ fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier 
         animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Reverse),
         label = "drift"
     )
-    Box(modifier.prismalGlassLayer(layer).background(Color.Black)) {
+    Box(modifier.prismalGlassLayer(layer).background(OttBg)) {
         Crossfade(targetState = model, animationSpec = tween(900), label = "ambientFade") { art ->
             AsyncImage(
                 model = art,
@@ -2678,7 +2678,7 @@ fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier 
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.7f), Color.Black)
+                        listOf(OttBg.copy(alpha = 0.05f), OttBg.copy(alpha = 0.7f), OttBg)
                     )
                 )
         )
@@ -2720,8 +2720,7 @@ fun PlayerGlassButton(
                 .height(height)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(CircleShape)
-                .background(Color(0x14FFFFFF))
-                .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                .background(OttInk(0.10f))
                 .clickable(interactionSource = source, indication = null, onClick = onClick)
                 .padding(pad),
             verticalAlignment = Alignment.CenterVertically,

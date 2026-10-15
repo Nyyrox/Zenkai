@@ -97,6 +97,7 @@ import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
 import com.nyyrox.aniverse.ui.theme.OttSurfaceElevated
 import com.nyyrox.aniverse.ui.theme.OttTextPrimary
+import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.viewmodel.MainViewModel
@@ -175,6 +176,14 @@ fun NovelHomeScreen(
                 },
                 onDownloadsClick = onDownloadsClick
             )
+
+            if (searchQuery.isBlank()) {
+                NovelGenreChips(
+                    selectedGenre = vm.selectedNovelGenre ?: "All",
+                    onSelectGenre = { vm.filterNovelsByGenre(it) }
+                )
+                Spacer(Modifier.height(6.dp))
+            }
 
             if (searchQuery.isNotBlank()) {
                 // Search Results Grid
@@ -285,16 +294,6 @@ fun NovelHomeScreen(
                             }
                         }
 
-                        // 3. Genre Filter Chips
-                        item {
-                            Box(modifier = Modifier.staggeredEntrance(index = 4)) {
-                                NovelGenreChips(
-                                    selectedGenre = vm.selectedNovelGenre ?: "All",
-                                    onSelectGenre = { vm.filterNovelsByGenre(it) }
-                                )
-                            }
-                        }
-
                         // 4. Popular Novels
                         if (vm.novelPopular.isNotEmpty()) {
                             item {
@@ -363,10 +362,10 @@ private fun NovelSearchHeader(
                 singleLine = true,
                 shape = OttPillShape,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = OttInk(0.13f),
-                    unfocusedContainerColor = OttInk(0.08f),
-                    focusedBorderColor = OttInk(0.33f),
-                    unfocusedBorderColor = OttInk(0.13f),
+                    focusedContainerColor = OttInk(0.10f),
+                    unfocusedContainerColor = OttInk(0.07f),
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
                     focusedTextColor = OttTextPrimary,
                     unfocusedTextColor = OttTextPrimary
                 ),
@@ -394,16 +393,10 @@ private fun NovelSearchHeader(
         val displaySources = remember {
             NovelSource.entries.filter { it != NovelSource.WEB_NOVEL }
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .zenkaiSurface(RoundedCornerShape(20.dp))
-                .padding(horizontal = 6.dp, vertical = 6.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
+                contentPadding = PaddingValues(horizontal = 0.dp)
             ) {
                 items(displaySources) { src ->
                     val isSelected = src == activeSource
@@ -441,11 +434,6 @@ private fun NovelSearchHeader(
                             .then(
                                 if (isSelected) Modifier.background(sourceGradient)
                                 else Modifier.background(OttInk(0.06f))
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) OttInk(0.38f) else OttInk(0.09f),
-                                shape = RoundedCornerShape(14.dp)
                             )
                             .clickable { onSourceSelect(src) }
                             .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -501,7 +489,6 @@ private fun NovelHeroCard(
             .padding(horizontal = 16.dp)
             .height(180.dp)
             .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, OttInk(0.19f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
     ) {
         AsyncImage(
@@ -705,12 +692,6 @@ private fun NovelCard(
                 contentScale = ContentScale.Crop
             )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(OttCardBottomGradient)
-            )
-
             novel.rating?.let { rate ->
                 Row(
                     modifier = Modifier
@@ -727,30 +708,20 @@ private fun NovelCard(
                     Text(text = rate, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = OttOnMedia)
                 }
             }
+        }
 
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = novel.title,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OttOnMedia,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                novel.stats?.let {
-                    Text(
-                        text = it,
-                        fontSize = 10.sp,
-                        color = OttOnMediaDim,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+        // Title sits under the poster (covers already carry their own lettering; overlaying more text made them unreadable)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = novel.title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = OttTextPrimary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        novel.stats?.let {
+            Text(text = it, fontSize = 11.sp, color = OttTextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -858,12 +829,7 @@ private fun NovelGenreChips(
             Box(
                 modifier = Modifier
                     .clip(OttPillShape)
-                    .background(if (isSelected) OttPrimary else OttInk(0.09f))
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) OttPrimary else OttInk(0.16f),
-                        shape = OttPillShape
-                    )
+                    .background(if (isSelected) OttPrimary else OttInk(0.07f))
                     .clickable { onSelectGenre(genre) }
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {

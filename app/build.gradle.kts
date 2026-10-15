@@ -134,6 +134,7 @@ dependencies {
 
     // Haze — live backdrop blur for glass UI (Android 12+)
     implementation("dev.chrisbanes.haze:haze:1.7.2")
+    implementation("dev.chrisbanes.haze:haze-materials:1.7.2") // ready-made blur materials for nav bar / sheets
 
     // Supabase Kotlin SDK
     val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.1.4")

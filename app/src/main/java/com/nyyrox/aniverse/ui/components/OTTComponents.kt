@@ -116,6 +116,10 @@ import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttCardBottomGradient
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
+import com.nyyrox.aniverse.ui.theme.OttBg
+import com.nyyrox.aniverse.ui.theme.OttOnPrimary
+import com.nyyrox.aniverse.ui.theme.OttAccentRed
+import dev.chrisbanes.haze.hazeEffect
 import com.nyyrox.aniverse.ui.theme.OttPrimary
 import com.nyyrox.aniverse.ui.theme.OttSecondary
 import com.nyyrox.aniverse.ui.theme.OttSurface
@@ -141,9 +145,9 @@ fun OttTopBar(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xE6040406),
-                        Color(0x99040406),
-                        Color(0x33040406),
+                        OttBg.copy(alpha = 0.90f),
+                        OttBg.copy(alpha = 0.55f),
+                        OttBg.copy(alpha = 0.15f),
                         Color.Transparent
                     )
                 )
@@ -191,12 +195,13 @@ fun OttTopBar(
     }
 }
 
-/** Premium liquid glass icon button with spring press haptics and glass gradient refraction. */
+/** Icon button. Ghost by default (no fill, no border); pass [filled] only where it sits on busy artwork. */
 @Composable
 fun OttGlassIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = 40.dp,
+    filled: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -207,26 +212,12 @@ fun OttGlassIconButton(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "ottBtnPress"
     )
-
     Box(
         modifier = modifier
             .size(size)
             .scale(pressScale)
             .clip(CircleShape)
-            .background(
-                Brush.verticalGradient(
-                    colors = if (isPressed) {
-                        listOf(OttInk(0.28f), OttInk(0.20f))
-                    } else {
-                        listOf(OttInk(0.19f), OttInk(0.09f))
-                    }
-                )
-            )
-            .border(
-                1.dp,
-                if (isPressed) OttInk(0.38f) else OttInk(0.22f),
-                CircleShape
-            )
+            .then(if (filled) Modifier.background(OttInk(if (isPressed) 0.16f else 0.10f)) else Modifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -251,115 +242,24 @@ fun LiquidGlassSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    activeColor: Color = Color(0xFF34C759),
+    activeColor: Color = OttPrimary,
     inactiveColor: Color = OttInk(0.22f),
     enabled: Boolean = true
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    // Smooth spring animation for switch position (0f = off, 1f = on)
-    val positionFraction by animateFloatAsState(
-        targetValue = if (checked) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "switchPosition"
-    )
-
-    // Damped press / hold scale animation (expanding thumb slightly while interacting)
-    val pressProgress by animateFloatAsState(
-        targetValue = if (isPressed) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "switchPress"
-    )
-
-    // Animated track background color
-    val trackBgColor by animateColorAsState(
-        targetValue = if (checked) activeColor else inactiveColor,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "switchTrackBg"
-    )
-
-    val trackWidth = 52.dp
-    val trackHeight = 30.dp
-    val thumbSize = 24.dp
-    val maxTravelPx = with(density) { (trackWidth - thumbSize - 6.dp).toPx() }
-    val startPaddingPx = with(density) { 3.dp.toPx() }
-
-    Box(
-        modifier = modifier
-            .size(trackWidth, trackHeight)
-            .clip(RoundedCornerShape(999.dp))
-            .background(trackBgColor)
-            .border(
-                1.dp,
-                if (checked) OttInk(0.38f) else OttInk(0.16f),
-                RoundedCornerShape(999.dp)
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled
-            ) {
-                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                onCheckedChange(!checked)
-            },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        // Subtle inner glow / highlight on track
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(OttInk(0.15f), Color.Transparent)
-                    )
-                )
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = OttOnPrimary,
+            checkedTrackColor = activeColor,
+            checkedBorderColor = Color.Transparent,
+            uncheckedThumbColor = OttTextMuted,
+            uncheckedTrackColor = inactiveColor,
+            uncheckedBorderColor = Color.Transparent
         )
-
-        // Refracting liquid glass thumb with velocity squash/stretch and specular rim
-        val currentThumbX = startPaddingPx + (maxTravelPx * positionFraction)
-        val thumbScaleX = 1f + (pressProgress * 0.28f)
-        val thumbScaleY = 1f - (pressProgress * 0.12f)
-
-        Box(
-            modifier = Modifier
-                .graphicsLayer {
-                    translationX = currentThumbX
-                    scaleX = thumbScaleX
-                    scaleY = thumbScaleY
-                }
-                .size(thumbSize)
-                .shadow(elevation = if (isPressed) 4.dp else 2.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        colors = if (isPressed) {
-                            listOf(OttTextPrimary, Color(0xFFF1F5F9))
-                        } else {
-                            listOf(OttTextPrimary, Color(0xFFE2E8F0))
-                        }
-                    )
-                )
-                .border(0.8.dp, OttInk(0.31f), CircleShape)
-        ) {
-            // Subtle glass specular top-shine
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.5f)
-                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                    .background(OttInk(0.20f))
-            )
-        }
-    }
+    )
 }
 
 private data class NavTabItem(
@@ -368,6 +268,11 @@ private data class NavTabItem(
     val label: String
 )
 
+/**
+ * Floating nav bar. One blurred Haze capsule (frosted material over the live screen), no per-tab bubbles:
+ * the selected tab is just full-contrast with a small accent bar. Falls back to a solid panel when glass is off.
+ */
+@OptIn(dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi::class)
 @Composable
 fun OttBottomDock(
     currentRoute: String,
@@ -375,12 +280,9 @@ fun OttBottomDock(
     userAvatarUrl: String? = null,
     avatarDecorationId: String? = null,
     avatarFrameId: String? = null,
-    backdrop: com.styropyr0.prismal.PrismalBackdrop? = null,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     modifier: Modifier = Modifier
 ) {
-    val themeColors = LocalThemeColors.current
-    val themeSettings = LocalThemeSettings.current
-
     val tabs = remember {
         listOf(
             NavTabItem("home", Icons.Default.Home, "Anime"),
@@ -390,195 +292,68 @@ fun OttBottomDock(
             NavTabItem("profile", Icons.Default.Person, "Profile")
         )
     }
+    val shape = RoundedCornerShape(30.dp)
+    val glass = hazeState != null && LocalThemeSettings.current.isGlassmorphismEnabled
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.let { if (it >= 0) it else 0 }
-    val isGlassEnabled = themeSettings.isGlassmorphismEnabled
-
-    if (isGlassEnabled) {
-        val ambientBackdrop = backdrop ?: com.styropyr0.prismal.LocalPrismalBackdrop.current ?: com.styropyr0.prismal.sources.emptyGlassSource()
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            PrismalGlassBottomTabs(
-                selectedTabIndex = { activeIndex },
-                onTabSelected = { idx ->
-                    if (idx in tabs.indices) {
-                        onNavigate(tabs[idx].route)
-                    }
-                },
-                backdrop = ambientBackdrop,
-                tabsCount = tabs.size,
-                specular = { PrismalSpecular.Default },
-                tintDropletContent = false,
-                modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .clip(shape)
+            .then(
+                if (glass) Modifier.hazeEffect(
+                    state = hazeState!!,
+                    style = dev.chrisbanes.haze.materials.HazeMaterials.regular(containerColor = OttBg)
+                ) else Modifier.background(OttPanelHigh)
+            )
+            .border(0.5.dp, OttInk(0.12f), shape)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        tabs.forEach { tab ->
+            val selected = tab.route == currentRoute
+            val tint by animateColorAsState(if (selected) OttTextPrimary else OttTextMuted, label = "navTint")
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                        onNavigate(tab.route)
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val highlightedIndex = LocalPrismalBottomTabHighlightedIndex.current
-                for ((index, tab) in tabs.withIndex()) {
-                    val isSelected = highlightedIndex() == index
-
-                    PrismalGlassBottomTab(
-                        onClick = { onNavigate(tab.route) }
-                    ) {
-                        if (tab.route == "profile") {
-                            AvatarDecorationRenderer(
-                                decorationId = avatarDecorationId,
-                                frameId = avatarFrameId,
-                                size = 22.dp
-                            ) {
-                                if (!userAvatarUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = userAvatarUrl,
-                                        contentDescription = tab.label,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(CircleShape)
-                                            .border(
-                                                width = if (isSelected) 1.5.dp else 0.5.dp,
-                                                color = if (isSelected) OttTextPrimary else OttInk(0.40f),
-                                                shape = CircleShape
-                                            ),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.label,
-                                        tint = if (isSelected) OttTextPrimary else Color(0x80A0A5B0),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        } else {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.label,
-                                tint = if (isSelected) OttTextPrimary else Color(0x80A0A5B0),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = tab.label,
-                            fontSize = 10.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) OttTextPrimary else Color(0x80A0A5B0),
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-    } else {
-        // Flat, optimized high-performance dock when glassmorphism is disabled in settings
-        val animatedIndex by animateFloatAsState(
-            targetValue = activeIndex.toFloat(),
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-            label = "flat_dock_spring"
-        )
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .shadow(4.dp, RoundedCornerShape(32.dp))
-                .clip(RoundedCornerShape(32.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            OttPanelHigh,
-                            OttPanelHigh
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    color = OttInk(0.13f),
-                    shape = RoundedCornerShape(32.dp)
-                )
-                .padding(horizontal = 6.dp, vertical = 6.dp)
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val totalWidth = maxWidth
-                val itemWidth = totalWidth / tabs.size
-                val pillPaddingH = 3.dp
-                val pillWidth = itemWidth - (pillPaddingH * 2)
-
-                Box(
-                    modifier = Modifier
-                        .offset(x = (itemWidth * animatedIndex) + pillPaddingH)
-                        .width(pillWidth)
-                        .height(46.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(OttInk(0.19f))
-                        .border(1.dp, OttInk(0.22f), RoundedCornerShape(24.dp))
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    tabs.forEachIndexed { index, tab ->
-                        val isActive = index == activeIndex
-                        Column(
+                if (tab.route == "profile" && !userAvatarUrl.isNullOrBlank()) {
+                    AvatarDecorationRenderer(decorationId = avatarDecorationId, frameId = avatarFrameId, size = 24.dp) {
+                        AsyncImage(
+                            model = userAvatarUrl,
+                            contentDescription = tab.label,
                             modifier = Modifier
-                                .width(itemWidth)
-                                .height(46.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .clickable { onNavigate(tab.route) },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (tab.route == "profile") {
-                                AvatarDecorationRenderer(
-                                    decorationId = avatarDecorationId,
-                                    frameId = avatarFrameId,
-                                    size = 22.dp
-                                ) {
-                                    if (!userAvatarUrl.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = userAvatarUrl,
-                                            contentDescription = tab.label,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(CircleShape)
-                                                .border(
-                                                    width = if (isActive) 1.5.dp else 0.5.dp,
-                                                    color = if (isActive) OttTextPrimary else OttInk(0.40f),
-                                                    shape = CircleShape
-                                                ),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = tab.icon,
-                                            contentDescription = tab.label,
-                                            tint = if (isActive) OttTextPrimary else Color(0x80A0A5B0),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                            } else {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = if (isActive) OttTextPrimary else Color(0x80A0A5B0),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = tab.label,
-                                fontSize = 10.5.sp,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isActive) OttTextPrimary else Color(0x80A0A5B0)
-                            )
-                        }
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .border(if (selected) 1.5.dp else 0.dp, OttTextPrimary, CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
                     }
+                } else {
+                    Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(24.dp))
                 }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = tab.label,
+                    fontSize = 10.5.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = tint,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(3.dp))
+                Box(
+                    Modifier
+                        .size(width = 14.dp, height = 3.dp)
+                        .clip(CircleShape)
+                        .background(if (selected) OttAccentRed else Color.Transparent)
+                )
             }
         }
     }

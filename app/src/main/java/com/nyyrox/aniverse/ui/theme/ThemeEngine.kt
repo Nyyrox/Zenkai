@@ -97,7 +97,7 @@ data class ThemeSettings(
     val preferredRefreshRate: Int = 90,
     val isGlassmorphismEnabled: Boolean = true,
     val mode: ThemeMode = ThemeMode.DARK,
-    val useCards: Boolean = true
+    val useCards: Boolean = false
 )
 
 fun getThemeColors(theme: AnimeTheme): ThemeColors {

@@ -1143,7 +1143,7 @@ class StorageManager(context: Context) {
                 } catch (_: Exception) {
                     com.nyyrox.aniverse.ui.theme.ThemeMode.DARK
                 },
-                useCards = obj.optBoolean("useCards", true)
+                useCards = obj.optBoolean("useCardsV3", false) // new key: old installs saved true by default, reset to flat
             )
         } catch (_: Exception) {
             ThemeSettings()
@@ -1158,7 +1158,7 @@ class StorageManager(context: Context) {
             put("preferredRefreshRate", settings.preferredRefreshRate)
             put("glassmorphism", settings.isGlassmorphismEnabled)
             put("mode", settings.mode.name)
-            put("useCards", settings.useCards)
+            put("useCardsV3", settings.useCards)
         }
         prefs.edit().putString(KEY_THEME_SETTINGS, obj.toString()).apply()
     }

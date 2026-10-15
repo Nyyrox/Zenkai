@@ -926,7 +926,6 @@ fun ProfileScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (selected) OttPrimary else OttInk(0.06f))
-                                .border(1.dp, if (selected) OttPrimary else OttSurfaceBorder, RoundedCornerShape(14.dp))
                                 .clickable { vm.setThemeMode(m) }
                                 .padding(vertical = 12.dp, horizontal = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -2477,27 +2476,17 @@ private fun ProfileSettingGroup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-    ) {
+    // Flat: label + rows separated by hairlines. No box, no fill.
+    Column(modifier = modifier.fillMaxWidth().padding(top = 18.dp)) {
         Text(
             text = title.uppercase(),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF64748B),
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
+            color = OttTextMuted,
+            letterSpacing = 1.2.sp,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .zenkaiSurface(RoundedCornerShape(18.dp), radius = 18.dp, alwaysBox = true)
-        ) {
-            content()
-        }
+        content()
     }
 }
 
@@ -2507,9 +2496,9 @@ private fun ProfileSettingRow(
     title: String,
     subtitle: String? = null,
     badgeText: String? = null,
-    badgeColor: Color = OttTextPrimary,
+    badgeColor: Color = OttTextSecondary,
     titleColor: Color = OttTextPrimary,
-    iconTint: Color = OttTextPrimary,
+    iconTint: Color = OttTextSecondary,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
@@ -2523,83 +2512,32 @@ private fun ProfileSettingRow(
                     onClick()
                 } else Modifier
             )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(OttInk(0.08f))
-                .border(1.dp, OttInk(0.11f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(Modifier.width(14.dp))
-
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = titleColor
-            )
+            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = titleColor)
             if (!subtitle.isNullOrBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
-                    lineHeight = 15.sp
-                )
+                Text(text = subtitle, fontSize = 12.sp, color = OttTextMuted, lineHeight = 16.sp)
             }
         }
-
         if (badgeText != null) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(OttInk(0.10f))
-                    .border(0.8.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = badgeText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = badgeColor
-                )
-            }
-            Spacer(Modifier.width(8.dp))
+            Text(text = badgeText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = badgeColor)
+            Spacer(Modifier.width(6.dp))
         }
-
         if (trailing != null) {
             trailing()
         } else if (onClick != null) {
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Color(0xFF64748B),
-                modifier = Modifier.size(18.dp)
-            )
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = OttTextMuted, modifier = Modifier.size(18.dp))
         }
     }
 }
 
 @Composable
 private fun ProfileDivider() {
-    HorizontalDivider(
-        color = OttInk(0.06f),
-        thickness = 1.dp,
-        modifier = Modifier.padding(horizontal = 16.dp)
-    )
+    HorizontalDivider(color = OttInk(0.07f), thickness = 0.5.dp, modifier = Modifier.padding(start = 58.dp, end = 20.dp))
 }
 
 @Composable

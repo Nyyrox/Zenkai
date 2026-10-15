@@ -33,7 +33,7 @@ object ThemeRuntime {
     /** The mode the user picked in Settings. */
     var userMode: ThemeMode = ThemeMode.DARK
     /** true = boxed cards (surface + border); false = clean, card-less poster layout. */
-    var cardStyle by mutableStateOf(true)
+    var cardStyle by mutableStateOf(false)
     val isLight: Boolean get() = mode == ThemeMode.LIGHT
 }
 

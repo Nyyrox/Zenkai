@@ -42,6 +42,7 @@ import com.nyyrox.aniverse.ui.components.OttBottomDock
 import com.styropyr0.prismal.sources.prismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import com.styropyr0.prismal.LocalPrismalBackdrop
+import dev.chrisbanes.haze.hazeSource
 import com.nyyrox.aniverse.ui.components.OttNavDrawer
 import com.nyyrox.aniverse.ui.components.OttTopBar
 import com.nyyrox.aniverse.ui.screens.AiringScreen
@@ -432,6 +433,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
         val currentThemeColors = com.nyyrox.aniverse.ui.theme.adaptColorsForMode(getThemeColors(vm.themeSettings.theme), vm.themeSettings.mode)
         val isReducedMotion = vm.themeSettings.isReducedMotionEnabled
         val appBackdropLayer = com.styropyr0.prismal.sources.rememberPrismalGlassLayer()
+        val hazeState = dev.chrisbanes.haze.rememberHazeState()
 
         CompositionLocalProvider(
             LocalOverscrollConfiguration provides null,
@@ -452,6 +454,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         modifier = Modifier
                             .fillMaxSize()
                             .prismalGlassLayer(appBackdropLayer)
+                            .hazeSource(hazeState)
                     ) {
                         AnimatedContent(
                             targetState = currentRoute,
@@ -942,7 +945,7 @@ NovelReaderScreen(
                             userAvatarUrl = vm.userProfile.avatarUrl,
                             avatarDecorationId = vm.userProfile.avatarDecorationId,
                             avatarFrameId = vm.userProfile.avatarFrameId,
-                            backdrop = appBackdropLayer,
+                            hazeState = hazeState,
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }

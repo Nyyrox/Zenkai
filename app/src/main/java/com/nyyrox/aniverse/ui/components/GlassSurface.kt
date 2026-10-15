@@ -45,8 +45,7 @@ val LocalContentGlassLayer = compositionLocalOf<PrismalGlassLayer?> { null }
 /**
  * Zenkai surface.
  *  - Card style OFF  -> no box at all (clean poster / list layout).
- *  - Glass ON + a [LocalContentGlassLayer] available -> Prismal liquid glass (AGSL refraction, API 33+).
- *  - Otherwise -> frosted translucent fill with a lit gradient rim. Works on every API level.
+ *  - Otherwise -> one quiet tonal fill (no rim, no refraction).
  *
  * @param alwaysBox keep the box even when card style is off (use for dialogs, sheets, inputs, floating bars).
  */
@@ -58,35 +57,8 @@ fun Modifier.zenkaiSurface(
     alwaysBox: Boolean = false
 ): Modifier {
     if (!ThemeRuntime.cardStyle && !alwaysBox) return this
-    val light = ThemeRuntime.isLight
-    val glassOn = LocalThemeSettings.current.isGlassmorphismEnabled
-    val layer = LocalContentGlassLayer.current
-    val fill = tint ?: if (light) Color(0x80FFFFFF) else Color(0x0FFFFFFF)
-
-    if (glassOn && layer != null && PrismalGlass.supportsRefraction) {
-        val density = LocalDensity.current
-        return drawPrismalGlass(
-            backdrop = layer,
-            shape = { PrismalRoundedRectangle(radius) },
-            effects = prismalGlassEffects(density),
-            onDrawSurface = { drawRect(fill) }
-        )
-    }
-
-    val rim = if (light) {
-        Brush.verticalGradient(listOf(Color(0xCCFFFFFF), Color(0x1A0F1220)))
-    } else {
-        Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x0DFFFFFF)))
-    }
-    val base = tint ?: when {
-        !glassOn && light -> Color(0xFFFFFFFF)
-        !glassOn -> Color(0xFF0D1017)
-        light -> Color(0xB3FFFFFF)
-        else -> Color(0x14FFFFFF)
-    }
-    return clip(shape)
-        .background(base)
-        .border(1.dp, rim, shape)
+    // Boxed surface = a quiet tonal fill. No rim, no refraction: the fill alone separates it from the page.
+    return clip(shape).background(tint ?: OttInk(if (ThemeRuntime.isLight) 0.05f else 0.07f))
 }
 
 /** Pill / circular variant for chips and icon buttons. Always boxed (small controls need a hit target). */

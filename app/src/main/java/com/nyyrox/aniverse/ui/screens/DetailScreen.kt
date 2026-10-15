@@ -201,6 +201,10 @@ import com.nyyrox.aniverse.ui.components.OttPosterCard
 import com.nyyrox.aniverse.ui.components.ShimmerBox
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
+import com.nyyrox.aniverse.ui.theme.OttInkSolid
+import com.nyyrox.aniverse.ui.theme.OttOnPrimary
+import com.nyyrox.aniverse.ui.theme.OttPrimary
+import com.nyyrox.aniverse.ui.theme.ThemeRuntime
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttHeroGradient
 import com.nyyrox.aniverse.ui.theme.OttPillShape
@@ -540,7 +544,7 @@ fun DetailScreen(
     // ponytail: per-card backdrop sampling was the main render cost; upgrade path = playerGlass(backdrop, r) on cards again.
     val glassOn = rememberGlassEnabled()
     val glassLayer = rememberPrismalGlassLayer()
-    val backdrop = if (glassOn) glassLayer else null
+    val backdrop: PrismalGlassLayer? = null // flat controls here: the black ambient layer made Light mode unreadable
     val shareAnime: () -> Unit = {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -805,7 +809,7 @@ fun DetailScreen(
                             listOf(
                                 Color(0x35000000),
                                 Color(0x10000000),
-                                Color(0x800B0E14),
+                                OttBg.copy(alpha = 0.55f),
                                 OttBg,
                                 OttBg
                             )
@@ -1989,26 +1993,13 @@ private fun RichEpisodeCard(
             }
             .clip(shape)
             .then(
-                if (glassOn) Modifier
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                if (isSelected) OttInk(0.20f) else OttInk(0.14f),
-                                OttInk(0.05f)
-                            )
-                        ),
-                        shape
-                    )
-                    .border(1.dp, Brush.verticalGradient(listOf(OttInk(0.27f), OttInk(0.06f))), shape)
-                else Modifier
-                    .background(if (isSelected) OttPanelHigh else OttPanelHigh)
-                    .border(1.dp, OttInk(0.09f), shape)
+                Modifier.background(OttInk(if (isSelected) 0.14f else 0.06f), shape)
             )
             .then(
                 if (isSelected) Modifier.drawWithContent {
                     drawContent()
                     drawRoundRect(
-                        color = Color.White.copy(alpha = 0.35f + 0.55f * glow.value),
+                        color = OttInkSolid.copy(alpha = 0.35f + 0.55f * glow.value),
                         style = Stroke(width = 1.5.dp.toPx()),
                         cornerRadius = CornerRadius(18.dp.toPx())
                     )
@@ -2841,10 +2832,7 @@ private fun rememberGlassEnabled(): Boolean =
 /** Flat translucent card surface: no backdrop sampling, so it stays cheap while scrolling. */
 private fun Modifier.cardSurface(glassOn: Boolean, radius: Dp = 18.dp): Modifier {
     val shape = RoundedCornerShape(radius)
-    return this
-        .clip(shape)
-        .background(if (glassOn) OttInk(0.08f) else OttPanelHigh)
-        .border(1.dp, OttInk(0.10f), shape)
+    return if (ThemeRuntime.cardStyle) this.clip(shape).background(OttInk(0.06f)) else this
 }
 
 /** Section card (flat). Grows/shrinks smoothly with its content. */
@@ -2860,8 +2848,8 @@ private fun DetailCard(
             .fillMaxWidth()
             .animateContentSize()
             .cardSurface(glassOn, 20.dp)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = if (ThemeRuntime.cardStyle) 16.dp else 0.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
             text = title,
@@ -3111,26 +3099,13 @@ private fun GlassPlayButton(
     }
 }
 
-/** Flat white play pill (glass off): idle glow + light sweep, bouncy press. */
+/** Solid play pill. Theme-aware (ink on light, white on dark); bouncy press only. */
 @Composable
 private fun FlatPlayButton(
     label: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val inf = rememberInfiniteTransition(label = "playFx")
-    val sweep by inf.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)),
-        label = "playSweep"
-    )
-    val glow by inf.animateFloat(
-        initialValue = 0.15f,
-        targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "playGlow"
-    )
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val iconScale by animateFloatAsState(
@@ -3142,45 +3117,17 @@ private fun FlatPlayButton(
         modifier = modifier
             .height(50.dp)
             .pressable(0.95f, onClick = onClick)
-            .drawBehind {
-                val pad = 5.dp.toPx()
-                drawRoundRect(
-                    color = Color.White.copy(alpha = glow * 0.5f),
-                    topLeft = Offset(-pad, -pad),
-                    size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
-                    cornerRadius = CornerRadius(size.height / 2f + pad)
-                )
-            }
             .clip(CircleShape)
-            .background(OttTextPrimary)
-            .drawWithContent {
-                drawContent()
-                // Soft reflection band that glides across, then rests.
-                if (sweep < 0.6f) {
-                    val w = size.width
-                    val x = -w * 0.4f + (sweep / 0.6f) * w * 1.8f
-                    drawRect(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(Color.Transparent, Color(0x26000000), Color.Transparent),
-                            startX = x,
-                            endX = x + w * 0.4f
-                        )
-                    )
-                }
-            },
+            .background(OttPrimary)
+            .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
     ) {
         Icon(
             Icons.Default.PlayArrow,
             contentDescription = null,
-            tint = Color.Black,
-            modifier = Modifier
-                .size(24.dp)
-                .graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                }
+            tint = OttOnPrimary,
+            modifier = Modifier.size(24.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }
         )
         AnimatedContent(
             targetState = label,
@@ -3190,7 +3137,7 @@ private fun FlatPlayButton(
             },
             label = "playLabel"
         ) { text ->
-            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1)
+            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = OttOnPrimary, maxLines = 1)
         }
     }
 }
