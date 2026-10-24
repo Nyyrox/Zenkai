@@ -1999,14 +1999,35 @@ fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modi
 }
 
 /**
- * Plain themed backdrop: solid dark (AMOLED) or solid light, no artwork, no gradient.
- * Glass controls still sample this layer, so liquid glass keeps working when it is on.
+ * Themed backdrop: solid dark or light with NO gradient, plus a very faint blurred still of the episode.
+ * The faint still is what the glass buttons refract; on a perfectly flat color they would look like plain
+ * flat circles. Raise/lower AMBIENT_ART_ALPHA_* to taste (0 = fully flat, glass loses its bending).
  */
+private const val AMBIENT_ART_ALPHA_DARK = 0.22f
+private const val AMBIENT_ART_ALPHA_LIGHT = 0.16f
+
 @Composable
 fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
     if (layer == null) return
     val c = LocalAppColors.current
-    Box(modifier.prismalGlassLayer(layer).background(c.bg))
+    val isDark = LocalIsDark.current
+    Box(modifier.prismalGlassLayer(layer).background(c.bg)) {
+        Crossfade(targetState = model, animationSpec = tween(900), label = "ambientFade") { art ->
+            AsyncImage(
+                model = art,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(60.dp)
+                    .graphicsLayer {
+                        scaleX = 1.3f
+                        scaleY = 1.3f
+                    }
+                    .alpha(if (isDark) AMBIENT_ART_ALPHA_DARK else AMBIENT_ART_ALPHA_LIGHT)
+            )
+        }
+    }
 }
 
 /** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. [active] = solid accent. */
