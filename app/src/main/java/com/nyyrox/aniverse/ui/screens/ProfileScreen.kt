@@ -1765,6 +1765,7 @@ private fun ThemeModeSelector(current: ThemeMode, onChange: (ThemeMode) -> Unit)
     }
 }
 
+@Composable
 private fun ProfileMangaCard(
     item: MangaBookmarkItem,
     onClick: () -> Unit

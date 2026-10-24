@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 
 package com.nyyrox.aniverse.ui.screens
 
@@ -164,6 +164,15 @@ import com.styropyr0.prismal.prismalGlassEffects
 import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
 import com.styropyr0.prismal.sources.PrismalGlassLayer
 import com.styropyr0.prismal.sources.prismalGlassLayer
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import com.nyyrox.aniverse.ui.theme.LocalAppColors
+import com.nyyrox.aniverse.ui.theme.LocalIsDark
 
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -177,6 +186,8 @@ fun PlayerScreen(
     liquidGlass: Boolean = true // wire to your settings toggle; false = flat AMOLED cards
 ) {
     val context = LocalContext.current
+    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
 
     // Mini player: hide it while this screen is open; drop a parked player that isn't this episode
     DisposableEffect(Unit) {
@@ -228,7 +239,7 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .background(OttBg),
+                .background(c.bg),
             contentAlignment = Alignment.Center
         ) {
             IconButton(
@@ -238,12 +249,12 @@ fun PlayerScreen(
                     .padding(start = 14.dp, top = 8.dp)
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background(OttSurfaceElevated)
+                    .background(c.surfaceElevated)
             ) {
                 Icon(
                     Icons.Default.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.White,
+                    tint = c.textPrimary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -256,26 +267,26 @@ fun PlayerScreen(
                         text = "Missing AniList ID",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = c.textPrimary
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "Please check if the requested show is missing an AniList ID on the server. If we made a mistake, please contact us in the Community tab for fixes!",
-                        color = OttTextSecondary,
+                        color = c.textSecondary,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(16.dp))
                     Button(
                         onClick = onBack,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(containerColor = c.accent, contentColor = c.onAccent),
                         shape = OttPillShape
                     ) {
                         Text("Go Back", fontWeight = FontWeight.Bold)
                     }
                 }
             } else {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(color = c.accent)
             }
         }
         return
@@ -649,6 +660,16 @@ fun PlayerScreen(
         null
     }
 
+    // Top strip above the video is always black, so force light status-bar icons here and restore on exit.
+    DisposableEffect(activity) {
+        val controller = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        val previous = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            if (controller != null && previous != null) controller.isAppearanceLightStatusBars = previous
+        }
+    }
+
     fun toggleFullscreen() {
         val target = !isFullscreen
         isFullscreen = target
@@ -671,6 +692,8 @@ fun PlayerScreen(
     val pageCount = (maxEpisode + pageSize - 1) / pageSize
     var selectedPage by remember(animeId) { mutableIntStateOf((currentEpisode - 1) / pageSize) }
     var isEpisodeGridView by remember { mutableStateOf(false) }
+    // Below-video tab: EPISODES / OVERVIEW / SERVERS (survives fullscreen toggles)
+    var detailTab by remember(animeId) { mutableStateOf("EPISODES") }
 
     // Keep page in sync when episode changes
     LaunchedEffect(currentEpisode) {
@@ -763,6 +786,89 @@ fun PlayerScreen(
         }
     }
 
+
+    // ── Source / audio / Zenkai-player actions (shared by the Servers tab and the header) ──
+    fun selectSourceMode(modeKey: String) {
+        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+        if (selectedSourceMode == modeKey) return
+        selectedSourceMode = modeKey
+        if (modeKey == "DIRECT") {
+            vm.setPlayEmbed(false)
+            if (selectedCategory == "MULTI") selectedCategory = "SUB"
+            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
+            availableDirectServers = nextDirect
+            val prov = nextDirect.first()
+            currentProvider = prov
+            vm.setPreferredServer(prov.id)
+        } else {
+            vm.setPlayEmbed(true)
+            val embedList = when (selectedCategory) {
+                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+            }
+            val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+            currentProvider = prov
+            vm.setPreferredServer(prov.id)
+        }
+    }
+
+    fun selectCategory(catKey: String) {
+        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+        if (selectedCategory == catKey) return
+        selectedCategory = catKey
+        if (selectedSourceMode == "DIRECT") {
+            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey)
+            availableDirectServers = nextDirect
+            val newProv = nextDirect.first()
+            currentProvider = newProv
+            vm.setPreferredServer(newProv.id)
+        } else {
+            val embedServers = when (catKey) {
+                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+            }
+            val newProv = embedServers.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
+            currentProvider = newProv
+            vm.setPreferredServer(newProv.id)
+        }
+    }
+
+    fun toggleZenkaiPlayer() {
+        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+        if (playInZenkaiPlayer) {
+            playInZenkaiPlayer = false
+            return
+        }
+        if (!sniffedStreamUrl.isNullOrBlank()) {
+            playInZenkaiPlayer = true
+            return
+        }
+        coroutineScope.launch {
+            isSniffingStream = true
+            try {
+                val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
+                    context = context,
+                    embedUrl = activeStreamUrl,
+                    timeoutMs = 12000L
+                )
+                if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
+                    sniffedStreamUrl = sniffed.streamUrl
+                    sniffedStreamHeaders = sniffed.headers
+                    sniffedStreamSubs = sniffed.subtitles
+                    playInZenkaiPlayer = true
+                } else {
+                    android.widget.Toast.makeText(context, "Direct stream could not be extracted", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(context, "Extraction failed", android.widget.Toast.LENGTH_SHORT).show()
+            } finally {
+                isSniffingStream = false
+            }
+        }
+    }
+
     // One backdrop (ambient artwork) sampled by every glass surface. null = glass off.
     val glassLayer = rememberPrismalGlassLayer()
     // Shader glass needs Android 13+ (AGSL) and a device with headroom; everything else gets the flat AMOLED cards.
@@ -780,12 +886,21 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isFullscreen) Color.Black else Color.Black.copy(alpha = bgAlpha))
-            .then(if (!isFullscreen) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
+            .background(if (isFullscreen) Color.Black else c.bg.copy(alpha = bgAlpha))
+            .then(if (!isFullscreen) Modifier.navigationBarsPadding() else Modifier)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            // Black strip behind the status bar (replaces statusBarsPadding so the page background stays themed)
+            if (!isFullscreen) {
+                Spacer(
+                    Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .background(Color.Black.copy(alpha = bgAlpha))
+                )
+            }
             // Video Player Container (Morphs into floating mini-player box at bottom-right)
             Box(
                 modifier = (if (isFullscreen) {
@@ -1034,7 +1149,7 @@ fun PlayerScreen(
             }
         }
 
-        // Below Video Section (Hidden in Fullscreen)
+        // Below Video Section (Hidden in Fullscreen) — flat, theme-aware, no cards
         if (!isFullscreen) {
             Box(
                 modifier = Modifier
@@ -1055,1369 +1170,612 @@ fun PlayerScreen(
                         ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
                     modifier = Modifier.fillMaxSize()
                 )
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                // Zenkai Player / Embed Mode Toggle Bar (Option down below the player with proper spacing)
-                val isEmbedModeActive = !isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
-                if (isEmbedModeActive || playInZenkaiPlayer) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (playInZenkaiPlayer) Color(0xFF161B26) else Color(0xFF121622))
-                                .border(
-                                    1.dp,
-                                    if (playInZenkaiPlayer) OttPrimary.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.18f),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .clickable {
-                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                    if (playInZenkaiPlayer) {
-                                        playInZenkaiPlayer = false
-                                    } else {
-                                        if (!sniffedStreamUrl.isNullOrBlank()) {
-                                            playInZenkaiPlayer = true
-                                        } else {
-                                            coroutineScope.launch {
-                                                isSniffingStream = true
-                                                try {
-                                                    val sniffed = com.nyyrox.aniverse.player.StreamSniffer.sniff(
-                                                        context = context,
-                                                        embedUrl = activeStreamUrl,
-                                                        timeoutMs = 12000L
-                                                    )
-                                                    if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
-                                                        sniffedStreamUrl = sniffed.streamUrl
-                                                        sniffedStreamHeaders = sniffed.headers
-                                                        sniffedStreamSubs = sniffed.subtitles
-                                                        playInZenkaiPlayer = true
-                                                    } else {
-                                                        android.widget.Toast.makeText(
-                                                            context,
-                                                            "Direct stream could not be extracted",
-                                                            android.widget.Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    }
-                                                } catch (_: Exception) {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "Extraction failed",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
-                                                } finally {
-                                                    isSniffingStream = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(horizontal = 16.dp, vertical = 11.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                if (isSniffingStream) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = OttPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Extracting Stream for Zenkai Player...",
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                } else if (playInZenkaiPlayer) {
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInBrowser,
-                                        contentDescription = null,
-                                        tint = OttPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Switch back to Embed Mode",
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "(Return to Web Player)",
-                                        fontSize = 11.sp,
-                                        color = OttTextMuted
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = OttPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Play in Zenkai Player",
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "(Native Player & Ad-Free)",
-                                        fontSize = 11.sp,
-                                        color = OttTextMuted
-                                    )
-                                }
-                            }
-                        }
+
+                val currentEpInfo = tmdbEpisodes[currentEpisode]
+                val currentEpTask = if (isCurrentEpDownloading) activeAnimeTasks["${anime.id}:$currentEpisode"] else null
+                val isEmbedModeActive = !isCurrentEpDownloaded && vm.isPlayEmbed &&
+                    (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
+                val customEpName = currentEpInfo?.name?.takeIf {
+                    it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true)
+                }
+                val tabKeys = if (isMovie) listOf("OVERVIEW", "SERVERS") else listOf("EPISODES", "OVERVIEW", "SERVERS")
+                val tabLabels = tabKeys.map { key ->
+                    when (key) {
+                        "EPISODES" -> "Episodes"
+                        "OVERVIEW" -> "Overview"
+                        else -> "Servers"
                     }
                 }
+                val activeTab = if (isMovie && detailTab == "EPISODES") "OVERVIEW" else detailTab
 
-                // 0. Active Episode Details & Header (Tight, authentic design from player_design_1.jpg)
-                item {
-                    val currentEpInfo = tmdbEpisodes[currentEpisode]
-                    val currentEpTask = if (isCurrentEpDownloading) activeAnimeTasks["${anime.id}:$currentEpisode"] else null
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    // ───────── Header: title, meta, actions ─────────
+                    item(key = "header") {
+                        val isDubActive = currentProvider.isDub || selectedCategory == "DUB"
+                        val audioTag = when {
+                            selectedCategory == "MULTI" -> "Multi audio"
+                            isDubActive -> "English dub"
+                            else -> "Japanese sub"
+                        }
+                        val metaLine = listOfNotNull(
+                            anime.score?.let { "★ $it%" },
+                            anime.format?.takeIf { it.isNotBlank() },
+                            anime.duration?.let { "$it min" },
+                            audioTag
+                        ).joinToString("  ·  ")
+                        val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
+                        val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
+                        val hasPrev = !isMovie && currentEpisode > 1
+                        val hasNext = !isMovie && currentEpisode < maxEpisode
+                        val dlQueued = currentEpTask?.status == DownloadStatus.QUEUED
+                        val dlProgress = currentEpTask?.progress ?: 0f
+                        val dlConnecting = currentEpTask != null && !dlQueued &&
+                            (dlProgress <= 0.02f || currentEpTask.speedFormatted.contains("Connecting", ignoreCase = true))
+                        val dlLabel = when {
+                            currentEpTask != null && dlQueued -> "Queued"
+                            currentEpTask != null && dlConnecting -> "Starting"
+                            currentEpTask != null -> "${(dlProgress * 100).toInt()}%"
+                            isCurrentEpDownloaded -> if (playOfflineMode) "Offline" else "Saved"
+                            else -> "Download"
+                        }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // High-Texture Unified Active Episode Card
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .playerGlass(backdrop, radius = 20.dp)
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .padding(horizontal = 18.dp)
+                                .padding(top = 16.dp, bottom = 6.dp)
                         ) {
-                            // Top Row: Thumbnail on Left, Title + Subtitle + Badges + Download Status on Right
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                // 16:9 Episode Thumbnail
-                                Box(
-                                    modifier = Modifier
-                                        .width(124.dp)
-                                        .aspectRatio(16f / 9.5f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(10.dp))
-                                ) {
-                                    AsyncImage(
-                                        model = currentEpInfo?.stillUrl?.takeIf { it.isNotBlank() }
-                                            ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
-                                            ?: anime.banner?.takeIf { it.isNotBlank() }
-                                            ?: anime.cover,
-                                        contentDescription = "Episode $currentEpisode",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
-                                                )
-                                            )
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(4.dp)
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(Color.Black.copy(alpha = 0.75f))
-                                            .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isMovie) "MOVIE" else "1080p",
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-
-                                // Details Column beside Thumbnail
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    // Episode Title
-                                    val customEpName = currentEpInfo?.name?.takeIf { it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true) }
-                                    val epDisplayTitle = when {
-                                        isMovie -> anime.title
-                                        customEpName != null -> customEpName
-                                        else -> "Episode $currentEpisode"
-                                    }
-                                    Text(
-                                        text = epDisplayTitle,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        lineHeight = 19.sp
-                                    )
-
-                                    // Episode Counter Subtitle ("Episode 104 of 170")
-                                    val episodeCounterText = if (isMovie) {
-                                        anime.format ?: "Movie"
-                                    } else {
-                                        "Episode $currentEpisode of $maxEpisode"
-                                    }
-                                    Text(
-                                        text = episodeCounterText,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF94A3B8)
-                                    )
-
-                                    // Badges row: Quality, Audio, Filler
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                    ) {
-                                        // Quality Badge
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
-                                                .background(Color(0x18FFFFFF))
-                                                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(5.dp))
-                                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                        ) {
-                                            Text(
-                                                text = if (isMovie) "Movie HD" else "1080p HD",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.White.copy(alpha = 0.9f)
-                                            )
-                                        }
-
-                                        // Audio Badge
-                                        val isDubActive = currentProvider.isDub || selectedCategory == "DUB"
-                                        val audioTag = when {
-                                            selectedCategory == "MULTI" -> "Multi Audio"
-                                            isDubActive -> "English Dub"
-                                            else -> "Japanese Sub"
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
-                                                .background(Color(0x18FFFFFF))
-                                                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(5.dp))
-                                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                        ) {
-                                            Text(
-                                                text = audioTag,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.White.copy(alpha = 0.9f)
-                                            )
-                                        }
-
-                                        // Filler Badge
-                                        val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
-                                        val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
-                                        if (isCurrentFiller || isCurrentMixed) {
-                                            EpisodeFillerBadge(isMixed = isCurrentMixed)
-                                        }
-                                    }
-
-                                    // Real-time Download Action / Status
-                                    if (isCurrentEpDownloading && currentEpTask != null) {
-                                        val dlProgress = currentEpTask.progress
-                                        val percentInt = (dlProgress * 100).toInt()
-                                        val isQueued = currentEpTask.status == DownloadStatus.QUEUED
-                                        val isConnecting = !isQueued && (dlProgress <= 0.02f || currentEpTask.speedFormatted.contains("Connecting", ignoreCase = true))
-
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(Color(0x22FFFFFF))
-                                                .padding(horizontal = 7.dp, vertical = 4.dp),
-                                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = when {
-                                                        isQueued -> "Queued"
-                                                        isConnecting -> "Connecting..."
-                                                        else -> "Downloading: $percentInt%"
-                                                    },
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isQueued) Color(0xFFFBBF24) else Color.White
-                                                )
-                                                if (currentEpTask.speedFormatted.isNotBlank() && !isQueued) {
-                                                    Text(
-                                                        text = currentEpTask.speedFormatted,
-                                                        fontSize = 8.5.sp,
-                                                        color = OttTextSecondary
-                                                    )
-                                                }
-                                            }
-                                            LinearProgressIndicator(
-                                                progress = { if (dlProgress > 0f) dlProgress else 0.05f },
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(3.dp)
-                                                    .clip(RoundedCornerShape(2.dp)),
-                                                color = OttPrimary,
-                                                trackColor = Color(0x33FFFFFF)
-                                            )
-                                        }
-                                    } else if (isCurrentEpDownloaded) {
-                                        Row(
-                                            modifier = Modifier
-                                                .clickable {
-                                                    if (!playOfflineMode) playOfflineMode = true
-                                                }
-                                                .padding(vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.CheckCircle,
-                                                contentDescription = "Downloaded",
-                                                tint = Color(0xFF10B981),
-                                                modifier = Modifier.size(13.dp)
-                                            )
-                                            Text(
-                                                text = if (playOfflineMode) "Playing Offline" else "Downloaded",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF10B981)
-                                            )
-                                        }
-                                    } else {
-                                        Row(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(Color(0x18FFFFFF))
-                                                .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
-                                                .clickable {
-                                                    showDownloadSheetEpisode = currentEpisode to currentEpInfo?.name
-                                                }
-                                                .padding(horizontal = 7.dp, vertical = 3.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Download,
-                                                contentDescription = "Download Episode",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Text(
-                                                text = "Download",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.White
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Middle Section: Full-Width Synopsis Snippet
-                            val epOverview = currentEpInfo?.overview?.takeIf { it.isNotBlank() }
-                                ?: anime.description?.replace(Regex("<[^>]*>"), "")?.trim()?.takeIf { it.isNotBlank() }
-                                ?: "Stream episode in high-definition. Switch servers or download for offline viewing below."
-
-                            var isSynopsisExpanded by remember(currentEpisode) { mutableStateOf(false) }
-
                             Text(
-                                text = epOverview,
-                                fontSize = 11.5.sp,
-                                lineHeight = 16.sp,
-                                color = Color(0xFFCBD5E1),
-                                maxLines = if (isSynopsisExpanded) 8 else 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                                text = if (isMovie) "MOVIE" else "NOW PLAYING  ·  EP $currentEpisode / $maxEpisode",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = c.textMuted
                             )
-
-                            // Subtle Divider Line
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(0.8.dp)
-                                    .background(Color(0x18FFFFFF))
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = anime.displayTitle,
+                                fontSize = 24.sp,
+                                lineHeight = 29.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = c.textPrimary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
-
-                            // Bottom Footer: Series Title + Duration on Left, Action on Right
+                            if (!isMovie) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = customEpName ?: "Episode $currentEpisode",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = c.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Text(
-                                    text = "${anime.displayTitle} · ${anime.duration?.let { "$it min" } ?: "24 min"}",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = OttTextMuted,
+                                    text = metaLine,
+                                    fontSize = 12.5.sp,
+                                    color = c.textMuted,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
-
-                                Spacer(Modifier.width(8.dp))
-
-                                val hasNextEp = currentEpisode < maxEpisode
-                                if (hasNextEp && !isMovie) {
-                                    Row(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(Color.White)
-                                            .clickable {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                currentEpisode += 1
-                                            }
-                                            .padding(horizontal = 10.dp, vertical = 4.5.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            tint = Color.Black,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Text(
-                                            text = "Next Ep",
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.Black
-                                        )
-                                    }
-                                } else {
-                                    // Toggle Embed / Direct Chip
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(if (vm.isPlayEmbed) Color.White.copy(alpha = 0.2f) else Color(0x18FFFFFF))
-                                            .border(0.8.dp, if (vm.isPlayEmbed) Color.White else Color(0x28FFFFFF), OttPillShape)
-                                            .clickable {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                val targetEmbed = !vm.isPlayEmbed
-                                                vm.setPlayEmbed(targetEmbed)
-                                                if (targetEmbed) {
-                                                    selectedSourceMode = "EMBED"
-                                                    val embedList = when (selectedCategory) {
-                                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                                    }
-                                                    val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                } else {
-                                                    selectedSourceMode = "DIRECT"
-                                                    if (selectedCategory == "MULTI") selectedCategory = "SUB"
-                                                    val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-                                                    availableDirectServers = nextDirect
-                                                    val prov = nextDirect.first()
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                }
-                                            }
-                                            .padding(horizontal = 8.dp, vertical = 3.5.dp)
-                                    ) {
-                                        Text(
-                                            text = if (vm.isPlayEmbed) "Embed Mode" else "Direct Mode",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 1. Previous / Next Fast Navigator Controls (Shown ONLY in EMBED mode)
-                val isEmbedPlayerActive = !isCurrentEpDownloaded && vm.isPlayEmbed && (currentProvider.isEmbedOnly || !currentProvider.isDirectStream)
-                if (isEmbedPlayerActive) {
-                    item {
-                        val hasPrev = currentEpisode > 1
-                        val hasNext = currentEpisode < maxEpisode
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Previous Episode Card
-                            Row(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .clip(OttCardShape)
-                                    .background(if (hasPrev) OttSurface else Color(0x3312151E))
-                                    .border(1.dp, if (hasPrev) OttSurfaceBorder else Color.Transparent, OttCardShape)
-                                    .clickable(enabled = hasPrev) {
-                                        if (currentEpisode > 1) {
-                                            currentEpisode -= 1
-                                        }
-                                    }
-                                    .padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.ChevronLeft,
-                                    contentDescription = null,
-                                    tint = if (hasPrev) OttTextPrimary else OttTextMuted,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Column {
-                                    Text(
-                                        text = "PREVIOUS",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = OttTextMuted
-                                    )
-                                    Text(
-                                        text = if (hasPrev) "Episode ${currentEpisode - 1}" else "First Episode",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (hasPrev) OttTextPrimary else OttTextMuted
-                                    )
-                                }
+                                if (isCurrentFiller || isCurrentMixed) FillerTag(isMixed = isCurrentMixed)
                             }
 
-                            // Next Episode Card
-                            Row(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .clip(OttCardShape)
-                                    .background(if (hasNext) OttSurface else Color(0x3312151E))
-                                    .border(1.dp, if (hasNext) OttSurfaceBorder else Color.Transparent, OttCardShape)
-                                    .clickable(enabled = hasNext) {
-                                        currentEpisode += 1
-                                    }
-                                    .padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "NEXT",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = if (hasNext) "Episode ${currentEpisode + 1}" else "Latest Episode",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (hasNext) OttTextPrimary else OttTextMuted
-                                    )
-                                }
-                                Spacer(Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = if (hasNext) Color.White else OttTextMuted,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // 2. SERVER SECTION (UP) - Streaming Server & Audio Controls (Glassmorphic Container)
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp)
-                            .playerGlass(backdrop, radius = 24.dp)
-                            .padding(14.dp)
-                    ) {
-                        if (isPlayingOffline) {
+                            // Action row: every control is a glass button (flat pill when glass is off)
+                            Spacer(Modifier.height(18.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(Color.White)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "PLAYING DOWNLOADED VIDEO",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.8.sp,
-                                            color = Color.White
-                                        )
+                                PlayerAction(
+                                    label = "Previous",
+                                    backdrop = backdrop,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = hasPrev,
+                                    onClick = {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        if (currentEpisode > 1) currentEpisode -= 1
                                     }
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(
-                                        text = "Offline Stream • ${downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"} · Local Storage",
-                                        fontSize = 10.sp,
-                                        color = OttTextMuted
-                                    )
+                                ) { tint ->
+                                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous episode", tint = tint, modifier = Modifier.size(22.dp))
                                 }
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OttPillShape)
-                                        .background(Color(0x18FFFFFF))
-                                        .border(1.dp, Color(0x33FFFFFF), OttPillShape)
-                                        .clickable { playOfflineMode = false }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "Switch to Online",
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
+                                PlayerAction(
+                                    label = "Next",
+                                    backdrop = backdrop,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = hasNext,
+                                    onClick = {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        if (currentEpisode < maxEpisode) currentEpisode += 1
+                                    }
+                                ) { tint ->
+                                    Icon(Icons.Default.SkipNext, contentDescription = "Next episode", tint = tint, modifier = Modifier.size(22.dp))
+                                }
+                                PlayerAction(
+                                    label = dlLabel,
+                                    backdrop = backdrop,
+                                    modifier = Modifier.weight(1f),
+                                    active = isCurrentEpDownloaded && playOfflineMode,
+                                    onClick = {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        when {
+                                            isCurrentEpDownloading -> {
+                                                android.widget.Toast.makeText(context, "Download in progress", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                            isCurrentEpDownloaded -> {
+                                                playOfflineMode = !playOfflineMode
+                                            }
+                                            else -> {
+                                                showDownloadSheetEpisode = currentEpisode to currentEpInfo?.name
+                                            }
+                                        }
+                                    }
+                                ) { tint ->
+                                    if (currentEpTask != null) {
+                                        CircularProgressIndicator(
+                                            progress = { dlProgress.coerceIn(0.05f, 1f) },
+                                            modifier = Modifier.size(22.dp),
+                                            strokeWidth = 2.dp,
+                                            color = tint,
+                                            trackColor = c.glass.border
+                                        )
+                                    } else if (isCurrentEpDownloaded) {
+                                        Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = tint, modifier = Modifier.size(22.dp))
+                                    } else {
+                                        Icon(Icons.Default.Download, contentDescription = "Download episode", tint = tint, modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                PlayerAction(
+                                    label = "Servers",
+                                    backdrop = backdrop,
+                                    modifier = Modifier.weight(1f),
+                                    active = activeTab == "SERVERS",
+                                    onClick = {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        detailTab = "SERVERS"
+                                    }
+                                ) { tint ->
+                                    Icon(Icons.Default.Dns, contentDescription = "Servers", tint = tint, modifier = Modifier.size(22.dp))
+                                }
+                                PlayerAction(
+                                    label = "Fullscreen",
+                                    backdrop = backdrop,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { toggleFullscreen() }
+                                ) { tint ->
+                                    Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen", tint = tint, modifier = Modifier.size(22.dp))
                                 }
                             }
-                        } else {
-                            if (isCurrentEpDownloaded && downloadedEpInfo != null) {
+
+                            // Embed mode only: hand the stream to the native, ad-free player
+                            if (isEmbedModeActive || playInZenkaiPlayer) {
+                                Spacer(Modifier.height(18.dp))
+                                Hairline()
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
-                                        .clickable { playOfflineMode = true }
-                                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .clickable { toggleZenkaiPlayer() }
+                                        .padding(vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.DownloadDone,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "Offline download available (${downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"})",
-                                        fontSize = 10.5.sp,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Text(
-                                        text = "Switch to Offline ➔",
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                                Spacer(Modifier.height(8.dp))
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                            Column {
-                                Text(
-                                    text = "STREAMING SERVERS",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.8.sp,
-                                    color = OttTextPrimary
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = if (selectedSourceMode == "DIRECT") "Native Direct Playback" else "Web Embed Sources",
-                                    fontSize = 10.sp,
-                                    color = OttTextMuted
-                                )
-                            }
-
-                            Spacer(Modifier.weight(1f))
-
-                            // DIRECT vs EMBED switch (liquid glass droplet when glass is on)
-                            val onModeSelect: (String) -> Unit = { modeKey ->
-                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                if (selectedSourceMode != modeKey) {
-                                    selectedSourceMode = modeKey
-                                    if (modeKey == "DIRECT") {
-                                        vm.setPlayEmbed(false)
-                                        if (selectedCategory == "MULTI") {
-                                            selectedCategory = "SUB"
-                                        }
-                                        val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-                                        availableDirectServers = nextDirect
-                                        val prov = nextDirect.first()
-                                        currentProvider = prov
-                                        vm.setPreferredServer(prov.id)
+                                    if (isSniffingStream) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(22.dp),
+                                            strokeWidth = 2.dp,
+                                            color = c.accent
+                                        )
                                     } else {
-                                        vm.setPlayEmbed(true)
-                                        val embedList = when (selectedCategory) {
-                                            "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                            "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                            else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                        }
-                                        val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                        currentProvider = prov
-                                        vm.setPreferredServer(prov.id)
+                                        Icon(
+                                            imageVector = if (playInZenkaiPlayer) Icons.Default.OpenInBrowser else Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = c.accent,
+                                            modifier = Modifier.size(22.dp)
+                                        )
                                     }
-                                }
-                            }
-                            if (backdrop != null) {
-                                PrismalSegmentedControl(
-                                    labels = listOf("DIRECT", "EMBED"),
-                                    selectedIndex = if (selectedSourceMode == "DIRECT") 0 else 1,
-                                    onSelected = { onModeSelect(if (it == 0) "DIRECT" else "EMBED") },
-                                    backdrop = backdrop,
-                                    modifier = Modifier
-                                        .width(188.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0x59000000))
-                                        .border(1.dp, Color(0x1FFFFFFF), CircleShape),
-                                    textStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                                    textColor = Color.White,
-                                    height = 40.dp
-                                )
-                            } else {
-                                Row(
-                                    modifier = Modifier
-                                        .clip(OttPillShape)
-                                        .background(Color(0x18FFFFFF))
-                                        .border(1.dp, Color(0x22FFFFFF), OttPillShape)
-                                        .padding(3.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    listOf("DIRECT", "EMBED").forEach { modeKey ->
-                                        val isModeSelected = selectedSourceMode == modeKey
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(OttPillShape)
-                                                .background(if (isModeSelected) Color.White else Color.Transparent)
-                                                .clickable { onModeSelect(modeKey) }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = modeKey,
-                                                fontSize = 10.5.sp,
-                                                fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isModeSelected) Color.Black else Color(0xFF94A3B8)
-                                            )
-                                        }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            text = when {
+                                                isSniffingStream -> "Extracting stream…"
+                                                playInZenkaiPlayer -> "Back to embed player"
+                                                else -> "Play in Zenkai Player"
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = c.textPrimary
+                                        )
+                                        Text(
+                                            text = if (playInZenkaiPlayer) "Return to the web player" else "Native player · ad-free",
+                                            fontSize = 12.sp,
+                                            color = c.textMuted
+                                        )
                                     }
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(20.dp))
                                 }
+                                Hairline()
                             }
                         }
+                    }
 
-                        Spacer(Modifier.height(8.dp))
-
-                        // SUB / DUB / MULTI-AUDIO (Direct mode only shows SUB / DUB)
-                        val audioCategories = if (selectedSourceMode == "DIRECT") {
-                            listOf("SUB" to "SUB", "DUB" to "DUB")
-                        } else {
-                            listOf("SUB" to "SUB", "DUB" to "DUB", "MULTI" to "MULTI-AUDIO")
-                        }
-                        val onCategorySelect: (String) -> Unit = { catKey ->
-                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                            if (selectedCategory != catKey) {
-                                selectedCategory = catKey
-                                if (selectedSourceMode == "DIRECT") {
-                                    val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey)
-                                    availableDirectServers = nextDirect
-                                    val newProv = nextDirect.first()
-                                    currentProvider = newProv
-                                    vm.setPreferredServer(newProv.id)
-                                } else {
-                                    val embedServers = when (catKey) {
-                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                    }
-                                    val newProv = embedServers.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-                                    currentProvider = newProv
-                                    vm.setPreferredServer(newProv.id)
-                                }
-                            }
-                        }
-                        if (backdrop != null) {
-                            PrismalSegmentedControl(
-                                labels = audioCategories.map { it.second },
-                                selectedIndex = audioCategories.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0),
-                                onSelected = { onCategorySelect(audioCategories[it].first) },
+                    // ───────── Tabs (sticky) ─────────
+                    stickyHeader(key = "tabs") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(c.bg)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            PlayerSegmented(
+                                labels = tabLabels,
+                                selectedIndex = tabKeys.indexOf(activeTab).coerceAtLeast(0),
+                                onSelected = { idx ->
+                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                    detailTab = tabKeys[idx]
+                                },
                                 backdrop = backdrop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(CircleShape)
-                                    .background(Color(0x59000000))
-                                    .border(1.dp, Color(0x1FFFFFFF), CircleShape),
-                                textStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                                textColor = Color.White,
+                                modifier = Modifier.fillMaxWidth(),
                                 height = 44.dp
                             )
-                        } else {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x14FFFFFF))
-                                    .padding(3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                audioCategories.forEach { (catKey, label) ->
-                                    val isCatSelected = selectedCategory == catKey
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(if (isCatSelected) Color.White else Color.Transparent)
-                                            .clickable { onCategorySelect(catKey) }
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = label,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isCatSelected) Color.Black else Color(0xFF94A3B8)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(8.dp))
-
-                        // Server selector: trigger + inline expanding list
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            val currentServerTitle = currentProvider.name
-                            val currentServerBadge = currentProvider.serverBadge.replace("Direct HD", "HD")
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x59000000))
-                                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                                    .clickable { isServerDropdownExpanded = !isServerDropdownExpanded }
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Clean active status dot (white)
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White)
-                                )
-
-                                Spacer(Modifier.width(10.dp))
-
-                                Text(
-                                    text = currentServerTitle,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-
-                                Spacer(Modifier.width(8.dp))
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x1FFFFFFF))
-                                        .border(0.8.dp, Color(0x35FFFFFF), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = currentServerBadge,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                }
-
-                                Spacer(Modifier.weight(1f))
-
-                                val arrowRot by animateFloatAsState(
-                                    targetValue = if (isServerDropdownExpanded) 180f else 0f,
-                                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
-                                    label = "arrowRot"
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Select Server",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = arrowRot }
-                                )
-                            }
-
-                            // Inline server list: expands in place (no popup overlapping the card)
-                            AnimatedVisibility(
-                                visible = isServerDropdownExpanded,
-                                enter = expandVertically(spring(dampingRatio = 0.8f, stiffness = 400f)) + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
-                                val isDirect = selectedSourceMode == "DIRECT"
-                                val servers = if (isDirect) {
-                                    when (selectedCategory) {
-                                        "DUB" -> availableDirectServers.filter { it.isDub || it.isMulti }
-                                        "MULTI" -> availableDirectServers.filter { it.isMulti }
-                                        else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
-                                    }.ifEmpty { availableDirectServers }
-                                } else {
-                                    when (selectedCategory) {
-                                        "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                        "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                        else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                                    }
-                                }
-                                Column(
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = if (isDirect) "DIRECT SERVERS" else "EMBED SOURCES",
-                                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF8E94A3),
-                                        letterSpacing = 1.sp
-                                    )
-                                    if (servers.isEmpty()) {
-                                        Text(
-                                            text = "No servers available for this audio category.",
-                                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
-                                            fontSize = 12.sp,
-                                            color = OttTextMuted
-                                        )
-                                    }
-                                    servers.forEach { prov ->
-                                        ServerRow(
-                                            name = prov.name,
-                                            badge = prov.serverBadge.replace("Direct HD", "HD"),
-                                            selected = prov.id == currentProvider.id,
-                                            onClick = {
-                                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                currentProvider = prov
-                                                vm.setPreferredServer(prov.id)
-                                                isServerDropdownExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
-                }
-            }
 
+                    // ───────── EPISODES ─────────
+                    if (activeTab == "EPISODES") {
+                        val curStart = selectedPage * pageSize + 1
+                        val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
+                        val episodeNumbers = (curStart..curEnd).toList()
 
-                // 4. MOVIE DETAILS (if Movie) OR EPISODE SECTION (if Series)
-                if (isMovie) {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            // Movie Title & Meta Card
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                verticalAlignment = Alignment.Top
+                        item(key = "ep-toolbar") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp)
+                                    .padding(top = 6.dp, bottom = 8.dp)
                             ) {
-                                AsyncImage(
-                                    model = anime.cover,
-                                    contentDescription = anime.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .width(96.dp)
-                                        .aspectRatio(2f / 3f)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
-                                )
-
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = anime.title,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .background(Color.White.copy(alpha = 0.15f))
-                                                .border(0.8.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = "MOVIE",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White
-                                            )
-                                        }
-
-                                        anime.duration?.let { dur ->
-                                            Text(
-                                                text = "$dur min",
-                                                fontSize = 12.sp,
-                                                color = OttTextSecondary
-                                            )
-                                        }
-
-                                        anime.score?.let { score ->
-                                            Text(
-                                                text = "★ ${score}%",
-                                                fontSize = 12.sp,
-                                                color = OttTextSecondary
-                                            )
-                                        }
-                                    }
-
-                                    if (!anime.genres.isNullOrEmpty()) {
-                                        Text(
-                                            text = anime.genres.take(3).joinToString(" • "),
-                                            fontSize = 11.5.sp,
-                                            color = OttTextMuted,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-
-                                    // Download Movie Button
-                                    val isMovieDl = remember(anime.id, downloadedAnimeList) {
-                                        vm.isAnimeEpisodeDownloaded(anime.id, 1)
-                                    }
-                                    val isMovieDling = remember(anime.id, activeAnimeTasks) {
-                                        activeAnimeTasks.containsKey("${anime.id}:1")
-                                    }
-
-                                    Row(
-                                        modifier = Modifier
-                                            .padding(top = 4.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isMovieDl) Color(0x22FFFFFF) else Color.White)
-                                            .clickable {
-                                                if (!isMovieDl && !isMovieDling) {
-                                                    showDownloadSheetEpisode = 1 to anime.title
-                                                } else if (isMovieDl) {
-                                                    android.widget.Toast.makeText(context, "Movie is already downloaded", android.widget.Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isMovieDl) Icons.Default.Check else Icons.Default.Download,
-                                            contentDescription = "Download Movie",
-                                            tint = if (isMovieDl) Color.White else Color.Black,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = if (isMovieDl) "Downloaded" else if (isMovieDling) "Downloading..." else "Download Movie",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isMovieDl) Color.White else Color.Black
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Synopsis
-                            if (!anime.description.isNullOrBlank()) {
-                                val cleanDesc = remember(anime.description) {
-                                    anime.description.replace(Regex("<[^>]*>"), "").trim()
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(
-                                        text = "SYNOPSIS",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = OttTextMuted,
-                                        letterSpacing = 1.sp
-                                    )
-                                    Text(
-                                        text = cleanDesc,
-                                        fontSize = 12.5.sp,
-                                        color = OttTextSecondary,
-                                        lineHeight = 18.sp,
-                                        maxLines = 6,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // EPISODE SECTION FOR SERIES
-                    // Range selector (liquid glass droplet) on its own row, actions below it
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            val curStart = selectedPage * pageSize + 1
-                            val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
-
-                            if (pageCount > 1) {
-                                if (backdrop != null) {
+                                if (pageCount > 1) {
                                     val rangeLabels = remember(pageCount, pageSize, maxEpisode) {
                                         List(pageCount) { p ->
                                             val s = p * pageSize + 1
                                             "$s–${minOf(s + pageSize - 1, maxEpisode)}"
                                         }
                                     }
-                                    PrismalHorizontalSelector(
-                                        labels = rangeLabels,
-                                        selectedIndex = selectedPage,
-                                        onSelected = { selectedPage = it },
-                                        backdrop = backdrop,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(24.dp))
-                                            .background(Color(0x59000000))
-                                            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(24.dp)),
-                                        textStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-                                        textColor = Color.White
-                                    )
-                                } else {
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        items(pageCount) { page ->
-                                            val pStart = page * pageSize + 1
-                                            val pEnd = minOf(pStart + pageSize - 1, maxEpisode)
-                                            val isSelected = selectedPage == page
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(OttPillShape)
-                                                    .background(if (isSelected) Color.White else Color(0x14FFFFFF))
-                                                    .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), OttPillShape)
-                                                    .clickable { selectedPage = page }
-                                                    .padding(horizontal = 14.dp, vertical = 8.dp)
-                                            ) {
-                                                Text(
-                                                    text = "$pStart–$pEnd",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSelected) Color.Black else OttTextSecondary
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Episodes",
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = "$curStart–$curEnd of $maxEpisode",
-                                        fontSize = 11.5.sp,
-                                        color = OttTextMuted
-                                    )
-                                }
-                                PlayerGlassButton(
-                                    backdrop = backdrop,
-                                    onClick = { showDownloadRangeSheet = curStart..curEnd }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Download,
-                                        contentDescription = "Download All",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "Download All",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                PlayerGlassButton(
-                                    backdrop = backdrop,
-                                    onClick = { isEpisodeGridView = !isEpisodeGridView },
-                                    circle = true
-                                ) {
-                                    Icon(
-                                        imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
-                                        contentDescription = "Toggle Episode View",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // 4. Episode Content (Grid or Rich Cards)
-                    val startEp = selectedPage * pageSize + 1
-                    val endEp = minOf(startEp + pageSize - 1, maxEpisode)
-                    val episodeNumbers = (startEp..endEp).toList()
-
-                    if (isEpisodeGridView) {
-                        // Compact fast-selection grid (5 columns)
-                        item {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val chunked = episodeNumbers.chunked(5)
-                                chunked.forEach { row ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        row.forEach { epNum ->
-                                            val isCurrent = epNum == currentEpisode
-                                            val isEpFiller = fillerInfo.isFiller(epNum)
-                                            val isEpMixed = fillerInfo.isMixed(epNum)
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(46.dp)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(
-                                                        if (isCurrent) Color.White
-                                                        else if (isEpFiller) Color(0x24F59E0B)
-                                                        else if (isEpMixed) Color(0x246366F1)
-                                                        else OttSurface
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (isCurrent) Color.White
-                                                        else if (isEpFiller) Color(0x60FBBF24)
-                                                        else if (isEpMixed) Color(0x60818CF8)
-                                                        else OttSurfaceBorder,
-                                                        RoundedCornerShape(10.dp)
-                                                    )
-                                                    .clickable {
-                                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                        currentEpisode = epNum
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "$epNum",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else OttTextPrimary
-                                                )
-                                                if (isEpFiller || isEpMixed) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .align(Alignment.TopEnd)
-                                                            .padding(4.dp)
-                                                            .size(5.dp)
-                                                            .clip(CircleShape)
-                                                            .background(if (isEpMixed) Color(0xFFA5B4FC) else Color(0xFFFBBF24))
+                                    if (backdrop != null) {
+                                        PrismalHorizontalSelector(
+                                            labels = rangeLabels,
+                                            selectedIndex = selectedPage,
+                                            onSelected = { selectedPage = it },
+                                            backdrop = backdrop,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(24.dp))
+                                                .background(if (isDark) Color(0x59000000) else Color(0x66FFFFFF))
+                                                .border(1.dp, c.glass.border, RoundedCornerShape(24.dp)),
+                                            textStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                                            textColor = c.textPrimary
+                                        )
+                                    } else {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            items(pageCount) { page ->
+                                                val selected = selectedPage == page
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(CircleShape)
+                                                        .background(if (selected) c.accent else c.skeleton)
+                                                        .clickable { selectedPage = page }
+                                                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = rangeLabels[page],
+                                                        fontSize = 12.5.sp,
+                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                        color = if (selected) c.onAccent else c.textSecondary
                                                     )
                                                 }
                                             }
                                         }
-                                        repeat(5 - row.size) {
-                                            Spacer(Modifier.weight(1f))
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Episodes",
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = c.textPrimary
+                                        )
+                                        Text(
+                                            text = "$curStart–$curEnd of $maxEpisode",
+                                            fontSize = 12.sp,
+                                            color = c.textMuted
+                                        )
+                                    }
+                                    PlayerGlassButton(
+                                        backdrop = backdrop,
+                                        onClick = { showDownloadRangeSheet = curStart..curEnd }
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = null, tint = c.textPrimary, modifier = Modifier.size(16.dp))
+                                        Text(
+                                            text = "Download all",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = c.textPrimary,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    PlayerGlassButton(
+                                        backdrop = backdrop,
+                                        onClick = { isEpisodeGridView = !isEpisodeGridView },
+                                        circle = true
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
+                                            contentDescription = "Toggle episode view",
+                                            tint = c.textPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isEpisodeGridView) {
+                            item(key = "ep-grid") {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    episodeNumbers.chunked(5).forEach { rowEps ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            rowEps.forEach { epNum ->
+                                                val isCurrent = epNum == currentEpisode
+                                                val isEpFiller = fillerInfo.isFiller(epNum)
+                                                val isEpMixed = fillerInfo.isMixed(epNum)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(48.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(
+                                                            when {
+                                                                isCurrent -> c.accent
+                                                                isEpFiller -> Color(0x24F59E0B)
+                                                                isEpMixed -> Color(0x246366F1)
+                                                                else -> c.skeleton
+                                                            }
+                                                        )
+                                                        .clickable {
+                                                            com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                            currentEpisode = epNum
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "$epNum",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (isCurrent) c.onAccent else c.textPrimary
+                                                    )
+                                                    if (isEpFiller || isEpMixed) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .align(Alignment.TopEnd)
+                                                                .padding(5.dp)
+                                                                .size(6.dp)
+                                                                .clip(CircleShape)
+                                                                .background(if (isEpMixed) Color(0xFF818CF8) else Color(0xFFF59E0B))
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            repeat(5 - rowEps.size) {
+                                                Spacer(Modifier.weight(1f))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            items(episodeNumbers, key = { it }) { epNum ->
+                                val epStillInfo = tmdbEpisodes[epNum]
+                                val isEpDl = remember(anime.id, epNum, downloadedAnimeList) {
+                                    vm.isAnimeEpisodeDownloaded(anime.id, epNum)
+                                }
+                                val isEpDling = remember(anime.id, epNum, activeAnimeTasks) {
+                                    activeAnimeTasks.containsKey("${anime.id}:$epNum")
+                                }
+                                PlayerEpisodeRow(
+                                    episode = epNum,
+                                    title = epStillInfo?.name,
+                                    still = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
+                                        ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
+                                        ?: anime.banner?.takeIf { it.isNotBlank() }
+                                        ?: anime.cover,
+                                    durationLabel = anime.duration?.let { "$it min" } ?: "24 min",
+                                    isSelected = epNum == currentEpisode,
+                                    isDownloaded = isEpDl,
+                                    isDownloading = isEpDling,
+                                    downloadProgress = activeAnimeTasks["${anime.id}:$epNum"]?.progress,
+                                    isFiller = fillerInfo.isFiller(epNum),
+                                    isMixed = fillerInfo.isMixed(epNum),
+                                    onDownload = {
+                                        if (!isEpDl && !isEpDling) {
+                                            showDownloadSheetEpisode = epNum to epStillInfo?.name
+                                        } else if (isEpDl) {
+                                            android.widget.Toast.makeText(context, "Ep $epNum is already downloaded", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onClick = {
+                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                        currentEpisode = epNum
+                                    },
+                                    overview = epStillInfo?.overview?.takeIf { it.isNotBlank() }
+                                )
+                            }
+                        }
+                    }
+
+                    // ───────── OVERVIEW ─────────
+                    if (activeTab == "OVERVIEW") {
+                        item(key = "overview") {
+                            PlayerOverview(
+                                anime = anime,
+                                episode = currentEpisode,
+                                episodeName = customEpName,
+                                episodeOverview = currentEpInfo?.overview,
+                                isMovie = isMovie,
+                                maxEpisode = maxEpisode
+                            )
+                        }
+                    }
+
+                    // ───────── SERVERS ─────────
+                    if (activeTab == "SERVERS") {
+                        item(key = "servers") {
+                            val isDirect = selectedSourceMode == "DIRECT"
+                            val servers = if (isDirect) {
+                                when (selectedCategory) {
+                                    "DUB" -> availableDirectServers.filter { it.isDub || it.isMulti }
+                                    "MULTI" -> availableDirectServers.filter { it.isMulti }
+                                    else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
+                                }.ifEmpty { availableDirectServers }
+                            } else {
+                                when (selectedCategory) {
+                                    "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
+                                    "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
+                                    else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                }
+                            }
+                            val audioKeys = if (isDirect) listOf("SUB", "DUB") else listOf("SUB", "DUB", "MULTI")
+                            val audioLabels = if (isDirect) listOf("Sub", "Dub") else listOf("Sub", "Dub", "Multi audio")
+                            val localName = downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp)
+                                    .padding(top = 8.dp)
+                            ) {
+                                if (isPlayingOffline) {
+                                    SectionLabel("PLAYBACK")
+                                    Spacer(Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text("Playing downloaded video", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary)
+                                            Text("Offline · $localName · local storage", fontSize = 12.sp, color = c.textMuted)
+                                        }
+                                        PlayerGlassButton(backdrop = backdrop, onClick = { playOfflineMode = false }) {
+                                            Text("Go online", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textPrimary, maxLines = 1, softWrap = false)
+                                        }
+                                    }
+                                } else {
+                                    if (isCurrentEpDownloaded && downloadedEpInfo != null) {
+                                        SectionLabel("OFFLINE COPY")
+                                        Spacer(Modifier.height(10.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Icon(Icons.Default.DownloadDone, contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
+                                            Column(Modifier.weight(1f)) {
+                                                Text("Downloaded on this device", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary)
+                                                Text(localName, fontSize = 12.sp, color = c.textMuted)
+                                            }
+                                            PlayerGlassButton(backdrop = backdrop, onClick = { playOfflineMode = true }) {
+                                                Text("Play offline", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textPrimary, maxLines = 1, softWrap = false)
+                                            }
+                                        }
+                                        Spacer(Modifier.height(22.dp))
+                                    }
+
+                                    SectionLabel("SOURCE")
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = if (isDirect) "Native player · fastest, no ads" else "Web embeds · more servers, may show ads",
+                                        fontSize = 12.5.sp,
+                                        color = c.textMuted
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                    PlayerSegmented(
+                                        labels = listOf("Direct", "Embed"),
+                                        selectedIndex = if (isDirect) 0 else 1,
+                                        onSelected = { selectSourceMode(if (it == 0) "DIRECT" else "EMBED") },
+                                        backdrop = backdrop,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        height = 44.dp
+                                    )
+
+                                    Spacer(Modifier.height(22.dp))
+                                    SectionLabel("AUDIO")
+                                    Spacer(Modifier.height(10.dp))
+                                    PlayerSegmented(
+                                        labels = audioLabels,
+                                        selectedIndex = audioKeys.indexOf(selectedCategory).coerceAtLeast(0),
+                                        onSelected = { selectCategory(audioKeys[it]) },
+                                        backdrop = backdrop,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        height = 44.dp
+                                    )
+
+                                    Spacer(Modifier.height(22.dp))
+                                    SectionLabel(if (isDirect) "DIRECT SERVERS" else "EMBED SOURCES")
+                                    Spacer(Modifier.height(4.dp))
+                                    if (servers.isEmpty()) {
+                                        Text(
+                                            text = "No servers available for this audio category.",
+                                            fontSize = 13.sp,
+                                            color = c.textMuted,
+                                            modifier = Modifier.padding(vertical = 12.dp)
+                                        )
+                                    } else {
+                                        Hairline()
+                                        servers.forEach { prov ->
+                                            ServerRow(
+                                                name = prov.name,
+                                                badge = prov.serverBadge.replace("Direct HD", "HD"),
+                                                selected = prov.id == currentProvider.id,
+                                                onClick = {
+                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                    currentProvider = prov
+                                                    vm.setPreferredServer(prov.id)
+                                                }
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
-                    } else {
-                        // Rich Episode Cards (Netflix / Crunchyroll style matching Details page)
-                        items(episodeNumbers, key = { it }) { epNum ->
-                            val epStillInfo = tmdbEpisodes[epNum]
-                            val isEpDl = remember(anime.id, epNum, downloadedAnimeList) {
-                                vm.isAnimeEpisodeDownloaded(anime.id, epNum)
-                            }
-                            val isEpDling = remember(anime.id, epNum, activeAnimeTasks) {
-                                activeAnimeTasks.containsKey("${anime.id}:$epNum")
-                            }
-                            PlayerEpisodeRow(
-                                episode = epNum,
-                                title = epStillInfo?.name,
-                                still = epStillInfo?.stillUrl?.takeIf { it.isNotBlank() }
-                                    ?: tmdbEpisodes[1]?.stillUrl?.takeIf { it.isNotBlank() }
-                                    ?: anime.banner?.takeIf { it.isNotBlank() }
-                                    ?: anime.cover,
-                                durationLabel = anime.duration?.let { "$it min" } ?: "24 min",
-                                isSelected = epNum == currentEpisode,
-                                isDownloaded = isEpDl,
-                                isDownloading = isEpDling,
-                                downloadProgress = activeAnimeTasks["${anime.id}:$epNum"]?.progress,
-                                isFiller = fillerInfo.isFiller(epNum),
-                                isMixed = fillerInfo.isMixed(epNum),
-                                onDownload = {
-                                    if (!isEpDl && !isEpDling) {
-                                        showDownloadSheetEpisode = epNum to epStillInfo?.name
-                                    } else if (isEpDl) {
-                                        android.widget.Toast.makeText(context, "Ep $epNum is already downloaded", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                glass = backdrop != null,
-                                onClick = {
-                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                    currentEpisode = epNum
-                                }
-                            )
-                        }
                     }
                 }
             }
-        }
         }
     }
 }
@@ -2488,13 +1846,13 @@ fun PlayerScreen(
                         tint = Color(0xFFFF5252),
                         modifier = Modifier.size(20.dp)
                     )
-                    Text("Download Stopped", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Download Stopped", fontWeight = FontWeight.Bold, color = c.textPrimary)
                 }
             },
             text = {
                 Text(
                     text = failedTask.error ?: "Download stopped on ${failedTask.providerName}. Would you like to retry or change server?",
-                    color = OttTextSecondary,
+                    color = c.textSecondary,
                     fontSize = 13.5.sp,
                     lineHeight = 19.sp
                 )
@@ -2513,12 +1871,12 @@ fun PlayerScreen(
                             audio = failedTask.audio
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OttPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = c.accent, contentColor = c.onAccent),
                     shape = OttPillShape
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Retry (${failedTask.providerName})", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Retry (${failedTask.providerName})", color = c.onAccent, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -2535,7 +1893,7 @@ fun PlayerScreen(
                             showDownloadSheetEpisode = ep to epTitle
                         }
                     ) {
-                        Text("Change Server", color = Color.White.copy(alpha = 0.8f))
+                        Text("Change Server", color = c.textPrimary)
                     }
                     TextButton(
                         onClick = {
@@ -2546,11 +1904,11 @@ fun PlayerScreen(
                             )
                         }
                     ) {
-                        Text("Dismiss", color = OttTextSecondary)
+                        Text("Dismiss", color = c.textSecondary)
                     }
                 }
             },
-            containerColor = OttSurfaceElevated,
+            containerColor = c.surfaceElevated,
             shape = RoundedCornerShape(16.dp)
         )
     }
@@ -2612,42 +1970,43 @@ private fun GlassmorphicControlChip(
 }
 
 
-// ───────── Player glass UI helpers (merged from PlayerGlass.kt) ─────────
-
-private val Amoled = Color(0xFF050507)
-private val Muted = Color(0xFF8E94A3)
+// ───────── Player UI helpers (theme-aware: LocalAppColors + LocalIsDark, light and dark) ─────────
 
 /**
- * Liquid glass surface. [backdrop] == null means glass is switched off: a flat AMOLED card is drawn instead,
- * so every call site works in both modes.
+ * Glass surface kept for other screens. [backdrop] == null means glass is off: a flat themed surface is drawn instead.
+ * The player page itself no longer wraps content in this (no cards); it's only for callers that still want a panel.
  */
 @Composable
 fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modifier {
+    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
     val shape = RoundedCornerShape(radius)
     if (backdrop == null) {
         return this
             .clip(shape)
-            .background(Color(0xFF0B0B10))
-            .border(1.dp, Color(0x1FFFFFFF), shape)
+            .background(c.surface)
+            .border(1.dp, c.glass.border, shape)
     }
     val density = LocalDensity.current
     val effects = remember(density) { prismalGlassEffects(density) }
+    val scrim = if (isDark) Color.Black.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.5f)
     return this.drawPrismalGlass(
         backdrop = backdrop,
         shape = { PrismalRoundedRectangle(radius) },
         effects = effects,
-        // ponytail: dark scrim keeps the glass AMOLED-black instead of washing out
-        onDrawSurface = { drawRect(Color.Black.copy(alpha = 0.42f)) }
+        onDrawSurface = { drawRect(scrim) }
     )
 }
 
 /**
  * Live ambient backdrop: the current episode still, blurred, slowly drifting, crossfading when the episode changes.
- * Every glass surface samples this layer, so the glass colours follow the episode too.
+ * Fades into the theme background (black in dark, soft white in light). Every glass control samples this layer.
  */
 @Composable
 fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
     if (layer == null) return
+    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
     val t = rememberInfiniteTransition(label = "ambient")
     val drift by t.animateFloat(
         initialValue = 0f,
@@ -2655,7 +2014,7 @@ fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier 
         animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Reverse),
         label = "drift"
     )
-    Box(modifier.prismalGlassLayer(layer).background(Color.Black)) {
+    Box(modifier.prismalGlassLayer(layer).background(c.bg)) {
         Crossfade(targetState = model, animationSpec = tween(900), label = "ambientFade") { art ->
             AsyncImage(
                 model = art,
@@ -2670,7 +2029,7 @@ fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier 
                         translationX = (drift - 0.5f) * 140f
                         translationY = (0.5f - drift) * 90f
                     }
-                    .alpha(0.55f)
+                    .alpha(if (isDark) 0.55f else 0.34f)
             )
         }
         Box(
@@ -2678,14 +2037,14 @@ fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier 
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.7f), Color.Black)
+                        listOf(c.bg.copy(alpha = 0.05f), c.bg.copy(alpha = 0.78f), c.bg)
                     )
                 )
         )
     }
 }
 
-/** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. */
+/** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. [active] = solid accent. */
 @Composable
 fun PlayerGlassButton(
     backdrop: PrismalGlassLayer?,
@@ -2693,8 +2052,11 @@ fun PlayerGlassButton(
     modifier: Modifier = Modifier,
     height: Dp = 40.dp,
     circle: Boolean = false,
+    active: Boolean = false,
     content: @Composable RowScope.() -> Unit
 ) {
+    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
     val sized = if (circle) modifier.width(height) else modifier
     val pad = if (circle) PaddingValues(0.dp) else PaddingValues(horizontal = 14.dp)
     if (backdrop != null) {
@@ -2703,7 +2065,11 @@ fun PlayerGlassButton(
             backdrop = backdrop,
             modifier = sized,
             height = height,
-            surfaceColor = Color.Black.copy(alpha = 0.3f),
+            surfaceColor = when {
+                active -> c.accent.copy(alpha = 0.92f)
+                isDark -> Color.Black.copy(alpha = 0.3f)
+                else -> Color.White.copy(alpha = 0.45f)
+            },
             contentPadding = pad,
             content = content
         )
@@ -2720,8 +2086,8 @@ fun PlayerGlassButton(
                 .height(height)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(CircleShape)
-                .background(Color(0x14FFFFFF))
-                .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                .background(if (active) c.accent else c.surfaceElevated)
+                .border(1.dp, if (active) c.accent else c.glass.border, CircleShape)
                 .clickable(interactionSource = source, indication = null, onClick = onClick)
                 .padding(pad),
             verticalAlignment = Alignment.CenterVertically,
@@ -2729,6 +2095,123 @@ fun PlayerGlassButton(
             content = content
         )
     }
+}
+
+/** Round glass icon button with a caption underneath. [icon] receives the tint to use (flips when [active]). */
+@Composable
+private fun PlayerAction(
+    label: String,
+    backdrop: PrismalGlassLayer?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    active: Boolean = false,
+    onClick: () -> Unit,
+    icon: @Composable (Color) -> Unit
+) {
+    val c = LocalAppColors.current
+    Column(
+        modifier = modifier.alpha(if (enabled) 1f else 0.38f),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        PlayerGlassButton(
+            backdrop = backdrop,
+            onClick = { if (enabled) onClick() },
+            height = 50.dp,
+            circle = true,
+            active = active
+        ) {
+            icon(if (active) c.onAccent else c.textPrimary)
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (active) c.textPrimary else c.textSecondary,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+/** Segmented control: Prismal liquid-glass droplet when glass is on, flat pill track otherwise. */
+@Composable
+private fun PlayerSegmented(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+    backdrop: PrismalGlassLayer?,
+    modifier: Modifier = Modifier,
+    height: Dp = 44.dp
+) {
+    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
+    if (backdrop != null) {
+        PrismalSegmentedControl(
+            labels = labels,
+            selectedIndex = selectedIndex,
+            onSelected = onSelected,
+            backdrop = backdrop,
+            modifier = modifier
+                .clip(CircleShape)
+                .background(if (isDark) Color(0x59000000) else Color(0x66FFFFFF))
+                .border(1.dp, c.glass.border, CircleShape),
+            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+            textColor = c.textPrimary,
+            height = height
+        )
+    } else {
+        Row(
+            modifier = modifier
+                .height(height)
+                .clip(CircleShape)
+                .background(c.surfaceElevated)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            labels.forEachIndexed { i, label ->
+                val selected = i == selectedIndex
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(CircleShape)
+                        .background(if (selected) c.accent else Color.Transparent)
+                        .clickable { onSelected(i) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) c.onAccent else c.textSecondary,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Hairline(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(0.5.dp)
+            .background(LocalAppColors.current.glass.border)
+    )
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.2.sp,
+        color = LocalAppColors.current.textMuted
+    )
 }
 
 /** Single-line chip. Never wraps its text, so "Direct" can't break into "Dire / ct" again. */
@@ -2764,13 +2247,16 @@ fun TagChip(
     }
 }
 
-/** The one and only filler/mixed tag. Used by the hero card and the episode rows. */
+/** The one and only filler/mixed tag. Readable on both themes. */
 @Composable
 fun FillerTag(isMixed: Boolean, modifier: Modifier = Modifier) {
+    val isDark = LocalIsDark.current
     if (isMixed) {
-        TagChip("MIXED", Color(0xFFC7D2FE), Color(0x266366F1), Color(0x66818CF8), modifier, dot = true)
+        if (isDark) TagChip("MIXED", Color(0xFFC7D2FE), Color(0x266366F1), Color(0x66818CF8), modifier, dot = true)
+        else TagChip("MIXED", Color(0xFF4338CA), Color(0x1A6366F1), Color(0x55818CF8), modifier, dot = true)
     } else {
-        TagChip("FILLER", Color(0xFFFDE68A), Color(0x26F59E0B), Color(0x66FBBF24), modifier, dot = true)
+        if (isDark) TagChip("FILLER", Color(0xFFFDE68A), Color(0x26F59E0B), Color(0x66FBBF24), modifier, dot = true)
+        else TagChip("FILLER", Color(0xFFB45309), Color(0x1FF59E0B), Color(0x66D97706), modifier, dot = true)
     }
 }
 
@@ -2801,9 +2287,9 @@ private fun Equalizer(color: Color, modifier: Modifier = Modifier) {
 }
 
 /**
- * Episode row for the player list. Replaces OttEpisodeCardItem here:
- * one filler tag (not two), a clearly lit "now playing" state, even spacing, spring press depth.
- * Plain Compose glass on purpose: a shader per row would make the list stutter.
+ * Flat episode row (no card): thumbnail, title, overview, tags and a trailing download state,
+ * separated by a hairline. The playing episode gets a soft accent wash + equalizer.
+ * [glass] is kept only so older call sites still compile.
  */
 @Composable
 fun PlayerEpisodeRow(
@@ -2820,195 +2306,367 @@ fun PlayerEpisodeRow(
     onDownload: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    glass: Boolean = true // false = flat AMOLED card, same as playerGlass(null)
+    glass: Boolean = true,
+    overview: String? = null
 ) {
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
-        label = "rowPress"
-    )
-    val shape = RoundedCornerShape(20.dp)
-    val fill = when {
-        !glass -> {
-            val c = if (isSelected) Color(0xFF16161F) else Color(0xFF0B0B10)
-            Brush.linearGradient(listOf(c, c))
-        }
-        isSelected -> Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
-        else -> Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
-    }
-    val edge = when {
-        !glass -> {
-            val c = if (isSelected) Color(0x80FFFFFF) else Color(0x1FFFFFFF)
-            Brush.linearGradient(listOf(c, c))
-        }
-        isSelected -> Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
-        else -> Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)))
-    }
+    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
+    val okColor = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(shape)
-            .background(Amoled)
-            .background(fill)
-            .border(if (isSelected) 1.2.dp else 1.dp, edge, shape)
-            .clickable(interactionSource = source, indication = null, onClick = onClick)
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier
-                .width(120.dp)
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(13.dp))
-                .background(Color(0x14FFFFFF))
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(if (isSelected) c.accent.copy(alpha = 0.07f) else Color.Transparent)
+                .clickable(onClick = onClick)
+                .padding(start = 18.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = still,
-                contentDescription = "Episode $episode",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
             Box(
                 Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = if (isSelected) 0.7f else 0.5f))
-                        )
-                    )
-            )
-            Text(
-                text = "$episode",
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White
-            )
-            if (isSelected) {
+                    .width(128.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(c.skeleton)
+            ) {
+                AsyncImage(
+                    model = still,
+                    contentDescription = "Episode $episode",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
                 Box(
                     Modifier
-                        .align(Alignment.Center)
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .border(1.dp, Color(0x55FFFFFF), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Equalizer(Color.White, Modifier.width(16.dp))
-                }
-            } else {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(6.dp)
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x66000000))
-                        .padding(3.dp)
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = if (isSelected) 0.7f else 0.5f))
+                            )
+                        )
                 )
-            }
-            if (isDownloading && downloadProgress != null) {
-                LinearProgressIndicator(
-                    progress = { downloadProgress.coerceIn(0f, 1f) },
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
-                    color = Color.White,
-                    trackColor = Color(0x33FFFFFF)
-                )
-            }
-        }
-
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = title?.takeIf { it.isNotBlank() } ?: "Episode $episode",
-                fontSize = 14.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
                 Text(
-                    text = "Ep $episode · $durationLabel",
-                    modifier = Modifier.padding(vertical = 3.dp),
-                    fontSize = 11.5.sp,
-                    color = Muted
+                    text = "$episode",
+                    modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 8.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
                 )
-                if (isSelected) TagChip("NOW PLAYING", Color.Black, Color.White, Color.White)
-                if (isFiller || isMixed) FillerTag(isMixed)
-            }
-            when {
-                isDownloaded -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF34D399), modifier = Modifier.size(14.dp))
-                    Text("Downloaded", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF34D399))
+                if (isSelected) {
+                    Box(
+                        Modifier
+                            .align(Alignment.Center)
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Equalizer(Color.White, Modifier.width(16.dp))
+                    }
                 }
-                isDownloading -> Text(
-                    text = "Downloading ${((downloadProgress ?: 0f) * 100).toInt()}%",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.8f)
+                if (isDownloading && downloadProgress != null) {
+                    LinearProgressIndicator(
+                        progress = { downloadProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                        color = Color.White,
+                        trackColor = Color(0x33FFFFFF)
+                    )
+                }
+            }
+
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = title?.takeIf { it.isNotBlank() } ?: "Episode $episode",
+                    fontSize = 14.5.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    color = c.textPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                else -> Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClick = onDownload)
-                        .padding(vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.Download, null, tint = Muted, modifier = Modifier.size(14.dp))
-                    Text("Download", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Muted)
+                    Text(
+                        text = "Ep $episode · $durationLabel",
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        fontSize = 11.5.sp,
+                        color = c.textMuted
+                    )
+                    if (isSelected) TagChip("NOW PLAYING", c.onAccent, c.accent, c.accent)
+                    if (isFiller || isMixed) FillerTag(isMixed)
+                }
+                if (!overview.isNullOrBlank()) {
+                    Text(
+                        text = overview,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = c.textMuted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onDownload),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    isDownloaded -> Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Downloaded",
+                        tint = okColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    isDownloading -> CircularProgressIndicator(
+                        progress = { (downloadProgress ?: 0f).coerceIn(0.05f, 1f) },
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = c.accent,
+                        trackColor = c.glass.border
+                    )
+                    else -> Icon(
+                        Icons.Default.Download,
+                        contentDescription = "Download episode $episode",
+                        tint = c.textMuted,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             }
         }
+        Hairline(Modifier.padding(start = 18.dp))
     }
 }
 
-
-/** One row of the inline server list. */
+/** Overview tab: what's playing, the show's facts, genres and synopsis. Flat sections, no containers. */
 @Composable
-private fun ServerRow(name: String, badge: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
-    Row(
+private fun PlayerOverview(
+    anime: Anime,
+    episode: Int,
+    episodeName: String?,
+    episodeOverview: String?,
+    isMovie: Boolean,
+    maxEpisode: Int
+) {
+    val c = LocalAppColors.current
+    val about = remember(anime.description) {
+        anime.description?.replace(Regex("<[^>]*>"), "")?.trim()?.takeIf { it.isNotBlank() }
+    }
+    var aboutExpanded by remember(anime.id) { mutableStateOf(false) }
+    var epExpanded by remember(episode) { mutableStateOf(false) }
+    val genres = anime.genres.orEmpty()
+    val statusText = anime.status?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() }
+    val facts = listOfNotNull(
+        anime.format?.takeIf { it.isNotBlank() }?.let { "Format" to it },
+        statusText?.takeIf { it.isNotBlank() }?.let { "Status" to it },
+        if (isMovie) null else maxEpisode.takeIf { it > 0 }?.let { "Episodes" to "$it" },
+        anime.duration?.let { "Duration" to "$it min" },
+        anime.seasonYear?.let { "Year" to "$it" },
+        anime.score?.let { "Score" to "$it%" }
+    )
+    val romaji = anime.romajiTitle?.takeIf { it.isNotBlank() && !it.equals(anime.title, ignoreCase = true) }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(if (selected) Color(0x26FFFFFF) else Color(0x0DFFFFFF))
-            .border(1.dp, if (selected) Color(0x66FFFFFF) else Color(0x1AFFFFFF), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 18.dp)
+            .padding(top = 10.dp)
     ) {
-        Text(
-            text = name,
-            modifier = Modifier.weight(1f),
-            fontSize = 13.5.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) Color.White else Color(0xFFCBD5E1),
-            maxLines = 1
-        )
-        TagChip(badge, Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
-        Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = null,
-            tint = if (selected) Color.White else Color.Transparent,
-            modifier = Modifier.size(16.dp)
-        )
+        // Currently playing episode
+        if (!isMovie && !episodeOverview.isNullOrBlank()) {
+            SectionLabel("EPISODE $episode")
+            Spacer(Modifier.height(8.dp))
+            if (!episodeName.isNullOrBlank()) {
+                Text(
+                    text = episodeName,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = c.textPrimary
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            Text(
+                text = episodeOverview,
+                fontSize = 14.sp,
+                lineHeight = 21.sp,
+                color = c.textSecondary,
+                maxLines = if (epExpanded) Int.MAX_VALUE else 4,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (episodeOverview.length > 170) {
+                Text(
+                    text = if (epExpanded) "Show less" else "Read more",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = c.textPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { epExpanded = !epExpanded }
+                        .padding(vertical = 8.dp)
+                )
+            }
+            Spacer(Modifier.height(18.dp))
+            Hairline()
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // Poster + facts
+        SectionLabel(if (isMovie) "ABOUT THE MOVIE" else "ABOUT THE SERIES")
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            AsyncImage(
+                model = anime.cover,
+                contentDescription = anime.displayTitle,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(104.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(c.skeleton)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                Text(
+                    text = anime.displayTitle,
+                    fontSize = 16.sp,
+                    lineHeight = 21.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = c.textPrimary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (romaji != null) {
+                    Text(
+                        text = romaji,
+                        fontSize = 12.5.sp,
+                        color = c.textMuted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                facts.forEach { (label, value) ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = label,
+                            modifier = Modifier.width(66.dp),
+                            fontSize = 12.5.sp,
+                            color = c.textMuted
+                        )
+                        Text(
+                            text = value,
+                            modifier = Modifier.weight(1f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = c.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        // Genres (outlined, not filled)
+        if (genres.isNotEmpty()) {
+            Spacer(Modifier.height(20.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                genres.forEach { genre ->
+                    Text(
+                        text = genre,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = c.textSecondary,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .border(1.dp, c.glass.border, CircleShape)
+                            .padding(horizontal = 13.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
+        // Synopsis
+        if (about != null) {
+            Spacer(Modifier.height(22.dp))
+            Hairline()
+            Spacer(Modifier.height(20.dp))
+            SectionLabel("SYNOPSIS")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = about,
+                fontSize = 14.sp,
+                lineHeight = 22.sp,
+                color = c.textSecondary,
+                maxLines = if (aboutExpanded) Int.MAX_VALUE else 6,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (about.length > 260) {
+                Text(
+                    text = if (aboutExpanded) "Show less" else "Read more",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = c.textPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { aboutExpanded = !aboutExpanded }
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** One row of the server list: radio dot, name, badge. Flat, separated by hairlines. */
+@Composable
+private fun ServerRow(name: String, badge: String, selected: Boolean, onClick: () -> Unit) {
+    val c = LocalAppColors.current
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, if (selected) c.accent else c.glass.border, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(c.accent))
+                }
+            }
+            Text(
+                text = name,
+                modifier = Modifier.weight(1f),
+                fontSize = 15.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) c.textPrimary else c.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            TagChip(badge, c.textSecondary, Color.Transparent, c.glass.border)
+        }
+        Hairline()
     }
 }
