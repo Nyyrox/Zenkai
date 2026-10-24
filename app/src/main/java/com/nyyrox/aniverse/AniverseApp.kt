@@ -42,7 +42,6 @@ import com.nyyrox.aniverse.ui.components.OttBottomDock
 import com.styropyr0.prismal.sources.prismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import com.styropyr0.prismal.LocalPrismalBackdrop
-import dev.chrisbanes.haze.hazeSource
 import com.nyyrox.aniverse.ui.components.OttNavDrawer
 import com.nyyrox.aniverse.ui.components.OttTopBar
 import com.nyyrox.aniverse.ui.screens.AiringScreen
@@ -430,10 +429,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     }
 
     ThemeEngineProvider(settings = vm.themeSettings) {
-        val currentThemeColors = com.nyyrox.aniverse.ui.theme.adaptColorsForMode(getThemeColors(vm.themeSettings.theme), vm.themeSettings.mode)
+        val currentThemeColors = getThemeColors(vm.themeSettings.theme)
         val isReducedMotion = vm.themeSettings.isReducedMotionEnabled
         val appBackdropLayer = com.styropyr0.prismal.sources.rememberPrismalGlassLayer()
-        val hazeState = dev.chrisbanes.haze.rememberHazeState()
 
         CompositionLocalProvider(
             LocalOverscrollConfiguration provides null,
@@ -454,7 +452,6 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         modifier = Modifier
                             .fillMaxSize()
                             .prismalGlassLayer(appBackdropLayer)
-                            .hazeSource(hazeState)
                     ) {
                         AnimatedContent(
                             targetState = currentRoute,
@@ -626,13 +623,11 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
 
                                 screen == "watchtogether" || screen.startsWith("watchtogether:") -> {
                                     val roomId = screen.removePrefix("watchtogether:").takeIf { it != "watchtogether" && it.isNotBlank() }
-                                    com.nyyrox.aniverse.ui.theme.ImmersiveDark {
-WatchTogetherScreen(
+                                    WatchTogetherScreen(
                                         vm = vm,
                                         onBack = { pop() },
                                         initialRoomId = roomId
                                     )
-}
                                 }
 
                                 screen == "login" -> {
@@ -842,8 +837,7 @@ WatchTogetherScreen(
                             exit = androidx.compose.animation.ExitTransition.None
                         ) {
                             if (isPlayerActive) {
-                                com.nyyrox.aniverse.ui.theme.ImmersiveDark {
-PlayerScreen(
+                                PlayerScreen(
                                     vm = vm,
                                     animeId = playerId,
                                     initialEpisode = playerEpisode,
@@ -855,7 +849,6 @@ PlayerScreen(
                                         pop()
                                     }
                                 )
-}
                             }
                         }
 
@@ -867,8 +860,7 @@ PlayerScreen(
                             exit = fadeOut(tween(200))
                         ) {
                             if (isMangaReaderActive) {
-                                com.nyyrox.aniverse.ui.theme.ImmersiveDark {
-MangaReaderScreen(
+                                MangaReaderScreen(
                                     vm = vm,
                                     mangaId = mangaReaderId,
                                     chapterId = mangaReaderChapterId,
@@ -883,7 +875,6 @@ MangaReaderScreen(
                                          navStack = withoutReader + "manga_reader:$mangaReaderId:$cleanCh"
                                      }
                                 )
-}
                             }
                         }
 
@@ -895,8 +886,7 @@ MangaReaderScreen(
                             exit = fadeOut(tween(200))
                         ) {
                             if (isNovelReaderActive) {
-                                com.nyyrox.aniverse.ui.theme.ImmersiveDark {
-NovelReaderScreen(
+                                NovelReaderScreen(
                                     vm = vm,
                                     novelSlug = novelReaderSlug,
                                     chapterSlug = novelReaderChapterSlug,
@@ -909,7 +899,6 @@ NovelReaderScreen(
                                         navStack = withoutReader + "novel_reader:$novelReaderSlug:$newCh"
                                     }
                                 )
-}
                             }
                         }
                     }
@@ -945,7 +934,7 @@ NovelReaderScreen(
                             userAvatarUrl = vm.userProfile.avatarUrl,
                             avatarDecorationId = vm.userProfile.avatarDecorationId,
                             avatarFrameId = vm.userProfile.avatarFrameId,
-                            hazeState = hazeState,
+                            backdrop = appBackdropLayer,
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }

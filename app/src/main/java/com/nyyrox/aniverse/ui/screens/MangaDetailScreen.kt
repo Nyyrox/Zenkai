@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.content.Intent
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -105,10 +102,6 @@ import com.nyyrox.aniverse.ui.animation.SharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedTransitionPhase
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.components.posterBorder
-import com.nyyrox.aniverse.ui.components.zenkaiSurface
-import com.nyyrox.aniverse.ui.components.GlassAmbient
-import com.nyyrox.aniverse.ui.theme.OttOnMedia
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttHeroGradient
 import com.nyyrox.aniverse.ui.theme.OttPillShape
@@ -298,11 +291,11 @@ fun MangaDetailScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = error ?: "Failed to load manga", color = OttTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(text = error ?: "Failed to load manga", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = { onBack() },
-                        colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = OttOnPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = Color.Black),
                         shape = OttPillShape
                     ) {
                         Text(text = "Go Back", fontWeight = FontWeight.Bold)
@@ -369,7 +362,8 @@ fun MangaDetailScreen(
                                         coordinator?.updateTargetBounds(coords.boundsInWindow())
                                     }
                                     .clip(OttCardShape)
-                                    .zenkaiSurface(OttCardShape)
+                                    .background(Color(0x20FFFFFF))
+                                    .border(1.dp, Color(0x35FFFFFF), OttCardShape)
                                     .shadow(12.dp, OttCardShape)
                             ) {
                                 AsyncImage(
@@ -520,8 +514,8 @@ fun MangaDetailScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(OttPillShape)
-                                                .background(OttInk(0.09f))
-                                                .border(0.8.dp, OttInk(0.15f), OttPillShape)
+                                                .background(Color(0x18FFFFFF))
+                                                .border(0.8.dp, Color(0x25FFFFFF), OttPillShape)
                                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                                         ) {
                                             Text(
@@ -555,7 +549,7 @@ fun MangaDetailScreen(
                                 targetChapterId?.let { onReadChapter(MangaRepository.cleanWeebId(currentMangaId), it) }
                             },
                             enabled = targetChapterId != null,
-                            colors = ButtonDefaults.buttonColors(containerColor = OttTextPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                             shape = OttPillShape,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -565,7 +559,7 @@ fun MangaDetailScreen(
                                 Icons.Default.AutoStories,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
-                                tint = OttOnPrimary
+                                tint = Color.Black
                             )
                             Spacer(Modifier.width(8.dp))
                             val continueBtnText = if (historyItem?.chapterNumber != null) {
@@ -576,7 +570,7 @@ fun MangaDetailScreen(
                                 text = continueBtnText,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
-                                color = OttOnPrimary
+                                color = Color.Black
                             )
                         }
 
@@ -601,10 +595,10 @@ fun MangaDetailScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(OttPillShape)
-                                        .background(if (isSelected) activeBg else OttInk(0.07f))
+                                        .background(if (isSelected) activeBg else Color(0x12FFFFFF))
                                         .border(
                                             1.dp,
-                                            if (isSelected) activeBorder else OttInk(0.13f),
+                                            if (isSelected) activeBorder else Color(0x20FFFFFF),
                                             OttPillShape
                                         )
                                         .clickable(enabled = !isSwitchingSource && !isSelected) {
@@ -695,10 +689,10 @@ fun MangaDetailScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(OttPillShape)
-                                    .background(if (isSelected) OttTextPrimary else OttInk(0.08f))
+                                    .background(if (isSelected) Color.White else Color(0x14FFFFFF))
                                     .border(
                                         1.dp,
-                                        if (isSelected) OttTextPrimary else OttInk(0.13f),
+                                        if (isSelected) Color.White else Color(0x22FFFFFF),
                                         OttPillShape
                                     )
                                     .clickable { selectedTab = index }
@@ -707,7 +701,7 @@ fun MangaDetailScreen(
                             ) {
                                 Text(
                                     text = tabTitle,
-                                    color = if (isSelected) OttOnPrimary else OttTextPrimary,
+                                    color = if (isSelected) Color.Black else Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
                                 )
@@ -742,7 +736,8 @@ fun MangaDetailScreen(
                                     .weight(1f)
                                     .height(38.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .zenkaiSurface(RoundedCornerShape(10.dp), alwaysBox = true)
+                                    .background(Color(0x16FFFFFF))
+                                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
                                     .padding(horizontal = 10.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
@@ -770,7 +765,7 @@ fun MangaDetailScreen(
                                             onValueChange = { chapterSearch = it },
                                             singleLine = true,
                                             textStyle = TextStyle(
-                                                color = OttTextPrimary,
+                                                color = Color.White,
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Normal
                                             ),
@@ -796,7 +791,8 @@ fun MangaDetailScreen(
                                 modifier = Modifier
                                     .height(38.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .zenkaiSurface(RoundedCornerShape(10.dp), alwaysBox = true)
+                                    .background(Color(0x16FFFFFF))
+                                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
                                     .clickable { sortAscending = !sortAscending }
                                     .padding(horizontal = 10.dp),
                                 contentAlignment = Alignment.Center
@@ -815,7 +811,7 @@ fun MangaDetailScreen(
                                         text = if (sortAscending) "1 → N" else "N → 1",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = OttTextPrimary
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -835,8 +831,8 @@ fun MangaDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isAll) OttTextPrimary else OttInk(0.08f))
-                                            .border(1.dp, if (isAll) OttTextPrimary else OttInk(0.13f), RoundedCornerShape(8.dp))
+                                            .background(if (isAll) Color.White else Color(0x14FFFFFF))
+                                            .border(1.dp, if (isAll) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                                             .clickable { selectedVolume = null }
                                             .padding(horizontal = 10.dp, vertical = 5.dp),
                                         contentAlignment = Alignment.Center
@@ -845,7 +841,7 @@ fun MangaDetailScreen(
                                             text = "All Volumes",
                                             fontSize = 11.sp,
                                             fontWeight = if (isAll) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isAll) OttOnPrimary else OttTextPrimary
+                                            color = if (isAll) Color.Black else Color.White
                                         )
                                     }
                                 }
@@ -854,8 +850,8 @@ fun MangaDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) OttTextPrimary else OttInk(0.08f))
-                                            .border(1.dp, if (isSelected) OttTextPrimary else OttInk(0.13f), RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) Color.White else Color(0x14FFFFFF))
+                                            .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                                             .clickable { selectedVolume = if (isSelected) null else vol }
                                             .padding(horizontal = 10.dp, vertical = 5.dp),
                                         contentAlignment = Alignment.Center
@@ -864,7 +860,7 @@ fun MangaDetailScreen(
                                             text = vol,
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) OttOnPrimary else OttTextPrimary
+                                            color = if (isSelected) Color.Black else Color.White
                                         )
                                     }
                                 }
@@ -885,7 +881,8 @@ fun MangaDetailScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(OttPillShape)
-                                .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                .background(Color(0x14FFFFFF))
+                                .border(1.dp, Color(0x25FFFFFF), OttPillShape)
                                 .clickable {
                                     val targetChapters = pagedChapters.take(5).map { it.chapterId to "Chapter ${it.number}" }
                                     vm.downloadMangaChaptersBatch(currentMangaId, info?.title ?: currentMangaId, info?.poster ?: "", targetChapters)
@@ -897,8 +894,8 @@ fun MangaDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.DownloadDone, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(13.dp))
-                                Text("Download 5", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                                Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                Text("Download 5", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
 
@@ -906,7 +903,8 @@ fun MangaDetailScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(OttPillShape)
-                                .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                .background(Color(0x14FFFFFF))
+                                .border(1.dp, Color(0x25FFFFFF), OttPillShape)
                                 .clickable {
                                     val targetChapters = pagedChapters.map { it.chapterId to "Chapter ${it.number}" }
                                     vm.downloadMangaChaptersBatch(currentMangaId, info?.title ?: currentMangaId, info?.poster ?: "", targetChapters)
@@ -918,8 +916,8 @@ fun MangaDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.DownloadDone, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(13.dp))
-                                Text("Download Loaded (${pagedChapters.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                                Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                Text("Download Loaded (${pagedChapters.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -933,14 +931,15 @@ fun MangaDetailScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 32.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .zenkaiSurface(RoundedCornerShape(14.dp))
+                                .background(Color(0x10FFFFFF))
+                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
                                 .padding(20.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = if (chapterSearch.isNotBlank()) "No chapters matching '$chapterSearch'" else "No readable chapters on ${activeSrc.displayName}",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -977,8 +976,8 @@ fun MangaDetailScreen(
                                 .background(
                                     when {
                                         isChBookmarked -> Color(0x220284C7)
-                                        isCurrent -> OttInk(0.11f)
-                                        else -> OttInk(0.05f)
+                                        isCurrent -> Color(0x1CFFFFFF)
+                                        else -> Color(0x0EFFFFFF)
                                     }
                                 )
                                 .border(
@@ -986,7 +985,7 @@ fun MangaDetailScreen(
                                     color = when {
                                         isChBookmarked -> Color(0xFF38BDF8)
                                         isCurrent -> Color(0x90E50914)
-                                        else -> OttInk(0.09f)
+                                        else -> Color(0x18FFFFFF)
                                     },
                                     shape = RoundedCornerShape(12.dp)
                                 )
@@ -1020,7 +1019,7 @@ fun MangaDetailScreen(
                                             text = "Chapter ${ch.number}",
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isChBookmarked) Color(0xFF38BDF8) else OttTextPrimary
+                                            color = if (isChBookmarked) Color(0xFF38BDF8) else Color.White
                                         )
                                         val cleanChId = MangaRepository.cleanChapterId(ch.chapterId)
                                         val savedChPage = vm.getMangaChapterPageProgress(currentMangaId, cleanChId)
@@ -1042,8 +1041,8 @@ fun MangaDetailScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(4.dp))
-                                                    .background(OttInk(0.09f))
-                                                    .border(0.5.dp, OttInk(0.19f), RoundedCornerShape(4.dp))
+                                                    .background(Color(0x18FFFFFF))
+                                                    .border(0.5.dp, Color(0x30FFFFFF), RoundedCornerShape(4.dp))
                                                     .padding(horizontal = 5.dp, vertical = 1.5.dp)
                                             ) {
                                                 Text(
@@ -1113,7 +1112,7 @@ fun MangaDetailScreen(
                                         Icon(
                                             Icons.Default.Share,
                                             contentDescription = "Share Chapter",
-                                            tint = OttInk(0.46f),
+                                            tint = Color(0x75FFFFFF),
                                             modifier = Modifier.size(15.dp)
                                         )
                                     }
@@ -1142,7 +1141,7 @@ fun MangaDetailScreen(
                                             Icon(
                                                 Icons.Default.DownloadDone,
                                                 contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                                                tint = if (isDownloaded) OttAccentGold else OttInk(0.33f),
+                                                tint = if (isDownloaded) OttAccentGold else Color(0x55FFFFFF),
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -1200,16 +1199,16 @@ fun MangaDetailScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(42.dp)
-                                        .border(1.dp, OttInk(0.19f), OttPillShape),
+                                        .border(1.dp, Color(0x30FFFFFF), OttPillShape),
                                     shape = OttPillShape,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = OttInk(0.13f),
-                                        contentColor = OttTextPrimary
+                                        containerColor = Color(0x20FFFFFF),
+                                        contentColor = Color.White
                                     )
                                 ) {
                                     Text(
                                         text = "Load More Chapters (+50)",
-                                        color = OttTextPrimary,
+                                        color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
                                     )
@@ -1220,10 +1219,10 @@ fun MangaDetailScreen(
                                         onClick = { visibleChapterCount = displayChapters.size },
                                         modifier = Modifier
                                             .height(42.dp)
-                                            .border(1.dp, OttInk(0.13f), OttPillShape),
+                                            .border(1.dp, Color(0x22FFFFFF), OttPillShape),
                                         shape = OttPillShape,
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = OttInk(0.08f),
+                                            containerColor = Color(0x14FFFFFF),
                                             contentColor = Color(0xFFCBD5E1)
                                         )
                                     ) {
@@ -1248,7 +1247,8 @@ fun MangaDetailScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .zenkaiSurface(RoundedCornerShape(14.dp))
+                                .background(Color(0x10FFFFFF))
+                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
                                 .clickable { isSynopsisExpanded = !isSynopsisExpanded }
                                 .padding(16.dp)
                         ) {
@@ -1302,13 +1302,14 @@ fun MangaDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(OttPillShape)
-                                            .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                            .background(Color(0x18FFFFFF))
+                                            .border(1.dp, Color(0x28FFFFFF), OttPillShape)
                                             .padding(horizontal = 10.dp, vertical = 5.dp)
                                     ) {
                                         Text(
                                             text = genre,
                                             fontSize = 11.sp,
-                                            color = OttTextPrimary,
+                                            color = Color.White,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -1341,13 +1342,14 @@ fun MangaDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(OttPillShape)
-                                            .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                            .background(Color(0x18FFFFFF))
+                                            .border(1.dp, Color(0x28FFFFFF), OttPillShape)
                                             .padding(horizontal = 10.dp, vertical = 5.dp)
                                     ) {
                                         Text(
                                             text = author,
                                             fontSize = 11.sp,
-                                            color = OttTextPrimary,
+                                            color = Color.White,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -1364,7 +1366,8 @@ fun MangaDetailScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .zenkaiSurface(RoundedCornerShape(14.dp))
+                            .background(Color(0x10FFFFFF))
+                            .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
                             .padding(16.dp)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1381,7 +1384,7 @@ fun MangaDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("Current Source", fontSize = 12.sp, color = OttTextMuted)
-                                Text(activeSrc.displayName, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                                Text(activeSrc.displayName, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                             if (currentInfo.anilistId != null) {
                                 Row(
@@ -1418,7 +1421,7 @@ fun MangaDetailScreen(
                 .drawBehind {
                     if (navbarAlpha > 0.05f) {
                         drawLine(
-                            color = OttInk(0.09f).copy(alpha = navbarAlpha),
+                            color = Color(0x18FFFFFF).copy(alpha = navbarAlpha),
                             start = Offset(0f, size.height),
                             end = Offset(size.width, size.height),
                             strokeWidth = 1f
@@ -1440,12 +1443,12 @@ fun MangaDetailScreen(
                         .size(38.dp)
                         .clip(CircleShape)
                         .background(Color(0x60000000))
-                        .border(1.dp, OttInk(0.21f), CircleShape)
+                        .border(1.dp, Color(0x35FFFFFF), CircleShape)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = OttTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1462,7 +1465,7 @@ fun MangaDetailScreen(
                         text = currentInfo.title,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary,
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1489,12 +1492,12 @@ fun MangaDetailScreen(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(Color(0x60000000))
-                            .border(1.dp, OttInk(0.21f), CircleShape)
+                            .border(1.dp, Color(0x35FFFFFF), CircleShape)
                     ) {
                         Icon(
                             Icons.Default.Share,
                             contentDescription = "Share",
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1515,14 +1518,14 @@ fun MangaDetailScreen(
                             .background(if (isBookmarked) Color(0x30E50914) else Color(0x60000000))
                             .border(
                                 1.dp,
-                                if (isBookmarked) Color(0x80E50914) else OttInk(0.21f),
+                                if (isBookmarked) Color(0x80E50914) else Color(0x35FFFFFF),
                                 CircleShape
                             )
                     ) {
                         Icon(
                             imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                             contentDescription = "Bookmark",
-                            tint = if (isBookmarked) Color(0xFFFF4D4D) else OttTextPrimary,
+                            tint = if (isBookmarked) Color(0xFFFF4D4D) else Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1562,11 +1565,11 @@ private fun MangaWaveSkeleton(
 
     val waveBrush = Brush.linearGradient(
         colors = listOf(
-            OttPanelHigh.copy(alpha = 0.65f),
+            Color(0xFF131722).copy(alpha = 0.65f),
             Color(0xFF1E2638).copy(alpha = 0.85f),
             Color(0xFF323F58).copy(alpha = 0.95f),
             Color(0xFF1E2638).copy(alpha = 0.85f),
-            OttPanelHigh.copy(alpha = 0.65f),
+            Color(0xFF131722).copy(alpha = 0.65f),
         ),
         start = Offset((wavePhase * 1600f) - 600f, (wavePhase * 600f) - 200f),
         end = Offset((wavePhase * 1600f) + 400f, (wavePhase * 600f) + 400f)
@@ -1636,7 +1639,7 @@ private fun MangaWaveSkeleton(
                                     .height(180.dp)
                                     .clip(OttCardShape)
                                     .background(waveBrush)
-                                    .border(1.dp, OttInk(0.21f), OttCardShape)
+                                    .border(1.dp, Color(0x35FFFFFF), OttCardShape)
                                     .shadow(12.dp, OttCardShape)
                             ) {
                                 if (!cachedPoster.isNullOrBlank()) {
@@ -1741,7 +1744,8 @@ private fun MangaWaveSkeleton(
                         .padding(horizontal = 16.dp)
                         .height(68.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .zenkaiSurface(RoundedCornerShape(14.dp))
+                        .background(Color(0x0CFFFFFF))
+                        .border(1.dp, Color(0x15FFFFFF), RoundedCornerShape(14.dp))
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Row(
@@ -1800,12 +1804,12 @@ private fun MangaWaveSkeleton(
                     .size(38.dp)
                     .clip(CircleShape)
                     .background(Color(0x60000000))
-                    .border(1.dp, OttInk(0.21f), CircleShape)
+                    .border(1.dp, Color(0x35FFFFFF), CircleShape)
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
             }

@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.foundation.background
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -146,13 +144,13 @@ fun WatchlistScreen(
                         .clip(CircleShape)
                         .background(
                             Brush.verticalGradient(
-                                listOf(OttInk(0.21f), OttInk(0.07f))
+                                listOf(Color(0x35FFFFFF), Color(0x12FFFFFF))
                             )
                         )
                         .border(
                             1.dp,
                             Brush.verticalGradient(
-                                listOf(OttInk(0.38f), OttInk(0.09f))
+                                listOf(Color(0x60FFFFFF), Color(0x18FFFFFF))
                             ),
                             CircleShape
                         )
@@ -160,7 +158,7 @@ fun WatchlistScreen(
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = OttTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -184,8 +182,8 @@ fun WatchlistScreen(
                 Box(
                     modifier = Modifier
                         .clip(OttPillShape)
-                        .background(OttInk(0.09f))
-                        .border(1.dp, OttInk(0.19f), OttPillShape)
+                        .background(Color(0x18FFFFFF))
+                        .border(1.dp, Color(0x30FFFFFF), OttPillShape)
                         .clickable(enabled = !vm.isTrackerSyncing) {
                             vm.syncTrackers()
                         }
@@ -197,14 +195,14 @@ fun WatchlistScreen(
                     ) {
                         if (vm.isTrackerSyncing) {
                             androidx.compose.material3.CircularProgressIndicator(
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 modifier = Modifier.size(13.dp),
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "Syncing...",
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 softWrap = false,
@@ -214,13 +212,13 @@ fun WatchlistScreen(
                             Icon(
                                 Icons.Default.Sync,
                                 contentDescription = "Sync",
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "Sync Trackers",
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 softWrap = false,
@@ -329,20 +327,20 @@ fun WatchlistScreen(
                                 val isSelected = selectedFilter == filter
                                 val chipBg = if (isSelected) {
                                     Brush.verticalGradient(
-                                        listOf(OttInk(0.33f), OttInk(0.16f))
+                                        listOf(Color(0x55FFFFFF), Color(0x28FFFFFF))
                                     )
                                 } else {
                                     Brush.verticalGradient(
-                                        listOf(OttInk(0.09f), OttInk(0.04f))
+                                        listOf(Color(0x18FFFFFF), Color(0x0AFFFFFF))
                                     )
                                 }
                                 val chipBorder = if (isSelected) {
                                     Brush.verticalGradient(
-                                        listOf(OttInk(0.58f), OttInk(0.25f))
+                                        listOf(Color(0x95FFFFFF), Color(0x40FFFFFF))
                                     )
                                 } else {
                                     Brush.verticalGradient(
-                                        listOf(OttInk(0.16f), OttInk(0.05f))
+                                        listOf(Color(0x28FFFFFF), Color(0x0CFFFFFF))
                                     )
                                 }
 
@@ -359,7 +357,7 @@ fun WatchlistScreen(
                                         text = filter.label,
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) OttTextPrimary else OttTextSecondary
+                                        color = if (isSelected) Color.White else OttTextSecondary
                                     )
                                     if (count > 0 || filter == WatchlistStatus.ALL) {
                                         Spacer(Modifier.width(6.dp))
@@ -367,8 +365,8 @@ fun WatchlistScreen(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(6.dp))
                                                 .background(
-                                                    if (isSelected) OttInk(0.25f)
-                                                    else OttInk(0.09f)
+                                                    if (isSelected) Color(0x40FFFFFF)
+                                                    else Color(0x18FFFFFF)
                                                 )
                                                 .padding(horizontal = 6.dp, vertical = 1.5.dp)
                                         ) {
@@ -376,7 +374,7 @@ fun WatchlistScreen(
                                                 text = "$count",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) OttTextPrimary else OttTextMuted
+                                                color = if (isSelected) Color.White else OttTextMuted
                                             )
                                         }
                                     }
@@ -553,7 +551,7 @@ private fun WatchlistGridCard(
         WatchlistStatus.COMPLETED -> Color(0xFFA855F7)
         WatchlistStatus.DROPPED -> Color(0xFFEF4444)
         WatchlistStatus.REWATCHING -> Color(0xFFF59E0B)
-        else -> OttTextPrimary
+        else -> Color.White
     }
     val statusText = when (item.watchlistStatus) {
         WatchlistStatus.WATCHING -> {
@@ -614,7 +612,7 @@ private fun WatchlistGridCard(
                 Icon(
                     Icons.Default.BookmarkRemove,
                     contentDescription = "Remove",
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -656,7 +654,7 @@ private fun WatchlistGridCard(
                     .border(
                         0.8.dp,
                         Brush.verticalGradient(
-                            listOf(OttInk(0.31f), OttInk(0.08f))
+                            listOf(Color(0x50FFFFFF), Color(0x15FFFFFF))
                         ),
                         RoundedCornerShape(6.dp)
                     )
@@ -675,7 +673,7 @@ private fun WatchlistGridCard(
                     text = statusText,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     softWrap = false,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -739,8 +737,8 @@ private fun WatchlistGridCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(OttInk(0.09f))
-                            .border(0.6.dp, OttInk(0.15f), RoundedCornerShape(4.dp))
+                            .background(Color(0x18FFFFFF))
+                            .border(0.6.dp, Color(0x25FFFFFF), RoundedCornerShape(4.dp))
                             .padding(horizontal = 5.dp, vertical = 1.5.dp)
                     ) {
                         Text(
@@ -850,13 +848,13 @@ fun WatchlistStatusSelectorDialog(
                 .clip(RoundedCornerShape(22.dp))
                 .background(
                     Brush.verticalGradient(
-                        listOf(OttPanelHigh, OttPanelHigh)
+                        listOf(Color(0xFF161B29), Color(0xFF0D101A))
                     )
                 )
                 .border(
                     1.dp,
                     Brush.verticalGradient(
-                        listOf(Color(0x55E11D48), OttInk(0.13f), OttInk(0.03f))
+                        listOf(Color(0x55E11D48), Color(0x20FFFFFF), Color(0x08FFFFFF))
                     ),
                     RoundedCornerShape(22.dp)
                 )
@@ -886,7 +884,7 @@ fun WatchlistStatusSelectorDialog(
                                 text = title,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -896,9 +894,9 @@ fun WatchlistStatusSelectorDialog(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(CircleShape)
-                                .background(OttInk(0.13f))
+                                .background(Color(0x22FFFFFF))
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -928,7 +926,7 @@ fun WatchlistStatusSelectorDialog(
                                         WatchlistStatus.COMPLETED -> Color(0xFFA855F7)
                                         WatchlistStatus.DROPPED -> Color(0xFFEF4444)
                                         WatchlistStatus.REWATCHING -> Color(0xFFF59E0B)
-                                        else -> OttTextPrimary
+                                        else -> Color.White
                                     }
 
                                     val bgBrush = if (isSelected) {
@@ -937,7 +935,7 @@ fun WatchlistStatusSelectorDialog(
                                         )
                                     } else {
                                         Brush.horizontalGradient(
-                                            listOf(OttInk(0.09f), OttInk(0.05f))
+                                            listOf(Color(0x18FFFFFF), Color(0x0CFFFFFF))
                                         )
                                     }
 
@@ -947,7 +945,7 @@ fun WatchlistStatusSelectorDialog(
                                         )
                                     } else {
                                         Brush.horizontalGradient(
-                                            listOf(OttInk(0.15f), OttInk(0.06f))
+                                            listOf(Color(0x25FFFFFF), Color(0x10FFFFFF))
                                         )
                                     }
 
@@ -980,7 +978,7 @@ fun WatchlistStatusSelectorDialog(
                                             text = status.label,
                                             fontSize = 11.5.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) OttTextPrimary else OttTextPrimary,
+                                            color = if (isSelected) Color.White else OttTextPrimary,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f)
@@ -1033,8 +1031,8 @@ fun WatchlistStatusSelectorDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(OttInk(0.09f))
-                                .border(1.dp, OttInk(0.13f), RoundedCornerShape(14.dp))
+                                .background(Color(0x16FFFFFF))
+                                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(14.dp))
                                 .padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
@@ -1060,13 +1058,13 @@ fun WatchlistStatusSelectorDialog(
                                             text = "Ep",
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = OttTextPrimary
+                                            color = Color.White
                                         )
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(OttInk(0.16f))
-                                                .border(1.dp, OttInk(0.25f), RoundedCornerShape(8.dp))
+                                                .background(Color(0x28FFFFFF))
+                                                .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(8.dp))
                                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -1087,7 +1085,7 @@ fun WatchlistStatusSelectorDialog(
                                                     }
                                                 },
                                                 textStyle = TextStyle(
-                                                    color = OttTextPrimary,
+                                                    color = Color.White,
                                                     fontSize = 15.sp,
                                                     fontWeight = FontWeight.Black,
                                                     textAlign = TextAlign.Center
@@ -1123,13 +1121,13 @@ fun WatchlistStatusSelectorDialog(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(OttInk(0.13f))
-                                            .border(1.dp, OttInk(0.19f), RoundedCornerShape(10.dp))
+                                            .background(Color(0x22FFFFFF))
+                                            .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(10.dp))
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Remove,
                                             contentDescription = "Decrease Episode",
-                                            tint = OttTextPrimary,
+                                            tint = Color.White,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1150,7 +1148,7 @@ fun WatchlistStatusSelectorDialog(
                                         Icon(
                                             imageVector = Icons.Default.Add,
                                             contentDescription = "Increase Episode",
-                                            tint = OttTextPrimary,
+                                            tint = Color.White,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1175,8 +1173,8 @@ fun WatchlistStatusSelectorDialog(
                                             .weight(1f)
                                             .height(30.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(OttInk(0.09f))
-                                            .border(0.8.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
+                                            .background(Color(0x18FFFFFF))
+                                            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                                             .clickable { onClick() },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -1184,7 +1182,7 @@ fun WatchlistStatusSelectorDialog(
                                             text = label,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = OttTextPrimary
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -1219,7 +1217,7 @@ fun WatchlistStatusSelectorDialog(
                                             .fillMaxWidth()
                                             .height(4.dp)
                                             .clip(RoundedCornerShape(2.dp))
-                                            .background(OttInk(0.13f))
+                                            .background(Color(0x22FFFFFF))
                                     ) {
                                         Box(
                                             modifier = Modifier
@@ -1304,8 +1302,8 @@ fun WatchlistStatusSelectorDialog(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(OttInk(0.09f))
-                                            .border(0.8.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
+                                            .background(Color(0x16FFFFFF))
+                                            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                                             .clickable { tags = tags + preset }
                                             .padding(horizontal = 9.dp, vertical = 4.dp)
                                     ) {
@@ -1325,15 +1323,15 @@ fun WatchlistStatusSelectorDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(OttInk(0.09f))
-                                .border(0.8.dp, OttInk(0.16f), RoundedCornerShape(10.dp))
+                                .background(Color(0x16FFFFFF))
+                                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(10.dp))
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             BasicTextField(
                                 value = newTagInput,
                                 onValueChange = { newTagInput = it },
-                                textStyle = TextStyle(color = OttTextPrimary, fontSize = 12.sp),
+                                textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
                                 modifier = Modifier.weight(1f),
                                 decorationBox = { innerTextField ->
                                     if (newTagInput.isEmpty()) {
@@ -1360,7 +1358,7 @@ fun WatchlistStatusSelectorDialog(
                                         }
                                         .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
-                                    Text("Add", color = OttTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("Add", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1377,7 +1375,7 @@ fun WatchlistStatusSelectorDialog(
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFE11D48),
-                                contentColor = OttTextPrimary
+                                contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -1388,7 +1386,7 @@ fun WatchlistStatusSelectorDialog(
                                 text = if (isNewItem) "Add to Watchlist" else "Save Changes",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                         }
 
@@ -1529,7 +1527,7 @@ private fun HistoryListItem(
                     .height(3.dp)
                     .align(Alignment.BottomCenter),
                 color = OttPrimary,
-                trackColor = OttInk(0.40f)
+                trackColor = Color(0x66FFFFFF)
             )
         }
 
@@ -1680,7 +1678,7 @@ private fun MangaBookmarkGridCard(
                     Icon(
                         Icons.Default.Search,
                         contentDescription = "Search Manga",
-                        tint = OttTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -1869,13 +1867,13 @@ private fun NovelHistoryListItem(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(OttPanelHigh),
+                        .background(Color(0xFF161822)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.AutoStories,
                         contentDescription = null,
-                        tint = OttInk(0.25f),
+                        tint = Color(0x40FFFFFF),
                         modifier = Modifier.size(28.dp)
                     )
                 }

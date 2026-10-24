@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import android.net.Uri
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -160,13 +158,13 @@ fun DownloadSettingsSheet(
                 // grab handle
                 Box(
                     Modifier.align(Alignment.CenterHorizontally).width(38.dp).height(4.dp)
-                        .clip(CircleShape).background(OttInk(0.25f))
+                        .clip(CircleShape).background(Color(0x40FFFFFF))
                 )
                 Spacer(Modifier.height(14.dp))
 
                 // ── Header ──
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(layer, Icons.Default.Tune, OttTextPrimary, size = 42.dp)
+                    IconBubble(layer, Icons.Default.Tune, Color.White, size = 42.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Download Settings", fontSize = 20.sp, fontWeight = FontWeight.Black, color = OttTextPrimary, letterSpacing = (-0.3).sp)
@@ -176,7 +174,7 @@ fun DownloadSettingsSheet(
                         Modifier.size(36.dp).glassSurface(layer, CircleShape, radius = 18.dp).clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
 
@@ -193,15 +191,15 @@ fun DownloadSettingsSheet(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (selected) OttTextPrimary else OttInk(0.08f))
-                                    .border(1.dp, if (selected) OttTextPrimary else OttInk(0.14f), RoundedCornerShape(14.dp))
+                                    .background(if (selected) Color.White else Color(0x14FFFFFF))
+                                    .border(1.dp, if (selected) Color.White else Color(0x24FFFFFF), RoundedCornerShape(14.dp))
                                     .clickable { DownloadPreferences.setMaxConcurrentDownloads(context, count) }
                                     .padding(vertical = 10.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("$count", fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (selected) Color.Black else OttTextPrimary)
+                                Text("$count", fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (selected) Color.Black else Color.White)
                                 Text(if (count == 1) "at a time" else "parallel", fontSize = 9.sp, fontWeight = FontWeight.Medium,
-                                    color = if (selected) Color(0xFF444444) else OttInk(0.60f))
+                                    color = if (selected) Color(0xFF444444) else Color(0x99FFFFFF))
                             }
                         }
                     }
@@ -260,7 +258,7 @@ fun DownloadSettingsSheet(
                     }
 
                     Spacer(Modifier.height(14.dp))
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(OttInk(0.09f)))
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
                     Spacer(Modifier.height(12.dp))
 
                     ToggleRow(
@@ -310,14 +308,14 @@ private fun rememberSaveLocationPicker(onPicked: (Uri?) -> Unit): () -> Unit {
 @Composable
 private fun Modifier.glassSurface(layer: PrismalGlassLayer?, shape: Shape = OttCardShape, radius: Dp = 22.dp, tint: Color? = null): Modifier {
     if (layer == null) {
-        return clip(shape).background(tint ?: OttPanelHigh).border(1.dp, SolidColor(OttInk(0.10f)), shape)
+        return clip(shape).background(tint ?: Color(0xFF0D1017)).border(1.dp, SolidColor(Color(0x1AFFFFFF)), shape)
     }
     val density = LocalDensity.current
     return drawPrismalGlass(
         backdrop = layer,
         shape = { if (shape == OttPillShape) PrismalCapsule() else PrismalRoundedRectangle(radius) },
         effects = prismalGlassEffects(density),
-        onDrawSurface = { drawRect(tint ?: OttInk(0.06f)) }
+        onDrawSurface = { drawRect(tint ?: Color(0x0FFFFFFF)) }
     )
 }
 
@@ -339,7 +337,7 @@ private fun SectionTitle(icon: ImageVector, accent: Color, title: String, subtit
         Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text(subtitle, fontSize = 11.5.sp, color = OttTextSecondary, lineHeight = 16.sp)
         }
     }
@@ -360,17 +358,17 @@ private fun LocationOption(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (selected) OttInk(0.15f) else OttInk(0.04f))
-            .border(1.dp, if (selected) OttInk(0.44f) else OttInk(0.10f), shape)
+            .background(if (selected) Color(0x26FFFFFF) else Color(0x0AFFFFFF))
+            .border(1.dp, if (selected) Color(0x70FFFFFF) else Color(0x1AFFFFFF), shape)
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBubble(layer, icon, if (selected) OttTextPrimary else OttTextSecondary)
+        IconBubble(layer, icon, if (selected) Color.White else OttTextSecondary)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(title, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = if (selected) OttTextPrimary else OttTextSecondary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Text(title, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else OttTextSecondary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (badge != null) {
                     Text(
                         badge, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399),
@@ -378,11 +376,11 @@ private fun LocationOption(
                     )
                 }
             }
-            Text(subtitle, fontSize = 10.5.sp, color = OttInk(0.60f), lineHeight = 14.sp)
+            Text(subtitle, fontSize = 10.5.sp, color = Color(0x99FFFFFF), lineHeight = 14.sp)
         }
         if (selected) {
             Spacer(Modifier.width(8.dp))
-            Box(Modifier.size(20.dp).clip(CircleShape).background(OttTextPrimary), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(20.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
             }
         }
@@ -402,18 +400,18 @@ private fun ToggleRow(
         Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+            Text(title, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text(subtitle, fontSize = 11.sp, color = OttTextSecondary, lineHeight = 15.sp)
         }
         Switch(
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = OttTextPrimary,
+                checkedThumbColor = Color.White,
                 checkedTrackColor = OttPrimary,
                 uncheckedThumbColor = Color(0xFFA0A4B2),
-                uncheckedTrackColor = OttInk(0.19f),
-                uncheckedBorderColor = OttInk(0.19f)
+                uncheckedTrackColor = Color(0x30FFFFFF),
+                uncheckedBorderColor = Color(0x30FFFFFF)
             )
         )
     }

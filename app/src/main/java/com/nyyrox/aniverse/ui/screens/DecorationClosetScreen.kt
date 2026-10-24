@@ -1,10 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.widget.Toast
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttPanel
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -192,7 +188,7 @@ fun DecorationClosetScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = OttTextPrimary
+                        tint = Color.White
                     )
                 }
 
@@ -202,7 +198,7 @@ fun DecorationClosetScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "Zenkai Locker",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Black
                         )
@@ -298,7 +294,7 @@ fun DecorationClosetScreen(
                         .height(84.dp)
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color(0xFF1E2330), OttPanelHigh)
+                                listOf(Color(0xFF1E2330), Color(0xFF10131B))
                             )
                         )
                 ) {
@@ -354,8 +350,8 @@ fun DecorationClosetScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(OttPanel)
-                                .border(2.5.dp, OttTextPrimary, CircleShape),
+                                .background(Color(0xFF0A0C10))
+                                .border(2.5.dp, Color.White, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             if (previewAvatarUrl.isNotBlank()) {
@@ -373,14 +369,14 @@ fun DecorationClosetScreen(
                                         .fillMaxSize()
                                         .background(
                                             Brush.linearGradient(
-                                                listOf(Color(0xFF2E3440), OttPanelHigh)
+                                                listOf(Color(0xFF2E3440), Color(0xFF191D24))
                                             )
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = (userProfile.displayName.take(1).ifBlank { "O" }).uppercase(),
-                                        color = OttTextPrimary,
+                                        color = Color.White,
                                         fontSize = 24.sp,
                                         fontWeight = FontWeight.Black
                                     )
@@ -418,7 +414,7 @@ fun DecorationClosetScreen(
                                 ) {
                                     Text(
                                         text = "ADMIN",
-                                        color = OttTextPrimary,
+                                        color = Color.White,
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Black
                                     )
@@ -447,7 +443,7 @@ fun DecorationClosetScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(Color(0xFF1E2330))
-                                        .border(0.5.dp, OttInk(0.20f), RoundedCornerShape(4.dp))
+                                        .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(4.dp))
                                         .padding(horizontal = 5.dp, vertical = 1.dp)
                                 ) {
                                     Text(
@@ -469,7 +465,7 @@ fun DecorationClosetScreen(
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = OttBg,
-                contentColor = OttTextPrimary,
+                contentColor = Color.White,
                 edgePadding = 16.dp,
                 indicator = { tabPositions ->
                     if (selectedTab < tabPositions.size) {
@@ -491,7 +487,7 @@ fun DecorationClosetScreen(
                                 text = title,
                                 fontSize = 13.5.sp,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index) OttTextPrimary else OttTextMuted
+                                color = if (selectedTab == index) Color.White else OttTextMuted
                             )
                         }
                     )
@@ -512,7 +508,7 @@ fun DecorationClosetScreen(
                         itemsIndexed(rarityFilters) { _, rarity ->
                             val isSelected = selectedRarity == rarity
                             val label = rarity?.label ?: "All Rarities"
-                            val chipColor = rarity?.color ?: OttTextPrimary
+                            val chipColor = rarity?.color ?: Color.White
 
                             Box(
                                 modifier = Modifier
@@ -562,7 +558,7 @@ fun DecorationClosetScreen(
                             ) {
                                 Text(
                                     text = cat,
-                                    color = if (isSelected) OttTextPrimary else OttTextSecondary,
+                                    color = if (isSelected) Color.White else OttTextSecondary,
                                     fontSize = 11.5.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -593,7 +589,7 @@ fun DecorationClosetScreen(
                             ) {
                                 Text(
                                     text = cat,
-                                    color = if (isSelected) OttTextPrimary else OttTextSecondary,
+                                    color = if (isSelected) Color.White else OttTextSecondary,
                                     fontSize = 11.5.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -769,7 +765,7 @@ fun DecorationClosetScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF141721))
                     .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                     .padding(14.dp)
             ) {
@@ -781,7 +777,7 @@ fun DecorationClosetScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Previewing Changes",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -870,8 +866,8 @@ private fun DecorationCatalogCard(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(OttPanel)
-                        .border(0.5.dp, OttInk(0.20f), RoundedCornerShape(10.dp)),
+                        .background(Color(0xFF090B10))
+                        .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     when (item.type) {
@@ -912,7 +908,7 @@ private fun DecorationCatalogCard(
                     ) {
                         Text(
                             text = item.name,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 14.5.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -984,7 +980,7 @@ private fun DecorationCatalogCard(
                             text = "Equip",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
                 }
@@ -997,8 +993,8 @@ private fun DecorationCatalogCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(OttPanel)
-                        .border(0.5.dp, OttInk(0.13f), RoundedCornerShape(8.dp))
+                        .background(Color(0xFF090B10))
+                        .border(0.5.dp, Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -1053,10 +1049,10 @@ private fun AvatarGridCard(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(OttPanel)
+                        .background(Color(0xFF0A0C10))
                         .border(
                             width = if (isSelectedInPreview) 2.dp else 1.dp,
-                            color = if (isSelectedInPreview) Color(0xFFE11D48) else OttInk(0.20f),
+                            color = if (isSelectedInPreview) Color(0xFFE11D48) else Color(0x33FFFFFF),
                             shape = CircleShape
                         ),
                     contentScale = ContentScale.Crop
@@ -1074,7 +1070,7 @@ private fun AvatarGridCard(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Equipped",
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(12.dp)
                         )
                     }
@@ -1086,7 +1082,7 @@ private fun AvatarGridCard(
             // Tag or ID
             Text(
                 text = item.tags.firstOrNull() ?: "#${item.id}",
-                color = if (isSelectedInPreview) OttTextPrimary else OttTextMuted,
+                color = if (isSelectedInPreview) Color.White else OttTextMuted,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -1124,7 +1120,7 @@ private fun AvatarGridCard(
                 ) {
                     Text(
                         text = "Use",
-                        color = OttTextPrimary,
+                        color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1163,7 +1159,7 @@ private fun BannerGridCard(
                     .fillMaxWidth()
                     .height(95.dp)
                     .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF10131B))
             ) {
                 AsyncImage(
                     model = item.url,
@@ -1184,7 +1180,7 @@ private fun BannerGridCard(
                     ) {
                         Text(
                             text = "EQUIPPED",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Black
                         )
@@ -1202,7 +1198,7 @@ private fun BannerGridCard(
             ) {
                 Text(
                     text = item.category.ifBlank { "General" },
-                    color = OttTextPrimary,
+                    color = Color.White,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -1229,7 +1225,7 @@ private fun BannerGridCard(
                     ) {
                         Text(
                             text = "Equip",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )

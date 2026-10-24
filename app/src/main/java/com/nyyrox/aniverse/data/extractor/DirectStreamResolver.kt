@@ -199,7 +199,14 @@ object DirectStreamResolver {
     ): DirectStreamResult? = withContext(Dispatchers.IO) {
         val audio = if (isDub) "dub" else "sub"
         val cacheKey = "$providerId:$anilistId:$episode:$audio"
-        directStreamCache[cacheKey]?.let { return@withContext it }
+        val cached = directStreamCache[cacheKey]
+        if (cached != null) {
+            if (!cached.streamUrl.contains("slopnet")) {
+                return@withContext cached
+            } else {
+                directStreamCache.remove(cacheKey)
+            }
+        }
 
         val normId = providerId.lowercase()
         val isAnimeSalt = normId.contains("animesalt") || normId.contains("acdn") || normId.contains("salt")
@@ -223,8 +230,9 @@ object DirectStreamResolver {
                     ?: AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "vidstream")
             }
             isFlixCloud -> {
-                // FlixCloud: ReAnime Flix API (with fallback to MegaPlay/Vidstream)
+                // FlixCloud: Direct HLS or ReAnime Flix API (with fallback to MegaPlay/Vidstream)
                 ReAnimeResolver.resolveStream(anilistId, episode, audio, animeTitle, preferredServer = "FlixCloud")
+                    ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, audio, server = "bcdn")
                     ?: AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "bcdn")
                     ?: AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "vidstream")
             }

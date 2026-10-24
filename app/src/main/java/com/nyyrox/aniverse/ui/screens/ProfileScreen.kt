@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.app.Activity
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttPanel
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
@@ -119,9 +117,6 @@ import com.nyyrox.aniverse.ui.theme.LocalThemeColors
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.components.zenkaiSurface
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
-import com.nyyrox.aniverse.ui.theme.OttInk
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
@@ -328,14 +323,14 @@ fun ProfileScreen(
                                         .size(34.dp)
                                         .clip(CircleShape)
                                         .background(Color(0x99000000))
-                                        .border(1.dp, OttInk(0.21f), CircleShape)
+                                        .border(1.dp, Color(0x35FFFFFF), CircleShape)
                                         .clickable { onOpenNotifications() },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Notifications,
                                         contentDescription = "Notifications",
-                                        tint = OttTextPrimary,
+                                        tint = Color.White,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     if (unread > 0) {
@@ -357,14 +352,14 @@ fun ProfileScreen(
                                     .size(34.dp)
                                     .clip(CircleShape)
                                     .background(Color(0x99000000))
-                                    .border(1.dp, OttInk(0.21f), CircleShape)
+                                    .border(1.dp, Color(0x35FFFFFF), CircleShape)
                                     .clickable { showBannerOptionsSheet = true },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = "Edit Banner",
-                                    tint = OttTextPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(15.dp)
                                 )
                             }
@@ -388,10 +383,10 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(CircleShape)
-                                    .background(OttPanel)
+                                    .background(Color(0xFF0A0C10))
                                     .border(
                                         width = if (hasDecoration) 1.dp else 3.dp,
-                                        color = if (hasDecoration) OttInk(0.20f) else OttTextPrimary,
+                                        color = if (hasDecoration) Color(0x33FFFFFF) else Color.White,
                                         shape = CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
@@ -411,7 +406,7 @@ fun ProfileScreen(
                                             .fillMaxSize()
                                             .background(
                                                 Brush.linearGradient(
-                                                    listOf(Color(0xFF2E3440), OttPanelHigh)
+                                                    listOf(Color(0xFF2E3440), Color(0xFF191D24))
                                                 )
                                             ),
                                         contentAlignment = Alignment.Center
@@ -420,7 +415,7 @@ fun ProfileScreen(
                                             text = displayName.take(1).uppercase(),
                                             fontSize = 30.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = OttTextPrimary
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -433,7 +428,7 @@ fun ProfileScreen(
                                 .align(Alignment.BottomEnd)
                                 .size(26.dp)
                                 .clip(CircleShape)
-                                .background(OttTextPrimary)
+                                .background(Color.White)
                                 .border(1.5.dp, Color.Black, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -489,8 +484,8 @@ fun ProfileScreen(
                     if (isLoggedIn) {
                         Button(
                             onClick = { showEditProfileModal = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = OttInk(0.09f)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, OttInk(0.21f)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x18FFFFFF)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x35FFFFFF)),
                             shape = OttPillShape,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                             modifier = Modifier.height(34.dp)
@@ -498,16 +493,16 @@ fun ProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = null,
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(Modifier.width(6.dp))
-                            Text("Edit Profile", color = OttTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Edit Profile", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     } else {
                         Button(
                             onClick = { onLogin?.invoke() },
-                            colors = ButtonDefaults.buttonColors(containerColor = OttTextPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                             shape = OttPillShape,
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                             modifier = Modifier.height(34.dp)
@@ -560,8 +555,8 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(OttPanelHigh)
-                            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+                            .background(Color(0xFF0F121A))
+                            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
                             .padding(14.dp)
                     ) {
                         Row(
@@ -588,8 +583,8 @@ fun ProfileScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(OttInk(0.09f))
-                                                .border(0.5.dp, OttInk(0.19f), RoundedCornerShape(6.dp))
+                                                .background(Color(0x18FFFFFF))
+                                                .border(0.5.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
                                                 .padding(horizontal = 7.dp, vertical = 2.5.dp)
                                         ) {
                                             Text(
@@ -641,7 +636,7 @@ fun ProfileScreen(
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
                             color = Color(0xFFE11D48),
-                            trackColor = OttInk(0.16f)
+                            trackColor = Color(0x28FFFFFF)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -678,8 +673,8 @@ fun ProfileScreen(
                     Column(
                         modifier = mod
                             .clip(RoundedCornerShape(14.dp))
-                            .background(OttInk(0.07f))
-                            .border(1.dp, OttInk(0.12f), RoundedCornerShape(14.dp))
+                            .background(Color(0x12FFFFFF))
+                            .border(1.dp, Color(0x1EFFFFFF), RoundedCornerShape(14.dp))
                             .padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -687,7 +682,7 @@ fun ProfileScreen(
                             text = count.toString(),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -818,7 +813,7 @@ fun ProfileScreen(
                                 text = "Saved Manga (${savedMangaList.size})",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                         }
                         Text(
@@ -857,7 +852,7 @@ fun ProfileScreen(
                     title = "AniList",
                     subtitle = if (aniListAcc != null) "Connected as @${aniListAcc.username}" else "Sync your AniList watchlist and history",
                     badgeText = if (aniListAcc != null) "Linked" else "Connect",
-                    badgeColor = if (aniListAcc != null) Color(0xFF02A9FF) else OttInk(0.20f),
+                    badgeColor = if (aniListAcc != null) Color(0xFF02A9FF) else Color(0x33FFFFFF),
                     onClick = {
                         showAniListSheet = true
                     }
@@ -869,7 +864,7 @@ fun ProfileScreen(
                     title = "MyAnimeList (MAL)",
                     subtitle = if (malAcc != null) "Connected as @${malAcc.username}" else "Sync your MyAnimeList watchlist and history",
                     badgeText = if (malAcc != null) "Linked" else "Connect",
-                    badgeColor = if (malAcc != null) Color(0xFF2E51A2) else OttInk(0.20f),
+                    badgeColor = if (malAcc != null) Color(0xFF2E51A2) else Color(0x33FFFFFF),
                     onClick = {
                         showMalSheet = true
                     }
@@ -884,10 +879,10 @@ fun ProfileScreen(
                             checked = vm.trackerSettings.isAutoSyncEnabled,
                             onCheckedChange = { vm.updateTrackerSettings(vm.trackerSettings.copy(isAutoSyncEnabled = it)) },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = OttOnPrimary,
-                                checkedTrackColor = OttPrimary,
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = Color.White,
                                 uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = OttInk(0.20f)
+                                uncheckedTrackColor = Color(0x33FFFFFF)
                             )
                         )
                     }
@@ -904,66 +899,9 @@ fun ProfileScreen(
                     title = "Discord Rich Presence",
                     subtitle = if (discordAcc != null) "Connected as @${discordAcc?.username} · Live Activity" else "Connect Discord to show what anime you're watching",
                     badgeText = if (discordAcc != null) "Connected" else "Connect",
-                    badgeColor = if (discordAcc != null) Color(0xFF5865F2) else OttInk(0.20f),
+                    badgeColor = if (discordAcc != null) Color(0xFF5865F2) else Color(0x33FFFFFF),
                     onClick = {
                         showDiscordSheet = true
-                    }
-                )
-            }
-        }
-
-        // ── Appearance: theme mode + card style ───────────────────────────
-        item {
-            ProfileSettingGroup(title = "Appearance") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    com.nyyrox.aniverse.ui.theme.ThemeMode.values().forEach { m ->
-                        val selected = themeSettings.mode == m
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (selected) OttPrimary else OttInk(0.06f))
-                                .clickable { vm.setThemeMode(m) }
-                                .padding(vertical = 12.dp, horizontal = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when (m) {
-                                            com.nyyrox.aniverse.ui.theme.ThemeMode.LIGHT -> Color(0xFFF1F2F7)
-                                            com.nyyrox.aniverse.ui.theme.ThemeMode.AMOLED -> Color.Black
-                                            else -> OttPanel
-                                        }
-                                    )
-                                    .border(1.dp, Color(0x55808080), CircleShape)
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                m.title,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (selected) OttOnPrimary else OttTextPrimary,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.AutoAwesome,
-                    title = "Card style",
-                    subtitle = if (themeSettings.useCards) "Posters and sections sit in boxed glass cards" else "Clean layout, no card boxes",
-                    trailing = {
-                        com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
-                            checked = themeSettings.useCards,
-                            onCheckedChange = { vm.setUseCards(it) }
-                        )
                     }
                 )
             }
@@ -977,7 +915,7 @@ fun ProfileScreen(
                     title = "Display Refresh Rate",
                     subtitle = if (isBatterySaverActive) "Locked to 60Hz (Battery Saver active)" else "Current: ${effectiveHz}Hz",
                     badgeText = "${effectiveHz} Hz",
-                    badgeColor = if (isBatterySaverActive) Color(0xFF10B981) else OttTextPrimary,
+                    badgeColor = if (isBatterySaverActive) Color(0xFF10B981) else Color.White,
                     onClick = { showRefreshRateSheet = true }
                 )
                 ProfileDivider()
@@ -990,10 +928,10 @@ fun ProfileScreen(
                             checked = themeSettings.isPowerSavingEnabled,
                             onCheckedChange = { vm.setPowerSaving(it) },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = OttOnPrimary,
-                                checkedTrackColor = OttPrimary,
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = Color.White,
                                 uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = OttInk(0.20f)
+                                uncheckedTrackColor = Color(0x33FFFFFF)
                             )
                         )
                     }
@@ -1008,10 +946,10 @@ fun ProfileScreen(
                             checked = themeSettings.isReducedMotionEnabled,
                             onCheckedChange = { vm.setReducedMotion(it) },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = OttOnPrimary,
-                                checkedTrackColor = OttPrimary,
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = Color.White,
                                 uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = OttInk(0.20f)
+                                uncheckedTrackColor = Color(0x33FFFFFF)
                             )
                         )
                     }
@@ -1045,10 +983,10 @@ fun ProfileScreen(
                                 checked = vm.userProfile.isWatchlistPrivate,
                                 onCheckedChange = { vm.updatePrivacySettings(isWatchlistPrivate = it) },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = OttOnPrimary,
-                                    checkedTrackColor = OttPrimary,
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = Color.White,
                                     uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = OttInk(0.20f)
+                                    uncheckedTrackColor = Color(0x33FFFFFF)
                                 )
                             )
                         }
@@ -1063,10 +1001,10 @@ fun ProfileScreen(
                                 checked = vm.userProfile.isWatchHistoryPrivate,
                                 onCheckedChange = { vm.updatePrivacySettings(isWatchHistoryPrivate = it) },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = OttOnPrimary,
-                                    checkedTrackColor = OttPrimary,
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = Color.White,
                                     uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = OttInk(0.20f)
+                                    uncheckedTrackColor = Color(0x33FFFFFF)
                                 )
                             )
                         }
@@ -1083,10 +1021,10 @@ fun ProfileScreen(
                                     vm.updatePrivacySettings(isMangaPrivate = it, isNovelPrivate = it) 
                                 },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = OttOnPrimary,
-                                    checkedTrackColor = OttPrimary,
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = Color.White,
                                     uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = OttInk(0.20f)
+                                    uncheckedTrackColor = Color(0x33FFFFFF)
                                 )
                             )
                         }
@@ -1103,7 +1041,7 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF141722))
                         .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f), RoundedCornerShape(16.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -1152,12 +1090,12 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanel,
+                            focusedContainerColor = Color(0xFF10131B),
+                            unfocusedContainerColor = Color(0xFF090B10),
                             focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -1174,8 +1112,8 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(OttPanelHigh)
-                                .border(1.dp, OttInk(0.16f), RoundedCornerShape(12.dp))
+                                .background(Color(0xFF161A26))
+                                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                                 .padding(6.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -1193,14 +1131,14 @@ fun ProfileScreen(
                                     AsyncImage(
                                         model = u.avatarUrl,
                                         contentDescription = null,
-                                        modifier = Modifier.size(32.dp).clip(CircleShape).background(OttInk(0.13f)),
+                                        modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
                                         contentScale = ContentScale.Crop
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = u.displayName ?: u.username ?: "Otaku",
-                                            color = OttTextPrimary,
+                                            color = Color.White,
                                             fontSize = 12.5.sp,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -1339,7 +1277,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showDmcaModal = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -1361,7 +1299,7 @@ fun ProfileScreen(
                         text = "DMCA & Legal Disclaimer",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
 
@@ -1380,8 +1318,8 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .height(44.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OttPrimary,
-                        contentColor = OttOnPrimary
+                        containerColor = Color.White,
+                        contentColor = Color.Black
                     ),
                     shape = OttPillShape
                 ) {
@@ -1411,7 +1349,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showEditProfileModal = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -1433,7 +1371,7 @@ fun ProfileScreen(
                         text = "Edit Profile",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
 
@@ -1444,11 +1382,11 @@ fun ProfileScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = OttTextPrimary,
-                        unfocusedTextColor = OttTextPrimary,
-                        focusedBorderColor = OttTextPrimary,
-                        unfocusedBorderColor = OttInk(0.19f),
-                        focusedLabelColor = OttTextPrimary,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color(0x30FFFFFF),
+                        focusedLabelColor = Color.White,
                         unfocusedLabelColor = OttTextMuted
                     )
                 )
@@ -1460,11 +1398,11 @@ fun ProfileScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = OttTextPrimary,
-                        unfocusedTextColor = OttTextPrimary,
-                        focusedBorderColor = OttTextPrimary,
-                        unfocusedBorderColor = OttInk(0.19f),
-                        focusedLabelColor = OttTextPrimary,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color(0x30FFFFFF),
+                        focusedLabelColor = Color.White,
                         unfocusedLabelColor = OttTextMuted
                     )
                 )
@@ -1476,11 +1414,11 @@ fun ProfileScreen(
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = OttTextPrimary,
-                        unfocusedTextColor = OttTextPrimary,
-                        focusedBorderColor = OttTextPrimary,
-                        unfocusedBorderColor = OttInk(0.19f),
-                        focusedLabelColor = OttTextPrimary,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color(0x30FFFFFF),
+                        focusedLabelColor = Color.White,
                         unfocusedLabelColor = OttTextMuted
                     )
                 )
@@ -1507,8 +1445,8 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(OttPanelHigh)
-                                .border(1.dp, OttInk(0.20f), RoundedCornerShape(12.dp))
+                                .background(Color(0xFF131722))
+                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
                                 .padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1526,7 +1464,7 @@ fun ProfileScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = parsed.title,
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -1551,10 +1489,10 @@ fun ProfileScreen(
                                 .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OttInk(0.09f),
-                                contentColor = OttTextPrimary
+                                containerColor = Color(0x18FFFFFF),
+                                contentColor = Color.White
                             ),
-                            border = BorderStroke(1.dp, OttInk(0.19f))
+                            border = BorderStroke(1.dp, Color(0x30FFFFFF))
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
@@ -1586,8 +1524,8 @@ fun ProfileScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) OttPrimary.copy(alpha = 0.25f) else OttInk(0.09f))
-                                        .border(1.dp, if (isSelected) OttPrimary else OttInk(0.19f), RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) OttPrimary.copy(alpha = 0.25f) else Color(0x18FFFFFF))
+                                        .border(1.dp, if (isSelected) OttPrimary else Color(0x30FFFFFF), RoundedCornerShape(8.dp))
                                         .clickable {
                                             editRoles = if (isSelected) editRoles - rKey else editRoles + rKey
                                         }
@@ -1595,7 +1533,7 @@ fun ProfileScreen(
                                 ) {
                                     Text(
                                         text = rLabel,
-                                        color = if (isSelected) OttTextPrimary else Color(0xFF94A3B8),
+                                        color = if (isSelected) Color.White else Color(0xFF94A3B8),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1634,7 +1572,7 @@ fun ProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.Palette,
                                 contentDescription = null,
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1643,7 +1581,7 @@ fun ProfileScreen(
                                 text = "Zenkai Decoration Locker",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                             Text(
                                 text = "Customise avatar frames, profile effects & banners",
@@ -1678,8 +1616,8 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .height(44.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OttPrimary,
-                        contentColor = OttOnPrimary
+                        containerColor = Color.White,
+                        contentColor = Color.Black
                     ),
                     shape = OttPillShape
                 ) {
@@ -1713,7 +1651,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showAvatarOptionsSheet = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -1725,7 +1663,7 @@ fun ProfileScreen(
                     text = "Profile Avatar",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
 
                 // 1. Upload from Gallery
@@ -1733,8 +1671,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttInk(0.09f))
-                        .border(1.dp, OttInk(0.19f), RoundedCornerShape(14.dp))
+                        .background(Color(0x16FFFFFF))
+                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
                         .clickable {
                             showAvatarOptionsSheet = false
                             avatarPickerLauncher.launch(
@@ -1745,9 +1683,9 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = OttTextPrimary)
+                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.White)
                     Column {
-                        Text("Upload from Device", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Upload from Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Choose any photo from your gallery", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                 }
@@ -1769,7 +1707,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.Default.Palette, contentDescription = null, tint = Color(0xFFFF4D6D))
                     Column {
-                        Text("Avatar & Text Effects", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Avatar & Text Effects", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Equip animated avatars & kinetic text effects", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                 }
@@ -1805,7 +1743,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showBannerOptionsSheet = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -1817,7 +1755,7 @@ fun ProfileScreen(
                     text = "Profile Banner",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
 
                 // 1. Upload from Gallery
@@ -1825,8 +1763,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttInk(0.09f))
-                        .border(1.dp, OttInk(0.19f), RoundedCornerShape(14.dp))
+                        .background(Color(0x16FFFFFF))
+                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
                         .clickable {
                             showBannerOptionsSheet = false
                             bannerPickerLauncher.launch(
@@ -1837,9 +1775,9 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = OttTextPrimary)
+                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.White)
                     Column {
-                        Text("Upload from Device", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Upload from Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Choose a wallpaper from your gallery", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                 }
@@ -1861,7 +1799,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.Default.Palette, contentDescription = null, tint = Color(0xFFFF4D6D))
                     Column {
-                        Text("Zenkai Banner Themes", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Zenkai Banner Themes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Choose from 16 dark, energy & anime themes", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                 }
@@ -1883,7 +1821,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFA78BFA))
                     Column {
-                        Text("Animated Overlays (Sakura, Butterflies...)", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Animated Overlays (Sakura, Butterflies...)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Add gentle drifting sakura, butterflies, or starlight", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                 }
@@ -1919,7 +1857,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showBannerEffectsSheet = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -1933,7 +1871,7 @@ fun ProfileScreen(
                         text = "Banner Animated Overlays",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -1954,10 +1892,10 @@ fun ProfileScreen(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isEquipped) Color(0xFF8B5CF6).copy(alpha = 0.2f) else OttInk(0.08f))
+                            .background(if (isEquipped) Color(0xFF8B5CF6).copy(alpha = 0.2f) else Color(0x14FFFFFF))
                             .border(
                                 1.dp,
-                                if (isEquipped) Color(0xFF8B5CF6) else OttInk(0.13f),
+                                if (isEquipped) Color(0xFF8B5CF6) else Color(0x22FFFFFF),
                                 RoundedCornerShape(14.dp)
                             )
                             .clickable {
@@ -1992,7 +1930,7 @@ fun ProfileScreen(
                             Column {
                                 Text(
                                     text = preset.name,
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.5.sp
                                 )
@@ -2011,7 +1949,7 @@ fun ProfileScreen(
                                     .background(Color(0xFF8B5CF6))
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text("Equipped", color = OttTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -2027,7 +1965,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showNinjaTagsSheet = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -2044,7 +1982,7 @@ fun ProfileScreen(
                             text = "Ninja Ranks & Title Tags",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Text(
                             text = "Level up & build daily streaks to unlock prestigious titles",
@@ -2076,10 +2014,10 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isNoTagEquipped) Color(0xFFE11D48).copy(alpha = 0.2f) else OttInk(0.04f))
+                                .background(if (isNoTagEquipped) Color(0xFFE11D48).copy(alpha = 0.2f) else Color(0x0AFFFFFF))
                                 .border(
                                     1.dp,
-                                    if (isNoTagEquipped) Color(0xFFE11D48) else OttInk(0.08f),
+                                    if (isNoTagEquipped) Color(0xFFE11D48) else Color(0x15FFFFFF),
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
@@ -2093,7 +2031,7 @@ fun ProfileScreen(
                             Column {
                                 Text(
                                     text = "No Tag",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
@@ -2110,7 +2048,7 @@ fun ProfileScreen(
                                         .background(Color(0xFFE11D48))
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("Equipped", color = OttTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -2127,16 +2065,16 @@ fun ProfileScreen(
                                 .background(
                                     when {
                                         isEquipped -> Color(tag.colorHex).copy(alpha = 0.25f)
-                                        isUnlocked -> OttInk(0.08f)
-                                        else -> OttInk(0.04f)
+                                        isUnlocked -> Color(0x14FFFFFF)
+                                        else -> Color(0x0AFFFFFF)
                                     }
                                 )
                                 .border(
                                     1.dp,
                                     when {
                                         isEquipped -> Color(tag.colorHex)
-                                        isUnlocked -> OttInk(0.19f)
-                                        else -> OttInk(0.08f)
+                                        isUnlocked -> Color(0x30FFFFFF)
+                                        else -> Color(0x15FFFFFF)
                                     },
                                     RoundedCornerShape(12.dp)
                                 )
@@ -2187,7 +2125,7 @@ fun ProfileScreen(
                                             .background(Color(tag.colorHex))
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("Equipped", color = OttTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                                 isUnlocked -> {
@@ -2196,12 +2134,12 @@ fun ProfileScreen(
                                             vm.equipCustomTag(tag.title)
                                             showNinjaTagsSheet = false
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = OttInk(0.16f)),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x28FFFFFF)),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                         modifier = Modifier.height(28.dp)
                                     ) {
-                                        Text("Equip", color = OttTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        Text("Equip", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                                 else -> {
@@ -2242,7 +2180,7 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { showRefreshRateSheet = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = OttPanelHigh
+            containerColor = Color(0xFF0D0F14)
         ) {
             Column(
                 modifier = Modifier
@@ -2254,7 +2192,7 @@ fun ProfileScreen(
                     text = "Display Refresh Rate",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
                 Text(
                     text = if (isBatterySaverActive)
@@ -2283,8 +2221,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(OttInk(0.09f))
-                        .border(1.dp, OttInk(0.15f), RoundedCornerShape(12.dp))
+                        .background(Color(0x18FFFFFF))
+                        .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp))
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Row(
@@ -2327,10 +2265,10 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isSelected) OttInk(0.13f) else OttInk(0.05f))
+                            .background(if (isSelected) Color(0x22FFFFFF) else Color(0x0CFFFFFF))
                             .border(
                                 1.dp,
-                                if (isSelected) OttTextPrimary else OttInk(0.10f),
+                                if (isSelected) Color.White else Color(0x1AFFFFFF),
                                 RoundedCornerShape(14.dp)
                             )
                             .clickable {
@@ -2348,7 +2286,7 @@ fun ProfileScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
                                     text = "${hz}Hz",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
@@ -2386,7 +2324,7 @@ fun ProfileScreen(
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = null,
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -2449,7 +2387,7 @@ fun ProfileScreen(
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { uploadNoticeMessage = null },
             title = {
-                Text("Upload Notice", fontWeight = FontWeight.Bold, color = OttTextPrimary, fontSize = 16.sp)
+                Text("Upload Notice", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
             },
             text = {
                 Text(uploadNoticeMessage ?: "", color = Color(0xFFCBD5E1), fontSize = 13.5.sp)
@@ -2459,10 +2397,10 @@ fun ProfileScreen(
                     onClick = { uploadNoticeMessage = null },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48))
                 ) {
-                    Text("OK", color = OttTextPrimary)
+                    Text("OK", color = Color.White)
                 }
             },
-            containerColor = OttPanelHigh,
+            containerColor = Color(0xFF141720),
             shape = RoundedCornerShape(18.dp)
         )
     }
@@ -2476,17 +2414,28 @@ private fun ProfileSettingGroup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    // Flat: label + rows separated by hairlines. No box, no fill.
-    Column(modifier = modifier.fillMaxWidth().padding(top = 18.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
         Text(
             text = title.uppercase(),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = OttTextMuted,
-            letterSpacing = 1.2.sp,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+            color = Color(0xFF64748B),
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
         )
-        content()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0x0EFFFFFF))
+                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(18.dp))
+        ) {
+            content()
+        }
     }
 }
 
@@ -2496,9 +2445,9 @@ private fun ProfileSettingRow(
     title: String,
     subtitle: String? = null,
     badgeText: String? = null,
-    badgeColor: Color = OttTextSecondary,
-    titleColor: Color = OttTextPrimary,
-    iconTint: Color = OttTextSecondary,
+    badgeColor: Color = Color.White,
+    titleColor: Color = Color.White,
+    iconTint: Color = Color.White,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
@@ -2512,32 +2461,83 @@ private fun ProfileSettingRow(
                     onClick()
                 } else Modifier
             )
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(16.dp))
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0x14FFFFFF))
+                .border(1.dp, Color(0x1CFFFFFF), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(Modifier.width(14.dp))
+
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = titleColor)
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = titleColor
+            )
             if (!subtitle.isNullOrBlank()) {
-                Text(text = subtitle, fontSize = 12.sp, color = OttTextMuted, lineHeight = 16.sp)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    lineHeight = 15.sp
+                )
             }
         }
+
         if (badgeText != null) {
-            Text(text = badgeText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = badgeColor)
-            Spacer(Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0x1AFFFFFF))
+                    .border(0.8.dp, Color(0x2AFFFFFF), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = badgeText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = badgeColor
+                )
+            }
+            Spacer(Modifier.width(8.dp))
         }
+
         if (trailing != null) {
             trailing()
         } else if (onClick != null) {
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = OttTextMuted, modifier = Modifier.size(18.dp))
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color(0xFF64748B),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
 
 @Composable
 private fun ProfileDivider() {
-    HorizontalDivider(color = OttInk(0.07f), thickness = 0.5.dp, modifier = Modifier.padding(start = 58.dp, end = 20.dp))
+    HorizontalDivider(
+        color = Color(0x10FFFFFF),
+        thickness = 1.dp,
+        modifier = Modifier.padding(horizontal = 16.dp)
+    )
 }
 
 @Composable
@@ -2559,8 +2559,8 @@ private fun ProfileMangaCard(
                 .width(115.dp)
                 .height(160.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(OttInk(0.08f))
-                .border(1.dp, OttInk(0.13f), RoundedCornerShape(12.dp))
+                .background(Color(0x15FFFFFF))
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
         ) {
             AsyncImage(
                 model = item.poster,
@@ -2584,7 +2584,7 @@ private fun ProfileMangaCard(
                     text = item.latestChapter ?: item.type ?: "Manga",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2595,7 +2595,7 @@ private fun ProfileMangaCard(
             text = item.title,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 14.sp

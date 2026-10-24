@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.foundation.background
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,7 +105,7 @@ fun SearchScreen(
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -120,7 +117,7 @@ fun SearchScreen(
                     .weight(1f)
                     .height(48.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF1E1F24))
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -143,11 +140,11 @@ fun SearchScreen(
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         textStyle = TextStyle(
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        cursorBrush = SolidColor(OttTextPrimary),
+                        cursorBrush = SolidColor(Color.White),
                         decorationBox = { innerTextField ->
                             if (query.isEmpty()) {
                                 Text(
@@ -195,13 +192,13 @@ fun SearchScreen(
                             modifier = Modifier
                                 .size(72.dp)
                                 .clip(CircleShape)
-                                .background(OttInk(0.09f)),
+                                .background(Color(0x16FFFFFF)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = null,
-                                tint = OttInk(0.44f),
+                                tint = Color(0x70FFFFFF),
                                 modifier = Modifier.size(36.dp)
                             )
                         }
@@ -212,7 +209,7 @@ fun SearchScreen(
                             text = "Find Your Next Obsession",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             textAlign = TextAlign.Center
                         )
 
@@ -239,7 +236,7 @@ fun SearchScreen(
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             CircularProgressIndicator(
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 strokeWidth = 3.dp,
                                 modifier = Modifier.size(38.dp)
                             )
@@ -265,7 +262,7 @@ fun SearchScreen(
                             text = "No results found for \"$query\"",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             textAlign = TextAlign.Center
                         )
 
@@ -331,7 +328,7 @@ private fun SearchResultCard(
                 text = anime.displayTitle,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -364,7 +361,7 @@ private fun SearchResultCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(OttTextPrimary)
+                            .background(Color.White)
                             .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -391,7 +388,7 @@ private fun SearchResultCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(OttTextPrimary)
+                            .background(Color.White)
                             .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Text(
@@ -409,14 +406,14 @@ private fun SearchResultCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(OttPanelHigh)
+                            .background(Color(0xFF26272C))
                             .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "$year",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
                 }

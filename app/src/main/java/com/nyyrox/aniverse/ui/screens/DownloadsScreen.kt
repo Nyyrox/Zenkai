@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.os.Build
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -215,7 +213,7 @@ fun DownloadsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlayerGlassButton(backdrop, onClick = onBack, height = 40.dp, circle = true) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = OttTextPrimary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -233,7 +231,7 @@ fun DownloadsScreen(
                     )
                 }
                 PlayerGlassButton(backdrop, onClick = { showDownloadSettingsSheet = true }, height = 40.dp, circle = true) {
-                    Icon(Icons.Default.Tune, contentDescription = "Download settings", tint = OttTextPrimary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Tune, contentDescription = "Download settings", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
 
@@ -284,7 +282,7 @@ fun DownloadsScreen(
                             accent = Color(0xFFFF5252),
                             expanded = isFailedExpanded,
                             onToggle = { isFailedExpanded = !isFailedExpanded },
-                            tint = if (glassOn) Color(0x18F44336) else OttPanelHigh,
+                            tint = if (glassOn) Color(0x18F44336) else Color(0xFF1A0F11),
                             modifier = ItemPad
                         ) {
                             failedTasks.forEach { task ->
@@ -445,21 +443,21 @@ fun DownloadsScreen(
 /** Glass on: faint translucent fill + lit rim. Glass off: solid AMOLED card + flat hairline. */
 private fun Modifier.surface(glass: Boolean, shape: Shape = OttCardShape, tint: Color? = null): Modifier = this
     .clip(shape)
-    .background(tint ?: if (glass) OttInk(0.08f) else OttPanelHigh)
+    .background(tint ?: if (glass) Color(0x14FFFFFF) else Color(0xFF0D1017))
     .border(
         1.dp,
-        if (glass) Brush.verticalGradient(listOf(OttInk(0.20f), OttInk(0.05f))) else SolidColor(OttInk(0.10f)),
+        if (glass) Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x0DFFFFFF))) else SolidColor(Color(0x1AFFFFFF)),
         shape
     )
 
 @Composable
 private fun ProgressBar(progress: Float, modifier: Modifier = Modifier) {
-    Box(modifier.height(5.dp).clip(CircleShape).background(OttInk(0.13f))) {
+    Box(modifier.height(5.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
         Box(
             Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .background(Brush.horizontalGradient(listOf(OttPrimary, OttTextPrimary)))
+                .background(Brush.horizontalGradient(listOf(OttPrimary, Color.White)))
         )
     }
 }
@@ -476,18 +474,18 @@ private fun StorageCard(glass: Boolean, anime: Long, manga: Long, novels: Long, 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("STORAGE USED", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = Color(0xFF8E94A3))
-                Text(formatBytes(total), color = OttTextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
+                Text(formatBytes(total), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
             }
             Box(
-                Modifier.size(40.dp).clip(CircleShape).background(OttInk(0.08f)),
+                Modifier.size(40.dp).clip(CircleShape).background(Color(0x14FFFFFF)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Storage, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Storage, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(Modifier.height(12.dp))
         Row(
-            Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(OttInk(0.10f)),
+            Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(Color(0x1AFFFFFF)),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             parts.forEach { (_, size, color) ->
@@ -528,12 +526,12 @@ private fun TaskGroupCard(
         ) {
             Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(title, color = OttTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (!expanded) collapsedHint()
             Icon(
                 if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = if (expanded) "Minimize" else "Expand",
-                tint = OttInk(0.8f),
+                tint = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -566,7 +564,7 @@ private fun DownloadTabs(
                 val pad = 4.dp.toPx()
                 val w = (size.width - pad * 2) / tabs.size
                 drawRoundRect(
-                    color = OttTextPrimary,
+                    color = Color.White,
                     topLeft = Offset(pad + pos * w, pad),
                     size = Size(w, size.height - pad * 2),
                     cornerRadius = CornerRadius(size.height)
@@ -620,7 +618,7 @@ private fun LibraryItemCard(
                 modifier = Modifier
                     .size(width = 54.dp, height = 76.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(OttInk(0.13f))
+                    .background(Color(0x20FFFFFF))
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -640,7 +638,7 @@ private fun LibraryItemCard(
             Icon(
                 if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = "Expand",
-                tint = OttInk(0.8f),
+                tint = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
             IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
@@ -650,7 +648,7 @@ private fun LibraryItemCard(
 
         AnimatedVisibility(visible = expanded) {
             Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                Box(Modifier.fillMaxWidth().height(1.dp).background(OttInk(0.09f)))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
                 Spacer(Modifier.height(8.dp))
                 // Composed only while expanded, so children are read lazily; keyed by the parent's counts on the caller side.
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp), content = children)
@@ -673,18 +671,18 @@ private fun ChildRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(OttInk(0.05f))
+            .background(Color(0x0DFFFFFF))
             .clickable(onClick = onOpen)
             .padding(start = 10.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = OttTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(subtitle, color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(
-            Modifier.padding(horizontal = 6.dp).clip(OttPillShape).background(OttTextPrimary).padding(horizontal = 11.dp, vertical = 6.dp),
+            Modifier.padding(horizontal = 6.dp).clip(OttPillShape).background(Color.White).padding(horizontal = 11.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(actionIcon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(15.dp))
@@ -875,7 +873,7 @@ private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) 
             .fillMaxWidth()
             .clip(TaskRowShape)
             .background(Color(0x26000000))
-            .border(1.dp, OttInk(0.08f), TaskRowShape)
+            .border(1.dp, Color(0x14FFFFFF), TaskRowShape)
             .padding(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -891,7 +889,7 @@ private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) 
             Column(Modifier.weight(1f)) {
                 Text(
                     text = "${if (task.itemTitle.isNotBlank()) "${task.itemTitle} • " else ""}${task.title}",
-                    color = OttTextPrimary,
+                    color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -911,11 +909,11 @@ private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(statusText, color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
-                    Text("${task.percentage}%", color = OttTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${task.percentage}%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
             IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel", tint = OttInk(0.7f), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -951,7 +949,7 @@ private fun FailedDownloadTaskRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = "${if (task.itemTitle.isNotBlank()) "${task.itemTitle} • " else ""}${task.title}",
-                    color = OttTextPrimary,
+                    color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -967,7 +965,7 @@ private fun FailedDownloadTaskRow(
                 )
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = OttInk(0.7f), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -977,7 +975,7 @@ private fun FailedDownloadTaskRow(
                 modifier = Modifier.height(34.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
             ) {
-                Text("Change Server", color = OttInk(0.75f), fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                Text("Change Server", color = Color.White.copy(alpha = 0.75f), fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
             }
             Spacer(Modifier.width(6.dp))
             Button(
@@ -987,9 +985,9 @@ private fun FailedDownloadTaskRow(
                 modifier = Modifier.height(34.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = OttTextPrimary)
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                 Spacer(Modifier.width(6.dp))
-                Text("Retry", color = OttTextPrimary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                Text("Retry", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1017,7 +1015,7 @@ private fun EmptyDownloadsView(type: String, glass: Boolean) {
         ) {
             Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(32.dp))
         }
-        Text("No Downloaded ${type.replaceFirstChar { it.uppercase() }}", color = OttTextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text("No Downloaded ${type.replaceFirstChar { it.uppercase() }}", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
         Text(hint, color = OttTextSecondary, fontSize = 12.5.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
     }
 }
@@ -1096,7 +1094,7 @@ fun IosDeleteConfirmationDialog(
                     text = target.title,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 20.dp)
                 )
@@ -1106,7 +1104,7 @@ fun IosDeleteConfirmationDialog(
                 Text(
                     text = target.subtitle,
                     fontSize = 13.sp,
-                    color = OttInk(0.80f),
+                    color = Color(0xCCFFFFFF),
                     textAlign = TextAlign.Center,
                     lineHeight = 18.sp,
                     modifier = Modifier.padding(horizontal = 20.dp)
@@ -1119,7 +1117,7 @@ fun IosDeleteConfirmationDialog(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(OttInk(0.09f))
+                            .background(Color(0x18FFFFFF))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Icon(
@@ -1144,7 +1142,7 @@ fun IosDeleteConfirmationDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(0.6.dp)
-                        .background(OttInk(0.16f))
+                        .background(Color(0x28FFFFFF))
                 )
 
                 // iOS 2-action buttons row (Cancel & Delete)
@@ -1163,7 +1161,7 @@ fun IosDeleteConfirmationDialog(
                     ) {
                         Text(
                             text = "Cancel",
-                            color = OttInk(0.93f),
+                            color = Color(0xEEFFFFFF),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Normal
                         )
@@ -1173,7 +1171,7 @@ fun IosDeleteConfirmationDialog(
                         modifier = Modifier
                             .width(0.6.dp)
                             .fillMaxSize()
-                            .background(OttInk(0.16f))
+                            .background(Color(0x28FFFFFF))
                     )
 
                     Box(

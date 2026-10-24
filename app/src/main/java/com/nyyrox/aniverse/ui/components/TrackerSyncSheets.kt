@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import android.annotation.SuppressLint
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import android.graphics.Bitmap
 import android.view.MotionEvent
 import android.webkit.WebResourceRequest
@@ -77,7 +74,7 @@ fun AniListSyncModalSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = OttPanelHigh,
+        containerColor = Color(0xFF0D0F14),
         dragHandle = null
     ) {
         Column(
@@ -99,18 +96,18 @@ fun AniListSyncModalSheet(
                             .background(Color(0xFF02A9FF)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Sync, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = "AniList Sync",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary)
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                 }
             }
 
@@ -119,7 +116,7 @@ fun AniListSyncModalSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF131722))
                         .border(1.dp, Color(0x2502A9FF), RoundedCornerShape(14.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -138,7 +135,7 @@ fun AniListSyncModalSheet(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = account.username,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
@@ -164,13 +161,13 @@ fun AniListSyncModalSheet(
                     enabled = !vm.isTrackerSyncing
                 ) {
                     if (vm.isTrackerSyncing) {
-                        CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Syncing Watchlist...", color = OttTextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Syncing Watchlist...", color = Color.White, fontWeight = FontWeight.Bold)
                     } else {
-                        Icon(Icons.Default.Sync, contentDescription = null, tint = OttTextPrimary)
+                        Icon(Icons.Default.Sync, contentDescription = null, tint = Color.White)
                         Spacer(Modifier.width(8.dp))
-                        Text("Sync Full AniList Watchlist", color = OttTextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Sync Full AniList Watchlist", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -196,8 +193,8 @@ fun AniListSyncModalSheet(
 
                 TabRow(
                     selectedTabIndex = selectedTab,
-                    containerColor = OttPanelHigh,
-                    contentColor = OttTextPrimary,
+                    containerColor = Color(0xFF131722),
+                    contentColor = Color.White,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
@@ -239,9 +236,9 @@ fun AniListSyncModalSheet(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF02A9FF),
-                                unfocusedBorderColor = OttInk(0.13f),
-                                focusedTextColor = OttTextPrimary,
-                                unfocusedTextColor = OttTextPrimary
+                                unfocusedBorderColor = Color(0x22FFFFFF),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
                             )
                         )
 
@@ -271,7 +268,7 @@ fun AniListSyncModalSheet(
                                 .height(46.dp)
                         ) {
                             if (isConnecting) {
-                                CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(18.dp))
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
                             } else {
                                 Text("Connect & Sync AniList", fontWeight = FontWeight.Bold)
                             }
@@ -293,9 +290,9 @@ fun AniListSyncModalSheet(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF02A9FF),
-                                unfocusedBorderColor = OttInk(0.13f),
-                                focusedTextColor = OttTextPrimary,
-                                unfocusedTextColor = OttTextPrimary
+                                unfocusedBorderColor = Color(0x22FFFFFF),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
                             )
                         )
 
@@ -325,7 +322,7 @@ fun AniListSyncModalSheet(
                                 .height(46.dp)
                         ) {
                             if (isConnecting) {
-                                CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(18.dp))
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
                             } else {
                                 Text("Import AniList Watchlist", fontWeight = FontWeight.Bold)
                             }
@@ -337,7 +334,7 @@ fun AniListSyncModalSheet(
                                 .fillMaxWidth()
                                 .height(460.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(OttTextPrimary)
+                                .background(Color.White)
                         ) {
                             InAppTrackerWebView(
                                 url = AniListTrackerClient.AUTH_URL,
@@ -367,7 +364,7 @@ fun MalSyncModalSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = OttPanelHigh,
+        containerColor = Color(0xFF0D0F14),
         dragHandle = null
     ) {
         Column(
@@ -389,18 +386,18 @@ fun MalSyncModalSheet(
                             .background(Color(0xFF2E51A2)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.SyncAlt, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.SyncAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = "MyAnimeList (MAL) Sync",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary)
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                 }
             }
 
@@ -409,7 +406,7 @@ fun MalSyncModalSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF131722))
                         .border(1.dp, Color(0x252E51A2), RoundedCornerShape(14.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -428,7 +425,7 @@ fun MalSyncModalSheet(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = account.username,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
@@ -454,13 +451,13 @@ fun MalSyncModalSheet(
                     enabled = !vm.isTrackerSyncing
                 ) {
                     if (vm.isTrackerSyncing) {
-                        CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Syncing Watchlist...", color = OttTextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Syncing Watchlist...", color = Color.White, fontWeight = FontWeight.Bold)
                     } else {
-                        Icon(Icons.Default.SyncAlt, contentDescription = null, tint = OttTextPrimary)
+                        Icon(Icons.Default.SyncAlt, contentDescription = null, tint = Color.White)
                         Spacer(Modifier.width(8.dp))
-                        Text("Sync Full MAL Watchlist", color = OttTextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Sync Full MAL Watchlist", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -486,8 +483,8 @@ fun MalSyncModalSheet(
 
                 TabRow(
                     selectedTabIndex = selectedTab,
-                    containerColor = OttPanelHigh,
-                    contentColor = OttTextPrimary,
+                    containerColor = Color(0xFF131722),
+                    contentColor = Color.White,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
@@ -529,9 +526,9 @@ fun MalSyncModalSheet(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF2E51A2),
-                                unfocusedBorderColor = OttInk(0.13f),
-                                focusedTextColor = OttTextPrimary,
-                                unfocusedTextColor = OttTextPrimary
+                                unfocusedBorderColor = Color(0x22FFFFFF),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
                             )
                         )
 
@@ -561,7 +558,7 @@ fun MalSyncModalSheet(
                                 .height(46.dp)
                         ) {
                             if (isConnecting) {
-                                CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(18.dp))
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
                             } else {
                                 Text("Import MyAnimeList Watchlist", fontWeight = FontWeight.Bold)
                             }
@@ -573,7 +570,7 @@ fun MalSyncModalSheet(
                                 .fillMaxWidth()
                                 .height(460.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(OttTextPrimary)
+                                .background(Color.White)
                         ) {
                             InAppTrackerWebView(
                                 url = MalTrackerClient.getOAuthUrl(),
@@ -602,9 +599,9 @@ fun MalSyncModalSheet(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF2E51A2),
-                                unfocusedBorderColor = OttInk(0.13f),
-                                focusedTextColor = OttTextPrimary,
-                                unfocusedTextColor = OttTextPrimary
+                                unfocusedBorderColor = Color(0x22FFFFFF),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
                             )
                         )
 
@@ -634,7 +631,7 @@ fun MalSyncModalSheet(
                                 .height(46.dp)
                         ) {
                             if (isConnecting) {
-                                CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(18.dp))
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
                             } else {
                                 Text("Connect Token", fontWeight = FontWeight.Bold)
                             }

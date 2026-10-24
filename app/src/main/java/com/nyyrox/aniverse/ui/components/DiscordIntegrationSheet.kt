@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import android.content.Intent
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import android.net.Uri
 import android.widget.Toast
 import kotlinx.coroutines.launch
@@ -82,7 +79,7 @@ fun DiscordIntegrationSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = OttPanelHigh,
+        containerColor = Color(0xFF0D0F14),
         dragHandle = null
     ) {
         Column(
@@ -108,7 +105,7 @@ fun DiscordIntegrationSheet(
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -118,17 +115,17 @@ fun DiscordIntegrationSheet(
                             text = "Discord Rich Presence",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Text(
                             text = "Show what you're watching live on Discord",
                             fontSize = 12.sp,
-                            color = OttInk(0.6f)
+                            color = Color.White.copy(alpha = 0.6f)
                         )
                     }
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary)
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                 }
             }
 
@@ -139,7 +136,7 @@ fun DiscordIntegrationSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF131722))
                         .border(1.dp, Color(0x355865F2), RoundedCornerShape(14.dp))
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -163,7 +160,7 @@ fun DiscordIntegrationSheet(
                             Text(
                                 text = acc.username.take(1).uppercase(),
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 fontSize = 18.sp
                             )
                         }
@@ -176,12 +173,12 @@ fun DiscordIntegrationSheet(
                             text = acc.globalName ?: acc.username,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Text(
                             text = "@${acc.username}",
                             fontSize = 12.sp,
-                            color = OttInk(0.65f)
+                            color = Color.White.copy(alpha = 0.65f)
                         )
                     }
 
@@ -203,9 +200,9 @@ fun DiscordIntegrationSheet(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = OttTextPrimary)
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Login with Discord", fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                    Text("Login with Discord", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
 
@@ -214,7 +211,7 @@ fun DiscordIntegrationSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF131722))
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -222,13 +219,13 @@ fun DiscordIntegrationSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Enable Rich Presence (RPC)",
-                        color = OttTextPrimary,
+                        color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = "Broadcasting anime title, episode & live timer",
-                        color = OttInk(0.55f),
+                        color = Color.White.copy(alpha = 0.55f),
                         fontSize = 11.sp
                     )
                 }
@@ -239,10 +236,10 @@ fun DiscordIntegrationSheet(
                         DiscordAccountManager.setRpcEnabled(enabled)
                     },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = OttTextPrimary,
+                        checkedThumbColor = Color.White,
                         checkedTrackColor = Color(0xFF5865F2),
                         uncheckedThumbColor = Color.Gray,
-                        uncheckedTrackColor = OttInk(0.20f)
+                        uncheckedTrackColor = Color(0x33FFFFFF)
                     )
                 )
             }
@@ -252,8 +249,8 @@ fun DiscordIntegrationSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(OttPanelHigh)
-                    .border(1.dp, OttInk(0.10f), RoundedCornerShape(14.dp))
+                    .background(Color(0xFF10131B))
+                    .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp))
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -293,7 +290,7 @@ fun DiscordIntegrationSheet(
                             .background(Color(0xFF5865F2)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                     Spacer(Modifier.width(10.dp))
                     Column {
@@ -301,17 +298,17 @@ fun DiscordIntegrationSheet(
                             text = "Watching Zenkai",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Text(
                             text = "Solo Leveling Season 2",
                             fontSize = 11.sp,
-                            color = OttInk(0.8f)
+                            color = Color.White.copy(alpha = 0.8f)
                         )
                         Text(
                             text = "Episode 4 (Sub) · 12:45 elapsed",
                             fontSize = 10.sp,
-                            color = OttInk(0.5f)
+                            color = Color.White.copy(alpha = 0.5f)
                         )
                     }
                 }
@@ -322,7 +319,7 @@ fun DiscordIntegrationSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF131722))
                     .border(1.dp, Color(0x205865F2), RoundedCornerShape(14.dp))
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -337,12 +334,12 @@ fun DiscordIntegrationSheet(
                             text = "Broadcast to Your Profile",
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Text(
                             text = if (!discordAccount?.userToken.isNullOrBlank()) "Active: Personal user token linked" else "Currently broadcasting via Zenkai Bot",
                             fontSize = 11.sp,
-                            color = if (!discordAccount?.userToken.isNullOrBlank()) Color(0xFF43B581) else OttInk(0.55f)
+                            color = if (!discordAccount?.userToken.isNullOrBlank()) Color(0xFF43B581) else Color.White.copy(alpha = 0.55f)
                         )
                     }
                     Text(
@@ -358,12 +355,12 @@ fun DiscordIntegrationSheet(
                     Text(
                         text = "1. Log into discord.com in a web browser.\n2. Press F12 (Inspect) > Network tab.\n3. Search 'api' and refresh page.\n4. Click any request, copy 'Authorization' value under Request Headers.",
                         fontSize = 10.5.sp,
-                        color = OttInk(0.7f),
+                        color = Color.White.copy(alpha = 0.7f),
                         lineHeight = 15.sp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(OttPanelHigh)
+                            .background(Color(0xFF0F121B))
                             .padding(10.dp)
                     )
                 }
@@ -375,10 +372,10 @@ fun DiscordIntegrationSheet(
                     placeholder = { Text("Paste your Discord token here...", fontSize = 11.sp, color = Color.Gray) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = OttTextPrimary,
-                        unfocusedTextColor = OttTextPrimary,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
                         focusedBorderColor = Color(0xFF5865F2),
-                        unfocusedBorderColor = OttInk(0.20f)
+                        unfocusedBorderColor = Color(0x33FFFFFF)
                     )
                 )
 
@@ -413,7 +410,7 @@ fun DiscordIntegrationSheet(
                         Text(
                             text = if (isValidatingToken) "Validating..." else if (customToken.isNotBlank()) "Verify & Save Token" else "Use Zenkai Bot",
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 11.5.sp
                         )
                     }
@@ -444,12 +441,12 @@ fun DiscordIntegrationSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = OttInk(0.7f), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "Discord App Credentials",
                         fontSize = 12.sp,
-                        color = OttInk(0.75f),
+                        color = Color.White.copy(alpha = 0.75f),
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -466,7 +463,7 @@ fun DiscordIntegrationSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF131722))
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -476,10 +473,10 @@ fun DiscordIntegrationSheet(
                         label = { Text("Application Client ID", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
                             focusedBorderColor = Color(0xFF5865F2),
-                            unfocusedBorderColor = OttInk(0.20f)
+                            unfocusedBorderColor = Color(0x33FFFFFF)
                         )
                     )
 
@@ -489,10 +486,10 @@ fun DiscordIntegrationSheet(
                         label = { Text("Client Secret / Key", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
                             focusedBorderColor = Color(0xFF5865F2),
-                            unfocusedBorderColor = OttInk(0.20f)
+                            unfocusedBorderColor = Color(0x33FFFFFF)
                         )
                     )
 
@@ -507,7 +504,7 @@ fun DiscordIntegrationSheet(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Save App Credentials", fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                        Text("Save App Credentials", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }

@@ -55,7 +55,7 @@ fun GlassIconButton(
     contentDescription: String,
     modifier: Modifier = Modifier,
     tintColor: Color = Color.White,
-    backgroundTint: Color = if (com.nyyrox.aniverse.ui.theme.ThemeRuntime.isLight) Color(0x66000000) else Color(0x1EFFFFFF),
+    backgroundTint: Color = Color(0x1EFFFFFF),
     borderColor: Color = Color(0x33FFFFFF)
 ) {
     val context = LocalContext.current

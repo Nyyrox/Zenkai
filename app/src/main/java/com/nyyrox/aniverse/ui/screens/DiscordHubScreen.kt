@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.annotation.SuppressLint
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -51,7 +48,7 @@ import com.nyyrox.aniverse.ui.theme.OttBg
 import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import kotlinx.coroutines.launch
 
-private val HubCardBg = OttPanelHigh
+private val HubCardBg = Color(0xFF131722)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +90,7 @@ fun DiscordHubScreen(
                             text = "Discord Community",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                         Text(
                             text = "Official ZENKAI Server Hub",
@@ -107,7 +104,7 @@ fun DiscordHubScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = OttTextPrimary
+                            tint = Color.White
                         )
                     }
                 },
@@ -116,7 +113,7 @@ fun DiscordHubScreen(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = OttInk(0.8f)
+                            tint = Color.White.copy(alpha = 0.8f)
                         )
                     }
                 },
@@ -156,7 +153,7 @@ fun DiscordHubScreen(
                     text = "COMMUNITY CHANNELS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttInk(0.5f),
+                    color = Color.White.copy(alpha = 0.5f),
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
@@ -165,7 +162,7 @@ fun DiscordHubScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(HubCardBg)
-                        .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
                         .padding(vertical = 6.dp)
                 ) {
                     DiscordChannelRow(
@@ -179,7 +176,7 @@ fun DiscordHubScreen(
                             showCommunityWebView = true
                         }
                     )
-                    HorizontalDivider(color = OttInk(0.07f), modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(color = Color(0x12FFFFFF), modifier = Modifier.padding(horizontal = 16.dp))
                     DiscordChannelRow(
                         icon = Icons.Default.Notifications,
                         name = "#announcements",
@@ -189,7 +186,7 @@ fun DiscordHubScreen(
                             showCommunityWebView = true
                         }
                     )
-                    HorizontalDivider(color = OttInk(0.07f), modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(color = Color(0x12FFFFFF), modifier = Modifier.padding(horizontal = 16.dp))
                     DiscordChannelRow(
                         icon = Icons.Default.PlayArrow,
                         name = "#anime-requests",
@@ -208,7 +205,7 @@ fun DiscordHubScreen(
                     text = "DISCORD RICH PRESENCE",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttInk(0.5f),
+                    color = Color.White.copy(alpha = 0.5f),
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
@@ -230,7 +227,7 @@ fun DiscordHubScreen(
                     text = "WHY JOIN ZENKAI DISCORD?",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttInk(0.5f),
+                    color = Color.White.copy(alpha = 0.5f),
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
@@ -239,7 +236,7 @@ fun DiscordHubScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(HubCardBg)
-                        .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -321,7 +318,7 @@ private fun DiscordCommunityWebView(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF0D0F14))
             ) {
                 // Header bar
                 Row(
@@ -338,13 +335,13 @@ private fun DiscordCommunityWebView(
                             .background(Color(0xFF5865F2)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("D", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("D", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = "ZENKAI Discord Community",
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary,
+                        color = Color.White,
                         fontSize = 14.sp,
                         modifier = Modifier.weight(1f)
                     )
@@ -353,7 +350,7 @@ private fun DiscordCommunityWebView(
                         Icon(
                             Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = "Open in Discord App",
-                            tint = OttInk(0.7f),
+                            tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -361,7 +358,7 @@ private fun DiscordCommunityWebView(
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = OttTextPrimary
+                            tint = Color.White
                         )
                     }
                 }
@@ -419,14 +416,14 @@ private fun DiscordHeroCard(
                 Brush.verticalGradient(
                     colors = listOf(
                         Color(0xFF5865F2).copy(alpha = 0.28f),
-                        OttPanelHigh
+                        Color(0xFF131722)
                     )
                 )
             )
             .border(
                 1.dp,
                 Brush.verticalGradient(
-                    listOf(Color(0xFF5865F2).copy(alpha = 0.6f), OttInk(0.13f))
+                    listOf(Color(0xFF5865F2).copy(alpha = 0.6f), Color(0x22FFFFFF))
                 ),
                 RoundedCornerShape(20.dp)
             )
@@ -458,7 +455,7 @@ private fun DiscordHeroCard(
                             text = "Z",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
                 }
@@ -470,7 +467,7 @@ private fun DiscordHeroCard(
                         text = guildInfo?.name ?: "ZENKAI",
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -497,7 +494,7 @@ private fun DiscordHeroCard(
             Text(
                 text = "Join our official Discord community for fast anime updates, episode discussions, and live Rich Presence on your profile.",
                 fontSize = 12.5.sp,
-                color = OttInk(0.75f),
+                color = Color.White.copy(alpha = 0.75f),
                 lineHeight = 18.sp
             )
 
@@ -515,7 +512,7 @@ private fun DiscordHeroCard(
                 Icon(
                     Icons.Default.Forum,
                     contentDescription = null,
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
@@ -523,7 +520,7 @@ private fun DiscordHeroCard(
                     text = "Browse Community In-App",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
 
@@ -587,7 +584,7 @@ private fun DiscordChannelRow(
                 text = name,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary
+                color = Color.White
             )
             Text(
                 text = description,
@@ -599,7 +596,7 @@ private fun DiscordChannelRow(
         Icon(
             Icons.AutoMirrored.Filled.OpenInNew,
             contentDescription = null,
-            tint = OttInk(0.35f),
+            tint = Color.White.copy(alpha = 0.35f),
             modifier = Modifier.size(16.dp)
         )
     }
@@ -615,7 +612,7 @@ private fun DiscordRpcStatusCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(HubCardBg)
-            .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Row(
@@ -628,7 +625,7 @@ private fun DiscordRpcStatusCard(
                     text = if (account != null) "Connected as @${account.username}" else "Discord Account",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
                 Text(
                     text = if (account != null) "Rich Presence Active (Watching Zenkai)" else "Connect to broadcast your watching activity",
@@ -641,7 +638,7 @@ private fun DiscordRpcStatusCard(
                 onClick = onConfigureClick,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (account != null) OttInk(0.13f) else Color(0xFF5865F2)
+                    containerColor = if (account != null) Color(0x22FFFFFF) else Color(0xFF5865F2)
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             ) {
@@ -649,7 +646,7 @@ private fun DiscordRpcStatusCard(
                     text = if (account != null) "Settings" else "Connect",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -683,13 +680,13 @@ private fun DiscordPerkRow(
                 text = title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary
+                color = Color.White
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = description,
                 fontSize = 11.5.sp,
-                color = OttInk(0.65f),
+                color = Color.White.copy(alpha = 0.65f),
                 lineHeight = 16.sp
             )
         }

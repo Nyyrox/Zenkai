@@ -4,6 +4,7 @@ import com.nyyrox.aniverse.data.SkipInterval
 import com.nyyrox.aniverse.data.subtitles.SubtitleTrack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -45,25 +46,17 @@ object ReAnimeResolver {
     ): DirectStreamResult? = withContext(Dispatchers.IO) {
         val targetAudio = audio.lowercase()
         val cacheKey = "$anilistId:$episode:$targetAudio:$preferredServer"
-        streamCache[cacheKey]?.let { return@withContext it }
-
-        // Tier 1: Client-Side Re:Anime Flix API + EncDec Decryption
-        val reanimeStream = resolveReanimeFlix(anilistId, episode, targetAudio, preferredServer)
-        if (reanimeStream != null && !reanimeStream.streamUrl.contains("slopnet")) {
-            val tagged = reanimeStream.copy(
-                serverId = "flixcloud-$targetAudio",
-                serverName = "FlixCloud",
-                audio = targetAudio
-            )
-            streamCache[cacheKey] = tagged
-            return@withContext tagged
+        val cached = streamCache[cacheKey]
+        if (cached != null && !cached.streamUrl.contains("slopnet")) {
+            return@withContext cached
         }
 
-        // Tier 2: Seamless Fallback to Verified Client-Side HLS Providers (MegaPlay / Vidstream)
+        // Tier 1: Fast & Verified Direct HLS Extraction (MegaPlay / Vidstream)
         try {
             val fallback = AnikotoResolver.resolveDirectMegaPlayWithServer(
                 anilistId, episode, targetAudio, "bcdn"
-            ) ?: AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, "vidstream")
+            ) ?: AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, "bcdn")
+              ?: AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, "vidstream")
 
             if (fallback != null && fallback.audio.equals(targetAudio, ignoreCase = true)) {
                 val reanimeTagged = fallback.copy(
@@ -73,6 +66,22 @@ object ReAnimeResolver {
                 )
                 streamCache[cacheKey] = reanimeTagged
                 return@withContext reanimeTagged
+            }
+        } catch (_: Exception) {}
+
+        // Tier 2: Client-Side Re:Anime Flix API + EncDec Decryption
+        try {
+            val reanimeStream = withTimeoutOrNull(6000L) {
+                resolveReanimeFlix(anilistId, episode, targetAudio, preferredServer)
+            }
+            if (reanimeStream != null && !reanimeStream.streamUrl.contains("slopnet")) {
+                val tagged = reanimeStream.copy(
+                    serverId = "flixcloud-$targetAudio",
+                    serverName = "FlixCloud",
+                    audio = targetAudio
+                )
+                streamCache[cacheKey] = tagged
+                return@withContext tagged
             }
         } catch (_: Exception) {}
 

@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import android.content.Context
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.net.Uri
@@ -127,7 +125,7 @@ fun ZenkaiCommunityCard(
                 brush = Brush.linearGradient(
                     listOf(
                         Color(0xFFFF1E27).copy(alpha = borderPulse),
-                        OttInk(0.44f).copy(alpha = borderPulse),
+                        Color(0x70FFFFFF).copy(alpha = borderPulse),
                         Color(0xFFFF1E27).copy(alpha = borderPulse)
                     )
                 ),
@@ -278,7 +276,7 @@ fun ZenkaiCommunityCard(
                         fontSize = 22.sp,
                         letterSpacing = 2.5.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
 
                     Spacer(Modifier.height(2.dp))

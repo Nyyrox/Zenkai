@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import androidx.compose.foundation.background
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -181,7 +178,7 @@ fun getBioTextStyle(fontKey: String?): TextStyle {
             fontSize = 12.5.sp,
             lineHeight = 18.sp,
             letterSpacing = 0.5.sp,
-            color = OttTextPrimary
+            color = Color.White
         )
         else -> TextStyle(
             fontFamily = OutfitFontFamily,
@@ -217,10 +214,10 @@ fun BioFontSelectorPills(
                 Box(
                     modifier = Modifier
                         .clip(OttPillShape)
-                        .background(if (isSelected) OttPrimary.copy(alpha = 0.25f) else OttInk(0.08f))
+                        .background(if (isSelected) OttPrimary.copy(alpha = 0.25f) else Color(0x14FFFFFF))
                         .border(
                             width = 1.dp,
-                            color = if (isSelected) OttPrimary else OttInk(0.16f),
+                            color = if (isSelected) OttPrimary else Color(0x28FFFFFF),
                             shape = OttPillShape
                         )
                         .clickable { onFontSelected(key) }
@@ -228,7 +225,7 @@ fun BioFontSelectorPills(
                 ) {
                     Text(
                         text = label,
-                        color = if (isSelected) OttTextPrimary else OttTextSecondary,
+                        color = if (isSelected) Color.White else OttTextSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
@@ -277,12 +274,12 @@ fun FavoriteAnimeShowcaseCard(
             .background(
                 Brush.linearGradient(
                     listOf(
-                        OttPanelHigh,
-                        OttPanelHigh
+                        Color(0xFF141824),
+                        Color(0xFF0D1017)
                     )
                 )
             )
-            .border(1.dp, OttInk(0.16f), RoundedCornerShape(16.dp))
+            .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(16.dp))
             .clickable(enabled = fav.id > 0 && onAnimeClick != null) {
                 if (fav.id > 0) onAnimeClick?.invoke(fav.id)
             }
@@ -338,7 +335,7 @@ fun FavoriteAnimeShowcaseCard(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = fav.title,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -380,7 +377,7 @@ fun AniListAnimePickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = OttPanelHigh
+        containerColor = Color(0xFF0C0E14)
     ) {
         Column(
             modifier = Modifier
@@ -394,12 +391,12 @@ fun AniListAnimePickerSheet(
             ) {
                 Text(
                     text = "Select Favorite Anime",
-                    color = OttTextPrimary,
+                    color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Black
                 )
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary)
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                 }
             }
 
@@ -414,12 +411,12 @@ fun AniListAnimePickerSheet(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = OttPanelHigh,
-                    unfocusedContainerColor = OttPanelHigh,
+                    focusedContainerColor = Color(0xFF141824),
+                    unfocusedContainerColor = Color(0xFF10131C),
                     focusedBorderColor = OttPrimary,
-                    unfocusedBorderColor = OttInk(0.20f),
-                    focusedTextColor = OttTextPrimary,
-                    unfocusedTextColor = OttTextPrimary
+                    unfocusedBorderColor = Color(0x33FFFFFF),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
                 )
             )
 
@@ -458,8 +455,8 @@ fun AniListAnimePickerSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(OttPanelHigh)
-                                .border(1.dp, OttInk(0.10f), RoundedCornerShape(12.dp))
+                                .background(Color(0xFF131722))
+                                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(12.dp))
                                 .clickable {
                                     onAnimeSelected(anime)
                                     onDismiss()
@@ -479,7 +476,7 @@ fun AniListAnimePickerSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = anime.title,
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 2,

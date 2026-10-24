@@ -1,7 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import android.content.Intent
-import com.nyyrox.aniverse.ui.theme.OttInk
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -72,7 +71,7 @@ fun OttNavDrawer(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color(0xF50D1018),
-        contentColor = OttTextPrimary,
+        contentColor = Color.White,
         dragHandle = null
     ) {
         Column(
@@ -93,9 +92,9 @@ fun OttNavDrawer(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.09f))
+                        .background(Color(0x18FFFFFF))
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = OttTextPrimary, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -203,8 +202,8 @@ private fun DrawerNavItem(
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(OttInk(0.06f))
-            .border(0.8.dp, OttInk(0.09f), RoundedCornerShape(14.dp))
+            .background(Color(0x10FFFFFF))
+            .border(0.8.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -213,19 +212,19 @@ private fun DrawerNavItem(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(OttInk(0.13f)),
+                .background(Color(0x22FFFFFF)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(18.dp))
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
         }
 
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+            Text(text = title, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text(text = subtitle, fontSize = 11.sp, color = OttTextSecondary)
         }
 
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = OttInk(0.38f), modifier = Modifier.size(14.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color(0x60FFFFFF), modifier = Modifier.size(14.dp))
     }
 }

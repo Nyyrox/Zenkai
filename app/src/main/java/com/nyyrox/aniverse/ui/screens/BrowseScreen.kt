@@ -1,10 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttPanel
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -158,7 +154,7 @@ fun BrowseScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(OttPanel)
+            .background(Color(0xFF08090C))
             .statusBarsPadding()
     ) {
         // ── TOP NAVIGATION BAR (Back, Brand, Source Toggle [AniList | TMDB], Grid/List Toggle) ──
@@ -180,13 +176,13 @@ fun BrowseScreen(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(OttInk(0.09f))
-                            .border(1.dp, OttInk(0.19f), CircleShape)
+                            .background(Color(0x18FFFFFF))
+                            .border(1.dp, Color(0x30FFFFFF), CircleShape)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -197,7 +193,7 @@ fun BrowseScreen(
                         text = "ZENKAI ",
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                     Text(
                         text = "BROWSE",
@@ -218,8 +214,8 @@ fun BrowseScreen(
                     modifier = Modifier
                         .height(34.dp)
                         .clip(RoundedCornerShape(17.dp))
-                        .background(OttInk(0.09f))
-                        .border(1.dp, OttInk(0.18f), RoundedCornerShape(17.dp))
+                        .background(Color(0x18FFFFFF))
+                        .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(17.dp))
                         .padding(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -241,7 +237,7 @@ fun BrowseScreen(
                             text = "AniList",
                             fontSize = 11.sp,
                             fontWeight = if (isAniList) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isAniList) OttTextPrimary else Color(0xFF94A3B8)
+                            color = if (isAniList) Color.White else Color(0xFF94A3B8)
                         )
                     }
 
@@ -262,7 +258,7 @@ fun BrowseScreen(
                             text = "TMDB",
                             fontSize = 11.sp,
                             fontWeight = if (!isAniList) FontWeight.Bold else FontWeight.Medium,
-                            color = if (!isAniList) OttTextPrimary else Color(0xFF94A3B8)
+                            color = if (!isAniList) Color.White else Color(0xFF94A3B8)
                         )
                     }
                 }
@@ -273,13 +269,13 @@ fun BrowseScreen(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.09f))
-                        .border(1.dp, OttInk(0.16f), CircleShape)
+                        .background(Color(0x16FFFFFF))
+                        .border(1.dp, Color(0x28FFFFFF), CircleShape)
                 ) {
                     Icon(
                         imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
                         contentDescription = "Toggle View",
-                        tint = OttTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(17.dp)
                     )
                 }
@@ -293,8 +289,8 @@ fun BrowseScreen(
                 .staggeredEntrance(index = 1)
                 .padding(horizontal = 16.dp, vertical = 4.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(OttPanelHigh)
-                .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+                .background(Color(0xFF10141E))
+                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
                 .padding(12.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -350,8 +346,8 @@ fun BrowseScreen(
                             .weight(1f)
                             .height(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(OttInk(0.09f))
-                            .border(1.dp, OttInk(0.14f), RoundedCornerShape(12.dp))
+                            .background(Color(0x16FFFFFF))
+                            .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(12.dp))
                             .padding(horizontal = 12.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
@@ -385,7 +381,7 @@ fun BrowseScreen(
                                     onValueChange = { query = it },
                                     modifier = Modifier.fillMaxWidth(),
                                     textStyle = TextStyle(
-                                        color = OttTextPrimary,
+                                        color = Color.White,
                                         fontSize = 13.5.sp,
                                         fontWeight = FontWeight.Medium
                                     ),
@@ -421,7 +417,7 @@ fun BrowseScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFFF1E27),
-                            contentColor = OttTextPrimary
+                            contentColor = Color.White
                         ),
                         contentPadding = PaddingValues(horizontal = 16.dp)
                     ) {
@@ -429,14 +425,14 @@ fun BrowseScreen(
                             Icons.Default.Search,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = OttTextPrimary
+                            tint = Color.White
                         )
                         Spacer(Modifier.width(5.dp))
                         Text(
                             text = "Search",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
                 }
@@ -457,8 +453,8 @@ fun BrowseScreen(
                             expanded = genreDropdownExpanded,
                             onDismissRequest = { genreDropdownExpanded = false },
                             modifier = Modifier
-                                .background(OttPanelHigh)
-                                .border(1.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
+                                .background(Color(0xFF161A24))
+                                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                         ) {
                             BROWSE_ALL_GENRES.forEach { genre ->
                                 DropdownMenuItem(
@@ -466,7 +462,7 @@ fun BrowseScreen(
                                         Text(
                                             text = genre,
                                             fontSize = 12.sp,
-                                            color = if (selectedGenre == genre) OttBloodPrimary else OttTextPrimary,
+                                            color = if (selectedGenre == genre) OttBloodPrimary else Color.White,
                                             fontWeight = if (selectedGenre == genre) FontWeight.Bold else FontWeight.Normal
                                         )
                                     },
@@ -476,7 +472,7 @@ fun BrowseScreen(
                                         triggerSearch(1)
                                     },
                                     colors = MenuDefaults.itemColors(
-                                        textColor = OttTextPrimary
+                                        textColor = Color.White
                                     )
                                 )
                             }
@@ -493,8 +489,8 @@ fun BrowseScreen(
                             expanded = yearDropdownExpanded,
                             onDismissRequest = { yearDropdownExpanded = false },
                             modifier = Modifier
-                                .background(OttPanelHigh)
-                                .border(1.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
+                                .background(Color(0xFF161A24))
+                                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                         ) {
                             BROWSE_ALL_YEARS.forEach { yr ->
                                 DropdownMenuItem(
@@ -502,7 +498,7 @@ fun BrowseScreen(
                                         Text(
                                             text = yr,
                                             fontSize = 12.sp,
-                                            color = if (selectedYear == yr) OttBloodPrimary else OttTextPrimary,
+                                            color = if (selectedYear == yr) OttBloodPrimary else Color.White,
                                             fontWeight = if (selectedYear == yr) FontWeight.Bold else FontWeight.Normal
                                         )
                                     },
@@ -512,7 +508,7 @@ fun BrowseScreen(
                                         triggerSearch(1)
                                     },
                                     colors = MenuDefaults.itemColors(
-                                        textColor = OttTextPrimary
+                                        textColor = Color.White
                                     )
                                 )
                             }
@@ -529,8 +525,8 @@ fun BrowseScreen(
                             expanded = sortDropdownExpanded,
                             onDismissRequest = { sortDropdownExpanded = false },
                             modifier = Modifier
-                                .background(OttPanelHigh)
-                                .border(1.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
+                                .background(Color(0xFF161A24))
+                                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                         ) {
                             BROWSE_ALL_SORTS.forEach { sort ->
                                 DropdownMenuItem(
@@ -538,7 +534,7 @@ fun BrowseScreen(
                                         Text(
                                             text = sort,
                                             fontSize = 12.sp,
-                                            color = if (selectedSort == sort) OttBloodPrimary else OttTextPrimary,
+                                            color = if (selectedSort == sort) OttBloodPrimary else Color.White,
                                             fontWeight = if (selectedSort == sort) FontWeight.Bold else FontWeight.Normal
                                         )
                                     },
@@ -548,7 +544,7 @@ fun BrowseScreen(
                                         triggerSearch(1)
                                     },
                                     colors = MenuDefaults.itemColors(
-                                        textColor = OttTextPrimary
+                                        textColor = Color.White
                                     )
                                 )
                             }
@@ -588,7 +584,7 @@ fun BrowseScreen(
                                 text = "Unable to load titles",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
@@ -601,8 +597,8 @@ fun BrowseScreen(
                             Button(
                                 onClick = { triggerSearch(1) },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = OttPrimary,
-                                    contentColor = OttOnPrimary
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black
                                 ),
                                 shape = OttPillShape
                             ) {
@@ -756,10 +752,10 @@ private fun FormatSelectorPill(
         modifier = Modifier
             .height(34.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(if (isSelected) Color(0xFFFF1E27) else OttInk(0.09f))
+            .background(if (isSelected) Color(0xFFFF1E27) else Color(0x18FFFFFF))
             .border(
                 1.dp,
-                if (isSelected) Color(0xFFFF1E27) else OttInk(0.16f),
+                if (isSelected) Color(0xFFFF1E27) else Color(0x28FFFFFF),
                 RoundedCornerShape(17.dp)
             )
             .clickable(onClick = onClick)
@@ -774,7 +770,7 @@ private fun FormatSelectorPill(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isSelected) OttTextPrimary else Color(0xFFCBD5E1),
+                    tint = if (isSelected) Color.White else Color(0xFFCBD5E1),
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -782,7 +778,7 @@ private fun FormatSelectorPill(
                 text = label,
                 fontSize = 12.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) OttTextPrimary else Color(0xFFCBD5E1)
+                color = if (isSelected) Color.White else Color(0xFFCBD5E1)
             )
         }
     }
@@ -801,8 +797,8 @@ private fun FilterDropdownButton(
             .fillMaxWidth()
             .height(38.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(10.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.CenterStart
@@ -816,7 +812,7 @@ private fun FilterDropdownButton(
                 text = label,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
-                color = OttTextPrimary,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false)
@@ -855,8 +851,8 @@ fun OttBrowseBackdropCard(
             .height(140.dp)
             .shadow(elevation = 6.dp, shape = RoundedCornerShape(14.dp), ambientColor = Color.Black, spotColor = Color.Black)
             .clip(RoundedCornerShape(14.dp))
-            .background(OttPanelHigh)
-            .border(1.dp, OttInk(0.12f), RoundedCornerShape(14.dp))
+            .background(Color(0xFF0C0F17))
+            .border(1.dp, Color(0x1EFFFFFF), RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
     ) {
         // ── 1. Subtle Darkened Wide Backdrop in Background ──
@@ -909,7 +905,7 @@ fun OttBrowseBackdropCard(
                     .size(width = 76.dp, height = 114.dp)
                     .shadow(elevation = 10.dp, shape = RoundedCornerShape(8.dp), ambientColor = Color.Black, spotColor = Color.Black)
                     .clip(RoundedCornerShape(8.dp))
-                    .border(1.dp, OttInk(0.19f), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
             ) {
                 AsyncImage(
                     model = anime.cover,
@@ -930,7 +926,7 @@ fun OttBrowseBackdropCard(
                         text = "#$rank",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
             }
@@ -949,7 +945,7 @@ fun OttBrowseBackdropCard(
                     text = anime.displayTitle,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -964,8 +960,8 @@ fun OttBrowseBackdropCard(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(OttInk(0.16f))
-                                .border(0.5.dp, OttInk(0.22f), RoundedCornerShape(4.dp))
+                                .background(Color(0x28FFFFFF))
+                                .border(0.5.dp, Color(0x38FFFFFF), RoundedCornerShape(4.dp))
                                 .padding(horizontal = 5.dp, vertical = 1.dp)
                         ) {
                             Icon(
@@ -979,7 +975,7 @@ fun OttBrowseBackdropCard(
                                 text = String.format(java.util.Locale.US, "%.1f", score / 10f),
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                         }
                     }
@@ -1003,16 +999,16 @@ fun OttBrowseBackdropCard(
                         Text(
                             text = anime.displayYear,
                             fontSize = 10.5.sp,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
 
                     anime.episodes?.let { epCount ->
-                        Text(text = "•", fontSize = 10.sp, color = OttInk(0.67f))
+                        Text(text = "•", fontSize = 10.sp, color = Color(0xAAFFFFFF))
                         Text(
                             text = "$epCount eps",
                             fontSize = 10.5.sp,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
                 }
@@ -1021,7 +1017,7 @@ fun OttBrowseBackdropCard(
                 Text(
                     text = anime.cleanDescription,
                     fontSize = 10.5.sp,
-                    color = OttInk(0.87f),
+                    color = Color(0xDDFFFFFF),
                     maxLines = 2,
                     lineHeight = 14.sp,
                     overflow = TextOverflow.Ellipsis
@@ -1036,14 +1032,14 @@ fun OttBrowseBackdropCard(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(OttInk(0.09f))
-                                    .border(0.5.dp, OttInk(0.13f), RoundedCornerShape(4.dp))
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.5.dp, Color(0x22FFFFFF), RoundedCornerShape(4.dp))
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Text(
                                     text = g,
                                     fontSize = 8.5.sp,
-                                    color = OttInk(0.80f),
+                                    color = Color(0xCCFFFFFF),
                                     fontWeight = FontWeight.Medium
                                 )
                             }

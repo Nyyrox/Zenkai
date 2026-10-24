@@ -32,11 +32,13 @@ jobs:
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: zenkai-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           overwrite: true
+          retention-days: 2
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')

@@ -1,11 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import androidx.activity.compose.BackHandler
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
-import com.nyyrox.aniverse.ui.theme.OttPrimary
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -186,8 +181,8 @@ fun CompulsoryUsernameCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(OttPanelHigh)
-            .border(BorderStroke(1.dp, OttInk(0.19f)), RoundedCornerShape(24.dp))
+            .background(Color(0xFF0F1117))
+            .border(BorderStroke(1.dp, Color(0x30FFFFFF)), RoundedCornerShape(24.dp))
             .padding(horizontal = 24.dp, vertical = 28.dp)
     ) {
         Column(
@@ -238,7 +233,7 @@ fun CompulsoryUsernameCard(
 
             Text(
                 text = "Enter Your Username",
-                color = OttTextPrimary,
+                color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center
@@ -312,7 +307,7 @@ fun CompulsoryUsernameCard(
                 trailingIcon = {
                     if (isCheckingAvailability) {
                         CircularProgressIndicator(
-                            color = OttTextPrimary,
+                            color = Color.White,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp)
                         )
@@ -336,14 +331,14 @@ fun CompulsoryUsernameCard(
                 },
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = if (isAvailable == true) Color(0xFF4ADE80) else OttTextPrimary,
-                    unfocusedBorderColor = if (isAvailable == true) Color(0x664ADE80) else OttInk(0.13f),
-                    focusedContainerColor = OttInk(0.06f),
-                    unfocusedContainerColor = OttInk(0.05f),
-                    focusedTextColor = OttTextPrimary,
-                    unfocusedTextColor = OttTextPrimary,
-                    cursorColor = OttTextPrimary,
-                    focusedLabelColor = if (isAvailable == true) Color(0xFF4ADE80) else OttTextPrimary,
+                    focusedBorderColor = if (isAvailable == true) Color(0xFF4ADE80) else Color.White,
+                    unfocusedBorderColor = if (isAvailable == true) Color(0x664ADE80) else Color(0x22FFFFFF),
+                    focusedContainerColor = Color(0x10FFFFFF),
+                    unfocusedContainerColor = Color(0x0CFFFFFF),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color.White,
+                    focusedLabelColor = if (isAvailable == true) Color(0xFF4ADE80) else Color.White,
                     unfocusedLabelColor = Color(0xFF64748B)
                 ),
                 singleLine = true,
@@ -384,8 +379,8 @@ fun CompulsoryUsernameCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(OttInk(0.08f))
-                                .border(1.dp, OttInk(0.14f), RoundedCornerShape(8.dp))
+                                .background(Color(0x15FFFFFF))
+                                .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(8.dp))
                                 .clickable { usernameInput = suggestion }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
@@ -424,10 +419,10 @@ fun CompulsoryUsernameCard(
                     .height(50.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = OttPrimary,
-                    contentColor = OttOnPrimary,
-                    disabledContainerColor = OttInk(0.12f),
-                    disabledContentColor = OttInk(0.25f)
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    disabledContainerColor = Color(0x1FFFFFFF),
+                    disabledContentColor = Color(0x40FFFFFF)
                 )
             ) {
                 if (isSubmitting) {

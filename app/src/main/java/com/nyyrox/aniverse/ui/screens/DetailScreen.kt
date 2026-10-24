@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.content.Intent
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.ColumnScope
@@ -201,10 +198,6 @@ import com.nyyrox.aniverse.ui.components.OttPosterCard
 import com.nyyrox.aniverse.ui.components.ShimmerBox
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttInkSolid
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
-import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.ThemeRuntime
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttHeroGradient
 import com.nyyrox.aniverse.ui.theme.OttPillShape
@@ -371,7 +364,7 @@ fun DetailScreen(
                 Icon(
                     Icons.Default.ArrowBack,
                     contentDescription = "Back",
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -393,7 +386,7 @@ fun DetailScreen(
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = { vm.openDetail(animeId) },
-                    colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = OttOnPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                     shape = OttPillShape
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black)
@@ -544,7 +537,7 @@ fun DetailScreen(
     // ponytail: per-card backdrop sampling was the main render cost; upgrade path = playerGlass(backdrop, r) on cards again.
     val glassOn = rememberGlassEnabled()
     val glassLayer = rememberPrismalGlassLayer()
-    val backdrop: PrismalGlassLayer? = null // flat controls here: the black ambient layer made Light mode unreadable
+    val backdrop = if (glassOn) glassLayer else null
     val shareAnime: () -> Unit = {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -809,7 +802,7 @@ fun DetailScreen(
                             listOf(
                                 Color(0x35000000),
                                 Color(0x10000000),
-                                OttBg.copy(alpha = 0.55f),
+                                Color(0x800B0E14),
                                 OttBg,
                                 OttBg
                             )
@@ -869,7 +862,7 @@ fun DetailScreen(
                                         text = tmdbDetails?.title?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: anime.displayTitle,
                                         fontSize = 22.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = OttTextPrimary,
+                                        color = Color.White,
                                         maxLines = 2,
                                         lineHeight = 28.sp,
                                         overflow = TextOverflow.Ellipsis
@@ -929,14 +922,14 @@ fun DetailScreen(
                     ) {
                         val seasonYearText = anime.displaySeason.ifBlank { anime.displayYear }
                         if (seasonYearText.isNotBlank()) {
-                            TagChip(seasonYearText.uppercase(), OttTextPrimary, OttInk(0.12f), OttInk(0.22f))
+                            TagChip(seasonYearText.uppercase(), Color.White, Color(0x1FFFFFFF), Color(0x38FFFFFF))
                         }
                         TagChip(
                             if (anime.isMovie) "MOVIE" else anime.displayFormat.uppercase(),
-                            Color(0xFFE2E8F0), OttInk(0.08f), OttInk(0.18f)
+                            Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF)
                         )
                         if (!anime.isMovie) {
-                            TagChip("$maxEpisode EPISODES", Color(0xFFE2E8F0), OttInk(0.08f), OttInk(0.18f))
+                            TagChip("$maxEpisode EPISODES", Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
                         }
                         if (scorePercent != null && scorePercent > 0) {
                             TagChip("★ $scorePercent%", Color(0xFFFDE68A), Color(0x26F59E0B), Color(0x66FBBF24))
@@ -970,7 +963,7 @@ fun DetailScreen(
                         PlayerGlassButton(backdrop, onClick = { showWatchlistStatusDialog = true }, height = 50.dp, circle = true) {
                             PopOnChange(isBookmarked) {
                                 val bmTint by animateColorAsState(
-                                    targetValue = if (isBookmarked) OttAccentGold else OttTextPrimary,
+                                    targetValue = if (isBookmarked) OttAccentGold else Color.White,
                                     animationSpec = tween(220),
                                     label = "bookmarkTint"
                                 )
@@ -983,7 +976,7 @@ fun DetailScreen(
                             }
                         }
                         PlayerGlassButton(backdrop, onClick = shareAnime, height = 50.dp, circle = true) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = OttTextPrimary, modifier = Modifier.size(21.dp))
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(21.dp))
                         }
                     }
 
@@ -1021,7 +1014,7 @@ fun DetailScreen(
                                     },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = OttTextPrimary
+                                    color = Color.White
                                 )
                                 if (!formattedDate.isNullOrBlank()) {
                                     Text(text = formattedDate, fontSize = 11.5.sp, color = OttTextMuted)
@@ -1047,7 +1040,7 @@ fun DetailScreen(
                                 text = displayOverview,
                                 fontSize = 13.5.sp,
                                 lineHeight = 21.sp,
-                                color = OttInk(0.90f),
+                                color = Color(0xE6FFFFFF),
                                 maxLines = if (isSynopsisExpanded || !isLongOverview) Int.MAX_VALUE else 4,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1056,7 +1049,7 @@ fun DetailScreen(
                                     text = if (isSynopsisExpanded) "Show less" else "Read more",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     modifier = Modifier.clickable { isSynopsisExpanded = !isSynopsisExpanded }
                                 )
                             }
@@ -1081,7 +1074,7 @@ fun DetailScreen(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 combinedGenres.take(8).forEach { g ->
-                                    TagChip(g.uppercase(), Color(0xFFE2E8F0), OttInk(0.08f), OttInk(0.18f))
+                                    TagChip(g.uppercase(), Color(0xFFE2E8F0), Color(0x14FFFFFF), Color(0x2EFFFFFF))
                                 }
                             }
                         }
@@ -1123,8 +1116,8 @@ fun DetailScreen(
                                     value = episodeSearchQuery,
                                     onValueChange = { episodeSearchQuery = it },
                                     singleLine = true,
-                                    textStyle = TextStyle(color = OttTextPrimary, fontSize = 13.sp),
-                                    cursorBrush = SolidColor(OttTextPrimary),
+                                    textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                                    cursorBrush = SolidColor(Color.White),
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(40.dp),
@@ -1157,7 +1150,7 @@ fun DetailScreen(
                                                     Icon(
                                                         Icons.Default.Close,
                                                         contentDescription = "Clear search",
-                                                        tint = OttTextPrimary,
+                                                        tint = Color.White,
                                                         modifier = Modifier.size(14.dp)
                                                     )
                                                 }
@@ -1175,7 +1168,7 @@ fun DetailScreen(
                                     Icon(
                                         imageVector = Icons.Default.SwapVert,
                                         contentDescription = "Sort Order",
-                                        tint = if (!isOldestFirst) OttAccentGold else OttTextPrimary,
+                                        tint = if (!isOldestFirst) OttAccentGold else Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -1189,7 +1182,7 @@ fun DetailScreen(
                                     Icon(
                                         imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
                                         contentDescription = "Toggle View",
-                                        tint = OttTextPrimary,
+                                        tint = Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -1227,14 +1220,14 @@ fun DetailScreen(
                                         Icon(
                                             imageVector = Icons.Default.Download,
                                             contentDescription = "Download All",
-                                            tint = OttTextPrimary,
+                                            tint = Color.White,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
                                             text = "Download All",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = OttTextPrimary,
+                                            color = Color.White,
                                             maxLines = 1,
                                             softWrap = false
                                         )
@@ -1273,17 +1266,17 @@ fun DetailScreen(
                                             }
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(
-                                                if (isCurrent) OttTextPrimary
+                                                if (isCurrent) Color.White
                                                 else if (isEpFiller) Color(0x24F59E0B)
                                                 else if (isEpMixed) Color(0x246366F1)
-                                                else OttInk(0.09f)
+                                                else Color(0x18FFFFFF)
                                             )
                                             .border(
                                                 1.dp,
-                                                if (isCurrent) OttTextPrimary
+                                                if (isCurrent) Color.White
                                                 else if (isEpFiller) Color(0x60FBBF24)
                                                 else if (isEpMixed) Color(0x60818CF8)
-                                                else OttInk(0.15f),
+                                                else Color(0x25FFFFFF),
                                                 RoundedCornerShape(10.dp)
                                             ),
                                         contentAlignment = Alignment.Center
@@ -1292,7 +1285,7 @@ fun DetailScreen(
                                             text = "$epNum",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else OttTextPrimary
+                                            color = if (isCurrent) Color.Black else if (isEpFiller) Color(0xFFFDE68A) else Color.White
                                         )
                                         if (isEpFiller || isEpMixed) {
                                             Box(
@@ -1532,7 +1525,7 @@ fun DetailScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlayerGlassButton(backdrop, onClick = handleBack, height = 40.dp, circle = true) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = OttTextPrimary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 Spacer(Modifier.width(10.dp))
 
@@ -1548,7 +1541,7 @@ fun DetailScreen(
                             modifier = Modifier
                                 .size(34.dp)
                                 .clip(CircleShape)
-                                .background(OttTextPrimary)
+                                .background(Color.White)
                                 .clickable {
                                     if (anime.id <= 0) showMissingAnilistDialog = true
                                     else onPlay(anime.id, selectedEpisode, selectedProvider)
@@ -1567,7 +1560,7 @@ fun DetailScreen(
                                 text = anime.displayTitle,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1585,13 +1578,13 @@ fun DetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         PlayerGlassButton(backdrop, onClick = shareAnime, height = 40.dp, circle = true) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = OttTextPrimary, modifier = Modifier.size(19.dp))
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(19.dp))
                         }
                         PlayerGlassButton(backdrop, onClick = { showWatchlistStatusDialog = true }, height = 40.dp, circle = true) {
                             Icon(
                                 imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                 contentDescription = "Watchlist",
-                                tint = if (isBookmarked) OttAccentGold else OttTextPrimary,
+                                tint = if (isBookmarked) OttAccentGold else Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1722,7 +1715,7 @@ fun DetailScreen(
                         tint = Color(0xFFFF5252),
                         modifier = Modifier.size(20.dp)
                     )
-                    Text("Download Stopped", fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                    Text("Download Stopped", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             },
             text = {
@@ -1747,7 +1740,7 @@ fun DetailScreen(
                             audio = failedTask.audio
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = OttOnPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                     shape = OttPillShape
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
@@ -1784,7 +1777,7 @@ fun DetailScreen(
                     }
                 }
             },
-            containerColor = OttPanelHigh,
+            containerColor = Color(0xFF141722),
             shape = RoundedCornerShape(18.dp)
         )
     }
@@ -1796,7 +1789,7 @@ fun DetailScreen(
                 Icon(
                     Icons.Default.ErrorOutline,
                     contentDescription = null,
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(32.dp)
                 )
             },
@@ -1805,7 +1798,7 @@ fun DetailScreen(
                     text = "Source Link Unavailable",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             },
             text = {
@@ -1820,15 +1813,15 @@ fun DetailScreen(
                 Button(
                     onClick = { showMissingAnilistDialog = false },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OttPrimary,
-                        contentColor = OttOnPrimary
+                        containerColor = Color.White,
+                        contentColor = Color.Black
                     ),
                     shape = OttPillShape
                 ) {
                     Text("Got It", fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = OttPanelHigh,
+            containerColor = Color(0xFF141722),
             shape = RoundedCornerShape(18.dp)
         )
     }
@@ -1869,7 +1862,7 @@ private fun SectionHeader(title: String, count: Int? = null) {
 }
 
 @Composable
-private fun MiniChip(text: String, color: Color = Color(0xFFCBD5E1), bg: Color = OttInk(0.08f), border: Color = OttInk(0.13f)) {
+private fun MiniChip(text: String, color: Color = Color(0xFFCBD5E1), bg: Color = Color(0x14FFFFFF), border: Color = Color(0x22FFFFFF)) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
@@ -1993,13 +1986,26 @@ private fun RichEpisodeCard(
             }
             .clip(shape)
             .then(
-                Modifier.background(OttInk(if (isSelected) 0.14f else 0.06f), shape)
+                if (glassOn) Modifier
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                if (isSelected) Color(0x34FFFFFF) else Color(0x24FFFFFF),
+                                Color(0x0DFFFFFF)
+                            )
+                        ),
+                        shape
+                    )
+                    .border(1.dp, Brush.verticalGradient(listOf(Color(0x44FFFFFF), Color(0x0FFFFFFF))), shape)
+                else Modifier
+                    .background(if (isSelected) Color(0xFF171B26) else Color(0xFF0D1017))
+                    .border(1.dp, Color(0x18FFFFFF), shape)
             )
             .then(
                 if (isSelected) Modifier.drawWithContent {
                     drawContent()
                     drawRoundRect(
-                        color = OttInkSolid.copy(alpha = 0.35f + 0.55f * glow.value),
+                        color = Color.White.copy(alpha = 0.35f + 0.55f * glow.value),
                         style = Stroke(width = 1.5.dp.toPx()),
                         cornerRadius = CornerRadius(18.dp.toPx())
                     )
@@ -2016,7 +2022,7 @@ private fun RichEpisodeCard(
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(OttPanelHigh)
+                .background(Color(0xFF141722))
         ) {
             // Thumbnail drifts slightly against the scroll for depth.
             SubcomposeAsyncImage(
@@ -2058,11 +2064,11 @@ private fun RichEpisodeCard(
                         scaleY = s
                     }
                     .clip(CircleShape)
-                    .background(if (glassOn) OttInk(0.25f) else Color(0x60000000))
-                    .border(1.dp, OttInk(0.31f), CircleShape),
+                    .background(if (glassOn) Color(0x40FFFFFF) else Color(0x60000000))
+                    .border(1.dp, Color(0x50FFFFFF), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(25.dp))
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
             }
 
             if (isSelected) {
@@ -2071,7 +2077,7 @@ private fun RichEpisodeCard(
                         .align(Alignment.TopStart)
                         .padding(8.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(OttTextPrimary)
+                        .background(Color.White)
                         .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
                     Text(
@@ -2096,10 +2102,10 @@ private fun RichEpisodeCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .background(Color(0xCC000000))
-                        .border(0.6.dp, OttInk(0.25f), RoundedCornerShape(6.dp))
+                        .border(0.6.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
-                    Text(text = "Episode $epNum", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                    Text(text = "Episode $epNum", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 if (isFiller || isMixed) EpisodeFillerBadge(isMixed = isMixed)
             }
@@ -2113,7 +2119,7 @@ private fun RichEpisodeCard(
                     .background(Color(0xCC000000))
                     .padding(horizontal = 6.dp, vertical = 3.dp)
             ) {
-                Text(text = "${runMin}m", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = OttInk(0.87f))
+                Text(text = "${runMin}m", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xDDFFFFFF))
             }
 
             // Share + Download, top-right
@@ -2130,10 +2136,10 @@ private fun RichEpisodeCard(
                         .pressable(0.82f, onClick = onShare)
                         .clip(CircleShape)
                         .background(Color(0x99101420))
-                        .border(1.dp, OttInk(0.22f), CircleShape),
+                        .border(1.dp, Color(0x38FFFFFF), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "Share episode $epNum", tint = OttTextPrimary, modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.Share, contentDescription = "Share episode $epNum", tint = Color.White, modifier = Modifier.size(15.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -2141,13 +2147,13 @@ private fun RichEpisodeCard(
                         .pressable(0.82f, haptic = false, onClick = onDownload) // onDownload already ticks
                         .clip(CircleShape)
                         .background(Color(0x99101420))
-                        .border(1.dp, OttInk(0.22f), CircleShape),
+                        .border(1.dp, Color(0x38FFFFFF), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     when {
                         isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
                         isDownloading -> Icon(Icons.Default.Downloading, contentDescription = "Downloading", tint = OttAccentGold, modifier = Modifier.size(16.dp))
-                        else -> Icon(Icons.Default.Download, contentDescription = "Download episode $epNum", tint = OttTextPrimary, modifier = Modifier.size(16.dp))
+                        else -> Icon(Icons.Default.Download, contentDescription = "Download episode $epNum", tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -2159,8 +2165,8 @@ private fun RichEpisodeCard(
                         .fillMaxWidth()
                         .height(3.dp)
                         .align(Alignment.BottomCenter),
-                    color = OttTextPrimary,
-                    trackColor = OttInk(0.25f)
+                    color = Color.White,
+                    trackColor = Color(0x40FFFFFF)
                 )
             }
         }
@@ -2170,7 +2176,7 @@ private fun RichEpisodeCard(
             text = title,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -2205,7 +2211,7 @@ private fun CharacterRow(char: AnimeCharacter, glassOn: Boolean) {
                 .width(66.dp)
                 .height(92.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(OttInk(0.13f)),
+                .background(Color(0x22FFFFFF)),
             contentScale = ContentScale.Crop
         )
         Column(
@@ -2216,7 +2222,7 @@ private fun CharacterRow(char: AnimeCharacter, glassOn: Boolean) {
                 text = char.name,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2232,8 +2238,8 @@ private fun CharacterRow(char: AnimeCharacter, glassOn: Boolean) {
             MiniChip(
                 text = char.role.lowercase().replaceFirstChar { it.uppercase() },
                 color = if (isMain) Color(0xFFFCA5A5) else Color(0xFFCBD5E1),
-                bg = if (isMain) Color(0x26E50914) else OttInk(0.08f),
-                border = if (isMain) Color(0x66E50914) else OttInk(0.13f)
+                bg = if (isMain) Color(0x26E50914) else Color(0x14FFFFFF),
+                border = if (isMain) Color(0x66E50914) else Color(0x22FFFFFF)
             )
             if (!char.voiceActorName.isNullOrBlank()) {
                 Spacer(Modifier.height(4.dp))
@@ -2247,8 +2253,8 @@ private fun CharacterRow(char: AnimeCharacter, glassOn: Boolean) {
                         modifier = Modifier
                             .size(26.dp)
                             .clip(CircleShape)
-                            .background(OttInk(0.13f))
-                            .border(0.6.dp, OttInk(0.19f), CircleShape),
+                            .background(Color(0x22FFFFFF))
+                            .border(0.6.dp, Color(0x30FFFFFF), CircleShape),
                         contentScale = ContentScale.Crop
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -2256,7 +2262,7 @@ private fun CharacterRow(char: AnimeCharacter, glassOn: Boolean) {
                             text = char.voiceActorName,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = OttInk(0.93f),
+                            color = Color(0xEEFFFFFF),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -2293,15 +2299,15 @@ private fun PeopleRow(people: List<Triple<String, String?, String?>>, glassOn: B
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.13f))
-                        .border(1.dp, OttInk(0.19f), CircleShape),
+                        .background(Color(0x22FFFFFF))
+                        .border(1.dp, Color(0x30FFFFFF), CircleShape),
                     contentScale = ContentScale.Crop
                 )
                 Text(
                     text = name,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 2,
                     lineHeight = 14.sp,
                     overflow = TextOverflow.Ellipsis,
@@ -2342,7 +2348,7 @@ private fun VideoItem(video: TmdbVideo, featured: Boolean, glassOn: Boolean, onC
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF141722))
             ) {
                 AsyncImage(
                     model = thumb,
@@ -2361,24 +2367,24 @@ private fun VideoItem(video: TmdbVideo, featured: Boolean, glassOn: Boolean, onC
                         .size(50.dp)
                         .clip(CircleShape)
                         .background(Color(0xDD000000))
-                        .border(1.5.dp, OttTextPrimary, CircleShape),
+                        .border(1.5.dp, Color.White, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = OttTextPrimary, modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = Color.White, modifier = Modifier.size(28.dp))
                 }
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(10.dp)
                 ) {
-                    MiniChip(video.type.uppercase(Locale.US), OttTextPrimary, Color(0xD0000000), OttInk(0.25f))
+                    MiniChip(video.type.uppercase(Locale.US), Color.White, Color(0xD0000000), Color(0x40FFFFFF))
                 }
             }
             Text(
                 text = video.name,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary,
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2399,7 +2405,7 @@ private fun VideoItem(video: TmdbVideo, featured: Boolean, glassOn: Boolean, onC
                     .width(128.dp)
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF141722))
             ) {
                 AsyncImage(
                     model = thumb,
@@ -2415,7 +2421,7 @@ private fun VideoItem(video: TmdbVideo, featured: Boolean, glassOn: Boolean, onC
                         .background(Color(0xAA000000)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = OttTextPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = Color.White, modifier = Modifier.size(18.dp))
                 }
             }
             Column(
@@ -2426,7 +2432,7 @@ private fun VideoItem(video: TmdbVideo, featured: Boolean, glassOn: Boolean, onC
                     text = video.name,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2489,7 +2495,7 @@ private fun RelationRow(rel: MediaRelation, glassOn: Boolean, vm: MainViewModel)
                 .width(54.dp)
                 .aspectRatio(0.72f)
                 .clip(RoundedCornerShape(8.dp))
-                .background(OttInk(0.13f)),
+                .background(Color(0x22FFFFFF)),
             contentScale = ContentScale.Crop
         )
         Column(
@@ -2500,7 +2506,7 @@ private fun RelationRow(rel: MediaRelation, glassOn: Boolean, vm: MainViewModel)
                 text = rel.title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary,
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2534,7 +2540,7 @@ private fun RecommendationPosterItem(
                 .fillMaxWidth()
                 .aspectRatio(0.7f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(OttInk(0.09f))
+                .background(Color(0x18FFFFFF))
         ) {
             AsyncImage(
                 model = rec.cover,
@@ -2566,7 +2572,7 @@ private fun RecommendationPosterItem(
                             text = "$score%",
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
                 }
@@ -2579,7 +2585,7 @@ private fun RecommendationPosterItem(
             text = rec.title,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 2,
             lineHeight = 15.sp,
             overflow = TextOverflow.Ellipsis
@@ -2682,7 +2688,7 @@ private fun DetailLoadingCard(
                         )
                     }
                     .clip(cardShape)
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF141822))
             ) {
                 if (!cachedPoster.isNullOrBlank()) {
                     AsyncImage(
@@ -2710,7 +2716,7 @@ private fun DetailLoadingCard(
                             val x = -w + sweep * w * 3f
                             drawRect(
                                 brush = Brush.linearGradient(
-                                    colors = listOf(Color.Transparent, OttInk(0.19f), Color.Transparent),
+                                    colors = listOf(Color.Transparent, Color(0x30FFFFFF), Color.Transparent),
                                     start = Offset(x, 0f),
                                     end = Offset(x + w * 0.7f, size.height * 0.6f)
                                 )
@@ -2723,7 +2729,7 @@ private fun DetailLoadingCard(
                         .fillMaxSize()
                         .border(
                             1.dp,
-                            Brush.linearGradient(listOf(OttInk(0.50f), OttInk(0.03f), OttInk(0.25f))),
+                            Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x08FFFFFF), Color(0x40FFFFFF))),
                             cardShape
                         )
                 )
@@ -2745,7 +2751,7 @@ private fun DetailLoadingCard(
                         lineHeight = 26.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.3).sp,
-                        color = OttTextPrimary,
+                        color = Color.White,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -2793,7 +2799,7 @@ private fun DetailLoadingCard(
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = OttTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -2808,13 +2814,13 @@ private fun SkeletonBar(modifier: Modifier, sweep: Float) {
     Box(
         modifier
             .clip(RoundedCornerShape(50))
-            .background(OttInk(0.08f))
+            .background(Color(0x14FFFFFF))
             .drawBehind {
                 val w = size.width
                 val x = -w + sweep * w * 2.5f
                 drawRect(
                     Brush.linearGradient(
-                        listOf(Color.Transparent, OttInk(0.13f), Color.Transparent),
+                        listOf(Color.Transparent, Color(0x22FFFFFF), Color.Transparent),
                         Offset(x, 0f),
                         Offset(x + w * 0.6f, 0f)
                     )
@@ -2832,7 +2838,10 @@ private fun rememberGlassEnabled(): Boolean =
 /** Flat translucent card surface: no backdrop sampling, so it stays cheap while scrolling. */
 private fun Modifier.cardSurface(glassOn: Boolean, radius: Dp = 18.dp): Modifier {
     val shape = RoundedCornerShape(radius)
-    return if (ThemeRuntime.cardStyle) this.clip(shape).background(OttInk(0.06f)) else this
+    return this
+        .clip(shape)
+        .background(if (glassOn) Color(0x14FFFFFF) else Color(0xFF0D1017))
+        .border(1.dp, Color(0x1AFFFFFF), shape)
 }
 
 /** Section card (flat). Grows/shrinks smoothly with its content. */
@@ -2848,8 +2857,8 @@ private fun DetailCard(
             .fillMaxWidth()
             .animateContentSize()
             .cardSurface(glassOn, 20.dp)
-            .padding(horizontal = if (ThemeRuntime.cardStyle) 16.dp else 0.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
             text = title,
@@ -2876,7 +2885,7 @@ private fun DetailFact(label: String, value: String, modifier: Modifier = Modifi
             text = value,
             fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -2938,7 +2947,7 @@ private fun SlidingPillTabs(
                         .width(with(density) { indW.toDp() })
                         .height(tabHeight)
                         .clip(CircleShape)
-                        .background(OttTextPrimary)
+                        .background(Color.White)
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2970,8 +2979,8 @@ private fun SlidingPillTabs(
                                 }
                             }
                             .clip(CircleShape)
-                            .background(if (isSel) Color.Transparent else OttInk(0.08f))
-                            .border(1.dp, if (isSel) Color.Transparent else OttInk(0.18f), CircleShape)
+                            .background(if (isSel) Color.Transparent else Color(0x14FFFFFF))
+                            .border(1.dp, if (isSel) Color.Transparent else Color(0x2EFFFFFF), CircleShape)
                             .semantics { selected = isSel }
                             .clickable(interactionSource = pillSource, indication = null, role = Role.Tab) { onSelect(i) },
                         contentAlignment = Alignment.Center
@@ -3085,7 +3094,7 @@ private fun GlassPlayButton(
         },
         height = 50.dp
     ) {
-        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(24.dp))
+        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
         AnimatedContent(
             targetState = label,
             transitionSpec = {
@@ -3094,18 +3103,31 @@ private fun GlassPlayButton(
             },
             label = "glassPlayLabel"
         ) { text ->
-            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary, maxLines = 1, softWrap = false)
+            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, softWrap = false)
         }
     }
 }
 
-/** Solid play pill. Theme-aware (ink on light, white on dark); bouncy press only. */
+/** Flat white play pill (glass off): idle glow + light sweep, bouncy press. */
 @Composable
 private fun FlatPlayButton(
     label: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val inf = rememberInfiniteTransition(label = "playFx")
+    val sweep by inf.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)),
+        label = "playSweep"
+    )
+    val glow by inf.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "playGlow"
+    )
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val iconScale by animateFloatAsState(
@@ -3117,17 +3139,45 @@ private fun FlatPlayButton(
         modifier = modifier
             .height(50.dp)
             .pressable(0.95f, onClick = onClick)
+            .drawBehind {
+                val pad = 5.dp.toPx()
+                drawRoundRect(
+                    color = Color.White.copy(alpha = glow * 0.5f),
+                    topLeft = Offset(-pad, -pad),
+                    size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
+                    cornerRadius = CornerRadius(size.height / 2f + pad)
+                )
+            }
             .clip(CircleShape)
-            .background(OttPrimary)
-            .padding(horizontal = 20.dp),
+            .background(Color.White)
+            .drawWithContent {
+                drawContent()
+                // Soft reflection band that glides across, then rests.
+                if (sweep < 0.6f) {
+                    val w = size.width
+                    val x = -w * 0.4f + (sweep / 0.6f) * w * 1.8f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color.Transparent, Color(0x26000000), Color.Transparent),
+                            startX = x,
+                            endX = x + w * 0.4f
+                        )
+                    )
+                }
+            },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
     ) {
         Icon(
             Icons.Default.PlayArrow,
             contentDescription = null,
-            tint = OttOnPrimary,
-            modifier = Modifier.size(24.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }
+            tint = Color.Black,
+            modifier = Modifier
+                .size(24.dp)
+                .graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                }
         )
         AnimatedContent(
             targetState = label,
@@ -3137,7 +3187,7 @@ private fun FlatPlayButton(
             },
             label = "playLabel"
         ) { text ->
-            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = OttOnPrimary, maxLines = 1)
+            Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1)
         }
     }
 }

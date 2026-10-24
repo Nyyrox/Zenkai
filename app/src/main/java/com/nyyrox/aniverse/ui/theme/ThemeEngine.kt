@@ -95,9 +95,7 @@ data class ThemeSettings(
     val isReducedMotionEnabled: Boolean = false,
     val isPowerSavingEnabled: Boolean = false,
     val preferredRefreshRate: Int = 90,
-    val isGlassmorphismEnabled: Boolean = true,
-    val mode: ThemeMode = ThemeMode.DARK,
-    val useCards: Boolean = false
+    val isGlassmorphismEnabled: Boolean = true
 )
 
 fun getThemeColors(theme: AnimeTheme): ThemeColors {
@@ -185,25 +183,6 @@ fun getThemeColors(theme: AnimeTheme): ThemeColors {
     }
 }
 
-/** Re-tints an accent preset for the chosen mode (Light / Dark / AMOLED). Accent colours are untouched. */
-fun adaptColorsForMode(c: ThemeColors, mode: ThemeMode): ThemeColors = when (mode) {
-    ThemeMode.DARK -> c
-    ThemeMode.AMOLED -> c.copy(
-        bg = Color.Black,
-        surface = Color(0xFF050506),
-        surfaceElevated = Color(0xFF0E0E10),
-        gradient = listOf(Color.Black, Color.Black, Color.Black)
-    )
-    ThemeMode.LIGHT -> c.copy(
-        bg = Color(0xFFF1F2F7),
-        surface = Color(0xFFFFFFFF),
-        surfaceElevated = Color(0xFFE9EBF2),
-        accentGlow = c.primary.copy(alpha = 0.28f),
-        borderGlow = c.primary.copy(alpha = 0.30f),
-        gradient = listOf(Color(0xFFF1F2F7), Color(0xFFE8EAF2), Color(0xFFF1F2F7))
-    )
-}
-
 val LocalAnimeTheme = compositionLocalOf { AnimeTheme.GOJO_LIMITLESS }
 val LocalThemeColors = compositionLocalOf { getThemeColors(AnimeTheme.GOJO_LIMITLESS) }
 val LocalThemeSettings = compositionLocalOf { ThemeSettings() }
@@ -213,8 +192,7 @@ fun ThemeEngineProvider(
     settings: ThemeSettings,
     content: @Composable () -> Unit
 ) {
-    val colors = adaptColorsForMode(getThemeColors(settings.theme), settings.mode)
-    if (ThemeRuntime.cardStyle != settings.useCards) ThemeRuntime.cardStyle = settings.useCards
+    val colors = getThemeColors(settings.theme)
     CompositionLocalProvider(
         LocalAnimeTheme provides settings.theme,
         LocalThemeColors provides colors,

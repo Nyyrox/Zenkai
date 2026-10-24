@@ -227,6 +227,9 @@ object StreamProxyServer {
                 queryMap["origin"]?.let { customHeaders["Origin"] = it }
                 queryMap["cookie"]?.let { customHeaders["Cookie"] = it }
                 queryMap["ua"]?.let { customHeaders["User-Agent"] = it }
+                if (queryMap["is_hls"] == "1" || queryMap["hls"] == "1" || queryMap["media"] == "video" || queryMap["media"] == "ts") {
+                    customHeaders["X-Is-Hls"] = "1"
+                }
 
                 proxyRequest(targetUrl, customHeaders, rangeHeader, method, output)
                 return
@@ -335,7 +338,7 @@ object StreamProxyServer {
                                 } catch (_: Exception) {
                                     subUri
                                 }
-                                val proxiedSub = "http://127.0.0.1:$port/proxy?url=${URLEncoder.encode(resolvedSub, "UTF-8")}" +
+                                val proxiedSub = "http://127.0.0.1:$port/proxy?url=${URLEncoder.encode(resolvedSub, "UTF-8")}&is_hls=1" +
                                         if (headersJson.isNotEmpty()) "&headers=$headersJson" else ""
                                 """URI="$proxiedSub""""
                             }
@@ -353,7 +356,7 @@ object StreamProxyServer {
                         } catch (_: Exception) {
                             trimmed
                         }
-                        "http://127.0.0.1:$port/proxy?url=${URLEncoder.encode(resolvedSegment, "UTF-8")}" +
+                        "http://127.0.0.1:$port/proxy?url=${URLEncoder.encode(resolvedSegment, "UTF-8")}&is_hls=1" +
                                 if (headersJson.isNotEmpty()) "&headers=$headersJson" else ""
                     }
                 }
@@ -418,15 +421,26 @@ object StreamProxyServer {
             headerSb.append("Accept-Ranges: bytes\r\n")
 
             val low = targetUrl.lowercase()
+            val isHlsMedia = headers["X-Is-Hls"] == "1" || low.contains("is_hls=1") || low.contains("is_segment=1")
             val isKey = low.endsWith(".bin") || low.endsWith(".key") || low.contains("key.bin") || low.contains("k=1")
             val isSubtitle = low.endsWith(".vtt") || low.endsWith(".srt") || low.contains("/subtitles/") || low.contains("type=vtt")
             val isMp4 = low.contains(".mp4") || low.contains(".m4s") || low.contains(".m4v")
-            val isImage = (upstreamType.startsWith("image/") ||
+            val isVideoSegment = isHlsMedia ||
+                    low.contains("seg-") || low.contains("seg_") || low.contains("chunk") || low.contains("slice-") ||
+                    low.contains("f1-v1") || low.contains("v1-a") || low.contains("v0-a") || low.contains("f0-v") || low.contains("f2-v") ||
+                    low.contains("/anime/") || low.contains("/video/") || low.contains("/_v7/") || low.contains("/_v6/") ||
+                    low.contains("rundowncdn") || low.contains("flixcloud") || low.contains("eclipseharbor") ||
+                    low.contains("nexabloom") || low.contains("megaplay") || low.contains("vidstream") ||
+                    low.contains(".ts") || low.contains(".m3u8")
+
+            val isImage = !isVideoSegment && !isKey && !isSubtitle && !isMp4 && (
                     low.contains("/covers/") || low.contains("/chapters/") ||
                     low.contains("comick") || low.contains("asurascans") ||
                     low.contains("mangadex") || low.contains("weebcentral") ||
-                    low.endsWith(".png") || low.endsWith(".webp") || low.endsWith(".avif")) &&
-                    !low.contains(".ts") && !low.contains(".m3u8")
+                    low.contains("/pages/") || low.contains("/manga/") ||
+                    low.contains("/novel/") || low.contains("/avatars/") ||
+                    (upstreamType.startsWith("image/") && !low.contains("rundowncdn") && !low.contains("flixcloud") && !low.contains("eclipseharbor") && !low.contains("nexabloom"))
+            )
 
             val finalContentType = when {
                 isKey -> "application/octet-stream"
@@ -435,8 +449,8 @@ object StreamProxyServer {
                 isImage -> if (upstreamType.startsWith("image/")) upstreamType else if (low.endsWith(".png")) "image/png" else if (low.endsWith(".webp")) "image/webp" else "image/jpeg"
                 upstreamType.contains("mp4") -> "video/mp4"
                 upstreamType.contains("webm") -> "video/webm"
-                // Crucial fix: Upstream CDNs (MegaPlay, Vidstream, TikTokCDN, etc.) disguise video TS chunks with
-                // fake extensions like .jpg, .html, .image and Content-Type: image/jpeg or text/html.
+                // Crucial fix: Upstream CDNs (MegaPlay, Vidstream, FlixCloud, RundownCDN, TikTokCDN, etc.) disguise video TS chunks with
+                // fake extensions like .jpg, .png, .webp, .html, .image and Content-Type: image/jpeg, image/png or text/html.
                 // ExoPlayer requires video/MP2T for HLS MPEG-2 transport stream segments to decode properly.
                 else -> "video/MP2T"
             }
@@ -520,8 +534,23 @@ object StreamProxyServer {
 
             val host = urlObj.host
             val isAsCdn = host.contains("as-cdn") || currentUrl.contains("as-cdn")
-            val effReferer = if (isAsCdn) "https://$host/" else headers["Referer"]
-            val effOrigin = if (isAsCdn) "https://$host" else headers["Origin"]
+            val isRundownOrFlix = host.contains("rundowncdn") || currentUrl.contains("rundowncdn") || host.contains("flixcloud") || currentUrl.contains("flixcloud")
+            val isMegaplayCdn = host.contains("eclipseharbor") || host.contains("nexabloom") || host.contains("megaplay") || host.contains("vidstream")
+
+            val effReferer = when {
+                isAsCdn -> "https://$host/"
+                !headers["Referer"].isNullOrBlank() -> headers["Referer"]
+                isRundownOrFlix -> "https://flixcloud.cc/"
+                isMegaplayCdn -> "https://megaplay.buzz/"
+                else -> null
+            }
+            val effOrigin = when {
+                isAsCdn -> "https://$host"
+                !headers["Origin"].isNullOrBlank() -> headers["Origin"]
+                isRundownOrFlix -> "https://flixcloud.cc"
+                isMegaplayCdn -> "https://megaplay.buzz"
+                else -> null
+            }
 
             // Attach Referer and Origin
             effReferer?.let { conn.setRequestProperty("Referer", it) }

@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.foundation.background
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttPanel
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -190,7 +188,7 @@ fun PublicProfileScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
-                                tint = OttTextPrimary
+                                tint = Color.White
                             )
                         }
 
@@ -240,7 +238,7 @@ fun PublicProfileScreen(
                                         text = displayName.take(1).uppercase(),
                                         fontSize = 30.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = OttTextPrimary
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -356,10 +354,10 @@ fun PublicProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isOnline) Color(0x1810B981) else OttInk(0.06f))
+                            .background(if (isOnline) Color(0x1810B981) else Color(0x10FFFFFF))
                             .border(
                                 1.dp,
-                                if (isOnline) Color(0x4410B981) else OttInk(0.13f),
+                                if (isOnline) Color(0x4410B981) else Color(0x20FFFFFF),
                                 RoundedCornerShape(12.dp)
                             )
                             .clickable(enabled = !actTargetId.isNullOrBlank()) {
@@ -428,9 +426,9 @@ fun PublicProfileScreen(
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 modifier = Modifier.height(32.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(13.dp))
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Chat", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                                Text("Chat", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -484,7 +482,7 @@ fun PublicProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(OttPanelHigh)
+                                .background(Color(0xFF141722))
                                 .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f), RoundedCornerShape(14.dp))
                                 .padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -559,7 +557,7 @@ fun PublicProfileScreen(
                                         },
                                         modifier = Modifier.weight(1f).height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48), contentColor = OttTextPrimary)
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48), contentColor = Color.White)
                                     ) {
                                         Text("Demote from Admin", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                                     }
@@ -591,8 +589,8 @@ fun PublicProfileScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isSelected) chipColor.copy(alpha = 0.25f) else OttInk(0.09f))
-                                                .border(1.dp, if (isSelected) chipColor else OttInk(0.16f), RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) chipColor.copy(alpha = 0.25f) else Color(0x18FFFFFF))
+                                                .border(1.dp, if (isSelected) chipColor else Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                                                 .clickable {
                                                     targetRoles = if (isSelected) targetRoles - roleItem else targetRoles + roleItem
                                                     if (roleItem == "ADMIN") {
@@ -653,7 +651,7 @@ fun PublicProfileScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFFF59E0B),
-                                    contentColor = OttPanel
+                                    contentColor = Color(0xFF090B10)
                                 )
                             ) {
                                 if (vm.isUpdatingUserRoles) {
@@ -676,8 +674,8 @@ fun PublicProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(OttInk(0.09f))
-                            .border(1.dp, OttInk(0.14f), RoundedCornerShape(10.dp))
+                            .background(Color(0x18FFFFFF))
+                            .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(10.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Column {
@@ -702,7 +700,7 @@ fun PublicProfileScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             val tierGradient = remember(userLevel) {
                                 when {
-                                    userLevel >= 100 -> Brush.horizontalGradient(listOf(Color(0xFFFFD700), OttInk(1.00f), Color(0xFFF59E0B)))
+                                    userLevel >= 100 -> Brush.horizontalGradient(listOf(Color(0xFFFFD700), Color(0xFFFFFFFF), Color(0xFFF59E0B)))
                                     userLevel >= 80 -> Brush.horizontalGradient(listOf(Color(0xFFC084FC), Color(0xFFE9D5FF), Color(0xFF818CF8)))
                                     userLevel >= 40 -> Brush.horizontalGradient(listOf(Color(0xFFE11D48), Color(0xFFFB7185), Color(0xFFF59E0B)))
                                     userLevel >= 15 -> Brush.horizontalGradient(listOf(Color(0xFF38BDF8), Color(0xFF34D399)))
@@ -714,7 +712,7 @@ fun PublicProfileScreen(
                                     .fillMaxWidth()
                                     .height(6.dp)
                                     .clip(RoundedCornerShape(3.dp))
-                                    .background(OttInk(0.16f))
+                                    .background(Color(0x28FFFFFF))
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -858,8 +856,8 @@ fun PrivateSectionCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .padding(vertical = 20.dp, horizontal = 16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -868,8 +866,8 @@ fun PrivateSectionCard(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background(OttInk(0.09f))
-                    .border(1.dp, OttInk(0.19f), CircleShape),
+                    .background(Color(0x18FFFFFF))
+                    .border(1.dp, Color(0x30FFFFFF), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text("🔒", fontSize = 16.sp)
@@ -918,8 +916,8 @@ fun PublicWatchlistShowcase(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         // Section Header
@@ -941,7 +939,7 @@ fun PublicWatchlistShowcase(
                     text = "${watchlist.size} Series Saved",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -969,11 +967,11 @@ fun PublicWatchlistShowcase(
                         .clip(OttPillShape)
                         .background(
                             if (isSelected) Color(0xFFE11D48).copy(alpha = 0.25f)
-                            else OttInk(0.08f)
+                            else Color(0x14FFFFFF)
                         )
                         .border(
                             1.dp,
-                            if (isSelected) Color(0xFFE11D48) else OttInk(0.11f),
+                            if (isSelected) Color(0xFFE11D48) else Color(0x1CFFFFFF),
                             OttPillShape
                         )
                         .clickable { selectedFilter = filter }
@@ -984,7 +982,7 @@ fun PublicWatchlistShowcase(
                             text = filter,
                             fontSize = 11.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) OttTextPrimary else OttTextSecondary
+                            color = if (isSelected) Color.White else OttTextSecondary
                         )
                         if (count > 0) {
                             Spacer(Modifier.width(5.dp))
@@ -1089,7 +1087,7 @@ fun PublicWatchlistCard(
                 .height(160.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(OttSurfaceElevated)
-                .border(1.dp, OttInk(0.16f), RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
         ) {
             AsyncImage(
                 model = item.cover,
@@ -1133,7 +1131,7 @@ fun PublicWatchlistCard(
                         text = statusLabel,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
+                        color = Color.White
                     )
                 }
             }
@@ -1165,7 +1163,7 @@ fun PublicWatchlistCard(
             text = item.title,
             fontSize = 11.5.sp,
             fontWeight = FontWeight.Bold,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -1206,8 +1204,8 @@ fun PublicWatchHistoryShowcase(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         // Header
@@ -1229,7 +1227,7 @@ fun PublicWatchHistoryShowcase(
                     text = if (history.isNotEmpty()) "${history.size} Episodes Watched" else "Watch History",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -1261,7 +1259,7 @@ fun PublicWatchHistoryShowcase(
                                 .width(115.dp)
                                 .height(160.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(OttInk(0.13f))
+                                .background(Color(0x22FFFFFF))
                         ) {
                             AsyncImage(
                                 model = item.cover.ifBlank { item.banner },
@@ -1342,8 +1340,8 @@ fun PublicMangaHistoryShowcase(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -1364,7 +1362,7 @@ fun PublicMangaHistoryShowcase(
                     text = "${mangaHistory.size} Chapters Read",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -1386,7 +1384,7 @@ fun PublicMangaHistoryShowcase(
                             .width(115.dp)
                             .height(160.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(OttInk(0.13f))
+                            .background(Color(0x22FFFFFF))
                     ) {
                         AsyncImage(
                             model = item.poster ?: "",
@@ -1442,8 +1440,8 @@ fun PublicNovelHistoryShowcase(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -1464,7 +1462,7 @@ fun PublicNovelHistoryShowcase(
                     text = "${novelHistory.size} Novels Read",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -1486,7 +1484,7 @@ fun PublicNovelHistoryShowcase(
                             .width(115.dp)
                             .height(160.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(OttInk(0.13f))
+                            .background(Color(0x22FFFFFF))
                     ) {
                         AsyncImage(
                             model = item.cover,
@@ -1544,8 +1542,8 @@ fun PublicMangaBookmarksShowcase(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -1566,7 +1564,7 @@ fun PublicMangaBookmarksShowcase(
                     text = "${bookmarks.size} Titles Bookmarked",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -1589,7 +1587,7 @@ fun PublicMangaBookmarksShowcase(
                             .width(115.dp)
                             .height(160.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(OttInk(0.13f))
+                            .background(Color(0x22FFFFFF))
                     ) {
                         AsyncImage(
                             model = item.poster ?: "",

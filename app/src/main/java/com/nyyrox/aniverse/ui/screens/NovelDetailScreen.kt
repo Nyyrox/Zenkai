@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import android.content.Intent
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -89,10 +87,6 @@ import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedTransitionPhase
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.components.posterBorder
-import com.nyyrox.aniverse.ui.components.zenkaiSurface
-import com.nyyrox.aniverse.ui.components.GlassAmbient
-import com.nyyrox.aniverse.ui.theme.OttOnMedia
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttHeroGradient
 import com.nyyrox.aniverse.ui.theme.OttPillShape
@@ -195,10 +189,10 @@ fun NovelDetailScreen(
                     Spacer(Modifier.height(14.dp))
                     Button(
                         onClick = { vm.loadNovelDetail(novelSlug) },
-                        colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = OttOnPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = Color.Black),
                         shape = OttPillShape
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = OttOnPrimary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Retry", fontWeight = FontWeight.Bold)
                     }
@@ -274,7 +268,8 @@ fun NovelDetailScreen(
                                             coordinator?.updateTargetBounds(coords.boundsInWindow())
                                         }
                                         .clip(OttCardShape)
-                                        .zenkaiSurface(OttCardShape)
+                                        .background(Color(0x20FFFFFF))
+                                        .border(1.dp, Color(0x35FFFFFF), OttCardShape)
                                         .shadow(12.dp, OttCardShape)
                                 ) {
                                     AsyncImage(
@@ -370,8 +365,8 @@ fun NovelDetailScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .clip(OttPillShape)
-                                                    .background(OttInk(0.09f))
-                                                    .border(0.8.dp, OttInk(0.15f), OttPillShape)
+                                                    .background(Color(0x18FFFFFF))
+                                                    .border(0.8.dp, Color(0x25FFFFFF), OttPillShape)
                                                     .padding(horizontal = 7.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
@@ -422,7 +417,7 @@ fun NovelDetailScreen(
                                     targetChapterSlug?.let { onReadChapter(novelSlug, it) }
                                 },
                                 enabled = targetChapterSlug != null,
-                                colors = ButtonDefaults.buttonColors(containerColor = OttTextPrimary),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                                 shape = OttPillShape,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -432,14 +427,14 @@ fun NovelDetailScreen(
                                     Icons.Default.AutoStories,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = OttOnPrimary
+                                    tint = Color.Black
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = if (lastReadChapter != null) "Continue Reading" else "Start Reading Ch. 1",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp,
-                                    color = OttOnPrimary
+                                    color = Color.Black
                                 )
                             }
 
@@ -491,10 +486,10 @@ fun NovelDetailScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(OttPillShape)
-                                        .background(if (isSelected) OttTextPrimary else OttInk(0.08f))
+                                        .background(if (isSelected) Color.White else Color(0x14FFFFFF))
                                         .border(
                                             1.dp,
-                                            if (isSelected) OttTextPrimary else OttInk(0.13f),
+                                            if (isSelected) Color.White else Color(0x22FFFFFF),
                                             OttPillShape
                                         )
                                         .clickable { selectedTab = index }
@@ -503,7 +498,7 @@ fun NovelDetailScreen(
                                 ) {
                                     Text(
                                         text = tabTitle,
-                                        color = if (isSelected) OttOnPrimary else OttTextPrimary,
+                                        color = if (isSelected) Color.Black else Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
                                     )
@@ -527,7 +522,8 @@ fun NovelDetailScreen(
                                         .weight(1f)
                                         .height(38.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .zenkaiSurface(RoundedCornerShape(10.dp), alwaysBox = true)
+                                        .background(Color(0x16FFFFFF))
+                                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
                                         .padding(horizontal = 10.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
@@ -555,7 +551,7 @@ fun NovelDetailScreen(
                                                 onValueChange = { chapterSearch = it },
                                                 singleLine = true,
                                                 textStyle = TextStyle(
-                                                    color = OttTextPrimary,
+                                                    color = Color.White,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Normal
                                                 ),
@@ -581,7 +577,8 @@ fun NovelDetailScreen(
                                     modifier = Modifier
                                         .height(38.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .zenkaiSurface(RoundedCornerShape(10.dp), alwaysBox = true)
+                                        .background(Color(0x16FFFFFF))
+                                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
                                         .clickable { isReversedOrder = !isReversedOrder }
                                         .padding(horizontal = 10.dp),
                                     contentAlignment = Alignment.Center
@@ -600,7 +597,7 @@ fun NovelDetailScreen(
                                             text = if (!isReversedOrder) "1 → N" else "N → 1",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = OttTextPrimary
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -623,7 +620,8 @@ fun NovelDetailScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(OttPillShape)
-                                    .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                    .background(Color(0x14FFFFFF))
+                                    .border(1.dp, Color(0x25FFFFFF), OttPillShape)
                                     .clickable {
                                         val targetChapters = displayChapters.take(10).map { it.slug to it.title }
                                         vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
@@ -635,8 +633,8 @@ fun NovelDetailScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(13.dp))
-                                    Text("Download 10", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    Text("Download 10", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
 
@@ -644,7 +642,8 @@ fun NovelDetailScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(OttPillShape)
-                                    .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                    .background(Color(0x14FFFFFF))
+                                    .border(1.dp, Color(0x25FFFFFF), OttPillShape)
                                     .clickable {
                                         val targetChapters = displayChapters.map { it.slug to it.title }
                                         vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
@@ -656,8 +655,8 @@ fun NovelDetailScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = OttTextPrimary, modifier = Modifier.size(13.dp))
-                                    Text("Download All (${displayChapters.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
+                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    Text("Download All (${displayChapters.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }
@@ -696,11 +695,11 @@ fun NovelDetailScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(
                                         if (isCurrent) Color(0x20E50914)
-                                        else OttInk(0.06f)
+                                        else Color(0x10FFFFFF)
                                     )
                                     .border(
                                         width = 1.dp,
-                                        color = if (isCurrent) Color(0x80E50914) else OttInk(0.09f),
+                                        color = if (isCurrent) Color(0x80E50914) else Color(0x18FFFFFF),
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .clickable { onReadChapter(novelSlug, ch.slug) }
@@ -718,7 +717,8 @@ fun NovelDetailScreen(
                                                 .width(46.dp)
                                                 .height(66.dp)
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .zenkaiSurface(RoundedCornerShape(8.dp), alwaysBox = true)
+                                                .background(Color(0x20FFFFFF))
+                                                .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
                                         ) {
                                             AsyncImage(
                                                 model = rememberNovelImageRequest(ch.cover),
@@ -735,7 +735,7 @@ fun NovelDetailScreen(
                                             text = ch.title,
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isCurrent) Color(0xFFFFB3B3) else OttTextPrimary
+                                            color = if (isCurrent) Color(0xFFFFB3B3) else Color.White
                                         )
                                         if (!ch.releaseTime.isNullOrBlank()) {
                                             Text(
@@ -773,7 +773,7 @@ fun NovelDetailScreen(
                                             Icon(
                                                 Icons.Default.Share,
                                                 contentDescription = "Share Chapter",
-                                                tint = OttInk(0.46f),
+                                                tint = Color(0x75FFFFFF),
                                                 modifier = Modifier.size(15.dp)
                                             )
                                         }
@@ -783,10 +783,10 @@ fun NovelDetailScreen(
                                                 text = "${activeTask.percentage}%",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = OttTextPrimary
+                                                color = Color.White
                                             )
                                             CircularProgressIndicator(
-                                                color = OttTextPrimary,
+                                                color = Color.White,
                                                 strokeWidth = 2.dp,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -802,7 +802,7 @@ fun NovelDetailScreen(
                                                 Icon(
                                                     Icons.Default.DownloadDone,
                                                     contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                                                    tint = if (isDownloaded) OttTextPrimary else OttInk(0.33f),
+                                                    tint = if (isDownloaded) Color.White else Color(0x55FFFFFF),
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -843,7 +843,8 @@ fun NovelDetailScreen(
                                             .fillMaxWidth()
                                             .height(44.dp)
                                             .clip(OttPillShape)
-                                            .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                            .background(Color(0x20FFFFFF))
+                                            .border(1.dp, Color(0x30FFFFFF), OttPillShape)
                                             .clickable(enabled = !vm.novelChaptersLoading) {
                                                 vm.loadMoreNovelChapters(novelSlug)
                                             },
@@ -851,14 +852,14 @@ fun NovelDetailScreen(
                                     ) {
                                         if (vm.novelChaptersLoading) {
                                             CircularProgressIndicator(
-                                                color = OttTextPrimary,
+                                                color = Color.White,
                                                 strokeWidth = 2.dp,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         } else {
                                             Text(
                                                 text = "Load More Chapters (Page ${vm.novelChaptersPage + 1} of ${vm.novelChaptersMaxPage})",
-                                                color = OttTextPrimary,
+                                                color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.5.sp
                                             )
@@ -877,7 +878,8 @@ fun NovelDetailScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                                     .clip(RoundedCornerShape(14.dp))
-                                    .zenkaiSurface(RoundedCornerShape(14.dp))
+                                    .background(Color(0x10FFFFFF))
+                                    .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
                                     .clickable { synopsisExpanded = !synopsisExpanded }
                                     .padding(16.dp)
                             ) {
@@ -931,13 +933,14 @@ fun NovelDetailScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(OttPillShape)
-                                                .zenkaiSurface(OttPillShape, alwaysBox = true)
+                                                .background(Color(0x18FFFFFF))
+                                                .border(1.dp, Color(0x28FFFFFF), OttPillShape)
                                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                                         ) {
                                             Text(
                                                 text = genre,
                                                 fontSize = 11.sp,
-                                                color = OttTextPrimary,
+                                                color = Color.White,
                                                 fontWeight = FontWeight.Medium
                                             )
                                         }
@@ -958,7 +961,7 @@ fun NovelDetailScreen(
                     .drawBehind {
                         if (navbarAlpha > 0.05f) {
                             drawLine(
-                                color = OttInk(0.09f).copy(alpha = navbarAlpha),
+                                color = Color(0x18FFFFFF).copy(alpha = navbarAlpha),
                                 start = Offset(0f, size.height),
                                 end = Offset(size.width, size.height),
                                 strokeWidth = 1f
@@ -980,12 +983,12 @@ fun NovelDetailScreen(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(Color(0x60000000))
-                            .border(1.dp, OttInk(0.21f), CircleShape)
+                            .border(1.dp, Color(0x35FFFFFF), CircleShape)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1002,7 +1005,7 @@ fun NovelDetailScreen(
                             text = novel.title,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1036,12 +1039,12 @@ fun NovelDetailScreen(
                                 .size(38.dp)
                                 .clip(CircleShape)
                                 .background(Color(0x60000000))
-                                .border(1.dp, OttInk(0.21f), CircleShape)
+                                .border(1.dp, Color(0x35FFFFFF), CircleShape)
                         ) {
                             Icon(
                                 Icons.Default.Share,
                                 contentDescription = "Share",
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1054,14 +1057,14 @@ fun NovelDetailScreen(
                                 .background(if (isBookmarked) Color(0x30E50914) else Color(0x60000000))
                                 .border(
                                     1.dp,
-                                    if (isBookmarked) Color(0x80E50914) else OttInk(0.21f),
+                                    if (isBookmarked) Color(0x80E50914) else Color(0x35FFFFFF),
                                     CircleShape
                                 )
                         ) {
                             Icon(
                                 imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                 contentDescription = "Bookmark",
-                                tint = if (isBookmarked) Color(0xFFFF8A8A) else OttTextPrimary,
+                                tint = if (isBookmarked) Color(0xFFFF8A8A) else Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                         }

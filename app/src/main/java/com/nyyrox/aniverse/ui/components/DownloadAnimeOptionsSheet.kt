@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import androidx.compose.animation.core.Animatable
-import com.nyyrox.aniverse.ui.theme.OttPanel
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -75,7 +72,7 @@ import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.StorageManager
 
-private val Amoled = OttPanel
+private val Amoled = Color(0xFF050507)
 private val Muted = Color(0xFF8E94A3)
 private val Soft = Color(0xFFCBD5E1)
 
@@ -214,7 +211,7 @@ fun DownloadAnimeOptionsSheet(
                     .width(36.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(OttInk(0.25f))
+                    .background(Color(0x40FFFFFF))
             )
         }
     ) {
@@ -253,17 +250,17 @@ fun DownloadAnimeOptionsSheet(
                         .graphicsLayer { translationY = (bob - 0.5f) * 5.dp.toPx() }
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.08f))
-                        .border(1.dp, OttInk(0.19f), CircleShape),
+                        .background(Color(0x14FFFFFF))
+                        .border(1.dp, Color(0x30FFFFFF), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Download, null, tint = OttTextPrimary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Download, null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = if (episodesRange != null) "Download Episodes ${episodesRange.first}–${episodesRange.last}"
                         else "Download Episode $episode",
-                        color = OttTextPrimary,
+                        color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -283,12 +280,12 @@ fun DownloadAnimeOptionsSheet(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.08f))
-                        .border(1.dp, OttInk(0.15f), CircleShape)
+                        .background(Color(0x14FFFFFF))
+                        .border(1.dp, Color(0x26FFFFFF), CircleShape)
                         .clickable(onClick = onDismiss),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Close, "Close", tint = OttTextPrimary, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -305,7 +302,7 @@ fun DownloadAnimeOptionsSheet(
                             contentPadding = PaddingValues(vertical = 12.dp, horizontal = 6.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(key, color = if (sel) OttTextPrimary else Soft, fontSize = 13.5.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium)
+                                Text(key, color = if (sel) Color.White else Soft, fontSize = 13.5.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium)
                                 Text(sub, color = if (sel) Soft else Muted, fontSize = 10.5.sp)
                             }
                         }
@@ -325,7 +322,7 @@ fun DownloadAnimeOptionsSheet(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(opt.label, color = if (sel) OttTextPrimary else Soft, fontSize = 14.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium)
+                                Text(opt.label, color = if (sel) Color.White else Soft, fontSize = 14.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium)
                                 Text(
                                     text = if (episodesRange != null && opt.id != "Auto") "${opt.approxSize}/ep" else opt.approxSize,
                                     color = if (sel) Soft else Muted,
@@ -368,7 +365,7 @@ fun DownloadAnimeOptionsSheet(
                             Text(
                                 text = prov.name,
                                 modifier = Modifier.weight(1f, fill = false),
-                                color = if (sel) OttTextPrimary else Soft,
+                                color = if (sel) Color.White else Soft,
                                 fontSize = 14.sp,
                                 fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1,
@@ -387,7 +384,7 @@ fun DownloadAnimeOptionsSheet(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                tint = if (sel) OttTextPrimary else Color.Transparent,
+                                tint = if (sel) Color.White else Color.Transparent,
                                 modifier = Modifier.size(17.dp)
                             )
                         }
@@ -401,15 +398,15 @@ fun DownloadAnimeOptionsSheet(
                     .floatIn(4, dragPx)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(OttInk(0.05f))
-                    .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+                    .background(Color(0x0DFFFFFF))
+                    .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
                     .padding(horizontal = 14.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(Icons.Default.Subtitles, null, tint = Soft, modifier = Modifier.size(18.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text("Offline captions included", color = OttTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Offline captions included", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Text("Matching subtitles download automatically for offline playback", color = Muted, fontSize = 10.5.sp, lineHeight = 14.sp)
                 }
             }
@@ -429,7 +426,7 @@ fun DownloadAnimeOptionsSheet(
                     .height(52.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(RoundedCornerShape(26.dp))
-                    .background(OttTextPrimary)
+                    .background(Color.White)
                     .clickable(interactionSource = source, indication = null) {
                         storage.saveDownloadSettings(selectedAudio, selectedQuality, selectedProvider.id)
                         if (episodesRange != null && onStartBatchDownload != null) {
@@ -493,10 +490,10 @@ private fun GlassOption(
         animationSpec = spring(dampingRatio = 0.45f, stiffness = 380f),
         label = "optPop"
     )
-    val fill = if (selected) Brush.linearGradient(listOf(OttInk(0.22f), OttInk(0.07f)))
-    else Brush.linearGradient(listOf(OttInk(0.08f), OttInk(0.02f)))
-    val edge = if (selected) Brush.linearGradient(listOf(OttInk(0.85f), OttInk(0.25f)))
-    else Brush.linearGradient(listOf(OttInk(0.19f), OttInk(0.04f)))
+    val fill = if (selected) Brush.linearGradient(listOf(Color(0x38FFFFFF), Color(0x12FFFFFF)))
+    else Brush.linearGradient(listOf(Color(0x14FFFFFF), Color(0x06FFFFFF)))
+    val edge = if (selected) Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x40FFFFFF)))
+    else Brush.linearGradient(listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)))
     Box(
         modifier = modifier
             .graphicsLayer { scaleX = scale * pop; scaleY = scale * pop }

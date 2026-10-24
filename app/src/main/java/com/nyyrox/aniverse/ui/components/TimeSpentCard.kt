@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -87,7 +85,7 @@ fun TimeSpentSectionCard(
             onDismissRequest = { showResetDialog = false },
             containerColor = Color(0xFF1E293B),
             title = {
-                Text("Reset Usage Stats?", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Reset Usage Stats?", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             },
             text = {
                 Text(
@@ -118,8 +116,8 @@ fun TimeSpentSectionCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         // Header Row: Title and Timeframe Selector Tabs
@@ -133,7 +131,7 @@ fun TimeSpentSectionCard(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.09f)),
+                        .background(Color(0x18FFFFFF)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -164,7 +162,7 @@ fun TimeSpentSectionCard(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(OttInk(0.09f))
+                    .background(Color(0x18FFFFFF))
                     .padding(2.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -185,7 +183,7 @@ fun TimeSpentSectionCard(
                             text = tab.label,
                             fontSize = 10.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) OttTextPrimary else Color(0xFF94A3B8),
+                            color = if (isSelected) Color.White else Color(0xFF94A3B8),
                             softWrap = false,
                             maxLines = 1
                         )
@@ -213,7 +211,7 @@ fun TimeSpentSectionCard(
                             text = stats.formattedTotal,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Black,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             letterSpacing = (-0.5).sp
                         )
                         Text(
@@ -227,8 +225,8 @@ fun TimeSpentSectionCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(OttInk(0.09f))
-                            .border(0.8.dp, OttInk(0.16f), RoundedCornerShape(8.dp))
+                            .background(Color(0x18FFFFFF))
+                            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -263,7 +261,7 @@ fun TimeSpentSectionCard(
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(OttInk(0.14f))
+                            .background(Color(0x24FFFFFF))
                     ) {
                         Row(modifier = Modifier.matchParentSize()) {
                             if (stats.animeRatio > 0f) {
@@ -360,8 +358,8 @@ fun TimeSpentSectionCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(OttInk(0.08f))
-                        .border(1.dp, OttInk(0.13f), RoundedCornerShape(10.dp))
+                        .background(Color(0x14FFFFFF))
+                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
                         .clickable { showResetDialog = true }
                         .padding(horizontal = 10.dp, vertical = 9.dp),
                     contentAlignment = Alignment.Center
@@ -398,8 +396,8 @@ private fun ActivityStatTile(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(OttInk(0.06f))
-            .border(1.dp, OttInk(0.09f), RoundedCornerShape(12.dp))
+            .background(Color(0x10FFFFFF))
+            .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(12.dp))
             .padding(10.dp)
     ) {
         Column {
@@ -413,7 +411,7 @@ private fun ActivityStatTile(
                         modifier = Modifier
                             .size(22.dp)
                             .clip(CircleShape)
-                            .background(OttInk(0.08f)),
+                            .background(Color(0x14FFFFFF)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -446,7 +444,7 @@ private fun ActivityStatTile(
                     text = timeText,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
 
                 Text(
@@ -489,8 +487,8 @@ fun PublicTimeSpentShowcase(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.10f), RoundedCornerShape(16.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -503,7 +501,7 @@ fun PublicTimeSpentShowcase(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.09f)),
+                        .background(Color(0x18FFFFFF)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -534,7 +532,7 @@ fun PublicTimeSpentShowcase(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(OttInk(0.09f))
+                    .background(Color(0x18FFFFFF))
                     .padding(2.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -555,7 +553,7 @@ fun PublicTimeSpentShowcase(
                             text = tab.label,
                             fontSize = 10.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) OttTextPrimary else Color(0xFF94A3B8),
+                            color = if (isSelected) Color.White else Color(0xFF94A3B8),
                             softWrap = false,
                             maxLines = 1
                         )
@@ -571,7 +569,7 @@ fun PublicTimeSpentShowcase(
                 text = formattedTotal,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Black,
-                color = OttTextPrimary
+                color = Color.White
             )
             Text(
                 text = "Total Recorded Activity",

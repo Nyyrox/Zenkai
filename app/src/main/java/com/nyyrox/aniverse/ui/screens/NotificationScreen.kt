@@ -1,10 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttPanel
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -259,7 +255,7 @@ fun NotificationScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = OttTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -270,7 +266,7 @@ fun NotificationScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "NOTIFICATIONS",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 0.5.sp,
@@ -287,7 +283,7 @@ fun NotificationScreen(
                             ) {
                                 Text(
                                     text = "$unreadCount new",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -328,7 +324,7 @@ fun NotificationScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -352,7 +348,7 @@ fun NotificationScreen(
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = Color.Transparent,
-                contentColor = OttTextPrimary,
+                contentColor = Color.White,
                 indicator = { tabPositions ->
                     if (selectedTab < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
@@ -363,7 +359,7 @@ fun NotificationScreen(
                     }
                 },
                 divider = {
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(OttInk(0.09f)))
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
                 },
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
@@ -390,7 +386,7 @@ fun NotificationScreen(
                                 }
                                 Text(
                                     text = title,
-                                    color = if (isSelected) OttTextPrimary else OttTextMuted,
+                                    color = if (isSelected) Color.White else OttTextMuted,
                                     fontSize = 13.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -577,13 +573,13 @@ fun NotificationCard(
     }
 
     val cardBg = if (isRead) {
-        OttPanelHigh
+        Color(0xFF11141D)
     } else {
-        OttPanelHigh
+        Color(0xFF161B28)
     }
 
     val cardBorder = if (isRead) {
-        OttInk(0.09f)
+        Color(0x18FFFFFF)
     } else {
         typeBadgeColor.copy(alpha = 0.5f)
     }
@@ -631,7 +627,7 @@ fun NotificationCard(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(Color(0xFF2E3440), OttPanelHigh))),
+                                .background(Brush.linearGradient(listOf(Color(0xFF2E3440), Color(0xFF191D24)))),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -641,7 +637,7 @@ fun NotificationCard(
                                     else -> Icons.Default.Person
                                 },
                                 contentDescription = null,
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -661,7 +657,7 @@ fun NotificationCard(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Text(
                             text = notification.senderName ?: "ZENKAI System",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -746,8 +742,8 @@ fun NotificationCard(
                             .fillMaxWidth()
                             .height(130.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(OttPanelHigh)
-                            .border(0.5.dp, OttInk(0.20f), RoundedCornerShape(10.dp)),
+                            .background(Color(0xFF0F121C))
+                            .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp)),
                         contentScale = ContentScale.Crop
                     )
                 }
@@ -795,7 +791,7 @@ fun NotificationCard(
                                     Icon(
                                         imageVector = Icons.Default.CardGiftcard,
                                         contentDescription = null,
-                                        tint = OttTextPrimary,
+                                        tint = Color.White,
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Spacer(modifier = Modifier.width(5.dp))
@@ -803,7 +799,7 @@ fun NotificationCard(
                                         text = notification.actionLabel ?: "Claim Reward (+100 EXP)",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = OttTextPrimary
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -830,7 +826,7 @@ fun NotificationCard(
                                     Icon(
                                         imageVector = Icons.Default.OpenInNew,
                                         contentDescription = null,
-                                        tint = OttPanel,
+                                        tint = Color(0xFF090B10),
                                         modifier = Modifier.size(12.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -838,7 +834,7 @@ fun NotificationCard(
                                         text = notification.actionLabel?.takeIf { notification.type != "reward" } ?: "Open Link",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = OttPanel
+                                        color = Color(0xFF090B10)
                                     )
                                 }
                             }
@@ -925,7 +921,7 @@ fun NotificationDetailsDialog(
                 modifier = Modifier
                     .fillMaxWidth(0.94f)
                     .clip(RoundedCornerShape(22.dp))
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF131722))
                     .border(1.2.dp, typeBadgeColor.copy(alpha = 0.45f), RoundedCornerShape(22.dp))
                     .clickable(enabled = false) {}
                     .padding(20.dp)
@@ -1011,7 +1007,7 @@ fun NotificationDetailsDialog(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .clip(CircleShape)
-                                            .background(Brush.linearGradient(listOf(Color(0xFF2E3440), OttPanelHigh))),
+                                            .background(Brush.linearGradient(listOf(Color(0xFF2E3440), Color(0xFF191D24)))),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -1021,7 +1017,7 @@ fun NotificationDetailsDialog(
                                                 else -> Icons.Default.Person
                                             },
                                             contentDescription = null,
-                                            tint = OttTextPrimary,
+                                            tint = Color.White,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -1036,7 +1032,7 @@ fun NotificationDetailsDialog(
                                 text = notification.senderName ?: "ZENKAI System",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                             Text(
                                 text = if (notification.userId == null) "Global Broadcast • Server Verified" else "Direct Notification",
@@ -1052,7 +1048,7 @@ fun NotificationDetailsDialog(
                             text = notification.title,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary
+                            color = Color.White
                         )
                     }
 
@@ -1077,7 +1073,7 @@ fun NotificationDetailsDialog(
                                 .height(160.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color(0xFF1E2333))
-                                .border(1.dp, OttInk(0.13f), RoundedCornerShape(14.dp))
+                                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(14.dp))
                         ) {
                             AsyncImage(
                                 model = imageModel,
@@ -1254,8 +1250,8 @@ fun AdminNotificationDispatchPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(OttPanelHigh)
-                    .border(1.dp, OttInk(0.16f), RoundedCornerShape(12.dp))
+                    .background(Color(0xFF141722))
+                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -1273,7 +1269,7 @@ fun AdminNotificationDispatchPanel(
                 ) {
                     Text(
                         text = "Broadcast",
-                        color = OttTextPrimary,
+                        color = Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1292,7 +1288,7 @@ fun AdminNotificationDispatchPanel(
                 ) {
                     Text(
                         text = "Direct User",
-                        color = if (dispatchMode == 1) OttPanel else OttTextPrimary,
+                        color = if (dispatchMode == 1) Color(0xFF090B10) else Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1311,7 +1307,7 @@ fun AdminNotificationDispatchPanel(
                 ) {
                     Text(
                         text = "Welcome Setup",
-                        color = if (dispatchMode == 2) OttPanel else OttTextPrimary,
+                        color = if (dispatchMode == 2) Color(0xFF090B10) else Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1326,7 +1322,7 @@ fun AdminNotificationDispatchPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF141722))
                         .border(1.dp, Color(0x30F59E0B), RoundedCornerShape(14.dp))
                         .padding(14.dp)
                 ) {
@@ -1366,12 +1362,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -1396,12 +1392,12 @@ fun AdminNotificationDispatchPanel(
                         maxLines = 6,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         )
                     )
                 }
@@ -1425,12 +1421,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -1468,8 +1464,8 @@ fun AdminNotificationDispatchPanel(
                             .fillMaxWidth()
                             .height(130.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(OttPanel)
-                            .border(1.dp, OttInk(0.13f), RoundedCornerShape(12.dp)),
+                            .background(Color(0xFF090B10))
+                            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         AsyncImage(
@@ -1501,12 +1497,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -1521,12 +1517,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -1539,8 +1535,8 @@ fun AdminNotificationDispatchPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
-                        .border(1.dp, OttInk(0.19f), RoundedCornerShape(14.dp))
+                        .background(Color(0xFF141722))
+                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -1555,7 +1551,7 @@ fun AdminNotificationDispatchPanel(
                         AsyncImage(
                             model = welcomeImageUrlText.ifBlank { defaultBananaArt },
                             contentDescription = null,
-                            modifier = Modifier.size(32.dp).clip(CircleShape).background(OttInk(0.13f)),
+                            modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
                             contentScale = ContentScale.Crop
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1564,7 +1560,7 @@ fun AdminNotificationDispatchPanel(
                                 text = welcomeTitleText.ifBlank { "Welcome to Zenkai" },
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                             Text(
                                 text = "From: Nano Banana 🍌",
@@ -1645,7 +1641,7 @@ fun AdminNotificationDispatchPanel(
                         },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B), contentColor = OttPanel)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B), contentColor = Color(0xFF090B10))
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1705,8 +1701,8 @@ fun AdminNotificationDispatchPanel(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSel) catColor else OttInk(0.09f))
-                                    .border(1.dp, if (isSel) catColor else OttInk(0.16f), RoundedCornerShape(20.dp))
+                                    .background(if (isSel) catColor else Color(0x18FFFFFF))
+                                    .border(1.dp, if (isSel) catColor else Color(0x28FFFFFF), RoundedCornerShape(20.dp))
                                     .clickable { selectedType = key }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
@@ -1714,7 +1710,7 @@ fun AdminNotificationDispatchPanel(
                                     text = label,
                                     fontSize = 11.sp,
                                     fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSel) (if (key == "admin" || key == "reward" || key == "alert" || key == "update") OttTextPrimary else OttPanel) else Color(0xFFCBD5E1)
+                                    color = if (isSel) (if (key == "admin" || key == "reward" || key == "alert" || key == "update") Color.White else Color(0xFF090B10)) else Color(0xFFCBD5E1)
                                 )
                             }
                         }
@@ -1760,12 +1756,12 @@ fun AdminNotificationDispatchPanel(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = OttPanelHigh,
-                                    unfocusedContainerColor = OttPanelHigh,
+                                    focusedContainerColor = Color(0xFF141722),
+                                    unfocusedContainerColor = Color(0xFF10131B),
                                     focusedBorderColor = Color(0xFF38BDF8),
-                                    unfocusedBorderColor = OttInk(0.16f),
-                                    focusedTextColor = OttTextPrimary,
-                                    unfocusedTextColor = OttTextPrimary
+                                    unfocusedBorderColor = Color(0x28FFFFFF),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
                                 ),
                                 singleLine = true
                             )
@@ -1784,8 +1780,8 @@ fun AdminNotificationDispatchPanel(
                                         .fillMaxWidth()
                                         .padding(top = 6.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(OttPanelHigh)
-                                        .border(1.dp, OttInk(0.20f), RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF161A26))
+                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
                                         .padding(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
@@ -1804,14 +1800,14 @@ fun AdminNotificationDispatchPanel(
                                             AsyncImage(
                                                 model = u.avatarUrl,
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp).clip(CircleShape).background(OttInk(0.13f)),
+                                                modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
                                                 contentScale = ContentScale.Crop
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = u.displayName ?: u.username ?: "Otaku",
-                                                    color = OttTextPrimary,
+                                                    color = Color.White,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -1850,14 +1846,14 @@ fun AdminNotificationDispatchPanel(
                                 AsyncImage(
                                     model = target.avatarUrl,
                                     contentDescription = null,
-                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(OttInk(0.13f)),
+                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
                                     contentScale = ContentScale.Crop
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = target.displayName ?: target.username ?: "Otaku",
-                                        color = OttTextPrimary,
+                                        color = Color.White,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1907,12 +1903,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = if (dispatchMode == 0) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -1940,12 +1936,12 @@ fun AdminNotificationDispatchPanel(
                         maxLines = 6,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = if (dispatchMode == 0) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         )
                     )
                 }
@@ -1973,12 +1969,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -2007,12 +2003,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -2029,12 +2025,12 @@ fun AdminNotificationDispatchPanel(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = OttPanelHigh,
-                            unfocusedContainerColor = OttPanelHigh,
+                            focusedContainerColor = Color(0xFF141722),
+                            unfocusedContainerColor = Color(0xFF10131B),
                             focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = OttInk(0.16f),
-                            focusedTextColor = OttTextPrimary,
-                            unfocusedTextColor = OttTextPrimary
+                            unfocusedBorderColor = Color(0x28FFFFFF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         ),
                         singleLine = true
                     )
@@ -2116,22 +2112,22 @@ fun AdminNotificationDispatchPanel(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (dispatchMode == 0) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                        disabledContainerColor = OttInk(0.13f)
+                        disabledContainerColor = Color(0x22FFFFFF)
                     )
                 ) {
                     if (vm.isSendingAdminNotification) {
-                        CircularProgressIndicator(color = OttTextPrimary, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = null,
-                            tint = if (dispatchMode == 1) OttPanel else OttTextPrimary,
+                            tint = if (dispatchMode == 1) Color(0xFF090B10) else Color.White,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (dispatchMode == 0) "SEND BROADCAST NOTIFICATION" else "SEND DIRECT NOTIFICATION",
-                            color = if (dispatchMode == 1) OttPanel else OttTextPrimary,
+                            color = if (dispatchMode == 1) Color(0xFF090B10) else Color.White,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -2173,7 +2169,7 @@ fun EmptyNotificationState(
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = title,
-            color = OttTextPrimary,
+            color = Color.White,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
@@ -2217,7 +2213,7 @@ fun GuestNotificationPrompt(
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = "Sign in for Personal Notifications",
-            color = OttTextPrimary,
+            color = Color.White,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
@@ -2234,7 +2230,7 @@ fun GuestNotificationPrompt(
             colors = ButtonDefaults.buttonColors(containerColor = OttPrimary),
             shape = OttPillShape
         ) {
-            Text("Sign In Now", color = OttTextPrimary, fontWeight = FontWeight.Bold)
+            Text("Sign In Now", color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }

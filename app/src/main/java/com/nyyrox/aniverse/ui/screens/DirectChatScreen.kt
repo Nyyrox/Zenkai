@@ -1,7 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -135,7 +134,7 @@ fun DirectChatScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(OttPanelHigh)
+                    .background(Color(0xFF0D0F14))
                     .statusBarsPadding()
             ) {
                 Row(
@@ -151,7 +150,7 @@ fun DirectChatScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = OttTextPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -178,7 +177,7 @@ fun DirectChatScreen(
                                     .background(Color(0xFF1E2330))
                                     .border(
                                         1.5.dp,
-                                        if (isOnline) Color(0xFF10B981) else OttInk(0.20f),
+                                        if (isOnline) Color(0xFF10B981) else Color(0x33FFFFFF),
                                         CircleShape
                                     )
                             ) {
@@ -198,7 +197,7 @@ fun DirectChatScreen(
                                     ) {
                                         Text(
                                             text = partnerName.take(1).uppercase(),
-                                            color = OttTextPrimary,
+                                            color = Color.White,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 16.sp
                                         )
@@ -215,7 +214,7 @@ fun DirectChatScreen(
                                     .align(Alignment.BottomEnd)
                                     .clip(CircleShape)
                                     .background(Color(0xFF10B981))
-                                    .border(1.5.dp, OttPanelHigh, CircleShape)
+                                    .border(1.5.dp, Color(0xFF0F172A), CircleShape)
                             )
                         }
                     }
@@ -250,7 +249,7 @@ fun DirectChatScreen(
                                         text = "STAFF",
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = OttTextPrimary
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -351,7 +350,7 @@ fun DirectChatScreen(
                         Spacer(modifier = Modifier.height(14.dp))
                         Text(
                             text = "Direct Chat with $partnerName",
-                            color = OttTextPrimary,
+                            color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -404,7 +403,7 @@ fun DirectChatScreen(
                     .fillMaxWidth()
                     .imePadding()
                     .navigationBarsPadding()
-                    .border(width = 0.5.dp, color = OttInk(0.13f))
+                    .border(width = 0.5.dp, color = Color(0x22FFFFFF))
             ) {
                 Column(
                     modifier = Modifier
@@ -485,7 +484,7 @@ fun DirectChatScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Attached: ${selectedRecAnime!!.title}",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -534,7 +533,7 @@ fun DirectChatScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Attached GIF: ${selectedGifItem!!.title.ifBlank { "Anime GIF" }}",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -614,10 +613,10 @@ fun DirectChatScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (selectedRecAnime != null) Color(0x33E11D48) else OttInk(0.07f))
+                                .background(if (selectedRecAnime != null) Color(0x33E11D48) else Color(0x12FFFFFF))
                                 .border(
                                     1.dp,
-                                    if (selectedRecAnime != null) Color(0xFFE11D48) else OttInk(0.16f),
+                                    if (selectedRecAnime != null) Color(0xFFE11D48) else Color(0x28FFFFFF),
                                     CircleShape
                                 )
                                 .clickable { showAnimePickerForRec = true },
@@ -638,10 +637,10 @@ fun DirectChatScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (isSpoilerMessage) Color(0x33F59E0B) else OttInk(0.07f))
+                                .background(if (isSpoilerMessage) Color(0x33F59E0B) else Color(0x12FFFFFF))
                                 .border(
                                     1.dp,
-                                    if (isSpoilerMessage) Color(0xFFF59E0B) else OttInk(0.16f),
+                                    if (isSpoilerMessage) Color(0xFFF59E0B) else Color(0x28FFFFFF),
                                     CircleShape
                                 )
                                 .clickable { isSpoilerMessage = !isSpoilerMessage },
@@ -662,10 +661,10 @@ fun DirectChatScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (selectedGifItem != null) Color(0x33E11D48) else OttInk(0.07f))
+                                .background(if (selectedGifItem != null) Color(0x33E11D48) else Color(0x12FFFFFF))
                                 .border(
                                     1.dp,
-                                    if (selectedGifItem != null) Color(0xFFE11D48) else OttInk(0.16f),
+                                    if (selectedGifItem != null) Color(0xFFE11D48) else Color(0x28FFFFFF),
                                     CircleShape
                                 )
                                 .clickable { showGifPicker = true },
@@ -686,10 +685,10 @@ fun DirectChatScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (selectedImageUrl != null) Color(0x3338BDF8) else OttInk(0.07f))
+                                .background(if (selectedImageUrl != null) Color(0x3338BDF8) else Color(0x12FFFFFF))
                                 .border(
                                     1.dp,
-                                    if (selectedImageUrl != null) Color(0xFF38BDF8) else OttInk(0.16f),
+                                    if (selectedImageUrl != null) Color(0xFF38BDF8) else Color(0x28FFFFFF),
                                     CircleShape
                                 )
                                 .clickable { showImageUrlDialog = true },
@@ -721,12 +720,12 @@ fun DirectChatScreen(
                             maxLines = 3,
                             shape = RoundedCornerShape(22.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = OttPanelHigh,
-                                unfocusedContainerColor = OttPanelHigh,
+                                focusedContainerColor = Color(0xFF131722),
+                                unfocusedContainerColor = Color(0xFF0F121C),
                                 focusedBorderColor = if (isSpoilerMessage) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                unfocusedBorderColor = OttInk(0.19f),
-                                focusedTextColor = OttTextPrimary,
-                                unfocusedTextColor = OttTextPrimary
+                                unfocusedBorderColor = Color(0x30FFFFFF),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
                             ),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(
@@ -818,12 +817,12 @@ fun DirectChatScreen(
                             contentPadding = PaddingValues(0.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isSpoilerMessage) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                disabledContainerColor = OttInk(0.13f)
+                                disabledContainerColor = Color(0x22FFFFFF)
                             )
                         ) {
                             if (vm.isSendingDirectMessage) {
                                 CircularProgressIndicator(
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp
                                 )
@@ -831,7 +830,7 @@ fun DirectChatScreen(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Send,
                                     contentDescription = "Send",
-                                    tint = OttTextPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -857,7 +856,7 @@ fun DirectChatScreen(
         if (showImageUrlDialog) {
             AlertDialog(
                 onDismissRequest = { showImageUrlDialog = false },
-                containerColor = OttPanelHigh,
+                containerColor = Color(0xFF131722),
                 shape = RoundedCornerShape(20.dp),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -868,7 +867,7 @@ fun DirectChatScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Attach Image URL", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Attach Image URL", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 },
                 text = {
@@ -885,10 +884,10 @@ fun DirectChatScreen(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = OttTextPrimary,
-                                unfocusedTextColor = OttTextPrimary,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
                                 focusedBorderColor = Color(0xFF38BDF8),
-                                unfocusedBorderColor = OttInk(0.19f)
+                                unfocusedBorderColor = Color(0x30FFFFFF)
                             )
                         )
                     }
@@ -914,7 +913,7 @@ fun DirectChatScreen(
                             showImageUrlDialog = false
                             tempImageUrlInput = ""
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = OttInk(0.13f))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x22FFFFFF))
                     ) {
                         Text("Cancel", color = Color(0xFF94A3B8))
                     }
@@ -940,12 +939,12 @@ fun DirectChatScreen(
 
             AlertDialog(
                 onDismissRequest = { messageForActions = null },
-                containerColor = OttPanelHigh,
+                containerColor = Color(0xFF131722),
                 shape = RoundedCornerShape(20.dp),
                 title = {
                     Text(
                         text = "Message Actions",
-                        color = OttTextPrimary,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp
                     )
@@ -979,7 +978,7 @@ fun DirectChatScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = "Reply to Message",
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -1022,7 +1021,7 @@ fun DirectChatScreen(
                 dismissButton = {
                     Button(
                         onClick = { messageForActions = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = OttInk(0.13f))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x22FFFFFF))
                     ) {
                         Text("Close", color = Color(0xFF94A3B8))
                     }
@@ -1034,10 +1033,10 @@ fun DirectChatScreen(
         if (messageToDelete != null) {
             AlertDialog(
                 onDismissRequest = { messageToDelete = null },
-                containerColor = OttPanelHigh,
+                containerColor = Color(0xFF131722),
                 shape = RoundedCornerShape(20.dp),
                 title = {
-                    Text("Delete Message", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Delete Message", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 },
                 text = {
                     Text(
@@ -1055,13 +1054,13 @@ fun DirectChatScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                     ) {
-                        Text("Delete", color = OttTextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     Button(
                         onClick = { messageToDelete = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = OttInk(0.13f))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x22FFFFFF))
                     ) {
                         Text("Cancel", color = Color(0xFF94A3B8))
                     }
@@ -1087,15 +1086,15 @@ fun DirectChatMessageItem(
     }
 
     val bubbleBg = if (isCurrentUser) {
-        Brush.verticalGradient(listOf(Color(0xFF2E0D1F), OttPanelHigh))
+        Brush.verticalGradient(listOf(Color(0xFF2E0D1F), Color(0xFF1E0914)))
     } else {
-        Brush.verticalGradient(listOf(OttPanelHigh, OttPanelHigh))
+        Brush.verticalGradient(listOf(Color(0xFF141926), Color(0xFF0D1017)))
     }
 
     val bubbleBorder = if (isCurrentUser) {
         Color(0x55E11D48)
     } else {
-        OttInk(0.13f)
+        Color(0x22FFFFFF)
     }
 
     val rawMsg = message.message
@@ -1185,8 +1184,8 @@ fun DirectChatMessageItem(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(OttPanelHigh)
-                                        .border(1.dp, OttInk(0.20f), RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF1A202C))
+                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
                                         .clickable {
                                             if (animeRec.animeId > 0) onAnimeClick(animeRec.animeId)
                                         }
@@ -1206,7 +1205,7 @@ fun DirectChatMessageItem(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = animeRec.title,
-                                            color = OttTextPrimary,
+                                            color = Color.White,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 2,
@@ -1241,7 +1240,7 @@ fun DirectChatMessageItem(
                                         .fillMaxWidth()
                                         .heightIn(min = 120.dp, max = 220.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(OttPanelHigh),
+                                        .background(Color(0xFF141721)),
                                     contentScale = ContentScale.Fit
                                 )
                                 if (gifData.comment.isNotBlank()) {
@@ -1264,7 +1263,7 @@ fun DirectChatMessageItem(
                                         .fillMaxWidth()
                                         .heightIn(min = 120.dp, max = 260.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(OttPanelHigh),
+                                        .background(Color(0xFF141721)),
                                     contentScale = ContentScale.Fit
                                 )
                                 if (imgData.comment.isNotBlank()) {
@@ -1332,8 +1331,8 @@ fun DirectChatAnimePickerModal(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = OttPanelHigh,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = OttInk(0.25f)) }
+        containerColor = Color(0xFF131722),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0x40FFFFFF)) }
     ) {
         Column(
             modifier = Modifier
@@ -1348,7 +1347,7 @@ fun DirectChatAnimePickerModal(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Recommend an Anime", color = OttTextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Recommend an Anime", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1361,10 +1360,10 @@ fun DirectChatAnimePickerModal(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = OttTextPrimary,
-                    unfocusedTextColor = OttTextPrimary,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
                     focusedBorderColor = Color(0xFFF59E0B),
-                    unfocusedBorderColor = OttInk(0.19f)
+                    unfocusedBorderColor = Color(0x30FFFFFF)
                 )
             )
 
@@ -1421,7 +1420,7 @@ fun DirectChatAnimePickerModal(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = anime.title ?: "Unknown",
-                                    color = OttTextPrimary,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
                                     maxLines = 1,

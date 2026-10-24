@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.foundation.background
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -712,7 +709,7 @@ private fun HomeMangaRow(
                         .fillMaxWidth()
                         .height(172.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF141822))
                 ) {
                     AsyncImage(
                         model = manga.poster,
@@ -757,7 +754,7 @@ private fun HomeMangaRow(
                     text = manga.title,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 2,
                     lineHeight = 16.sp,
                     overflow = TextOverflow.Ellipsis
@@ -787,7 +784,7 @@ private fun HomeNovelRow(
                         .fillMaxWidth()
                         .height(172.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(OttPanelHigh)
+                        .background(Color(0xFF141822))
                 ) {
                     AsyncImage(
                         model = novel.cover,
@@ -820,7 +817,7 @@ private fun HomeNovelRow(
                                 text = badge,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -832,7 +829,7 @@ private fun HomeNovelRow(
                     text = novel.title,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 2,
                     lineHeight = 16.sp,
                     overflow = TextOverflow.Ellipsis
@@ -895,7 +892,7 @@ fun YouTubeStyleEpisodeCard(
                 .padding(horizontal = 16.dp)
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(OttPanelHigh)
+                .background(Color(0xFF131722))
                 .clickable { onPlayClick(anime.id, episodeNumber) }
         ) {
             SubcomposeAsyncImage(
@@ -949,7 +946,7 @@ fun YouTubeStyleEpisodeCard(
                         text = badgeText,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary,
+                        color = Color.White,
                         letterSpacing = 0.5.sp
                     )
                 }
@@ -982,7 +979,7 @@ fun YouTubeStyleEpisodeCard(
                 Icon(
                     Icons.Default.PlayArrow,
                     contentDescription = "Play",
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -1017,7 +1014,7 @@ fun YouTubeStyleEpisodeCard(
                     text = durationText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
             }
         }
@@ -1055,7 +1052,7 @@ fun YouTubeStyleEpisodeCard(
                     text = headerTitle,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 2,
                     lineHeight = 18.sp,
                     overflow = TextOverflow.Ellipsis
@@ -1083,14 +1080,14 @@ fun YouTubeStyleEpisodeCard(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(OttInk(0.12f))
+                    .background(Color(0x1FFFFFFF))
                     .clickable { onPlayClick(anime.id, episodeNumber) },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.PlayArrow,
                     contentDescription = "Play",
-                    tint = OttTextPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -1199,7 +1196,7 @@ fun OfflineHomeScreenContent(
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 text = "You're Offline",
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 fontSize = 23.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = (-0.3).sp
@@ -1214,7 +1211,7 @@ fun OfflineHomeScreenContent(
                         } else {
                             "No internet connection detected. Connect to Wi-Fi or mobile data to explore trending shows, or browse your downloaded library."
                         },
-                        color = OttInk(0.70f),
+                        color = Color(0xB3FFFFFF),
                         fontSize = 13.5.sp,
                         lineHeight = 19.sp
                     )
@@ -1234,8 +1231,8 @@ fun OfflineHomeScreenContent(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Storage used", color = OttInk(0.60f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                Text(formatBytes(totalDownloadedBytes), color = OttTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Storage used", color = Color(0x99FFFFFF), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text(formatBytes(totalDownloadedBytes), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(Modifier.height(8.dp))
                             Row(
@@ -1243,7 +1240,7 @@ fun OfflineHomeScreenContent(
                                     .fillMaxWidth()
                                     .height(8.dp)
                                     .clip(CircleShape)
-                                    .background(OttInk(0.12f)),
+                                    .background(Color(0x1FFFFFFF)),
                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 if (animeBytes > 0L) Box(Modifier.weight(animeBytes.toFloat()).fillMaxHeight().background(animeColor))
@@ -1265,8 +1262,8 @@ fun OfflineHomeScreenContent(
                         Button(
                             onClick = onDownloadsClick,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OttPrimary,
-                                contentColor = OttOnPrimary
+                                containerColor = Color.White,
+                                contentColor = Color.Black
                             ),
                             shape = OttPillShape,
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -1297,8 +1294,8 @@ fun OfflineHomeScreenContent(
                                 vm.loadHome()
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OttInk(0.16f),
-                                contentColor = OttTextPrimary
+                                containerColor = Color(0x28FFFFFF),
+                                contentColor = Color.White
                             ),
                             shape = OttPillShape,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
@@ -1307,7 +1304,7 @@ fun OfflineHomeScreenContent(
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = null,
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier
                                     .size(18.dp)
                                     .graphicsLayer { rotationZ = spin.value }
@@ -1315,7 +1312,7 @@ fun OfflineHomeScreenContent(
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "Retry",
-                                color = OttTextPrimary,
+                                color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -1453,14 +1450,14 @@ fun OfflineHomeScreenContent(
                             modifier = Modifier
                                 .size(60.dp)
                                 .clip(CircleShape)
-                                .background(OttInk(0.12f))
-                                .border(1.dp, OttInk(0.13f), CircleShape),
+                                .background(Color(0x1FFFFFFF))
+                                .border(1.dp, Color(0x22FFFFFF), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Storage,
                                 contentDescription = null,
-                                tint = OttInk(0.67f),
+                                tint = Color(0xAAFFFFFF),
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -1468,13 +1465,13 @@ fun OfflineHomeScreenContent(
                             text = "No Downloaded Titles Yet",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttTextPrimary,
+                            color = Color.White,
                             textAlign = TextAlign.Center
                         )
                         Text(
                             text = "Download anime episodes, manga chapters, and novel chapters while connected so you can enjoy them anywhere without internet.",
                             fontSize = 13.sp,
-                            color = OttInk(0.60f),
+                            color = Color(0x99FFFFFF),
                             textAlign = TextAlign.Center,
                             lineHeight = 18.sp
                         )
@@ -1482,8 +1479,8 @@ fun OfflineHomeScreenContent(
                         Button(
                             onClick = onDownloadsClick,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OttPrimary,
-                                contentColor = OttOnPrimary
+                                containerColor = Color.White,
+                                contentColor = Color.Black
                             ),
                             shape = OttPillShape
                         ) {
@@ -1555,16 +1552,16 @@ private fun RowScope.OfflineStatTile(color: Color, value: String, label: String)
         modifier = Modifier
             .weight(1f)
             .clip(shape)
-            .background(OttInk(0.08f))
-            .border(1.dp, OttInk(0.08f), shape)
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x14FFFFFF), shape)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.size(7.dp).clip(CircleShape).background(color))
-            Text(label, color = OttInk(0.60f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Text(label, color = Color(0x99FFFFFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
         }
         Spacer(Modifier.height(4.dp))
-        Text(value, color = OttTextPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+        Text(value, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
@@ -1602,8 +1599,8 @@ private fun OfflineMediaCard(
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
                 .clip(shape)
-                .border(1.dp, OttInk(0.13f), shape)
-                .background(OttInk(0.09f))
+                .border(1.dp, Color(0x22FFFFFF), shape)
+                .background(Color(0x18FFFFFF))
         ) {
             SubcomposeAsyncImage(
                 model = coverUrl,
@@ -1614,13 +1611,13 @@ private fun OfflineMediaCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(OttInk(0.16f)),
+                            .background(Color(0x28FFFFFF)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Movie,
                             contentDescription = null,
-                            tint = OttInk(0.38f),
+                            tint = Color(0x60FFFFFF),
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -1661,7 +1658,7 @@ private fun OfflineMediaCard(
                         .align(Alignment.TopEnd)
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(OttInk(0.90f))
+                        .background(Color(0xE6FFFFFF))
                         .clickable(onClick = onDirectAction),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1686,10 +1683,10 @@ private fun OfflineMediaCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.Storage, contentDescription = null, tint = OttInk(0.80f), modifier = Modifier.size(10.dp))
+                    Icon(Icons.Default.Storage, contentDescription = null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(10.dp))
                     Text(
                         text = formatBytes(sizeBytes),
-                        color = OttInk(0.90f),
+                        color = Color(0xE6FFFFFF),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
                     )

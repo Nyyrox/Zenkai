@@ -1,9 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.foundation.background
-import com.nyyrox.aniverse.ui.theme.OttPanelHigh
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -120,8 +117,8 @@ fun AiringScreen(
                 Button(
                     onClick = { vm.loadAiring() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OttPrimary,
-                        contentColor = OttOnPrimary
+                        containerColor = Color.White,
+                        contentColor = Color.Black
                     ),
                     shape = OttPillShape
                 ) {
@@ -231,7 +228,7 @@ fun AiringScreen(
                         .width(68.dp)
                         .height(60.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) OttTextPrimary else OttPanelHigh)
+                        .background(if (isSelected) Color.White else Color(0xFF181A20))
                         .clickable { selectedDayIndex = index }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
@@ -244,7 +241,7 @@ fun AiringScreen(
                             text = day.dayName,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color.Black else OttTextPrimary
+                            color = if (isSelected) Color.Black else Color.White
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -298,14 +295,14 @@ fun AiringScreen(
                                 modifier = Modifier
                                     .size(9.dp)
                                     .clip(CircleShape)
-                                    .background(OttTextPrimary)
+                                    .background(Color.White)
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
                                 text = "> $hourKey",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                         }
                     }
@@ -326,7 +323,7 @@ fun AiringScreen(
                                     modifier = Modifier
                                         .width(1.5.dp)
                                         .fillMaxHeight()
-                                        .background(OttInk(0.19f))
+                                        .background(Color(0x30FFFFFF))
                                 )
                             }
 
@@ -365,7 +362,7 @@ private fun TimelineAiringCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(OttPanelHigh)
+            .background(Color(0xFF16171B))
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
@@ -392,7 +389,7 @@ private fun TimelineAiringCard(
                     text = anime.displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -415,7 +412,7 @@ private fun TimelineAiringCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(OttTextPrimary)
+                            .background(Color.White)
                             .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Text(
@@ -430,14 +427,14 @@ private fun TimelineAiringCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(OttPanelHigh)
+                                .background(Color(0xFF26272C))
                                 .padding(horizontal = 9.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = yearText,
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = OttTextPrimary
+                                color = Color.White
                             )
                         }
                     }
@@ -455,7 +452,7 @@ private fun TimelineAiringCard(
                     text = timeFormatted,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
-                    color = OttTextPrimary
+                    color = Color.White
                 )
 
                 Spacer(Modifier.height(18.dp))

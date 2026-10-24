@@ -1,8 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import com.nyyrox.aniverse.ui.theme.OttInk
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -22,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -90,11 +87,6 @@ import com.nyyrox.aniverse.data.manga.MangaCard
 import com.nyyrox.aniverse.data.manga.MangaHistoryItem
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.components.posterBorder
-import com.nyyrox.aniverse.ui.components.zenkaiSurface
-import com.nyyrox.aniverse.ui.components.GlassAmbient
-import com.nyyrox.aniverse.ui.theme.OttOnMedia
-import com.nyyrox.aniverse.ui.theme.OttOnPrimary
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
@@ -117,7 +109,11 @@ fun MangaHomeScreen(
         vm.refreshStorageData()
     }
 
-    GlassAmbient(imageUrl = vm.mangaHome.trending.firstOrNull()?.poster) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(OttBg)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -201,7 +197,7 @@ private fun MangaHeaderSearch(
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = "Clear",
-                                tint = OttTextPrimary,
+                                tint = Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -209,15 +205,15 @@ private fun MangaHeaderSearch(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 56.dp),
+                    .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = OttSurfaceElevated,
                     unfocusedContainerColor = OttSurface,
                     focusedBorderColor = OttPrimary,
-                    unfocusedBorderColor = OttInk(0.12f),
-                    focusedTextColor = OttTextPrimary,
-                    unfocusedTextColor = OttTextPrimary
+                    unfocusedBorderColor = Color(0x1EFFFFFF),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
                 ),
                 singleLine = true
             )
@@ -256,10 +252,10 @@ private fun MangaHeaderSearch(
                 Box(
                     modifier = Modifier
                         .clip(OttPillShape)
-                        .background(if (isSelected) activeBg else OttInk(0.08f))
+                        .background(if (isSelected) activeBg else Color(0x14FFFFFF))
                         .border(
                             width = 1.dp,
-                            color = if (isSelected) activeBorder else OttInk(0.13f),
+                            color = if (isSelected) activeBorder else Color(0x22FFFFFF),
                             shape = OttPillShape
                         )
                         .clickable { onSourceSelect(src) }
@@ -274,14 +270,14 @@ private fun MangaHeaderSearch(
                             text = src.displayName,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                            color = if (isSelected) activeText else OttTextPrimary
+                            color = if (isSelected) activeText else Color.White
                         )
                         if (src.badge != null) {
                             Text(
                                 text = "• ${src.badge}",
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Normal,
-                                color = if (isSelected) activeText.copy(alpha = 0.8f) else OttInk(0.67f)
+                                color = if (isSelected) activeText.copy(alpha = 0.8f) else Color(0xAAFFFFFF)
                             )
                         }
                     }
@@ -552,7 +548,7 @@ private fun MangaContinueReadingSection(
                 text = "Continue Reading",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary
+                color = Color.White
             )
         }
 
@@ -584,7 +580,7 @@ private fun MangaContinueCard(
             .height(116.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(OttSurfaceElevated)
-            .posterBorder(1.dp, OttInk(0.13f), RoundedCornerShape(16.dp))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(10.dp)
     ) {
@@ -620,7 +616,7 @@ private fun MangaContinueCard(
                         text = item.title,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary,
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -654,7 +650,7 @@ private fun MangaContinueCard(
                             .height(3.dp)
                             .clip(RoundedCornerShape(2.dp)),
                         color = OttPrimary,
-                        trackColor = OttInk(0.15f)
+                        trackColor = Color(0x25FFFFFF)
                     )
                 }
 
@@ -662,7 +658,7 @@ private fun MangaContinueCard(
                 Box(
                     modifier = Modifier
                         .clip(OttPillShape)
-                        .background(OttPrimary)
+                        .background(Color.White)
                         .clickable { onResume() }
                         .padding(horizontal = 12.dp, vertical = 5.dp),
                     contentAlignment = Alignment.Center
@@ -674,14 +670,14 @@ private fun MangaContinueCard(
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = OttOnPrimary,
+                            tint = Color.Black,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
                             text = "Resume",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OttOnPrimary
+                            color = Color.Black
                         )
                     }
                 }
@@ -717,7 +713,7 @@ private fun MangaBookmarksSection(
                 text = "Bookmarked Manga",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary
+                color = Color.White
             )
         }
 
@@ -800,7 +796,7 @@ private fun MangaHeroBanner(
                         text = "FEATURED",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        color = OttOnPrimary
+                        color = Color.Black
                     )
                 }
             }
@@ -811,7 +807,7 @@ private fun MangaHeroBanner(
                 text = featured.title,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Black,
-                color = OttOnMedia,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -821,7 +817,7 @@ private fun MangaHeroBanner(
             Row(
                 modifier = Modifier
                     .clip(OttPillShape)
-                    .background(OttPrimary)
+                    .background(Color.White)
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -829,14 +825,14 @@ private fun MangaHeroBanner(
                 Icon(
                     Icons.Default.AutoStories,
                     contentDescription = null,
-                    tint = OttOnPrimary,
+                    tint = Color.Black,
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
                     text = "Read Chapter 1",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OttOnPrimary
+                    color = Color.Black
                 )
             }
         }
@@ -872,7 +868,7 @@ private fun MangaHorizontalRail(
                 text = title,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = OttTextPrimary
+                color = Color.White
             )
         }
 
@@ -929,7 +925,7 @@ private fun MangaCardView(
                 }
                 .clip(RoundedCornerShape(14.dp))
                 .background(OttSurfaceElevated)
-                .posterBorder(1.dp, OttInk(0.09f), RoundedCornerShape(14.dp))
+                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
         ) {
             AsyncImage(
                 model = rememberMangaImageRequest(card.poster),
@@ -962,7 +958,7 @@ private fun MangaCardView(
                         .padding(5.dp)
                         .clip(OttPillShape)
                         .background(Color(0xD0000000))
-                        .border(0.5.dp, OttInk(0.21f), OttPillShape)
+                        .border(0.5.dp, Color(0x35FFFFFF), OttPillShape)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
@@ -986,14 +982,14 @@ private fun MangaCardView(
                         .padding(5.dp)
                         .clip(OttPillShape)
                         .background(Color(0xD0000000))
-                        .border(0.5.dp, OttInk(0.21f), OttPillShape)
+                        .border(0.5.dp, Color(0x35FFFFFF), OttPillShape)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = if (card.chapter.startsWith("Ch", ignoreCase = true)) card.chapter else "Ch. ${card.chapter}",
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttOnMedia
+                        color = Color.White
                     )
                 }
             }
@@ -1005,7 +1001,7 @@ private fun MangaCardView(
             text = card.title,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 15.sp
@@ -1055,7 +1051,7 @@ private fun MangaGridItem(
                 }
                 .clip(RoundedCornerShape(14.dp))
                 .background(OttSurfaceElevated)
-                .posterBorder(1.dp, OttInk(0.09f), RoundedCornerShape(14.dp))
+                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
         ) {
             AsyncImage(
                 model = rememberMangaImageRequest(card.poster),
@@ -1087,7 +1083,7 @@ private fun MangaGridItem(
                         .padding(5.dp)
                         .clip(OttPillShape)
                         .background(Color(0xD0000000))
-                        .border(0.5.dp, OttInk(0.21f), OttPillShape)
+                        .border(0.5.dp, Color(0x35FFFFFF), OttPillShape)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
@@ -1110,7 +1106,7 @@ private fun MangaGridItem(
             text = card.title,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = OttTextPrimary,
+            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )

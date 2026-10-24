@@ -339,9 +339,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = themeSettings.isGlassmorphismEnabled
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.mode = themeSettings.mode
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.userMode = themeSettings.mode
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.cardStyle = themeSettings.useCards
         com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.init(application.applicationContext)
         com.nyyrox.aniverse.data.AvatarBannerRepository.init(application.applicationContext)
         viewModelScope.launch {
@@ -549,9 +546,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         userProfile = updatedProfile
         themeSettings = storage.getThemeSettings()
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.mode = themeSettings.mode
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.userMode = themeSettings.mode
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.cardStyle = themeSettings.useCards
         preferredServerId = storage.getPreferredServerId()
     }
 
@@ -1437,21 +1431,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = themeSettings.copy(theme = theme)
         storage.saveThemeSettings(updated)
         themeSettings = updated
-    }
-
-    fun setThemeMode(mode: com.nyyrox.aniverse.ui.theme.ThemeMode) {
-        val updated = themeSettings.copy(mode = mode)
-        storage.saveThemeSettings(updated)
-        themeSettings = updated
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.mode = mode
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.userMode = mode
-    }
-
-    fun setUseCards(enabled: Boolean) {
-        val updated = themeSettings.copy(useCards = enabled)
-        storage.saveThemeSettings(updated)
-        themeSettings = updated
-        com.nyyrox.aniverse.ui.theme.ThemeRuntime.cardStyle = enabled
     }
 
     fun setReducedMotion(enabled: Boolean) {
