@@ -25,6 +25,7 @@ import com.nyyrox.aniverse.data.manga.MangaHistoryItem
 import com.nyyrox.aniverse.data.manga.MangaHome
 import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.ui.theme.AnimeTheme
+import com.nyyrox.aniverse.ui.theme.ThemeMode
 import com.nyyrox.aniverse.ui.theme.ThemeSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1429,6 +1430,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setTheme(theme: AnimeTheme) {
         val updated = themeSettings.copy(theme = theme)
+        storage.saveThemeSettings(updated)
+        themeSettings = updated
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        val updated = themeSettings.copy(mode = mode)
         storage.saveThemeSettings(updated)
         themeSettings = updated
     }
