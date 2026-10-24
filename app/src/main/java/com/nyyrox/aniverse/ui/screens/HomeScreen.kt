@@ -1,6 +1,16 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.ImageRequest
+import kotlinx.coroutines.Job
+import kotlin.math.floor
+import kotlin.math.sin
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -509,9 +519,10 @@ private val HeroCardW = 200.dp
 private val HeroCardH = 292.dp
 private val HeroCardShape = RoundedCornerShape(14.dp)
 
-/** Blurred poster that fades out toward the bottom so it melts into the page gradient. */
+/** Blurred poster that fades out toward the bottom so it melts into the page gradient. Decoded tiny, so the blur is cheap. */
 @Composable
 private fun HeroBackdrop(poster: String?, p: HomePalette, modifier: Modifier) {
+    val ctx = LocalContext.current
     Crossfade(
         targetState = poster,
         modifier = modifier
@@ -525,12 +536,13 @@ private fun HeroBackdrop(poster: String?, p: HomePalette, modifier: Modifier) {
             },
         label = "heroBg"
     ) { url ->
+        val req = remember(url) { ImageRequest.Builder(ctx).data(url).size(96, 144).build() }
         Box(Modifier.fillMaxSize()) {
             AsyncImage(
-                model = url, contentDescription = null, contentScale = ContentScale.Crop,
+                model = req, contentDescription = null, contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(40.dp)
+                    .blur(24.dp)
                     .graphicsLayer { scaleX = 1.25f; scaleY = 1.25f; alpha = if (p.dark) 0.60f else 0.50f }
             )
             Box(
@@ -542,6 +554,12 @@ private fun HeroBackdrop(poster: String?, p: HomePalette, modifier: Modifier) {
     }
 }
 
+private const val TWO_PI = (2.0 * Math.PI).toFloat()
+
+/**
+ * One continuous position drives everything (3.0 = card 3 centred), so there is no index/offset
+ * reset to glitch. Cards only ever show as: centre + one peeking on each side. Nothing reaches the edges.
+ */
 @Composable
 private fun HomeHero(
     shows: List<Anime>,
@@ -552,40 +570,51 @@ private fun HomeHero(
 ) {
     val reduced = LocalThemeSettings.current.isReducedMotionEnabled
     val n = shows.size
-    var index by remember { mutableIntStateOf(0) }
-    var dragging by remember { mutableStateOf(false) }
-    val dragX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val travel = with(LocalDensity.current) { (HeroCardW * 0.78f).toPx() }
-    val current = Math.floorMod(index, n)
+    var position by remember { mutableFloatStateOf(0f) }
+    var dragging by remember { mutableStateOf(false) }
+    var animJob by remember { mutableStateOf<Job?>(null) }
+    val scrollingNow by rememberUpdatedState(listScrolling)
+    val center by remember { derivedStateOf { floor(position + 0.5f).toInt() } }
+    val current = Math.floorMod(center, n)
+    val travel = with(LocalDensity.current) { (HeroCardW * 0.70f).toPx() }
 
-    LaunchedEffect(current, n) {
-        for (k in -1..2) vm.loadTmdbArtwork(shows[Math.floorMod(index + k, n)])
-    }
-
-    // dir = +1 -> next (cards slide left), -1 -> previous (cards slide right)
-    suspend fun go(dir: Int) {
-        dragX.animateTo(-dir * travel, tween(300, easing = FastOutSlowInEasing))
-        index += dir
-        dragX.snapTo(0f)
-    }
-
-    suspend fun settle() {
-        val f = dragX.value / travel
-        when {
-            f < -0.22f -> go(1)
-            f > 0.22f -> go(-1)
-            else -> dragX.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium))
+    fun animateTo(target: Float, velocity: Float = 0f) {
+        animJob?.cancel()
+        animJob = scope.launch {
+            animate(
+                initialValue = position, targetValue = target, initialVelocity = velocity,
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 170f)
+            ) { v, _ -> position = v }
         }
     }
 
-    LaunchedEffect(n, listScrolling, dragging, reduced) {
-        if (n < 2 || listScrolling || dragging || reduced) return@LaunchedEffect
+    fun settle(fingerVelocityPx: Float) {
+        val v = -fingerVelocityPx / travel
+        val nearest = floor(position + 0.5f)
+        val target = floor(position + v * 0.15f + 0.5f).coerceIn(nearest - 1f, nearest + 1f)
+        animateTo(target, v)
+    }
+
+    LaunchedEffect(center, n) {
+        for (k in -1..2) vm.loadTmdbArtwork(shows[Math.floorMod(center + k, n)])
+    }
+
+    LaunchedEffect(n, dragging, reduced) {
+        if (n < 2 || dragging || reduced) return@LaunchedEffect
         while (true) {
             delay(6000)
-            go(1)
+            if (!scrollingNow) animateTo(floor(position + 0.5f) + 1f)
         }
     }
+
+    // slow shared "breathing" phase, only ever read in draw lambdas (no recomposition)
+    val breath = rememberInfiniteTransition(label = "breath")
+    val phase by breath.animateFloat(
+        initialValue = 0f, targetValue = TWO_PI,
+        animationSpec = infiniteRepeatable(tween(5600, easing = LinearEasing)),
+        label = "phase"
+    )
 
     Box(Modifier.fillMaxWidth()) {
         HeroBackdrop(shows[current].cover, p, Modifier.matchParentSize())
@@ -598,58 +627,62 @@ private fun HomeHero(
                 Modifier
                     .fillMaxWidth()
                     .height(HeroCardH + 32.dp)
-                    .pointerInput(n) {
-                        if (n < 2) return@pointerInput
-                        detectHorizontalDragGestures(
-                            onDragStart = { dragging = true; scope.launch { dragX.stop() } },
-                            onDragEnd = { dragging = false; scope.launch { settle() } },
-                            onDragCancel = { dragging = false; scope.launch { settle() } },
-                            onHorizontalDrag = { change, amount ->
-                                change.consume()
-                                scope.launch { dragX.snapTo((dragX.value + amount).coerceIn(-travel, travel)) }
-                            }
-                        )
-                    },
+                    .draggable(
+                        orientation = Orientation.Horizontal,
+                        enabled = n > 1,
+                        state = rememberDraggableState { d -> position -= d / travel },
+                        onDragStarted = { dragging = true; animJob?.cancel() },
+                        onDragStopped = { v -> dragging = false; settle(v) }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                val range = if (n < 2) 0..0 else -2..2
-                // far cards first so the centre card is drawn on top
-                for (r in range.sortedByDescending { abs(it) }) {
-                    val absIdx = index + r
-                    val anime = shows[Math.floorMod(absIdx, n)]
-                    key(absIdx) {
+                val order = if (n < 2) listOf(center)
+                else (center - 2..center + 2).sortedByDescending { abs(it - center) }
+                // far first, centre last = drawn on top
+                for (i in order) {
+                    val anime = shows[Math.floorMod(i, n)]
+                    key(i) {
                         Box(
                             Modifier
                                 .width(HeroCardW)
                                 .height(HeroCardH)
                                 .graphicsLayer {
-                                    // continuous position: 0 = centre, +1 = right slot, -1 = left slot
-                                    val x = r + dragX.value / travel
+                                    val x = i - position            // 0 = centre, +1 right slot, -1 left slot
                                     val ax = abs(x)
-                                    val near = ax.coerceAtMost(1f)
-                                    val far = (ax - 1f).coerceAtLeast(0f)
-                                    val dir = if (x < 0f) -1f else 1f
-                                    translationX = dir * (near * 0.52f + far * 0.26f) * size.width
-                                    translationY = near * 12f * density
-                                    rotationY = (-x * 32f).coerceIn(-48f, 48f)
-                                    rotationZ = x * 5f
-                                    val s = 1f - 0.10f * near - 0.04f * far
-                                    scaleX = s
-                                    scaleY = s
-                                    alpha = (1f - 0.30f * ax).coerceIn(0f, 1f)
-                                    cameraDistance = 14f * density
+                                    val a = ax.coerceAtMost(1f)     // cards past the slot park behind it
+                                    val side = if (x < 0f) -1f else 1f
+                                    val bw = if (reduced) 0f else sin(phase + i * 1.3f)
+                                    translationX = side * 0.26f * a * size.width
+                                    translationY = (a * 6f + bw * (1.5f + 2.5f * a)) * density
+                                    rotationY = -side * 30f * a
+                                    rotationZ = side * a * 4f + bw * 0.7f * (0.3f + a)
+                                    val sc = 1f - 0.08f * a + bw * 0.006f
+                                    scaleX = sc
+                                    scaleY = sc
+                                    alpha = when {
+                                        ax <= 1f -> 1f
+                                        ax >= 2f -> 0f
+                                        else -> 2f - ax
+                                    }
+                                    cameraDistance = 18f * density
                                 }
-                                .shadow(14.dp, HeroCardShape, clip = false)
+                                .shadow(12.dp, HeroCardShape, clip = false)
                                 .clip(HeroCardShape)
-                                .shimmer(p)
+                                .background(p.skeleton)
                                 .tap {
-                                    if (r == 0) onAnimeClick(anime.id)
-                                    else scope.launch { go(if (r > 0) 1 else -1) }
+                                    if (i == center) onAnimeClick(anime.id) else animateTo(i.toFloat())
                                 }
                         ) {
                             AsyncImage(
                                 model = anime.cover, contentDescription = anime.displayTitle,
                                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                            )
+                            // depth: back cards are dimmed, not see-through
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = 0.30f * abs(i - position).coerceAtMost(1f) }
+                                    .background(Color.Black)
                             )
                         }
                     }
