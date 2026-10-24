@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,17 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nyyrox.aniverse.data.Airing
-import androidx.compose.foundation.border
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.IconButton
-import com.nyyrox.aniverse.ui.components.AiringListSkeleton
+import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
-import com.nyyrox.aniverse.ui.theme.OttBg
 import com.nyyrox.aniverse.ui.theme.OttPillShape
-import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.OttTextMuted
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
-import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -75,6 +68,10 @@ data class ScheduleDay(
     val isToday: Boolean
 )
 
+/**
+ * Uses the same palette, page gradient and glass toggle as the Home screen
+ * (rememberHomePalette / HomeBackdrop / homeGlass), so light, dark and glass all follow one setting.
+ */
 @Composable
 fun AiringScreen(
     vm: MainViewModel,
@@ -86,52 +83,92 @@ fun AiringScreen(
         }
     }
 
-    if (vm.airingLoading && vm.airing.isEmpty()) {
-        AiringListSkeleton()
-        return
+    val p = rememberHomePalette()
+
+    val body: @Composable () -> Unit = {
+        when {
+            vm.airingLoading && vm.airing.isEmpty() -> AiringSkeleton(p)
+            vm.airingError != null && vm.airing.isEmpty() -> AiringError(vm, p)
+            else -> AiringContent(vm, p, onAnimeClick)
+        }
     }
 
-    if (vm.airingError != null && vm.airing.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(OttBg)
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+    if (p.glassOn) {
+        GlassBackdropHost(background = { HomeBackdrop(p) }) { body() }
+    } else {
+        Box(Modifier.fillMaxSize()) {
+            HomeBackdrop(p)
+            body()
+        }
+    }
+}
+
+@Composable
+private fun AiringSkeleton(p: HomePalette) {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Airing Schedule Unavailable",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OttTextPrimary
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = vm.airingError ?: "Unable to fetch schedule.",
-                    fontSize = 13.sp,
-                    color = OttTextSecondary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { vm.loadAiring() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
-                    ),
-                    shape = OttPillShape
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
+            repeat(5) {
+                Box(Modifier.width(68.dp).height(60.dp).clip(RoundedCornerShape(16.dp)).shimmer(p))
             }
         }
-        return
+        Column(
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            repeat(5) {
+                Box(Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(18.dp)).shimmer(p))
+            }
+        }
     }
+}
 
-    // 5 days in the past (e.g. 4th, 5th, 6th, 7th...) + Today (8th) + 8 days upcoming (9th..16th)
+@Composable
+private fun AiringError(vm: MainViewModel, p: HomePalette) {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Airing Schedule Unavailable",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = p.text
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = vm.airingError ?: "Unable to fetch schedule.",
+                fontSize = 13.sp,
+                color = p.textSub,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { vm.loadAiring() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = p.accentA,
+                    contentColor = p.onAccent
+                ),
+                shape = OttPillShape
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = p.onAccent)
+                Spacer(Modifier.width(6.dp))
+                Text("Retry", color = p.onAccent, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiringContent(
+    vm: MainViewModel,
+    p: HomePalette,
+    onAnimeClick: (Int) -> Unit
+) {
+    // 5 days in the past + Today + 8 days upcoming
     val days = remember {
         val list = mutableListOf<ScheduleDay>()
         val cal = Calendar.getInstance()
@@ -141,7 +178,6 @@ fun AiringScreen(
         cal.set(Calendar.MILLISECOND, 0)
         val todayStartSec = cal.timeInMillis / 1000
 
-        // Start from 5 days ago
         cal.add(Calendar.DAY_OF_YEAR, -5)
 
         val dayFormat = SimpleDateFormat("EEE", Locale.US)
@@ -187,7 +223,6 @@ fun AiringScreen(
     val rowListState = rememberLazyListState()
     LaunchedEffect(todayIndex) {
         if (todayIndex > 0) {
-            // Scroll so today is visible, with previous dates to the left and upcoming dates to the right
             rowListState.scrollToItem((todayIndex - 1).coerceAtLeast(0))
         }
     }
@@ -212,7 +247,6 @@ fun AiringScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(OttBg)
             .statusBarsPadding()
     ) {
         // Horizontal Day Selector Tabs
@@ -227,8 +261,10 @@ fun AiringScreen(
                     modifier = Modifier
                         .width(68.dp)
                         .height(60.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) Color.White else Color(0xFF181A20))
+                        .then(
+                            if (isSelected) Modifier.clip(RoundedCornerShape(16.dp)).background(p.accentBrush)
+                            else Modifier.homeGlass(p, 16.dp)
+                        )
                         .clickable { selectedDayIndex = index }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
@@ -241,14 +277,14 @@ fun AiringScreen(
                             text = day.dayName,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color.Black else Color.White
+                            color = if (isSelected) p.onAccent else p.text
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = day.fullDateFormatted,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = if (isSelected) Color(0xFF444444) else Color(0xFF888B96)
+                            color = if (isSelected) p.onAccent.copy(alpha = 0.7f) else p.textMuted
                         )
                     }
                 }
@@ -267,12 +303,12 @@ fun AiringScreen(
                         text = "No Scheduled Broadcasts",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OttTextPrimary
+                        color = p.text
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "No anime scheduled to air on ${selectedDay?.displayHeader ?: "this date"}.",
-                        color = OttTextMuted,
+                        color = p.textMuted,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
@@ -295,14 +331,14 @@ fun AiringScreen(
                                 modifier = Modifier
                                     .size(9.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White)
+                                    .background(p.text)
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
                                 text = "> $hourKey",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = p.text
                             )
                         }
                     }
@@ -323,7 +359,7 @@ fun AiringScreen(
                                     modifier = Modifier
                                         .width(1.5.dp)
                                         .fillMaxHeight()
-                                        .background(Color(0x30FFFFFF))
+                                        .background(p.text.copy(alpha = 0.18f))
                                 )
                             }
 
@@ -331,6 +367,7 @@ fun AiringScreen(
 
                             TimelineAiringCard(
                                 airing = airing,
+                                p = p,
                                 onClick = { onAnimeClick(airing.anime.id) },
                                 modifier = Modifier.weight(1f)
                             )
@@ -345,6 +382,7 @@ fun AiringScreen(
 @Composable
 private fun TimelineAiringCard(
     airing: Airing,
+    p: HomePalette,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -361,8 +399,7 @@ private fun TimelineAiringCard(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF16171B))
+            .homeGlass(p, 18.dp)
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
@@ -389,7 +426,7 @@ private fun TimelineAiringCard(
                     text = anime.displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = p.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -400,7 +437,7 @@ private fun TimelineAiringCard(
                     text = "Episode ${airing.episode}",
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF9E9E9E)
+                    color = p.textMuted
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -412,14 +449,14 @@ private fun TimelineAiringCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(Color.White)
+                            .background(p.accentBrush)
                             .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = if (anime.isMovie) "Movie" else anime.displayFormat,
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = p.onAccent
                         )
                     }
 
@@ -427,14 +464,14 @@ private fun TimelineAiringCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(Color(0xFF26272C))
+                                .background(p.text.copy(alpha = 0.10f))
                                 .padding(horizontal = 9.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = yearText,
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color.White
+                                color = p.text
                             )
                         }
                     }
@@ -452,7 +489,7 @@ private fun TimelineAiringCard(
                     text = timeFormatted,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = p.text
                 )
 
                 Spacer(Modifier.height(18.dp))
@@ -464,9 +501,9 @@ private fun TimelineAiringCard(
                 }
 
                 val statusColor = when (statusLabel) {
-                    "AIRED" -> Color(0xFF757575)
-                    "AIRING" -> OttAccentGold
-                    else -> Color(0xFF888B96)
+                    "AIRED" -> p.textMuted
+                    "AIRING" -> if (p.dark) OttAccentGold else Color(0xFFB07A00)
+                    else -> p.textSub
                 }
 
                 Text(

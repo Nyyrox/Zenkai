@@ -3,8 +3,9 @@ package com.nyyrox.aniverse.ui.screens
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,6 +14,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.util.lerp
 import androidx.compose.animation.core.LinearEasing
@@ -54,6 +56,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -83,6 +86,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -110,6 +114,7 @@ import com.nyyrox.aniverse.viewmodel.MainViewModel
 import com.styropyr0.prismal.PrismalGlass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Self-contained Home. No Ott* / Ani* components, no cards.
@@ -119,7 +124,7 @@ import kotlinx.coroutines.launch
 // ── Palette: every colour is chosen separately for dark and light ────────────
 
 @Immutable
-private class HomePalette(
+internal class HomePalette(
     val dark: Boolean,
     val glassOn: Boolean,
     val bg: Color,
@@ -149,7 +154,7 @@ private class HomePalette(
  * Dark: burgundy-to-black page gradient. Light: warm white page gradient.
  */
 @Composable
-private fun rememberHomePalette(): HomePalette {
+internal fun rememberHomePalette(): HomePalette {
     val c = LocalAppColors.current
     val ts = LocalThemeSettings.current
     val dark = c.bg.luminance() < 0.5f
@@ -197,7 +202,7 @@ private fun rememberHomePalette(): HomePalette {
 
 /** Liquid glass when the profile toggle is on, a flat tinted pill when it is off. */
 @Composable
-private fun Modifier.homeGlass(p: HomePalette, radius: Dp): Modifier =
+internal fun Modifier.homeGlass(p: HomePalette, radius: Dp): Modifier =
     if (p.glassOn) {
         this.aniGlass(radius = radius)
     } else {
@@ -235,8 +240,53 @@ private fun Modifier.pressable(onClick: () -> Unit): Modifier {
         .clickable(interactionSource = src, indication = null, onClick = onClick)
 }
 
+/** 3D coverflow effect for horizontal rows: items fold away from the centre as they scroll. */
+private fun Modifier.rowTilt(state: LazyListState, index: Int): Modifier = this.graphicsLayer {
+    val info = state.layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return@graphicsLayer
+    val vw = (info.viewportEndOffset - info.viewportStartOffset).toFloat().coerceAtLeast(1f)
+    val x = ((item.offset + item.size / 2f - (info.viewportStartOffset + vw / 2f)) / (vw / 2f)).coerceIn(-1.2f, 1.2f)
+    val ax = abs(x)
+    rotationY = -x * 22f
+    val s = 1f - 0.08f * ax
+    scaleX = s
+    scaleY = s
+    alpha = (1f - 0.25f * ax * ax).coerceIn(0.4f, 1f)
+    cameraDistance = 14f * density
+}
+
+/** Drag sideways (either way) and the card tilts in 3D, then springs back. */
 @Composable
-private fun Modifier.shimmer(p: HomePalette): Modifier {
+private fun Modifier.dragTilt3d(): Modifier {
+    val x = remember { Animatable(0f) }
+    val w = remember { mutableFloatStateOf(1f) }
+    val scope = rememberCoroutineScope()
+    return this
+        .onSizeChanged { w.floatValue = it.width.toFloat().coerceAtLeast(1f) }
+        .pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragEnd = { scope.launch { x.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 220f)) } },
+                onDragCancel = { scope.launch { x.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 220f)) } },
+                onHorizontalDrag = { change, amount ->
+                    change.consume()
+                    scope.launch { x.snapTo((x.value + amount * 0.8f).coerceIn(-w.floatValue * 0.4f, w.floatValue * 0.4f)) }
+                }
+            )
+        }
+        .graphicsLayer {
+            val f = (x.value / w.floatValue).coerceIn(-0.5f, 0.5f)
+            translationX = x.value * 0.45f
+            rotationY = -f * 60f
+            rotationZ = f * 3f
+            val s = 1f - 0.06f * abs(f)
+            scaleX = s
+            scaleY = s
+            cameraDistance = 14f * density
+        }
+}
+
+@Composable
+internal fun Modifier.shimmer(p: HomePalette): Modifier {
     val t = rememberInfiniteTransition(label = "shimmer")
     val x by t.animateFloat(
         initialValue = 0f, targetValue = 1f,
@@ -337,9 +387,9 @@ private fun pickEpisode(anime: Anime): Int =
 @Composable
 private fun PosterTile(
     title: String, image: String?, meta: String?, p: HomePalette,
-    anime: Anime? = null, onClick: () -> Unit
+    anime: Anime? = null, modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
-    Column(Modifier.width(140.dp).pressable(onClick)) {
+    Column(modifier.width(140.dp).pressable(onClick)) {
         Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)).shimmer(p)) {
             AsyncImage(
                 model = image, contentDescription = null,
@@ -362,12 +412,14 @@ private fun PosterTile(
 
 @Composable
 private fun AnimeRow(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
+    val st = rememberLazyListState()
     LazyRow(
+        state = st,
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        itemsIndexed(list, key = { i, a -> "${a.id}_$i" }) { _, anime ->
-            PosterTile(anime.displayTitle, anime.cover, anime.displayFormat, p, anime) { onAnimeClick(anime.id) }
+        itemsIndexed(list, key = { i, a -> "${a.id}_$i" }) { i, anime ->
+            PosterTile(anime.displayTitle, anime.cover, anime.displayFormat, p, anime, Modifier.rowTilt(st, i)) { onAnimeClick(anime.id) }
         }
     }
 }
@@ -375,12 +427,14 @@ private fun AnimeRow(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> U
 @Composable
 private fun Top10Row(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
     val top = remember(list) { list.take(10) }
+    val st = rememberLazyListState()
     LazyRow(
+        state = st,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         itemsIndexed(top, key = { i, a -> "top_${a.id}_$i" }) { idx, anime ->
-            Box(Modifier.width(if (idx >= 9) 196.dp else 164.dp).height(184.dp).pressable { onAnimeClick(anime.id) }) {
+            Box(Modifier.rowTilt(st, idx).width(if (idx >= 9) 196.dp else 164.dp).height(184.dp).pressable { onAnimeClick(anime.id) }) {
                 Text(
                     text = "${idx + 1}",
                     color = p.text.copy(alpha = 0.30f),
@@ -409,12 +463,15 @@ private fun Top10Row(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> U
 
 @Composable
 private fun MangaRow(list: List<com.nyyrox.aniverse.data.manga.MangaCard>, p: HomePalette, onMangaClick: (String) -> Unit) {
+    val st = rememberLazyListState()
     LazyRow(
+        state = st,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        itemsIndexed(list, key = { i, m -> "manga_${m.id}_$i" }) { _, manga ->
+        itemsIndexed(list, key = { i, m -> "manga_${m.id}_$i" }) { i, manga ->
             PosterTile(
+                modifier = Modifier.rowTilt(st, i),
                 title = manga.title,
                 image = manga.poster,
                 meta = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga"),
@@ -427,12 +484,15 @@ private fun MangaRow(list: List<com.nyyrox.aniverse.data.manga.MangaCard>, p: Ho
 
 @Composable
 private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: HomePalette, onNovelClick: (String) -> Unit) {
+    val st = rememberLazyListState()
     LazyRow(
+        state = st,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        itemsIndexed(list, key = { i, n -> "novel_${n.slug}_$i" }) { _, novel ->
+        itemsIndexed(list, key = { i, n -> "novel_${n.slug}_$i" }) { i, novel ->
             PosterTile(
+                modifier = Modifier.rowTilt(st, i),
                 title = novel.title,
                 image = novel.cover,
                 meta = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source),
@@ -443,21 +503,11 @@ private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: Ho
     }
 }
 
-// ── Hero: scattered card stack, swipe down to cycle (infinite), blurred poster backdrop ──
+// ── Hero: 3D coverflow stack, swipe left/right (infinite), blurred poster backdrop ──
 
 private val HeroCardW = 200.dp
 private val HeroCardH = 292.dp
 private val HeroCardShape = RoundedCornerShape(14.dp)
-
-private class HeroPose(val rot: Float, val tx: Float, val ty: Float, val scale: Float, val alpha: Float)
-
-/** tx = fraction of card width, ty = dp. Slot 0 is the front card. */
-private fun heroPose(slot: Int): HeroPose = when (slot) {
-    0 -> HeroPose(0f, 0f, 0f, 1f, 1f)
-    1 -> HeroPose(7f, 0.30f, 10f, 0.93f, 1f)
-    2 -> HeroPose(-7f, -0.30f, 10f, 0.93f, 1f)
-    else -> HeroPose(-7f, -0.30f, 10f, 0.88f, 0f)
-}
 
 /** Blurred poster that fades out toward the bottom so it melts into the page gradient. */
 @Composable
@@ -504,33 +554,36 @@ private fun HomeHero(
     val n = shows.size
     var index by remember { mutableIntStateOf(0) }
     var dragging by remember { mutableStateOf(false) }
-    val dragY = remember { Animatable(0f) }
+    val dragX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val dn = LocalDensity.current
-    val travel = with(dn) { (HeroCardH + 40.dp).toPx() }
+    val travel = with(LocalDensity.current) { (HeroCardW * 0.78f).toPx() }
     val current = Math.floorMod(index, n)
 
     LaunchedEffect(current, n) {
-        for (k in 0..3) vm.loadTmdbArtwork(shows[Math.floorMod(index + k, n)])
+        for (k in -1..2) vm.loadTmdbArtwork(shows[Math.floorMod(index + k, n)])
+    }
+
+    // dir = +1 -> next (cards slide left), -1 -> previous (cards slide right)
+    suspend fun go(dir: Int) {
+        dragX.animateTo(-dir * travel, tween(300, easing = FastOutSlowInEasing))
+        index += dir
+        dragX.snapTo(0f)
+    }
+
+    suspend fun settle() {
+        val f = dragX.value / travel
+        when {
+            f < -0.22f -> go(1)
+            f > 0.22f -> go(-1)
+            else -> dragX.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium))
+        }
     }
 
     LaunchedEffect(n, listScrolling, dragging, reduced) {
         if (n < 2 || listScrolling || dragging || reduced) return@LaunchedEffect
         while (true) {
             delay(6000)
-            dragY.animateTo(travel, tween(320, easing = FastOutSlowInEasing))
-            index += 1
-            dragY.snapTo(0f)
-        }
-    }
-
-    suspend fun settle() {
-        if (dragY.value > travel * 0.30f) {
-            dragY.animateTo(travel, tween(220, easing = FastOutSlowInEasing))
-            index += 1
-            dragY.snapTo(0f)
-        } else {
-            dragY.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+            go(1)
         }
     }
 
@@ -547,50 +600,52 @@ private fun HomeHero(
                     .height(HeroCardH + 32.dp)
                     .pointerInput(n) {
                         if (n < 2) return@pointerInput
-                        detectVerticalDragGestures(
-                            onDragStart = { dragging = true; scope.launch { dragY.stop() } },
+                        detectHorizontalDragGestures(
+                            onDragStart = { dragging = true; scope.launch { dragX.stop() } },
                             onDragEnd = { dragging = false; scope.launch { settle() } },
                             onDragCancel = { dragging = false; scope.launch { settle() } },
-                            onVerticalDrag = { change, amount ->
+                            onHorizontalDrag = { change, amount ->
                                 change.consume()
-                                scope.launch { dragY.snapTo((dragY.value + amount).coerceAtLeast(0f)) }
+                                scope.launch { dragX.snapTo((dragX.value + amount).coerceIn(-travel, travel)) }
                             }
                         )
                     },
                 contentAlignment = Alignment.Center
             ) {
-                val slots = minOf(n, 4)
-                for (slot in slots - 1 downTo 0) {
-                    val anime = shows[Math.floorMod(index + slot, n)]
-                    key(anime.id) {
-                        val front = slot == 0
+                val range = if (n < 2) 0..0 else -2..2
+                // far cards first so the centre card is drawn on top
+                for (r in range.sortedByDescending { abs(it) }) {
+                    val absIdx = index + r
+                    val anime = shows[Math.floorMod(absIdx, n)]
+                    key(absIdx) {
                         Box(
                             Modifier
                                 .width(HeroCardW)
                                 .height(HeroCardH)
                                 .graphicsLayer {
-                                    val pr = (dragY.value / travel).coerceIn(0f, 1f)
-                                    if (front) {
-                                        translationY = dragY.value
-                                        rotationZ = pr * 6f
-                                        val s = 1f - 0.05f * pr
-                                        scaleX = s; scaleY = s
-                                        alpha = 1f - 0.7f * pr
-                                    } else {
-                                        val a = heroPose(slot)
-                                        val b = heroPose(slot - 1)
-                                        translationX = lerp(a.tx, b.tx, pr) * size.width
-                                        translationY = lerp(a.ty, b.ty, pr) * density
-                                        rotationZ = lerp(a.rot, b.rot, pr)
-                                        val s = lerp(a.scale, b.scale, pr)
-                                        scaleX = s; scaleY = s
-                                        alpha = lerp(a.alpha, b.alpha, pr)
-                                    }
+                                    // continuous position: 0 = centre, +1 = right slot, -1 = left slot
+                                    val x = r + dragX.value / travel
+                                    val ax = abs(x)
+                                    val near = ax.coerceAtMost(1f)
+                                    val far = (ax - 1f).coerceAtLeast(0f)
+                                    val dir = if (x < 0f) -1f else 1f
+                                    translationX = dir * (near * 0.52f + far * 0.26f) * size.width
+                                    translationY = near * 12f * density
+                                    rotationY = (-x * 32f).coerceIn(-48f, 48f)
+                                    rotationZ = x * 5f
+                                    val s = 1f - 0.10f * near - 0.04f * far
+                                    scaleX = s
+                                    scaleY = s
+                                    alpha = (1f - 0.30f * ax).coerceIn(0f, 1f)
+                                    cameraDistance = 14f * density
                                 }
                                 .shadow(14.dp, HeroCardShape, clip = false)
                                 .clip(HeroCardShape)
                                 .shimmer(p)
-                                .then(if (front) Modifier.tap { onAnimeClick(anime.id) } else Modifier)
+                                .tap {
+                                    if (r == 0) onAnimeClick(anime.id)
+                                    else scope.launch { go(if (r > 0) 1 else -1) }
+                                }
                         ) {
                             AsyncImage(
                                 model = anime.cover, contentDescription = anime.displayTitle,
@@ -614,6 +669,15 @@ private fun HomeHero(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (logo != null) {
+                      Box(contentAlignment = Alignment.Center) {
+                        if (!p.dark) {
+                            AsyncImage(
+                                model = logo, contentDescription = null,
+                                modifier = Modifier.heightIn(max = 64.dp).fillMaxWidth(0.62f).offset(y = 2.dp).blur(3.dp),
+                                contentScale = ContentScale.Fit,
+                                colorFilter = ColorFilter.tint(Color(0x4D000000))
+                            )
+                        }
                         SubcomposeAsyncImage(
                             model = logo, contentDescription = title,
                             modifier = Modifier.heightIn(max = 64.dp).fillMaxWidth(0.62f),
@@ -626,6 +690,7 @@ private fun HomeHero(
                                 )
                             }
                         )
+                      }
                     } else {
                         Text(
                             title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
@@ -657,7 +722,7 @@ private fun HomeHero(
 
 /** Page gradient (burgundy to black in dark, warm white in light) with a faint glow behind the cards. */
 @Composable
-private fun HomeBackdrop(p: HomePalette) {
+internal fun HomeBackdrop(p: HomePalette) {
     Box(
         Modifier
             .fillMaxSize()
@@ -709,6 +774,7 @@ fun YouTubeStyleEpisodeCard(
         Box(
             Modifier
                 .fillMaxWidth()
+                .dragTilt3d()
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(14.dp))
                 .shimmer(p)
@@ -860,19 +926,21 @@ private fun ContinueRow(
 
     Column(Modifier.fillMaxWidth()) {
         SectionTitle("Continue", p)
+        val st = rememberLazyListState()
         LazyRow(
+            state = st,
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(entries, key = { it.key }) { e -> ContinueTile(e, p) }
+            itemsIndexed(entries, key = { _, e -> e.key }) { i, e -> ContinueTile(e, p, Modifier.rowTilt(st, i)) }
         }
     }
 }
 
 @Composable
-private fun ContinueTile(e: ContinueEntry, p: HomePalette) {
+private fun ContinueTile(e: ContinueEntry, p: HomePalette, modifier: Modifier = Modifier) {
     LaunchedEffect(e.key) { e.loadStill?.invoke() }
-    Column(Modifier.width(250.dp).pressable(e.onOpen)) {
+    Column(modifier.width(250.dp).pressable(e.onOpen)) {
         Box(
             Modifier
                 .fillMaxWidth()
