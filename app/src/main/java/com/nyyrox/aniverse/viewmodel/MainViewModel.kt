@@ -26,6 +26,7 @@ import com.nyyrox.aniverse.data.manga.MangaHome
 import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.ui.theme.AnimeTheme
 import com.nyyrox.aniverse.ui.theme.ThemeMode
+import com.nyyrox.aniverse.ui.theme.ThemeModeState
 import com.nyyrox.aniverse.ui.theme.ThemeSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,6 +60,10 @@ import com.nyyrox.aniverse.data.tracker.TrackerSyncResult
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = AniListRepository()
     private val storage = StorageManager(application.applicationContext)
+    // Light/dark choice is saved separately so it always survives restarts.
+    private val themePrefs = application.getSharedPreferences("aniverse_theme_mode", Context.MODE_PRIVATE)
+    private fun loadThemeMode(): ThemeMode =
+        runCatching { ThemeMode.valueOf(themePrefs.getString("mode", null) ?: "DARK") }.getOrDefault(ThemeMode.DARK)
     
     private val supabaseRepo = SupabaseRepository()
     
@@ -70,7 +75,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var isUsernameSetupRequired by mutableStateOf(false); private set
 
     var userProfile by mutableStateOf(storage.getUserProfile()); private set
-    var themeSettings by mutableStateOf(storage.getThemeSettings()); private set
+    var themeSettings by mutableStateOf(
+        storage.getThemeSettings().copy(mode = loadThemeMode().also { ThemeModeState.mode = it })
+    ); private set
     var preferredServerId by mutableStateOf(storage.getPreferredServerId()); private set
 
     // Dynamic Providers & Server Configurations (from Supabase)
@@ -546,7 +553,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             storage.saveUserProfile(updatedProfile)
         }
         userProfile = updatedProfile
-        themeSettings = storage.getThemeSettings()
+        themeSettings = storage.getThemeSettings().copy(mode = ThemeModeState.mode)
         preferredServerId = storage.getPreferredServerId()
     }
 
@@ -1435,6 +1442,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setThemeMode(mode: ThemeMode) {
+        themePrefs.edit().putString("mode", mode.name).apply()
+        ThemeModeState.mode = mode
         val updated = themeSettings.copy(mode = mode)
         storage.saveThemeSettings(updated)
         themeSettings = updated
