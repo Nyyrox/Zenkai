@@ -180,7 +180,8 @@ fun ProfileScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val themeSettings = LocalThemeSettings.current
+    // read straight from the ViewModel so toggles and theme mode update instantly
+    val themeSettings = vm.themeSettings
     val systemDark = isSystemInDarkTheme()
 
     val activity = remember(context) {
@@ -490,21 +491,21 @@ fun ProfileScreen(
                         SettingRow(
                             Icons.Default.BatteryChargingFull, "Battery saver",
                             subtitle = "Caps to 60 Hz, lighter rendering",
-                            trailing = { AniSwitch(themeSettings.isPowerSavingEnabled) { vm.setPowerSaving(it) } }
+                            trailing = { AppSwitch(themeSettings.isPowerSavingEnabled) { vm.setPowerSaving(it) } }
                         )
                         RowDivider()
                         SettingRow(
                             Icons.Default.MotionPhotosOff, "Reduced motion",
-                            trailing = { AniSwitch(themeSettings.isReducedMotionEnabled) { vm.setReducedMotion(it) } }
+                            trailing = { AppSwitch(themeSettings.isReducedMotionEnabled) { vm.setReducedMotion(it) } }
                         )
-                        if (PrismalGlass.supportsRefraction || !themeSettings.isGlassmorphismEnabled) {
-                            RowDivider()
-                            SettingRow(
-                                Icons.Default.AutoAwesome, "Liquid glass",
-                                subtitle = "Turn off for lower GPU use",
-                                trailing = { AniSwitch(themeSettings.isGlassmorphismEnabled) { vm.setGlassmorphism(it) } }
-                            )
-                        }
+                        RowDivider()
+                        SettingRow(
+                            Icons.Default.AutoAwesome, "Liquid glass",
+                            subtitle = "Turn off for lower GPU use",
+                            trailing = {
+                                AppSwitch(themeSettings.isGlassmorphismEnabled) { vm.setGlassmorphism(it) }
+                            }
+                        )
                     }
                 }
 
@@ -563,7 +564,7 @@ fun ProfileScreen(
                             Icons.Default.CloudSync, "Auto-sync",
                             subtitle = "Update AniList & MAL while you watch",
                             trailing = {
-                                AniSwitch(vm.trackerSettings.isAutoSyncEnabled) {
+                                AppSwitch(vm.trackerSettings.isAutoSyncEnabled) {
                                     vm.updateTrackerSettings(vm.trackerSettings.copy(isAutoSyncEnabled = it))
                                 }
                             }
@@ -576,14 +577,14 @@ fun ProfileScreen(
                     item {
                         Section("Privacy") {
                             SettingRow(Icons.Default.Lock, "Private watchlist",
-                                trailing = { AniSwitch(vm.userProfile.isWatchlistPrivate) { vm.updatePrivacySettings(isWatchlistPrivate = it) } })
+                                trailing = { AppSwitch(vm.userProfile.isWatchlistPrivate) { vm.updatePrivacySettings(isWatchlistPrivate = it) } })
                             RowDivider()
                             SettingRow(Icons.Default.Lock, "Private watch history",
-                                trailing = { AniSwitch(vm.userProfile.isWatchHistoryPrivate) { vm.updatePrivacySettings(isWatchHistoryPrivate = it) } })
+                                trailing = { AppSwitch(vm.userProfile.isWatchHistoryPrivate) { vm.updatePrivacySettings(isWatchHistoryPrivate = it) } })
                             RowDivider()
                             SettingRow(Icons.Default.Lock, "Private manga & novels",
                                 trailing = {
-                                    AniSwitch(vm.userProfile.isMangaPrivate || vm.userProfile.isNovelPrivate) {
+                                    AppSwitch(vm.userProfile.isMangaPrivate || vm.userProfile.isNovelPrivate) {
                                         vm.updatePrivacySettings(isMangaPrivate = it, isNovelPrivate = it)
                                     }
                                 })
@@ -1875,3 +1876,16 @@ private fun ProfileMangaCard(
     }
 }
 
+/** Plain Material switch: always visible and tappable, independent of the glass setting. */
+@Composable
+private fun AppSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
+    val c = LocalAppColors.current
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onChange,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedTrackColor = c.accent,
+            checkedThumbColor = c.onAccent
+        )
+    )
+}
