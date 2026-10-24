@@ -877,7 +877,7 @@ fun PlayerScreen(
             context.getSystemService(android.app.ActivityManager::class.java)?.isLowRamDevice != true
     }
     // Follows Profile > Liquid Glassmorphism, same switch the details page uses.
-    val glassSetting = LocalThemeSettings.current.isGlassmorphismEnabled
+    val glassSetting = vm.themeSettings.isGlassmorphismEnabled
     val backdrop = if (liquidGlass && glassSetting && glassOk) glassLayer else null
 
     val progress = dragProgress.value
@@ -2120,7 +2120,7 @@ private fun PlayerAction(
     }
 }
 
-/** Segmented control: clean flat pill track, same in dark and light. Every tab gets equal width. */
+/** Segmented control: liquid-glass droplet when glass is on, clean flat pill when it is off. Equal-width tabs both ways. */
 @Composable
 private fun PlayerSegmented(
     labels: List<String>,
@@ -2131,32 +2131,49 @@ private fun PlayerSegmented(
     height: Dp = 44.dp
 ) {
     val c = LocalAppColors.current
-    Row(
-        modifier = modifier
-            .height(height)
-            .clip(CircleShape)
-            .background(c.surfaceElevated)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        labels.forEachIndexed { i, label ->
-            val selected = i == selectedIndex
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(CircleShape)
-                    .background(if (selected) c.accent else Color.Transparent)
-                    .clickable { onSelected(i) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected) c.onAccent else c.textSecondary,
-                    maxLines = 1
-                )
+    val isDark = LocalIsDark.current
+    if (backdrop != null) {
+        PrismalSegmentedControl(
+            labels = labels,
+            selectedIndex = selectedIndex,
+            onSelected = onSelected,
+            backdrop = backdrop,
+            modifier = modifier
+                .clip(CircleShape)
+                .background(if (isDark) Color(0x59000000) else Color(0x66FFFFFF))
+                .border(1.dp, c.glass.border, CircleShape),
+            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+            textColor = c.textPrimary,
+            height = height
+        )
+    } else {
+        Row(
+            modifier = modifier
+                .height(height)
+                .clip(CircleShape)
+                .background(c.surfaceElevated)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            labels.forEachIndexed { i, label ->
+                val selected = i == selectedIndex
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(CircleShape)
+                        .background(if (selected) c.accent else Color.Transparent)
+                        .clickable { onSelected(i) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) c.onAccent else c.textSecondary,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
