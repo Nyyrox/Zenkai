@@ -13,9 +13,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import kotlin.math.min
 import com.nyyrox.aniverse.data.StorageManager
 import com.nyyrox.aniverse.player.PlayerGesturePlugin
 import com.nyyrox.aniverse.util.DisplayRefreshRateManager
@@ -41,6 +47,14 @@ import com.nyyrox.aniverse.data.discord.DiscordAccountManager
 
 class MainActivity : ComponentActivity() {
     companion object {
+        /**
+         * The UI is laid out as if the phone's shorter screen side were exactly this many dp wide, on every device.
+         * Every dp / sp value then takes the same share of the screen everywhere (phones, tablets, big or small
+         * "Display size"), and the system "Font size" setting no longer resizes text.
+         * Bigger number = everything smaller. 411 matches a standard Pixel-class phone.
+         */
+        const val DESIGN_SHORT_SIDE_DP = 411f
+
         val isInPipMode = mutableStateOf(false)
         var isPlayerActive: Boolean = false
 
@@ -212,9 +226,23 @@ class MainActivity : ComponentActivity() {
         } catch (_: Throwable) {}
 
         setContent {
-            Box(Modifier.fillMaxSize()) {
-                App(deepLinkUri = deepLinkUriState.value)
-                com.nyyrox.aniverse.player.MiniPlayerHost()
+            val systemDensity = LocalDensity.current
+            val config = LocalConfiguration.current
+            val inPip = isInPipMode.value
+            val fixedDensity = remember(systemDensity.density, config.screenWidthDp, config.screenHeightDp, inPip) {
+                if (inPip) {
+                    systemDensity
+                } else {
+                    // Shorter side stays the same when rotating, so portrait and landscape keep the same scale.
+                    val shortPx = min(config.screenWidthDp, config.screenHeightDp) * systemDensity.density
+                    Density(density = shortPx / DESIGN_SHORT_SIDE_DP, fontScale = 1f)
+                }
+            }
+            CompositionLocalProvider(LocalDensity provides fixedDensity) {
+                Box(Modifier.fillMaxSize()) {
+                    App(deepLinkUri = deepLinkUriState.value)
+                    com.nyyrox.aniverse.player.MiniPlayerHost()
+                }
             }
         }
     }

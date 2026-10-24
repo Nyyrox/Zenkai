@@ -910,14 +910,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     }
 
                     // Transparent Dark Gradient Top Bar overlay (Only on home, manga, novel - NOT profile or airing)
-                    if (isRootRoute && currentRoute != "profile" && currentRoute != "airing" && currentRoute != "browse") {
+                    if (isRootRoute && currentRoute != "profile" && currentRoute != "browse") {
                         OttTopBar(
-                            expanded = chrome.topExpanded,
+                            // Schedule has its own header: keep only the profile bubble there.
+                            expanded = chrome.topExpanded && currentRoute != "airing",
                             userAvatarUrl = vm.userProfile.avatarUrl,
                             avatarDecorationId = vm.userProfile.avatarDecorationId,
                             avatarFrameId = vm.userProfile.avatarFrameId,
                             onMenuClick = { isDrawerOpen = true },
-                            onSearchClick = { push("search") },
                             onWatchlistClick = { push("watchlist") },
                             onProfileClick = { switchTab("profile") },
                             modifier = Modifier.align(Alignment.TopCenter)
@@ -948,6 +948,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             backdrop = appBackdropLayer,
                             collapsed = chrome.bottomCollapsed,
                             onExpand = { chrome.expandBottom() },
+                            onSearchClick = { push("search") },
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
