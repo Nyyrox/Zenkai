@@ -1,5 +1,6 @@
 package com.nyyrox.aniverse.ui.screens
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -61,9 +63,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -72,6 +77,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +100,8 @@ import com.nyyrox.aniverse.ui.theme.aniGlass
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import com.styropyr0.prismal.PrismalGlass
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Self-contained Home. No Ott* / Ani* components, no cards.
@@ -117,7 +126,8 @@ private class HomePalette(
     val glassBorder: Color,
     val skeleton: Color,
     val skeletonHi: Color,
-    val glow: Color
+    val glow: Color,
+    val rating: Color
 ) {
     val accentBrush: Brush = Brush.horizontalGradient(listOf(accentA, accentB))
 }
@@ -142,7 +152,8 @@ private fun rememberHomePalette(): HomePalette {
             glassBorder = Color(0x40FFFFFF),
             skeleton = Color(0xFF1E2333),
             skeletonHi = Color(0xFF2C3248),
-            glow = Color(0xFF9B8CFF).copy(alpha = 0.26f)
+            glow = Color(0xFF9B8CFF).copy(alpha = 0.30f),
+            rating = Color(0xFFFF4B5C)
         ) else HomePalette(
             dark = false, glassOn = glassOn, bg = c.bg,
             text = Color(0xFF0A0D18),
@@ -156,7 +167,8 @@ private fun rememberHomePalette(): HomePalette {
             glassBorder = Color(0x26000000),
             skeleton = Color(0xFFDDE1EE),
             skeletonHi = Color(0xFFF0F2FA),
-            glow = Color(0xFF4A3AE6).copy(alpha = 0.14f)
+            glow = Color(0xFF4A3AE6).copy(alpha = 0.16f),
+            rating = Color(0xFFD0102A)
         )
     }
 }
@@ -260,9 +272,7 @@ private fun SectionTitle(title: String, p: HomePalette, subtitle: String? = null
         verticalAlignment = Alignment.Bottom
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = p.text, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(5.dp))
-            Box(Modifier.width(28.dp).height(3.dp).clip(CircleShape).background(p.accentBrush))
+            Text(title, color = p.text, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!subtitle.isNullOrBlank()) {
                 Spacer(Modifier.height(5.dp))
                 Text(subtitle, color = p.textMuted, fontSize = 12.sp, maxLines = 1)
@@ -277,8 +287,17 @@ private fun SectionTitle(title: String, p: HomePalette, subtitle: String? = null
     }
 }
 
-private fun metaLine(a: Anime): String =
-    listOfNotNull(a.displayFormat, a.score?.let { "$it%" }).joinToString(" · ")
+private fun ratingText(a: Anime): String? = a.score?.let { String.format("%.1f", it.toDouble() / 10.0) }
+
+@Composable
+private fun RatingText(a: Anime, p: HomePalette, iconSize: Dp = 13.dp, fontSize: androidx.compose.ui.unit.TextUnit = 12.sp) {
+    val r = ratingText(a) ?: return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Star, null, tint = p.rating, modifier = Modifier.size(iconSize))
+        Spacer(Modifier.width(3.dp))
+        Text(r, color = p.rating, fontSize = fontSize, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
 
 private fun pickEpisode(anime: Anime): Int =
     if (anime.isMovie || anime.episodes == 1) 1
@@ -290,18 +309,27 @@ private fun pickEpisode(anime: Anime): Int =
 // ── Poster tile + rows ───────────────────────────────────────────────────────
 
 @Composable
-private fun PosterTile(title: String, image: String?, meta: String?, p: HomePalette, onClick: () -> Unit) {
-    Column(Modifier.width(124.dp).pressable(onClick)) {
-        Box(Modifier.fillMaxWidth().height(184.dp).clip(RoundedCornerShape(14.dp)).shimmer(p)) {
+private fun PosterTile(
+    title: String, image: String?, meta: String?, p: HomePalette,
+    anime: Anime? = null, onClick: () -> Unit
+) {
+    Column(Modifier.width(140.dp).pressable(onClick)) {
+        Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)).shimmer(p)) {
             AsyncImage(
                 model = image, contentDescription = null,
                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
             )
         }
         Spacer(Modifier.height(8.dp))
-        Text(title, color = p.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (!meta.isNullOrBlank()) {
-            Text(meta, color = p.textMuted, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, color = p.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (anime != null && ratingText(anime) != null) {
+                RatingText(anime, p)
+                if (!meta.isNullOrBlank()) Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
+            }
+            if (!meta.isNullOrBlank()) {
+                Text(meta, color = p.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -309,11 +337,11 @@ private fun PosterTile(title: String, image: String?, meta: String?, p: HomePale
 @Composable
 private fun AnimeRow(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         itemsIndexed(list, key = { i, a -> "${a.id}_$i" }) { _, anime ->
-            PosterTile(anime.displayTitle, anime.cover, metaLine(anime), p) { onAnimeClick(anime.id) }
+            PosterTile(anime.displayTitle, anime.cover, anime.displayFormat, p, anime) { onAnimeClick(anime.id) }
         }
     }
 }
@@ -389,9 +417,10 @@ private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: Ho
     }
 }
 
-// ── Hero banner (own pager, autoplay, dots) ──────────────────────────────────
+// ── Hero: swipeable 3D card stack ────────────────────────────────────────────
 
-private val HeroHeight = 540.dp
+private val HeroCardW = 232.dp
+private val HeroCardH = 340.dp
 
 @Composable
 private fun HomeHero(
@@ -413,85 +442,116 @@ private fun HomeHero(
         }
     }
 
-    Box(Modifier.fillMaxWidth().height(HeroHeight)) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-            val anime = shows[page]
-            val artwork = vm.tmdbArtworks[anime.id]
-            LaunchedEffect(anime.id) { vm.loadTmdbArtwork(anime) }
-            val image = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover
-            val title = artwork?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+    val scope = rememberCoroutineScope()
+    val screenW = LocalConfiguration.current.screenWidthDp.dp
+    val sidePad = ((screenW - HeroCardW) / 2).coerceAtLeast(0.dp)
+    val current = pager.currentPage.coerceIn(0, shows.lastIndex)
 
-            Box(Modifier.fillMaxSize().clickable { onAnimeClick(anime.id) }) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        // clears the floating top bar (separate file)
+        Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(68.dp))
+        Text(
+            "Watch today", color = p.textSub, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.align(Alignment.Start).padding(start = 22.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+
+        HorizontalPager(
+            state = pager,
+            contentPadding = PaddingValues(horizontal = sidePad),
+            pageSpacing = 0.dp,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().height(HeroCardH + 28.dp)
+        ) { page ->
+            val anime = shows[page]
+            LaunchedEffect(anime.id) { vm.loadTmdbArtwork(anime) }
+            val shape = RoundedCornerShape(24.dp)
+            Box(
+                Modifier
+                    .zIndex(-abs(page - pager.currentPage).toFloat())
+                    .width(HeroCardW)
+                    .height(HeroCardH)
+                    .graphicsLayer {
+                        val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
+                        val a = abs(off).coerceAtMost(2f)
+                        val s = 1f - 0.14f * a.coerceAtMost(1f) - 0.05f * (a - 1f).coerceAtLeast(0f)
+                        scaleX = s
+                        scaleY = s
+                        rotationY = (off * 30f).coerceIn(-42f, 42f)
+                        translationX = off * size.width * 0.22f
+                        alpha = (1f - 0.32f * a).coerceIn(0.3f, 1f)
+                        cameraDistance = 14f * density
+                    }
+                    .shadow(20.dp, shape, ambientColor = p.accentA, spotColor = p.accentA)
+                    .clip(shape)
+                    .shimmer(p)
+                    .border(0.8.dp, p.glassBorder, shape)
+                    .clickable {
+                        if (pager.currentPage == page) onAnimeClick(anime.id)
+                        else scope.launch { pager.animateScrollToPage(page) }
+                    }
+            ) {
                 AsyncImage(
-                    model = image, contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.TopCenter
+                    model = anime.cover, contentDescription = anime.displayTitle,
+                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
                 )
-                // status-bar scrim (top) + theme-coloured fade into the page (bottom)
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(0f to Color(0x66000000), 0.22f to Color.Transparent)
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        Crossfade(targetState = current, label = "heroInfo") { idx ->
+            val anime = shows[idx.coerceIn(0, shows.lastIndex)]
+            val artwork = vm.tmdbArtworks[anime.id]
+            val title = artwork?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "#${idx + 1} TRENDING", color = p.accentText, fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                if (!artwork?.logoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = artwork?.logoUrl, contentDescription = title,
+                        modifier = Modifier.heightIn(max = 52.dp).fillMaxWidth(0.6f),
+                        contentScale = ContentScale.Fit
                     )
-                )
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0.30f to Color.Transparent,
-                            0.58f to p.bg.copy(alpha = 0.82f),
-                            0.80f to p.bg
-                        )
-                    )
-                )
-                Column(
-                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
-                ) {
+                } else {
                     Text(
-                        "#${page + 1} TRENDING",
-                        color = p.accentText, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp
+                        title, color = p.text, fontSize = 24.sp, lineHeight = 28.sp,
+                        fontWeight = FontWeight.Black, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(8.dp))
-                    if (!artwork?.logoUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = artwork?.logoUrl, contentDescription = title,
-                            modifier = Modifier.heightIn(max = 66.dp).fillMaxWidth(0.62f),
-                            contentScale = ContentScale.Fit, alignment = Alignment.CenterStart
-                        )
-                    } else {
-                        Text(
-                            title, color = p.text, fontSize = 30.sp, lineHeight = 34.sp,
-                            fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     Text(
-                        listOfNotNull(
-                            anime.genres.take(3).joinToString(" • ").ifBlank { null },
-                            anime.displayFormat,
-                            anime.score?.let { "$it% Match" }
-                        ).joinToString("  ·  "),
-                        color = p.textSub, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                        listOfNotNull(anime.genres.take(2).joinToString(" • ").ifBlank { null }, anime.displayFormat)
+                            .joinToString(" · "),
+                        color = p.textSub, fontSize = 13.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
                     )
-                    Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        GradientPill("Play", Icons.Default.PlayArrow, p, { onPlayClick(anime.id, 1) })
-                        GlassPill("Details", Icons.Default.Info, p, { onAnimeClick(anime.id) })
+                    if (ratingText(anime) != null) {
+                        Text("  ·  ", color = p.textMuted, fontSize = 13.sp)
+                        RatingText(anime, p, 14.dp, 14.sp)
                     }
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GradientPill("Play", Icons.Default.PlayArrow, p, { onPlayClick(anime.id, 1) })
+                    GlassPill("Details", Icons.Default.Info, p, { onAnimeClick(anime.id) })
                 }
             }
         }
 
-        // page dots (no background, just the dots)
         if (shows.size > 1) {
-            Row(
-                Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val cur = pager.currentPage
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                 repeat(shows.size) { i ->
-                    val active = i == cur
+                    val active = i == current
                     Box(
                         Modifier
                             .height(4.dp)
@@ -499,7 +559,7 @@ private fun HomeHero(
                             .clip(CircleShape)
                             .then(
                                 if (active) Modifier.background(p.accentBrush)
-                                else Modifier.background(p.textMuted.copy(alpha = 0.55f))
+                                else Modifier.background(p.textMuted.copy(alpha = 0.5f))
                             )
                     )
                 }
@@ -508,46 +568,35 @@ private fun HomeHero(
     }
 }
 
-/** Fixed art behind the whole page: current hero image + theme glow. It is what the glass refracts. */
+/** Soft ambient glow behind the whole page (no images, no hard edges). It is what the glass refracts. */
 @Composable
-private fun HomeBackdrop(show: Anime?, state: LazyListState, p: HomePalette) {
+private fun HomeBackdrop(state: LazyListState, p: HomePalette) {
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "home_hero_banner" }
-                    alpha = if (info == null) 0f else (1f + info.offset / (info.size * 1.4f)).coerceIn(0f, 1f)
+                    alpha = if (info == null) 0f else (1f + info.offset / (info.size * 1.2f)).coerceIn(0f, 1f)
                 }
-        ) {
-            val img = show?.banner?.takeIf { it.isNotBlank() } ?: show?.cover
-            if (img != null) {
-                AsyncImage(
-                    model = img, contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(HeroHeight),
-                    contentScale = ContentScale.Crop, alignment = Alignment.TopCenter
-                )
-            }
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(0f to p.glow, 0.45f to p.glow.copy(alpha = p.glow.alpha * 0.4f), 1f to Color.Transparent)
-                )
-            )
-        }
+                .drawBehind {
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(p.glow, Color.Transparent),
+                            center = Offset(size.width * 0.5f, size.height * 0.30f),
+                            radius = size.width * 1.15f
+                        )
+                    )
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(p.accentB.copy(alpha = if (p.dark) 0.16f else 0.09f), Color.Transparent),
+                            center = Offset(size.width * 0.1f, size.height * 0.55f),
+                            radius = size.width * 0.9f
+                        )
+                    )
+                }
+        )
     }
-}
-
-private fun Modifier.heroSlideAway(state: LazyListState): Modifier = graphicsLayer {
-    val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "home_hero_banner" }
-    if (info == null) {
-        alpha = 0f
-        return@graphicsLayer
-    }
-    val scrolled = (-info.offset).toFloat().coerceAtLeast(0f)
-    val frac = (scrolled / info.size.coerceAtLeast(1)).coerceIn(0f, 1f)
-    transformOrigin = TransformOrigin(0.5f, 0f)
-    translationY = scrolled * 0.55f
-    alpha = (1f - frac * 1.25f).coerceIn(0f, 1f)
 }
 
 // ── Episode feed item ────────────────────────────────────────────────────────
@@ -636,14 +685,18 @@ fun YouTubeStyleEpisodeCard(
                 fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(3.dp))
-            Text(
-                listOfNotNull(
-                    anime.genres.take(2).joinToString(" • ").ifBlank { null },
-                    anime.displayFormat ?: "TV",
-                    anime.score?.let { "$it% Match" } ?: "Trending"
-                ).joinToString(" • "),
-                color = p.textSub, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    listOfNotNull(anime.genres.take(2).joinToString(" • ").ifBlank { null }, anime.displayFormat ?: "TV")
+                        .joinToString(" • "),
+                    color = p.textSub, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (ratingText(anime) != null) {
+                    Text("  •  ", color = p.textMuted, fontSize = 12.5.sp)
+                    RatingText(anime, p, 13.dp, 12.5.sp)
+                }
+            }
         }
     }
 }
@@ -842,7 +895,12 @@ private fun HomeSkeleton(p: HomePalette) {
         contentPadding = PaddingValues(bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
-        item { Box(Modifier.fillMaxWidth().height(HeroHeight).shimmer(p)) }
+        item {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
+                Box(Modifier.width(HeroCardW).height(HeroCardH).clip(RoundedCornerShape(24.dp)).shimmer(p))
+            }
+        }
         repeat(3) {
             item {
                 Column {
@@ -911,7 +969,7 @@ fun HomeScreen(
 
         if (p.glassOn) {
             GlassBackdropHost(
-                background = { HomeBackdrop(heroShows.getOrNull(pager.currentPage), lazyListState, p) }
+                background = { HomeBackdrop(lazyListState, p) }
             ) {
                 HomeFeed(
                     vm, p, heroShows, pager, lazyListState,
@@ -919,7 +977,7 @@ fun HomeScreen(
                 )
             }
         } else {
-            HomeBackdrop(heroShows.getOrNull(pager.currentPage), lazyListState, p)
+            HomeBackdrop(lazyListState, p)
             HomeFeed(
                 vm, p, heroShows, pager, lazyListState,
                 onAnimeClick, onPlayClick, onMangaClick, onMangaReadClick, onNovelClick, onNovelReadClick
@@ -1017,13 +1075,11 @@ private fun HomeFeed(
 
         if (heroShows.isNotEmpty()) {
             item(key = "home_hero_banner") {
-                Box(Modifier.heroSlideAway(lazyListState)) {
-                    HomeHero(
-                        shows = heroShows, pager = pager, vm = vm, p = p,
-                        listScrolling = lazyListState.isScrollInProgress,
-                        onAnimeClick = onAnimeClick, onPlayClick = onPlayClick
-                    )
-                }
+                HomeHero(
+                    shows = heroShows, pager = pager, vm = vm, p = p,
+                    listScrolling = lazyListState.isScrollInProgress,
+                    onAnimeClick = onAnimeClick, onPlayClick = onPlayClick
+                )
             }
         }
 
