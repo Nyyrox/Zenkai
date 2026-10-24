@@ -139,6 +139,8 @@ import com.nyyrox.aniverse.ui.theme.AniSwitch
 import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
 import com.nyyrox.aniverse.ui.theme.LocalAppColors
 import com.nyyrox.aniverse.ui.theme.ThemeMode
+import com.nyyrox.aniverse.ui.theme.ThemeRuntime
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.nyyrox.aniverse.ui.theme.aniGlass
 import com.styropyr0.prismal.PrismalGlass
 import com.nyyrox.aniverse.ui.components.BioFontSelectorPills
@@ -179,6 +181,7 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val themeSettings = LocalThemeSettings.current
+    val systemDark = isSystemInDarkTheme()
 
     val activity = remember(context) {
         var ctx = context
@@ -357,23 +360,31 @@ fun ProfileScreen(
                             Spacer(Modifier.height(12.dp))
                             Text(text = bio, style = getBioTextStyle(vm.userProfile.bioFont), color = c.textPrimary)
                         }
-                        val favoriteAnime = vm.userProfile.favoriteAnime
-                        if (favoriteAnime.isNotBlank()) {
-                            Spacer(Modifier.height(12.dp))
-                            FavoriteAnimeShowcaseCard(favoriteAnime = favoriteAnime, onAnimeClick = onAnimeClick)
-                        }
                     }
                 }
 
-                // ── Level, streak, stats: plain, no card ──────────────────
+                // ── Level, streak & library stats ─────────────────────────
                 item {
                     val level = vm.userProfile.level
                     val exp = vm.userProfile.exp
                     val progress = LevelAndStreakSystem.calculateLevelProgress(exp)
+                    val nextExp = LevelAndStreakSystem.expForNextLevel(level)
                     val equippedTag = vm.userProfile.customTag?.takeIf {
                         it.isNotBlank() && !it.equals("null", true) && !it.equals("none", true)
                     }
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                    val watching = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.WATCHING }
+                    val completed = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.COMPLETED }
+                    val planned = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.PLAN_TO_WATCH }
+                    val tile = c.skeleton.copy(alpha = 0.35f)
+
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
+                            .aniGlass(radius = 24.dp)
+                            .padding(16.dp)
+                    ) {
+                        // Level + rank tag
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AnimatedLevelThemeBadge(level = level)
                             Spacer(Modifier.width(8.dp))
@@ -382,43 +393,74 @@ fun ProfileScreen(
                                 else Text("+ Equip tag", fontSize = 12.sp, color = c.textMuted)
                             }
                             Spacer(Modifier.weight(1f))
-                            AnimatedStreakBadge(streakCount = vm.userProfile.streakCount, isFullLabel = true)
+                            Text(
+                                "Ranks",
+                                fontSize = 12.sp, color = c.textSecondary, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clickable { showNinjaTagsSheet = true }
+                            )
                         }
-                        Spacer(Modifier.height(12.dp))
+
+                        Spacer(Modifier.height(14.dp))
+
+                        // EXP progress
                         LinearProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
                             color = c.accent,
                             trackColor = c.skeleton
                         )
                         Spacer(Modifier.height(6.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(
-                                "EXP $exp / ${LevelAndStreakSystem.expForNextLevel(level)} · Best streak ${vm.userProfile.longestStreak}d",
-                                fontSize = 11.sp, color = c.textMuted
-                            )
-                            Text(
-                                "Ranks",
-                                fontSize = 11.sp, color = c.textSecondary, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.clickable { showNinjaTagsSheet = true }
-                            )
+                            Text("EXP $exp / $nextExp", fontSize = 11.sp, color = c.textMuted)
+                            Text("${(progress * 100).toInt()}%", fontSize = 11.sp, color = c.textMuted)
                         }
 
-                        Spacer(Modifier.height(20.dp))
-                        Row(Modifier.fillMaxWidth()) {
-                            Stat(vm.watchlist.count { it.watchlistStatus == WatchlistStatus.WATCHING }, "Watching", Modifier.weight(1f))
-                            Stat(vm.watchlist.count { it.watchlistStatus == WatchlistStatus.COMPLETED }, "Completed", Modifier.weight(1f))
-                            Stat(vm.watchlist.count { it.watchlistStatus == WatchlistStatus.PLAN_TO_WATCH }, "Planned", Modifier.weight(1f))
+                        Spacer(Modifier.height(16.dp))
+
+                        // Streaks
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(tile)
+                                    .padding(12.dp)
+                            ) {
+                                Text("CURRENT STREAK", fontSize = 10.sp, color = c.textMuted, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
+                                Spacer(Modifier.height(8.dp))
+                                AnimatedStreakBadge(streakCount = vm.userProfile.streakCount, isFullLabel = true)
+                            }
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(tile)
+                                    .padding(12.dp)
+                            ) {
+                                Text("BEST STREAK", fontSize = 10.sp, color = c.textMuted, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "${vm.userProfile.longestStreak} days",
+                                    fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.textPrimary
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Library stats
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(tile)
+                                .padding(vertical = 14.dp)
+                        ) {
+                            Stat(watching, "Watching", Modifier.weight(1f))
+                            Stat(completed, "Completed", Modifier.weight(1f))
+                            Stat(planned, "Planned", Modifier.weight(1f))
                         }
                     }
-                }
-
-                item {
-                    TimeSpentSectionCard(
-                        record = vm.timeSpentRecord,
-                        onResetStats = { vm.resetTimeSpentStats() },
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                    )
                 }
 
                 // ── Appearance ────────────────────────────────────────────
@@ -426,7 +468,14 @@ fun ProfileScreen(
                     Section("Appearance") {
                         ThemeModeSelector(
                             current = themeSettings.mode,
-                            onChange = { vm.setThemeMode(it) }
+                            onChange = { mode ->
+                                vm.setThemeMode(mode)
+                                ThemeRuntime.isLight = when (mode) {
+                                    ThemeMode.LIGHT -> true
+                                    ThemeMode.DARK -> false
+                                    ThemeMode.SYSTEM -> !systemDark
+                                }
+                            }
                         )
                         RowDivider()
                         SettingRow(Icons.Default.Palette, "Profile decorations", onClick = { onOpenDecorations?.invoke() })
@@ -448,7 +497,7 @@ fun ProfileScreen(
                             Icons.Default.MotionPhotosOff, "Reduced motion",
                             trailing = { AniSwitch(themeSettings.isReducedMotionEnabled) { vm.setReducedMotion(it) } }
                         )
-                        if (PrismalGlass.supportsRefraction) {
+                        if (PrismalGlass.supportsRefraction || !themeSettings.isGlassmorphismEnabled) {
                             RowDivider()
                             SettingRow(
                                 Icons.Default.AutoAwesome, "Liquid glass",
@@ -1667,8 +1716,8 @@ private fun ProfileBanner(vm: MainViewModel, scrollPx: () -> Float) {
 @Composable
 private fun Stat(count: Int, label: String, modifier: Modifier = Modifier) {
     val c = LocalAppColors.current
-    Column(modifier) {
-        Text(count.toString(), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(count.toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = c.textPrimary)
         Text(label, fontSize = 12.sp, color = c.textMuted)
     }
 }

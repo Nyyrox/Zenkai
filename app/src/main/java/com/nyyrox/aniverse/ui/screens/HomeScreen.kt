@@ -1,6 +1,18 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.foundation.background
+import com.nyyrox.aniverse.data.novel.NovelHistoryItem
+import com.nyyrox.aniverse.data.manga.MangaHistoryItem
+import com.nyyrox.aniverse.data.WatchHistoryItem
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +35,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import com.nyyrox.aniverse.ui.animation.heroScrollParallax
 import com.nyyrox.aniverse.ui.animation.staggeredEntrance
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -209,6 +220,42 @@ fun HomeScreen(
             }
         }
 
+        // Random episode cards dropped between shelves (new picks every launch)
+        val breakRnd = remember { kotlin.random.Random(System.nanoTime()) }
+        val breakSlots = remember {
+            listOf("top_rated", "fantasy", "new", "upcoming", "scifi", "romance").shuffled(breakRnd).take(3).toSet()
+        }
+        val breakPool = remember(vm.trending, vm.popular, vm.topRated, vm.actionAnime) {
+            val used = setOfNotNull(
+                (vm.popular.getOrNull(1) ?: vm.trending.getOrNull(2))?.id,
+                vm.actionAnime.firstOrNull()?.id,
+                (vm.scifiAnime.firstOrNull() ?: vm.fantasyAnime.firstOrNull())?.id
+            )
+            (vm.trending + vm.popular + vm.topRated + vm.actionAnime)
+                .distinctBy { it.id }
+                .filter { it.id !in used }
+                .shuffled(breakRnd)
+        }
+
+        // Full-screen tint behind everything: strongest at the top, melts into the page,
+        // and fades out as the hero scrolls away.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val info = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "home_hero_banner" }
+                    alpha = if (info == null) 0f else (1f + info.offset / (info.size * 1.4f)).coerceIn(0f, 1f)
+                }
+                .background(
+                    Brush.verticalGradient(
+                        0f to c.accent.copy(alpha = 0.34f),
+                        0.35f to c.accent.copy(alpha = 0.16f),
+                        0.75f to c.accent.copy(alpha = 0.05f),
+                        1f to Color.Transparent
+                    )
+                )
+        )
+
         LazyColumn(
             state = lazyListState,
             contentPadding = PaddingValues(bottom = 100.dp),
@@ -244,7 +291,7 @@ fun HomeScreen(
             if (heroShows.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .heroScrollParallax(lazyListState)
+                        .heroSlideAway(lazyListState)
                         .staggeredEntrance(index = 0)
                 ) {
                     OttHeroBanner(
@@ -266,11 +313,11 @@ fun HomeScreen(
         if (hasAnyHistory) {
             item(key = "home_continue_watching") {
                 Box(modifier = Modifier.staggeredEntrance(index = 1)) {
-                    OttUnifiedContinueWatchingRow(
+                    HomeContinueRow(
                         animeHistory = vm.history,
                         mangaHistory = vm.mangaHistory,
                         novelHistory = vm.novelHistoryList,
-                        tmdbEpisodeStills = vm.tmdbEpisodeStills,
+                        stillFor = { id, ep -> vm.tmdbEpisodeStills["${id}_$ep"] },
                         onLoadEpisodeStill = { id, ep -> vm.loadHistoryEpisodeStill(id, ep) },
                         onPlayAnime = onPlayClick,
                         onReadManga = onMangaReadClick,
@@ -382,6 +429,8 @@ fun HomeScreen(
             }
         }
 
+        if ("top_rated" in breakSlots) episodeBreak("top_rated", breakPool, 0, vm, onAnimeClick, onPlayClick)
+
         // Action & Thrills
         if (vm.actionAnime.isNotEmpty()) {
             item(key = "home_action_anime") {
@@ -438,6 +487,8 @@ fun HomeScreen(
             }
         }
 
+        if ("fantasy" in breakSlots) episodeBreak("fantasy", breakPool, 1, vm, onAnimeClick, onPlayClick)
+
         // New Releases
         if (vm.newReleases.isNotEmpty()) {
             item(key = "home_new_releases") {
@@ -452,6 +503,8 @@ fun HomeScreen(
                 }
             }
         }
+
+        if ("new" in breakSlots) episodeBreak("new", breakPool, 2, vm, onAnimeClick, onPlayClick)
 
         // Upcoming Anime
         if (vm.upcomingAnime.isNotEmpty()) {
@@ -468,6 +521,8 @@ fun HomeScreen(
             }
         }
 
+        if ("upcoming" in breakSlots) episodeBreak("upcoming", breakPool, 3, vm, onAnimeClick, onPlayClick)
+
         // Sci-Fi & Cyberpunk
         if (vm.scifiAnime.isNotEmpty()) {
             item(key = "home_scifi_anime") {
@@ -483,6 +538,8 @@ fun HomeScreen(
             }
         }
 
+        if ("scifi" in breakSlots) episodeBreak("scifi", breakPool, 4, vm, onAnimeClick, onPlayClick)
+
         // Romance & Drama
         if (vm.romanceAnime.isNotEmpty()) {
             item(key = "home_romance_anime") {
@@ -497,6 +554,8 @@ fun HomeScreen(
                 }
             }
         }
+
+        if ("romance" in breakSlots) episodeBreak("romance", breakPool, 5, vm, onAnimeClick, onPlayClick)
 
         // ── Popular Manga Shelf ──
         val mangaList = vm.mangaHome.trending.ifEmpty { vm.mangaHome.latest }
@@ -649,19 +708,7 @@ fun HomeScreen(
 private fun OttHorizontalMediaRow(
     list: List<Anime>,
     onAnimeClick: (Int) -> Unit
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        items(list, key = { it.id }) { anime ->
-            OttPosterCard(
-                anime = anime,
-                onClick = { onAnimeClick(anime.id) }
-            )
-        }
-    }
-}
+) = OttOverlapMediaRow(list = list, onAnimeClick = onAnimeClick)
 
 @Composable
 private fun HomeMangaRow(
@@ -983,11 +1030,11 @@ fun OfflineHomeScreenContent(
 
         if (hasAnyHistory) {
             item(key = "offline_continue_watching") {
-                OttUnifiedContinueWatchingRow(
+                HomeContinueRow(
                     animeHistory = vm.history,
                     mangaHistory = vm.mangaHistory,
                     novelHistory = vm.novelHistoryList,
-                    tmdbEpisodeStills = vm.tmdbEpisodeStills,
+                    stillFor = { id, ep -> vm.tmdbEpisodeStills["${id}_$ep"] },
                     onLoadEpisodeStill = { id, ep -> vm.loadHistoryEpisodeStill(id, ep) },
                     onPlayAnime = onPlayClick,
                     onReadManga = onMangaReadClick,
@@ -1170,5 +1217,382 @@ private fun OfflineMediaCard(
             fontSize = 11.sp,
             maxLines = 1
         )
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Home redesign helpers: 3D press tilt, overlapped poster rows, hero slide-away,
+//  random episode breaks, and the new Continue row.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Press = card tilts toward the finger and sinks in, release = springs back with a little bounce. */
+@Composable
+private fun Modifier.tiltClickable(maxTilt: Float = 12f, onClick: () -> Unit): Modifier {
+    val scope = rememberCoroutineScope()
+    val rx = remember { Animatable(0f) }
+    val ry = remember { Animatable(0f) }
+    val sc = remember { Animatable(1f) }
+    val density = LocalDensity.current.density
+    val latest by rememberUpdatedState(onClick)
+    return this
+        .graphicsLayer {
+            rotationX = rx.value
+            rotationY = ry.value
+            scaleX = sc.value
+            scaleY = sc.value
+            cameraDistance = 14f * density
+        }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onPress = { p ->
+                    val w = size.width.toFloat().coerceAtLeast(1f)
+                    val h = size.height.toFloat().coerceAtLeast(1f)
+                    val down = spring<Float>(stiffness = Spring.StiffnessMedium)
+                    scope.launch { ry.animateTo(((p.x / w) - 0.5f) * 2f * maxTilt, down) }
+                    scope.launch { rx.animateTo(-((p.y / h) - 0.5f) * 2f * maxTilt, down) }
+                    scope.launch { sc.animateTo(0.95f, down) }
+                    tryAwaitRelease()
+                    val back = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                    scope.launch { ry.animateTo(0f, back) }
+                    scope.launch { rx.animateTo(0f, back) }
+                    scope.launch { sc.animateTo(1f, back) }
+                },
+                onTap = { latest() }
+            )
+        }
+}
+
+/**
+ * Hero leaves like a layer under the page: it drifts up slower than the content (parallax),
+ * zooms in a touch and fades out, instead of shrinking back. Content slides over it.
+ */
+private fun Modifier.heroSlideAway(state: LazyListState): Modifier = graphicsLayer {
+    val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "home_hero_banner" }
+    if (info == null) {
+        alpha = 0f
+        return@graphicsLayer
+    }
+    val scrolled = (-info.offset).toFloat().coerceAtLeast(0f)
+    val frac = (scrolled / info.size.coerceAtLeast(1)).coerceIn(0f, 1f)
+    transformOrigin = TransformOrigin(0.5f, 0f)
+    translationY = scrolled * 0.55f
+    val s = 1f + 0.06f * frac
+    scaleX = s
+    scaleY = s
+    alpha = (1f - frac * 1.25f).coerceIn(0f, 1f)
+}
+
+// ── Overlapped poster row (front card big, the rest tucked behind, 3D on swipe) ──
+
+private val OverlapCardW = 150.dp
+private val OverlapCardH = 214.dp
+private val OverlapAmount = 38.dp
+
+@Composable
+private fun OttOverlapMediaRow(list: List<Anime>, onAnimeClick: (Int) -> Unit) {
+    val listState = rememberLazyListState()
+    val stepPx = with(LocalDensity.current) { (OverlapCardW - OverlapAmount).toPx() }
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(start = 18.dp, end = 56.dp, top = 14.dp, bottom = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(-OverlapAmount)
+    ) {
+        itemsIndexed(list, key = { _, a -> a.id }) { idx, anime ->
+            // 0 = card in the front slot, 1 = next one behind it, negative = leaving to the left
+            val rel: () -> Float = {
+                val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == idx }
+                if (info == null) 4f else info.offset / stepPx
+            }
+            OverlapPosterCard(
+                anime = anime,
+                depth = (list.size - idx).toFloat(),
+                rel = rel,
+                onClick = { onAnimeClick(anime.id) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun OverlapPosterCard(anime: Anime, depth: Float, rel: () -> Float, onClick: () -> Unit) {
+    val c = LocalAppColors.current
+    val shape = RoundedCornerShape(20.dp)
+    val meta = remember(anime.id) {
+        listOfNotNull(anime.displayFormat, anime.score?.let { "$it%" }).joinToString(" · ")
+    }
+    Box(
+        Modifier
+            .zIndex(depth) // earlier cards sit on top of later ones
+            .graphicsLayer {
+                val r = rel()
+                val behind = r.coerceIn(0f, 3f)
+                val leaving = (-r).coerceIn(0f, 1f)
+                val s = 1f - 0.075f * behind - 0.10f * leaving
+                scaleX = s
+                scaleY = s
+                rotationY = -9f * behind.coerceAtMost(2f) + 26f * leaving
+                alpha = 1f - 0.55f * leaving
+                cameraDistance = 14f * density
+            }
+            .width(OverlapCardW)
+            .height(OverlapCardH)
+            .tiltClickable(onClick = onClick)
+            .clip(shape)
+            .background(c.skeleton)
+    ) {
+        AsyncImage(
+            model = anime.cover,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color(0xCC000000))
+            )
+        )
+        // cards further back get darker, so the front one reads as the focus
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val r = rel()
+                    alpha = (0.16f * r.coerceIn(0f, 3f) + 0.30f * (-r).coerceIn(0f, 1f)).coerceAtMost(0.5f)
+                }
+                .background(Color.Black)
+        )
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+        ) {
+            Text(
+                text = anime.displayTitle,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                lineHeight = 16.sp,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (meta.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(text = meta, fontSize = 11.sp, color = Color(0xB3FFFFFF), maxLines = 1)
+            }
+        }
+    }
+}
+
+// ── Random episode cards dropped between shelves ──
+
+private fun LazyListScope.episodeBreak(
+    slot: String,
+    pool: List<Anime>,
+    order: Int,
+    vm: MainViewModel,
+    onAnimeClick: (Int) -> Unit,
+    onPlayClick: (animeId: Int, episode: Int) -> Unit
+) {
+    val anime = pool.getOrNull(order) ?: return
+    item(key = "ep_break_${slot}_${anime.id}") {
+        val epNum = remember(anime.id, anime.episodes, anime.isMovie) {
+            if (anime.isMovie || anime.episodes == 1) 1
+            else {
+                val maxEp = (anime.episodes ?: 12).coerceAtLeast(1)
+                ((anime.id % maxEp) + 1).coerceIn(1, maxEp)
+            }
+        }
+        val titles = listOf("Jump Into an Episode", "Pick Up Here", "Top Episode Right Now", "Don't Miss This")
+        val artwork = vm.tmdbArtworks[anime.id]
+        Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            OttSectionHeader(title = titles[order % titles.size])
+            YouTubeStyleEpisodeCard(
+                anime = anime,
+                episodeNumber = epNum,
+                badgeText = "TOP EPISODE",
+                episodeStill = vm.tmdbEpisodeStills["${anime.id}_$epNum"],
+                logoUrl = artwork?.logoUrl,
+                tmdbTitle = artwork?.title,
+                onLoadStill = { vm.loadTmdbEpisodeStill(anime, epNum) },
+                onLoadArtwork = { vm.loadTmdbArtwork(anime) },
+                onAnimeClick = onAnimeClick,
+                onPlayClick = onPlayClick
+            )
+        }
+    }
+}
+
+// ── Continue row: wide cards, progress bar, type chip, quick remove ──
+
+private enum class ContinueKind(val label: String) { ANIME("ANIME"), MANGA("MANGA"), NOVEL("NOVEL") }
+
+private class ContinueEntry(
+    val key: String,
+    val kind: ContinueKind,
+    val title: String,
+    val subtitle: String,
+    val progress: Float,
+    val image: () -> Any?,
+    val onOpen: () -> Unit,
+    val onRemove: () -> Unit,
+    val loadStill: (() -> Unit)? = null
+)
+
+private fun firstNonBlank(vararg s: String?): String? = s.firstOrNull { !it.isNullOrBlank() }
+
+private fun Number?.asLong(): Long = this?.toLong() ?: 0L
+
+@Composable
+private fun HomeContinueRow(
+    animeHistory: List<WatchHistoryItem>,
+    mangaHistory: List<MangaHistoryItem>,
+    novelHistory: List<NovelHistoryItem>,
+    stillFor: (Int, Int) -> String?,
+    onLoadEpisodeStill: (Int, Int) -> Unit,
+    onPlayAnime: (Int, Int) -> Unit,
+    onReadManga: (String, String) -> Unit,
+    onReadNovel: (String, String) -> Unit,
+    onRemoveAnime: (Int) -> Unit,
+    onRemoveManga: (String) -> Unit,
+    onRemoveNovel: (String) -> Unit
+) {
+    val entries = remember(animeHistory, mangaHistory, novelHistory) {
+        val out = ArrayList<ContinueEntry>()
+        animeHistory.forEach { h ->
+            val ep = h.lastEpisode
+            val pos = h.positionMs.asLong()
+            val dur = h.durationMs.asLong()
+            val left = ((dur - pos) / 60_000L).coerceAtLeast(1L)
+            out += ContinueEntry(
+                key = "a_${h.animeId}",
+                kind = ContinueKind.ANIME,
+                title = h.title,
+                subtitle = "EP $ep" + if (dur > 0L) " · ${left}m left" else "",
+                progress = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f,
+                image = { firstNonBlank(stillFor(h.animeId, ep), h.banner, h.cover) },
+                onOpen = { onPlayAnime(h.animeId, ep) },
+                onRemove = { onRemoveAnime(h.animeId) },
+                loadStill = { onLoadEpisodeStill(h.animeId, ep) }
+            )
+        }
+        mangaHistory.forEach { m ->
+            val total = m.pageCount
+            out += ContinueEntry(
+                key = "m_${m.mangaId}",
+                kind = ContinueKind.MANGA,
+                title = m.title,
+                subtitle = "Ch ${m.chapterNumber}" + if (total > 0) " · p${m.pageIndex + 1}/$total" else "",
+                progress = if (total > 0) ((m.pageIndex + 1).toFloat() / total).coerceIn(0f, 1f) else 0f,
+                image = { m.poster },
+                onOpen = { onReadManga(m.mangaId, m.chapterId) },
+                onRemove = { onRemoveManga(m.mangaId) }
+            )
+        }
+        novelHistory.forEach { n ->
+            val chapter = (n.lastChapterTitle as String?)?.takeIf { it.isNotBlank() } ?: "Continue reading"
+            out += ContinueEntry(
+                key = "n_${n.slug}",
+                kind = ContinueKind.NOVEL,
+                title = n.title,
+                subtitle = chapter,
+                progress = 0f,
+                image = { n.cover },
+                onOpen = { onReadNovel(n.slug, n.lastChapterSlug ?: "") },
+                onRemove = { onRemoveNovel(n.slug) }
+            )
+        }
+        out.take(20)
+    }
+    if (entries.isEmpty()) return
+
+    Column(Modifier.fillMaxWidth()) {
+        OttSectionHeader(title = "Continue")
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(entries, key = { it.key }) { e -> ContinueCard(e) }
+        }
+    }
+}
+
+@Composable
+private fun ContinueCard(e: ContinueEntry) {
+    val c = LocalAppColors.current
+    LaunchedEffect(e.key) { e.loadStill?.invoke() }
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        Modifier
+            .width(272.dp)
+            .aspectRatio(16f / 9f)
+            .tiltClickable(maxTilt = 8f, onClick = e.onOpen)
+            .clip(shape)
+            .background(c.skeleton)
+    ) {
+        AsyncImage(
+            model = e.image(),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alignment = if (e.kind == ContinueKind.ANIME) Alignment.Center else Alignment.TopCenter
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0f to Color(0x55000000), 0.4f to Color.Transparent, 1f to Color(0xE6000000))
+            )
+        )
+        // type chip
+        Text(
+            text = e.kind.label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(10.dp)
+                .clip(CircleShape)
+                .background(Color(0x66000000))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+        // quick remove
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(Color(0x66000000))
+                .clickable(onClick = e.onRemove),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(14.dp))
+        }
+        // title + subtitle + play
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(e.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(2.dp))
+                Text(e.subtitle, fontSize = 11.5.sp, color = Color(0xB3FFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(10.dp))
+            Box(
+                Modifier.size(38.dp).clip(CircleShape).background(c.accent),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = c.onAccent, modifier = Modifier.size(22.dp))
+            }
+        }
+        // progress
+        if (e.progress > 0f) {
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x40FFFFFF)))
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(e.progress).height(3.dp).background(c.accent))
+        }
     }
 }

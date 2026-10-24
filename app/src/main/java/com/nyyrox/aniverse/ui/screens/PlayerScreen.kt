@@ -1999,49 +1999,14 @@ fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modi
 }
 
 /**
- * Live ambient backdrop: the current episode still, blurred, slowly drifting, crossfading when the episode changes.
- * Fades into the theme background (black in dark, soft white in light). Every glass control samples this layer.
+ * Plain themed backdrop: solid dark (AMOLED) or solid light, no artwork, no gradient.
+ * Glass controls still sample this layer, so liquid glass keeps working when it is on.
  */
 @Composable
 fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
     if (layer == null) return
     val c = LocalAppColors.current
-    val isDark = LocalIsDark.current
-    val t = rememberInfiniteTransition(label = "ambient")
-    val drift by t.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "drift"
-    )
-    Box(modifier.prismalGlassLayer(layer).background(c.bg)) {
-        Crossfade(targetState = model, animationSpec = tween(900), label = "ambientFade") { art ->
-            AsyncImage(
-                model = art,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(40.dp)
-                    .graphicsLayer {
-                        scaleX = 1.4f
-                        scaleY = 1.4f
-                        translationX = (drift - 0.5f) * 140f
-                        translationY = (0.5f - drift) * 90f
-                    }
-                    .alpha(if (isDark) 0.55f else 0.34f)
-            )
-        }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(c.bg.copy(alpha = 0.05f), c.bg.copy(alpha = 0.78f), c.bg)
-                    )
-                )
-        )
-    }
+    Box(modifier.prismalGlassLayer(layer).background(c.bg))
 }
 
 /** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. [active] = solid accent. */
@@ -2134,7 +2099,7 @@ private fun PlayerAction(
     }
 }
 
-/** Segmented control: Prismal liquid-glass droplet when glass is on, flat pill track otherwise. */
+/** Segmented control: clean flat pill track, same in dark and light. Every tab gets equal width. */
 @Composable
 private fun PlayerSegmented(
     labels: List<String>,
@@ -2145,49 +2110,32 @@ private fun PlayerSegmented(
     height: Dp = 44.dp
 ) {
     val c = LocalAppColors.current
-    val isDark = LocalIsDark.current
-    if (backdrop != null) {
-        PrismalSegmentedControl(
-            labels = labels,
-            selectedIndex = selectedIndex,
-            onSelected = onSelected,
-            backdrop = backdrop,
-            modifier = modifier
-                .clip(CircleShape)
-                .background(if (isDark) Color(0x59000000) else Color(0x66FFFFFF))
-                .border(1.dp, c.glass.border, CircleShape),
-            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-            textColor = c.textPrimary,
-            height = height
-        )
-    } else {
-        Row(
-            modifier = modifier
-                .height(height)
-                .clip(CircleShape)
-                .background(c.surfaceElevated)
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            labels.forEachIndexed { i, label ->
-                val selected = i == selectedIndex
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(CircleShape)
-                        .background(if (selected) c.accent else Color.Transparent)
-                        .clickable { onSelected(i) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (selected) c.onAccent else c.textSecondary,
-                        maxLines = 1
-                    )
-                }
+    Row(
+        modifier = modifier
+            .height(height)
+            .clip(CircleShape)
+            .background(c.surfaceElevated)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        labels.forEachIndexed { i, label ->
+            val selected = i == selectedIndex
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .background(if (selected) c.accent else Color.Transparent)
+                    .clickable { onSelected(i) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) c.onAccent else c.textSecondary,
+                    maxLines = 1
+                )
             }
         }
     }
