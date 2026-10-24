@@ -1,6 +1,20 @@
 package com.nyyrox.aniverse.ui.screens
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.util.lerp
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -40,9 +54,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,8 +88,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -101,7 +110,6 @@ import com.nyyrox.aniverse.viewmodel.MainViewModel
 import com.styropyr0.prismal.PrismalGlass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Self-contained Home. No Ott* / Ani* components, no cards.
@@ -435,108 +443,214 @@ private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: Ho
     }
 }
 
-// ── Hero: small swipeable 3D card stack ─────────────────────────────────────
+// ── Hero: scattered card stack, swipe down to cycle (infinite), blurred poster backdrop ──
 
-private val HeroCardW = 176.dp
-private val HeroCardH = 258.dp
+private val HeroCardW = 200.dp
+private val HeroCardH = 292.dp
+private val HeroCardShape = RoundedCornerShape(14.dp)
+
+private class HeroPose(val rot: Float, val tx: Float, val ty: Float, val scale: Float, val alpha: Float)
+
+/** tx = fraction of card width, ty = dp. Slot 0 is the front card. */
+private fun heroPose(slot: Int): HeroPose = when (slot) {
+    0 -> HeroPose(0f, 0f, 0f, 1f, 1f)
+    1 -> HeroPose(7f, 0.30f, 10f, 0.93f, 1f)
+    2 -> HeroPose(-7f, -0.30f, 10f, 0.93f, 1f)
+    else -> HeroPose(-7f, -0.30f, 10f, 0.88f, 0f)
+}
+
+/** Blurred poster that fades out toward the bottom so it melts into the page gradient. */
+@Composable
+private fun HeroBackdrop(poster: String?, p: HomePalette, modifier: Modifier) {
+    Crossfade(
+        targetState = poster,
+        modifier = modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    Brush.verticalGradient(0.40f to Color.Black, 1f to Color.Transparent),
+                    blendMode = BlendMode.DstIn
+                )
+            },
+        label = "heroBg"
+    ) { url ->
+        Box(Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = url, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(40.dp)
+                    .graphicsLayer { scaleX = 1.25f; scaleY = 1.25f; alpha = if (p.dark) 0.60f else 0.50f }
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(p.gradTop.copy(alpha = 0.45f), Color.Transparent))
+                )
+            )
+        }
+    }
+}
 
 @Composable
 private fun HomeHero(
     shows: List<Anime>,
-    pager: PagerState,
     vm: MainViewModel,
     p: HomePalette,
     listScrolling: Boolean,
     onAnimeClick: (Int) -> Unit
 ) {
     val reduced = LocalThemeSettings.current.isReducedMotionEnabled
-    val dragging = pager.isScrollInProgress
-    LaunchedEffect(shows.size, listScrolling, dragging, reduced) {
-        if (shows.size < 2 || listScrolling || dragging || reduced) return@LaunchedEffect
+    val n = shows.size
+    var index by remember { mutableIntStateOf(0) }
+    var dragging by remember { mutableStateOf(false) }
+    val dragY = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val dn = LocalDensity.current
+    val travel = with(dn) { (HeroCardH + 40.dp).toPx() }
+    val current = Math.floorMod(index, n)
+
+    LaunchedEffect(current, n) {
+        for (k in 0..3) vm.loadTmdbArtwork(shows[Math.floorMod(index + k, n)])
+    }
+
+    LaunchedEffect(n, listScrolling, dragging, reduced) {
+        if (n < 2 || listScrolling || dragging || reduced) return@LaunchedEffect
         while (true) {
             delay(6000)
-            pager.animateScrollToPage((pager.currentPage + 1) % shows.size)
+            dragY.animateTo(travel, tween(320, easing = FastOutSlowInEasing))
+            index += 1
+            dragY.snapTo(0f)
         }
     }
 
-    val scope = rememberCoroutineScope()
-    val screenW = LocalConfiguration.current.screenWidthDp.dp
-    val sidePad = ((screenW - HeroCardW) / 2).coerceAtLeast(0.dp)
-    val current = pager.currentPage.coerceIn(0, shows.lastIndex)
+    suspend fun settle() {
+        if (dragY.value > travel * 0.30f) {
+            dragY.animateTo(travel, tween(220, easing = FastOutSlowInEasing))
+            index += 1
+            dragY.snapTo(0f)
+        } else {
+            dragY.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+        }
+    }
 
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        // clears the floating top bar (separate file)
-        Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(88.dp))
+    Box(Modifier.fillMaxWidth()) {
+        HeroBackdrop(shows[current].cover, p, Modifier.matchParentSize())
 
-        HorizontalPager(
-            state = pager,
-            contentPadding = PaddingValues(horizontal = sidePad),
-            pageSpacing = 0.dp,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().height(HeroCardH + 12.dp)
-        ) { page ->
-            val anime = shows[page]
-            LaunchedEffect(anime.id) { vm.loadTmdbArtwork(anime) }
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // clears the floating top bar (separate file)
+            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
+
             Box(
                 Modifier
-                    .zIndex(-abs(page - pager.currentPage).toFloat())
-                    .width(HeroCardW)
-                    .height(HeroCardH)
-                    .graphicsLayer {
-                        val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
-                        val a = abs(off).coerceAtMost(2f)
-                        val s = 1f - 0.13f * a.coerceAtMost(1f) - 0.05f * (a - 1f).coerceAtLeast(0f)
-                        scaleX = s
-                        scaleY = s
-                        rotationY = (off * 28f).coerceIn(-40f, 40f)
-                        translationX = off * size.width * 0.27f
-                        alpha = (1f - 0.35f * a).coerceIn(0.25f, 1f)
-                        cameraDistance = 14f * density
-                    }
-                    .clip(RoundedCornerShape(18.dp))
-                    .shimmer(p)
-                    .tap {
-                        if (pager.currentPage == page) onAnimeClick(anime.id)
-                        else scope.launch { pager.animateScrollToPage(page) }
-                    }
+                    .fillMaxWidth()
+                    .height(HeroCardH + 32.dp)
+                    .pointerInput(n) {
+                        if (n < 2) return@pointerInput
+                        detectVerticalDragGestures(
+                            onDragStart = { dragging = true; scope.launch { dragY.stop() } },
+                            onDragEnd = { dragging = false; scope.launch { settle() } },
+                            onDragCancel = { dragging = false; scope.launch { settle() } },
+                            onVerticalDrag = { change, amount ->
+                                change.consume()
+                                scope.launch { dragY.snapTo((dragY.value + amount).coerceAtLeast(0f)) }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = anime.cover, contentDescription = anime.displayTitle,
-                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-                )
-            }
-        }
-
-        Spacer(Modifier.height(18.dp))
-
-        Crossfade(targetState = current, label = "heroInfo") { idx ->
-            val anime = shows[idx.coerceIn(0, shows.lastIndex)]
-            val title = vm.tmdbArtworks[anime.id]?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
-            val genres = anime.genres.take(2).joinToString(" • ")
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (genres.isNotBlank()) {
-                    Text(genres, color = p.textMuted, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(3.dp))
-                }
-                Text(
-                    title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
-                    fontWeight = FontWeight.Bold, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(5.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    if (!anime.displayFormat.isNullOrBlank()) {
-                        Text(anime.displayFormat ?: "", color = p.textSub, fontSize = 13.sp, maxLines = 1)
+                val slots = minOf(n, 4)
+                for (slot in slots - 1 downTo 0) {
+                    val anime = shows[Math.floorMod(index + slot, n)]
+                    key(anime.id) {
+                        val front = slot == 0
+                        Box(
+                            Modifier
+                                .width(HeroCardW)
+                                .height(HeroCardH)
+                                .graphicsLayer {
+                                    val pr = (dragY.value / travel).coerceIn(0f, 1f)
+                                    if (front) {
+                                        translationY = dragY.value
+                                        rotationZ = pr * 6f
+                                        val s = 1f - 0.05f * pr
+                                        scaleX = s; scaleY = s
+                                        alpha = 1f - 0.7f * pr
+                                    } else {
+                                        val a = heroPose(slot)
+                                        val b = heroPose(slot - 1)
+                                        translationX = lerp(a.tx, b.tx, pr) * size.width
+                                        translationY = lerp(a.ty, b.ty, pr) * density
+                                        rotationZ = lerp(a.rot, b.rot, pr)
+                                        val s = lerp(a.scale, b.scale, pr)
+                                        scaleX = s; scaleY = s
+                                        alpha = lerp(a.alpha, b.alpha, pr)
+                                    }
+                                }
+                                .shadow(14.dp, HeroCardShape, clip = false)
+                                .clip(HeroCardShape)
+                                .shimmer(p)
+                                .then(if (front) Modifier.tap { onAnimeClick(anime.id) } else Modifier)
+                        ) {
+                            AsyncImage(
+                                model = anime.cover, contentDescription = anime.displayTitle,
+                                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                            )
+                        }
                     }
-                    if (ratingText(anime) != null) {
-                        if (!anime.displayFormat.isNullOrBlank()) Text("  ·  ", color = p.textMuted, fontSize = 13.sp)
-                        RatingText(anime, p, 14.dp, 14.sp)
+                }
+            }
+
+            Spacer(Modifier.height(22.dp))
+
+            Crossfade(targetState = current, label = "heroInfo") { idx ->
+                val anime = shows[Math.floorMod(idx, n)]
+                val artwork = vm.tmdbArtworks[anime.id]
+                val title = artwork?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+                val logo = artwork?.logoUrl?.takeIf { it.isNotBlank() }
+                val genres = anime.genres.take(2).joinToString(" • ")
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (logo != null) {
+                        SubcomposeAsyncImage(
+                            model = logo, contentDescription = title,
+                            modifier = Modifier.heightIn(max = 64.dp).fillMaxWidth(0.62f),
+                            contentScale = ContentScale.Fit,
+                            error = {
+                                Text(
+                                    title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
+                                    fontWeight = FontWeight.Bold, maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                                )
+                            }
+                        )
+                    } else {
+                        Text(
+                            title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
+                            fontWeight = FontWeight.Bold, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        if (!anime.displayFormat.isNullOrBlank()) {
+                            Text(anime.displayFormat ?: "", color = p.textSub, fontSize = 13.sp, maxLines = 1)
+                        }
+                        if (ratingText(anime) != null) {
+                            if (!anime.displayFormat.isNullOrBlank()) Text("  ·  ", color = p.textMuted, fontSize = 13.sp)
+                            RatingText(anime, p, 14.dp, 14.sp)
+                        }
+                    }
+                    if (genres.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(genres, color = p.textMuted, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
@@ -907,21 +1021,20 @@ fun HomeScreen(
         val heroShows = remember(vm.trending, vm.popular) {
             (vm.trending + vm.popular).distinctBy { it.id }.take(10)
         }
-        val pager = rememberPagerState(pageCount = { heroShows.size })
 
         if (p.glassOn) {
             GlassBackdropHost(
                 background = { HomeBackdrop(p) }
             ) {
                 HomeFeed(
-                    vm, p, heroShows, pager, lazyListState,
+                    vm, p, heroShows, lazyListState,
                     onAnimeClick, onPlayClick, onMangaClick, onMangaReadClick, onNovelClick, onNovelReadClick
                 )
             }
         } else {
             HomeBackdrop(p)
             HomeFeed(
-                vm, p, heroShows, pager, lazyListState,
+                vm, p, heroShows, lazyListState,
                 onAnimeClick, onPlayClick, onMangaClick, onMangaReadClick, onNovelClick, onNovelReadClick
             )
         }
@@ -933,7 +1046,6 @@ private fun HomeFeed(
     vm: MainViewModel,
     p: HomePalette,
     heroShows: List<Anime>,
-    pager: PagerState,
     lazyListState: LazyListState,
     onAnimeClick: (Int) -> Unit,
     onPlayClick: (animeId: Int, episode: Int) -> Unit,
@@ -1000,7 +1112,7 @@ private fun HomeFeed(
         if (heroShows.isNotEmpty()) {
             item(key = "home_hero_banner") {
                 HomeHero(
-                    shows = heroShows, pager = pager, vm = vm, p = p,
+                    shows = heroShows, vm = vm, p = p,
                     listScrolling = lazyListState.isScrollInProgress,
                     onAnimeClick = onAnimeClick
                 )
