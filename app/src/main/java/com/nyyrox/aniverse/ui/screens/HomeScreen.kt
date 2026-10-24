@@ -77,23 +77,12 @@ import com.nyyrox.aniverse.ui.components.OttSectionHeader
 import com.nyyrox.aniverse.ui.components.OttTop10Row
 import com.nyyrox.aniverse.ui.components.PosterRowSkeleton
 import com.nyyrox.aniverse.ui.components.Top10RowSkeleton
-import com.nyyrox.aniverse.ui.theme.OttAccentGold
-import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttCardShape
-import com.nyyrox.aniverse.ui.theme.OttHeroGradient
-import com.nyyrox.aniverse.ui.theme.OttPillShape
-import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.OttSecondary
-import com.nyyrox.aniverse.ui.theme.OttSurface
-import com.nyyrox.aniverse.ui.theme.OttSurfaceBorder
-import com.nyyrox.aniverse.ui.theme.OttSurfaceElevated
-import com.nyyrox.aniverse.ui.theme.OttTextMuted
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
-import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import com.nyyrox.aniverse.R
 import com.nyyrox.aniverse.ui.components.ZenkaiCommunityRow
+import com.nyyrox.aniverse.ui.theme.AniButton
+import com.nyyrox.aniverse.ui.theme.LocalAppColors
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import androidx.compose.animation.core.Animatable
@@ -139,10 +128,12 @@ fun HomeScreen(
         }
     }
 
+    val c = LocalAppColors.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(OttBg)
+            .background(c.bg)
     ) {
 
         if (vm.homeLoading && vm.trending.isEmpty()) {
@@ -231,13 +222,13 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 2.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x18FFD54F))
+                        .background(c.surfaceElevated)
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = vm.homeError ?: "",
                         fontSize = 11.5.sp,
-                        color = Color(0xFFFFE082),
+                        color = c.textSecondary,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -245,7 +236,7 @@ fun HomeScreen(
             }
         }
 
-        // Featured 3D Stacked Hero Banner (10-15 different shows)
+        // Full-bleed hero (up to 15 shows)
         item(key = "home_hero_banner") {
             val heroShows = remember(vm.trending, vm.popular) {
                 (vm.trending + vm.popular).distinctBy { it.id }.take(15)
@@ -297,8 +288,7 @@ fun HomeScreen(
             item(key = "home_trending_episodes_header") {
                 Column(modifier = Modifier.staggeredEntrance(index = 2)) {
                     OttSectionHeader(
-                        title = "Trending Top Watched",
-                        subtitle = "Popular episodes streaming right now"
+                        title = "Trending Top Watched"
                     )
                 }
             }
@@ -326,8 +316,7 @@ fun HomeScreen(
             item(key = "home_top_10") {
                 Column(modifier = Modifier.staggeredEntrance(index = 2)) {
                     OttSectionHeader(
-                        title = "Top 10 Today",
-                        subtitle = "Most streamed titles right now"
+                        title = "Top 10 Today"
                     )
                     OttTop10Row(
                         list = vm.trending,
@@ -342,8 +331,7 @@ fun HomeScreen(
             item(key = "home_popular_series") {
                 Column(modifier = Modifier.staggeredEntrance(index = 3)) {
                     OttSectionHeader(
-                        title = "Popular Series",
-                        subtitle = "Fan favorites and trending hits"
+                        title = "Popular Series"
                     )
                     OttHorizontalMediaRow(
                         list = vm.popular,
@@ -361,8 +349,7 @@ fun HomeScreen(
                 val epStill = vm.tmdbEpisodeStills["${spotlight1.id}_1"]
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 4)) {
                     OttSectionHeader(
-                        title = "Must Watch Spotlight",
-                        subtitle = "Trending worldwide on Zenkai"
+                        title = "Must Watch Spotlight"
                     )
                     YouTubeStyleEpisodeCard(
                         anime = spotlight1,
@@ -385,8 +372,7 @@ fun HomeScreen(
             item(key = "home_top_rated") {
                 Column(modifier = Modifier.staggeredEntrance(index = 4)) {
                     OttSectionHeader(
-                        title = "Critically Acclaimed",
-                        subtitle = "Highest rated by global community"
+                        title = "Critically Acclaimed"
                     )
                     OttHorizontalMediaRow(
                         list = vm.topRated,
@@ -401,8 +387,7 @@ fun HomeScreen(
             item(key = "home_action_anime") {
                 Column(modifier = Modifier.staggeredEntrance(index = 5)) {
                     OttSectionHeader(
-                        title = "Action & High Adrenaline",
-                        subtitle = "Epic fights and supernatural showdowns"
+                        title = "Action & High Adrenaline"
                     )
                     OttHorizontalMediaRow(
                         list = vm.actionAnime,
@@ -420,8 +405,7 @@ fun HomeScreen(
                 val epStill = vm.tmdbEpisodeStills["${actionSpotlight.id}_1"]
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 6)) {
                     OttSectionHeader(
-                        title = "Action Spotlight",
-                        subtitle = "High octane showdowns and epic fights"
+                        title = "Action Spotlight"
                     )
                     YouTubeStyleEpisodeCard(
                         anime = actionSpotlight,
@@ -444,8 +428,7 @@ fun HomeScreen(
             item(key = "home_fantasy_anime") {
                 Column(modifier = Modifier.staggeredEntrance(index = 6)) {
                     OttSectionHeader(
-                        title = "Fantasy & Magic",
-                        subtitle = "Immersive worlds and magical adventures"
+                        title = "Fantasy & Magic"
                     )
                     OttHorizontalMediaRow(
                         list = vm.fantasyAnime,
@@ -460,8 +443,7 @@ fun HomeScreen(
             item(key = "home_new_releases") {
                 Column(modifier = Modifier.staggeredEntrance(index = 7)) {
                     OttSectionHeader(
-                        title = "New Releases",
-                        subtitle = "Freshly airing broadcast episodes"
+                        title = "New Releases"
                     )
                     OttHorizontalMediaRow(
                         list = vm.newReleases,
@@ -476,8 +458,7 @@ fun HomeScreen(
             item(key = "home_upcoming_anime") {
                 Column(modifier = Modifier.staggeredEntrance(index = 8)) {
                     OttSectionHeader(
-                        title = "Upcoming Shows",
-                        subtitle = "Most anticipated upcoming titles"
+                        title = "Upcoming Shows"
                     )
                     OttHorizontalMediaRow(
                         list = vm.upcomingAnime,
@@ -492,8 +473,7 @@ fun HomeScreen(
             item(key = "home_scifi_anime") {
                 Column(modifier = Modifier.staggeredEntrance(index = 9)) {
                     OttSectionHeader(
-                        title = "Sci-Fi & Cyberpunk",
-                        subtitle = "Futuristic realms and tech thrillers"
+                        title = "Sci-Fi & Cyberpunk"
                     )
                     OttHorizontalMediaRow(
                         list = vm.scifiAnime,
@@ -508,8 +488,7 @@ fun HomeScreen(
             item(key = "home_romance_anime") {
                 Column(modifier = Modifier.staggeredEntrance(index = 10)) {
                     OttSectionHeader(
-                        title = "Romance & Slice of Life",
-                        subtitle = "Heartwarming stories and emotional journeys"
+                        title = "Romance & Slice of Life"
                     )
                     OttHorizontalMediaRow(
                         list = vm.romanceAnime,
@@ -525,8 +504,7 @@ fun HomeScreen(
             item(key = "home_popular_manga") {
                 Column(modifier = Modifier.staggeredEntrance(index = 10)) {
                     OttSectionHeader(
-                        title = "Popular Manga",
-                        subtitle = "Trending manga, manhwa & comics"
+                        title = "Popular Manga"
                     )
                     HomeMangaRow(
                         list = mangaList,
@@ -542,8 +520,7 @@ fun HomeScreen(
             item(key = "home_popular_novels") {
                 Column(modifier = Modifier.staggeredEntrance(index = 11)) {
                     OttSectionHeader(
-                        title = "Top Light Novels",
-                        subtitle = "Most read novels & web serials"
+                        title = "Top Light Novels"
                     )
                     HomeNovelRow(
                         list = novelList,
@@ -561,8 +538,7 @@ fun HomeScreen(
                 val epStill = vm.tmdbEpisodeStills["${featureSpotlight.id}_1"]
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp).staggeredEntrance(index = 11)) {
                     OttSectionHeader(
-                        title = "Featured Spotlight",
-                        subtitle = "Handpicked masterpiece with full episodes"
+                        title = "Featured Spotlight"
                     )
                     YouTubeStyleEpisodeCard(
                         anime = featureSpotlight,
@@ -585,8 +561,7 @@ fun HomeScreen(
             item(key = "home_explore_header") {
                 Column(modifier = Modifier.padding(top = 10.dp).staggeredEntrance(index = 12)) {
                     OttSectionHeader(
-                        title = "Top Episodes & Discover",
-                        subtitle = "Stream top episodes and explore genres"
+                        title = "Top Episodes & Discover"
                     )
                 }
             }
@@ -638,8 +613,7 @@ fun HomeScreen(
                             .padding(vertical = 6.dp)
                     ) {
                         OttSectionHeader(
-                            title = genreTitle,
-                            subtitle = "Top recommended titles in this genre"
+                            title = genreTitle
                         )
                         OttHorizontalMediaRow(
                             list = genreList,
@@ -659,7 +633,7 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
-                            color = OttPrimary,
+                            color = c.accent,
                             strokeWidth = 3.dp,
                             modifier = Modifier.size(28.dp)
                         )
@@ -699,67 +673,12 @@ private fun HomeMangaRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(list, key = { "manga_${it.id}" }) { manga ->
-            Column(
-                modifier = Modifier
-                    .width(118.dp)
-                    .clickable { onMangaClick(manga.id) }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(172.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141822))
-                ) {
-                    AsyncImage(
-                        model = manga.poster,
-                        contentDescription = manga.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color(0xB3000000))
-                                )
-                            )
-                    )
-                    val chText: String = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga")
-                    if (chText.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(6.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x8A000000))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = chText,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = OttAccentGold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = manga.title,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    lineHeight = 16.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            HomePosterTile(
+                title = manga.title,
+                image = manga.poster,
+                meta = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga"),
+                onClick = { onMangaClick(manga.id) }
+            )
         }
     }
 }
@@ -774,76 +693,49 @@ private fun HomeNovelRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(list, key = { "novel_${it.slug}" }) { novel ->
-            Column(
-                modifier = Modifier
-                    .width(118.dp)
-                    .clickable { onNovelClick(novel.slug) }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(172.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141822))
-                ) {
-                    AsyncImage(
-                        model = novel.cover,
-                        contentDescription = novel.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color(0xB3000000))
-                                )
-                            )
-                    )
-                    val badge: String = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source)
-                    if (badge.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(6.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x8A000000))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = badge,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = novel.title,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    lineHeight = 16.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            HomePosterTile(
+                title = novel.title,
+                image = novel.cover,
+                meta = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source),
+                onClick = { onNovelClick(novel.slug) }
+            )
+        }
+    }
+}
+
+/** Same look as OttPosterCard: plain poster, title, one muted meta line. */
+@Composable
+private fun HomePosterTile(title: String, image: String?, meta: String?, onClick: () -> Unit) {
+    val c = LocalAppColors.current
+    Column(modifier = Modifier.width(118.dp).clickable(onClick = onClick)) {
+        AsyncImage(
+            model = image,
+            contentDescription = null, // title below labels the tile
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(172.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(c.skeleton),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = c.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (!meta.isNullOrBlank()) {
+            Text(text = meta, fontSize = 11.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 /**
- * YouTube-style episode feed card with 16:9 thumbnail, duration and episode badge,
- * circular channel avatar, title, genres, and quick play action.
- * Supports lazy loading TMDB episode stills with fallback to AniList banner/cover.
- * Subtle frosted glass styling, borderless text boxes, and emoji-free.
+ * Episode feed item: 16:9 thumbnail (tap = play), then label / title / meta on the page background (tap = details).
+ * No card, no badges. Scrims sit on the image only, so they stay dark in both themes.
  */
 @Composable
 fun YouTubeStyleEpisodeCard(
@@ -864,233 +756,119 @@ fun YouTubeStyleEpisodeCard(
         onLoadArtwork?.invoke()
     }
 
-    val durationText = remember(anime.duration) {
-        val mins = anime.duration ?: 24
-        "${mins}:00"
-    }
-
-    val displayTitle = anime.displayTitle
-    val preferredTitle = tmdbTitle?.takeIf { it.isNotBlank() } ?: displayTitle
-    val episodeTitle = if (anime.isMovie) "Full Movie" else "Episode $episodeNumber"
-
+    val c = LocalAppColors.current
+    val durationText = remember(anime.duration) { "${anime.duration ?: 24}:00" }
+    val title = tmdbTitle?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+    val headerTitle = if (anime.isMovie) title else "$title • Episode $episodeNumber"
     val thumbnailImage = remember(episodeStill, anime.banner, anime.cover) {
         episodeStill?.takeIf { it.isNotBlank() }
             ?: anime.banner?.takeIf { it.isNotBlank() }
             ?: anime.cover
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onAnimeClick(anime.id) }
-            .padding(bottom = 16.dp)
-    ) {
-        // 1. YouTube 16:9 Thumbnail Box
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF131722))
+                .clip(RoundedCornerShape(12.dp))
+                .background(c.skeleton)
                 .clickable { onPlayClick(anime.id, episodeNumber) }
         ) {
             SubcomposeAsyncImage(
                 model = thumbnailImage,
-                contentDescription = preferredTitle,
+                contentDescription = null, // title below labels the item
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                loading = {
-                    ShimmerBox(
-                        modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                },
+                loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(12.dp)) },
                 error = {
                     AsyncImage(
                         model = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
-                        contentDescription = preferredTitle,
+                        contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 }
             )
 
-            // Gradient darkening (top, center, and deep bottom for text and logo readability)
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x60000000),
-                                Color(0x10000000),
-                                Color(0x9A000000)
-                            )
-                        )
-                    )
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0x99000000))
+                )
             )
 
-            // Top-Left Badge (e.g. "MUST WATCH", "TOP WATCHED", "TRENDING") - Subtle frosted glass (no border)
-            if (!badgeText.isNullOrBlank()) {
-                val isMustWatch = badgeText.contains("MUST WATCH", ignoreCase = true)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isMustWatch) Color(0x95E50914) else Color(0x850E131E))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = badgeText,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
-
-            // TMDB Title Logo PNG Overlay (Overlaid inside thumbnail above bottom badges)
             if (!logoUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = logoUrl,
-                    contentDescription = preferredTitle,
+                    contentDescription = null,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 12.dp, bottom = 36.dp)
-                        .heightIn(max = 42.dp)
-                        .fillMaxWidth(0.55f),
+                        .padding(start = 12.dp, bottom = 10.dp)
+                        .heightIn(max = 36.dp)
+                        .fillMaxWidth(0.5f),
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.BottomStart
                 )
             }
 
-            // Center Circular Play Button - Frosted Glass Circle (no border)
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(0x60000000))
+                    .background(Color(0x66000000))
                     .align(Alignment.Center),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
+                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(26.dp))
             }
 
-            // Bottom-Left Episode Badge (no border)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x8A000000))
-                    .padding(horizontal = 7.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = if (anime.isMovie) "MOVIE" else "EP $episodeNumber",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OttAccentGold
-                )
-            }
-
-            // Bottom-Right Duration Badge (no border)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x8A000000))
-                    .padding(horizontal = 7.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = durationText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+            Text(
+                text = durationText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp)
+            )
         }
 
-        Spacer(Modifier.height(10.dp))
-
-        // 2. Video Info Row (Avatar on Left, Title + Subtitle in Middle, Play button on Right)
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .clickable { onAnimeClick(anime.id) }
+                .padding(top = 10.dp)
         ) {
-            // Anime Avatar (YouTube Channel style) - Clean Circle (no border)
-            AsyncImage(
-                model = anime.cover,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .clickable { onAnimeClick(anime.id) },
-                contentScale = ContentScale.Crop
+            if (!badgeText.isNullOrBlank()) {
+                Text(
+                    text = badgeText,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = c.textMuted,
+                    letterSpacing = 0.8.sp,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+            }
+            Text(
+                text = headerTitle,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = c.textPrimary,
+                maxLines = 2,
+                lineHeight = 19.sp,
+                overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(Modifier.width(12.dp))
-
-            // Title + Metadata Column
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onAnimeClick(anime.id) }
-            ) {
-                val headerTitle = if (anime.isMovie) preferredTitle else "$preferredTitle • $episodeTitle"
-                Text(
-                    text = headerTitle,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 2,
-                    lineHeight = 18.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(Modifier.height(3.dp))
-
-                val genreText = anime.genres.take(2).joinToString(" • ")
-                val scoreText = anime.score?.let { "$it% Match" } ?: "Trending"
-                val formatText = anime.displayFormat ?: "TV"
-
-                Text(
-                    text = listOfNotNull(genreText.ifBlank { null }, formatText, scoreText).joinToString(" • "),
-                    fontSize = 12.sp,
-                    color = OttTextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            // Play Icon Button (Frosted glass button, no border)
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x1FFFFFFF))
-                    .clickable { onPlayClick(anime.id, episodeNumber) },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = listOfNotNull(
+                    anime.genres.take(2).joinToString(" • ").ifBlank { null },
+                    anime.displayFormat ?: "TV",
+                    anime.score?.let { "$it% Match" } ?: "Trending"
+                ).joinToString(" • "),
+                fontSize = 12.sp,
+                color = c.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -1105,7 +883,7 @@ private fun formatBytes(bytes: Long): String {
 
 private val OfflineMargin = 18.dp
 
-/** Offline home: status card with library stats, then the downloaded shelves. Clears the floating top bar and nav bar. */
+/** Offline home: plain status block, then the downloaded shelves. Clears the floating top bar and nav bar. */
 @Composable
 fun OfflineHomeScreenContent(
     vm: MainViewModel,
@@ -1117,6 +895,7 @@ fun OfflineHomeScreenContent(
     onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit,
     onDownloadsClick: () -> Unit
 ) {
+    val c = LocalAppColors.current
     val downloadedAnime by vm.downloadManager.downloadedAnime.collectAsState()
     val downloadedManga by vm.downloadManager.downloadedManga.collectAsState()
     val downloadedNovels by vm.downloadManager.downloadedNovels.collectAsState()
@@ -1128,201 +907,80 @@ fun OfflineHomeScreenContent(
     val totalDownloadedBytes = animeBytes + mangaBytes + novelBytes
     val hasAnyHistory = vm.history.isNotEmpty() || vm.mangaHistory.isNotEmpty() || vm.novelHistoryList.isNotEmpty()
 
-    val animeColor = Color(0xFF60A5FA)
-    val mangaColor = Color(0xFF34D399)
-    val novelColor = Color(0xFFF472B6)
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        // Top: clear the status bar + floating app bar (menu / logo / search). Bottom: clear the floating nav bar.
-        contentPadding = PaddingValues(
-            top = 0.dp,
-            bottom = 120.dp
-        ),
+        contentPadding = PaddingValues(bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item(key = "offline_top_spacer") {
-            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(40.dp))
+            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(56.dp))
         }
 
-        // ── Offline status card ──
-        item(key = "offline_hero_banner") {
-            val shape = RoundedCornerShape(26.dp)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = OfflineMargin)
-                    .iosGlass(
-                        shape = shape,
-                        backgroundColor = Color(0xD81C1D24),
-                        borderWidth = 1.dp
-                    )
-            ) {
-                // Warm amber glow in the corner
-                Box(Modifier.matchParentSize().clip(shape)) {
-                    Box(
-                        modifier = Modifier
-                            .size(220.dp)
-                            .offset(x = (-70).dp, y = (-90).dp)
-                            .background(
-                                Brush.radialGradient(listOf(Color(0x33F59E0B), Color.Transparent)),
-                                CircleShape
-                            )
-                    )
+        item(key = "offline_status") {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = OfflineMargin)) {
+                Text("OFFLINE", color = c.textMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("You're offline", color = c.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = if (totalDownloadsCount > 0) {
+                        "No connection, but your library is ready. Everything below plays and reads without internet."
+                    } else {
+                        "No internet connection detected. Connect to Wi-Fi or mobile data to explore trending shows, or browse your downloaded library."
+                    },
+                    color = c.textSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+
+                if (totalDownloadsCount > 0) {
+                    Spacer(Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OfflineStat(downloadedAnime.size.toString(), "Anime")
+                        OfflineStat(downloadedManga.size.toString(), "Manga")
+                        OfflineStat(downloadedNovels.size.toString(), "Novels")
+                    }
+
+                    if (totalDownloadedBytes > 0L) {
+                        Spacer(Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Storage used", color = c.textMuted, fontSize = 12.sp)
+                            Text(formatBytes(totalDownloadedBytes), color = c.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        // One neutral hue in three strengths: anime / manga / novels
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(c.skeleton),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (animeBytes > 0L) Box(Modifier.weight(animeBytes.toFloat()).fillMaxHeight().background(c.accent))
+                            if (mangaBytes > 0L) Box(Modifier.weight(mangaBytes.toFloat()).fillMaxHeight().background(c.accent.copy(alpha = 0.55f)))
+                            if (novelBytes > 0L) Box(Modifier.weight(novelBytes.toFloat()).fillMaxHeight().background(c.accent.copy(alpha = 0.25f)))
+                        }
+                    }
                 }
 
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        OfflinePulseIcon()
-                        Column {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(7.dp))
-                                    .background(Color(0x28F59E0B))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = "OFFLINE MODE",
-                                    color = Color(0xFFFBBF24),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "You're Offline",
-                                color = Color.White,
-                                fontSize = 23.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = (-0.3).sp
-                            )
-                        }
+                Spacer(Modifier.height(20.dp))
+                // ponytail: retry spin animation dropped
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AniButton(onClick = onDownloadsClick, primary = true, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp)) {
+                        Icon(Icons.Default.Storage, contentDescription = null, tint = c.onAccent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Open Downloads", color = c.onAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
-
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = if (totalDownloadsCount > 0) {
-                            "No connection, but your library is ready. Everything below plays and reads without internet."
-                        } else {
-                            "No internet connection detected. Connect to Wi-Fi or mobile data to explore trending shows, or browse your downloaded library."
-                        },
-                        color = Color(0xB3FFFFFF),
-                        fontSize = 13.5.sp,
-                        lineHeight = 19.sp
-                    )
-
-                    if (totalDownloadsCount > 0) {
-                        Spacer(Modifier.height(18.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OfflineStatTile(animeColor, downloadedAnime.size.toString(), "Anime")
-                            OfflineStatTile(mangaColor, downloadedManga.size.toString(), "Manga")
-                            OfflineStatTile(novelColor, downloadedNovels.size.toString(), "Novels")
-                        }
-
-                        if (totalDownloadedBytes > 0L) {
-                            Spacer(Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Storage used", color = Color(0x99FFFFFF), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                Text(formatBytes(totalDownloadedBytes), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x1FFFFFFF)),
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                if (animeBytes > 0L) Box(Modifier.weight(animeBytes.toFloat()).fillMaxHeight().background(animeColor))
-                                if (mangaBytes > 0L) Box(Modifier.weight(mangaBytes.toFloat()).fillMaxHeight().background(mangaColor))
-                                if (novelBytes > 0L) Box(Modifier.weight(novelBytes.toFloat()).fillMaxHeight().background(novelColor))
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(20.dp))
-
-                    val scope = rememberCoroutineScope()
-                    val spin = remember { Animatable(0f) }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = onDownloadsClick,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White,
-                                contentColor = Color.Black
-                            ),
-                            shape = OttPillShape,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                            modifier = Modifier.weight(1.3f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storage,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(7.dp))
-                            Text(
-                                text = "Open Downloads",
-                                color = Color.Black,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    spin.snapTo(0f)
-                                    spin.animateTo(360f, tween(650, easing = FastOutSlowInEasing))
-                                }
-                                vm.loadHome()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0x28FFFFFF),
-                                contentColor = Color.White
-                            ),
-                            shape = OttPillShape,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-                            modifier = Modifier.weight(0.8f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .graphicsLayer { rotationZ = spin.value }
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "Retry",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                    AniButton(onClick = { vm.loadHome() }, contentPadding = PaddingValues(horizontal = 18.dp, vertical = 13.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = c.textPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Retry", color = c.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     }
                 }
             }
         }
 
-        // Continue Watching & Reading (if history exists)
         if (hasAnyHistory) {
             item(key = "offline_continue_watching") {
                 OttUnifiedContinueWatchingRow(
@@ -1341,7 +999,6 @@ fun OfflineHomeScreenContent(
             }
         }
 
-        // Downloaded Anime
         if (downloadedAnime.isNotEmpty()) {
             item(key = "offline_downloaded_anime") {
                 Column {
@@ -1360,7 +1017,6 @@ fun OfflineHomeScreenContent(
                                 coverUrl = anime.cover,
                                 countBadge = "${anime.episodesCount} EPS",
                                 sizeBytes = anime.totalSizeBytes,
-                                badgeColor = animeColor,
                                 onClick = { onAnimeClick(anime.animeId) },
                                 onDirectAction = { onPlayClick(anime.animeId, 1) },
                                 directActionIcon = Icons.Default.PlayArrow
@@ -1371,7 +1027,6 @@ fun OfflineHomeScreenContent(
             }
         }
 
-        // Downloaded Manga
         if (downloadedManga.isNotEmpty()) {
             item(key = "offline_downloaded_manga") {
                 Column {
@@ -1390,7 +1045,6 @@ fun OfflineHomeScreenContent(
                                 coverUrl = manga.poster,
                                 countBadge = "${manga.chaptersCount} CH",
                                 sizeBytes = manga.totalSizeBytes,
-                                badgeColor = mangaColor,
                                 onClick = { onMangaClick(manga.mangaId) }
                             )
                         }
@@ -1399,7 +1053,6 @@ fun OfflineHomeScreenContent(
             }
         }
 
-        // Downloaded Novels
         if (downloadedNovels.isNotEmpty()) {
             item(key = "offline_downloaded_novels") {
                 Column {
@@ -1418,7 +1071,6 @@ fun OfflineHomeScreenContent(
                                 coverUrl = novel.cover,
                                 countBadge = "${novel.chaptersCount} CH",
                                 sizeBytes = novel.totalSizeBytes,
-                                badgeColor = novelColor,
                                 onClick = { onNovelClick(novel.novelSlug) }
                             )
                         }
@@ -1427,77 +1079,25 @@ fun OfflineHomeScreenContent(
             }
         }
 
-        // Empty state when there are 0 downloads and 0 history
         if (totalDownloadsCount == 0 && !hasAnyHistory) {
             item(key = "offline_empty_state") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = OfflineMargin)
-                        .iosGlass(
-                            shape = RoundedCornerShape(24.dp),
-                            backgroundColor = Color(0xD81C1D24),
-                            borderWidth = 1.dp
-                        )
-                        .padding(vertical = 32.dp, horizontal = 20.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = OfflineMargin * 2),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x1FFFFFFF))
-                                .border(1.dp, Color(0x22FFFFFF), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storage,
-                                contentDescription = null,
-                                tint = Color(0xAAFFFFFF),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                        Text(
-                            text = "No Downloaded Titles Yet",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Download anime episodes, manga chapters, and novel chapters while connected so you can enjoy them anywhere without internet.",
-                            fontSize = 13.sp,
-                            color = Color(0x99FFFFFF),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 18.sp
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Button(
-                            onClick = onDownloadsClick,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White,
-                                contentColor = Color.Black
-                            ),
-                            shape = OttPillShape
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storage,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "Open Downloads Hub",
-                                color = Color.Black,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    Icon(Icons.Default.Storage, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(32.dp))
+                    Text("No downloads yet", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary, textAlign = TextAlign.Center)
+                    Text(
+                        text = "Download anime episodes, manga chapters, and novel chapters while connected so you can enjoy them anywhere without internet.",
+                        fontSize = 13.sp,
+                        color = c.textSecondary,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    AniButton(onClick = onDownloadsClick, primary = true, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp)) {
+                        Text("Open Downloads Hub", color = c.onAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -1505,63 +1105,12 @@ fun OfflineHomeScreenContent(
     }
 }
 
-/** Amber download icon with a slow radiating ring. */
 @Composable
-private fun OfflinePulseIcon() {
-    val t = rememberInfiniteTransition(label = "offlinePulse")
-    val ring by t.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing)),
-        label = "offlineRing"
-    )
-    Box(
-        modifier = Modifier
-            .size(52.dp)
-            .drawBehind {
-                drawCircle(
-                    color = Color(0xFFF59E0B).copy(alpha = (1f - ring) * 0.45f),
-                    radius = size.minDimension / 2f * (1f + ring * 0.55f),
-                    style = Stroke(width = 1.5.dp.toPx())
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color(0x26F59E0B))
-                .border(1.dp, Color(0x4DF59E0B), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Downloading,
-                contentDescription = "Offline",
-                tint = Color(0xFFFBBF24),
-                modifier = Modifier.size(26.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun RowScope.OfflineStatTile(color: Color, value: String, label: String) {
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .clip(shape)
-            .background(Color(0x14FFFFFF))
-            .border(1.dp, Color(0x14FFFFFF), shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(color))
-            Text(label, color = Color(0x99FFFFFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(value, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+private fun RowScope.OfflineStat(value: String, label: String) {
+    val c = LocalAppColors.current
+    Column(modifier = Modifier.weight(1f)) {
+        Text(value, color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = c.textMuted, fontSize = 12.sp)
     }
 }
 
@@ -1571,138 +1120,55 @@ private fun OfflineMediaCard(
     coverUrl: String?,
     countBadge: String,
     sizeBytes: Long,
-    badgeColor: Color,
     onClick: () -> Unit,
     onDirectAction: (() -> Unit)? = null,
     directActionIcon: androidx.compose.ui.graphics.vector.ImageVector? = null
 ) {
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
-        label = "offlineCardPress"
-    )
-    val shape = RoundedCornerShape(18.dp)
-
-    Column(
-        modifier = Modifier
-            .width(140.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clickable(interactionSource = source, indication = null, onClick = onClick)
-    ) {
+    val c = LocalAppColors.current
+    Column(modifier = Modifier.width(130.dp).clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .clip(shape)
-                .border(1.dp, Color(0x22FFFFFF), shape)
-                .background(Color(0x18FFFFFF))
+                .clip(RoundedCornerShape(12.dp))
+                .background(c.skeleton)
         ) {
             SubcomposeAsyncImage(
                 model = coverUrl,
-                contentDescription = title,
+                contentDescription = null, // title below labels the card
                 contentScale = ContentScale.Crop,
                 loading = { ShimmerBox(modifier = Modifier.fillMaxSize()) },
                 error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0x28FFFFFF)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Movie,
-                            contentDescription = null,
-                            tint = Color(0x60FFFFFF),
-                            modifier = Modifier.size(32.dp)
-                        )
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Movie, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(32.dp))
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color(0x44000000),
-                            0.4f to Color.Transparent,
-                            1f to Color(0xDD000000)
-                        )
-                    )
-            )
-
-            // Count badge
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .align(Alignment.TopStart)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xD90F1015))
-                    .border(0.8.dp, badgeColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 7.dp, vertical = 3.dp)
-            ) {
-                Text(text = countBadge, color = badgeColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-
-            // Quick action (e.g. play)
             if (onDirectAction != null && directActionIcon != null) {
                 Box(
                     modifier = Modifier
+                        .align(Alignment.BottomEnd)
                         .padding(8.dp)
-                        .align(Alignment.TopEnd)
-                        .size(32.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color(0xE6FFFFFF))
+                        .background(c.accent)
                         .clickable(onClick = onDirectAction),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = directActionIcon,
-                        contentDescription = "Action",
-                        tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            // Size pill
-            if (sizeBytes > 0L) {
-                Row(
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .align(Alignment.BottomStart)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0x99000000))
-                        .padding(horizontal = 7.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(Icons.Default.Storage, contentDescription = null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(10.dp))
-                    Text(
-                        text = formatBytes(sizeBytes),
-                        color = Color(0xE6FFFFFF),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Icon(directActionIcon, contentDescription = "Play", tint = c.onAccent, modifier = Modifier.size(20.dp))
                 }
             }
         }
 
         Spacer(Modifier.height(8.dp))
+        Text(text = title, color = c.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
-            text = title,
-            color = OttTextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp)
+            text = listOfNotNull(countBadge, if (sizeBytes > 0L) formatBytes(sizeBytes) else null).joinToString(" · "),
+            color = c.textMuted,
+            fontSize = 11.sp,
+            maxLines = 1
         )
     }
 }

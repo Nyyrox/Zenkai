@@ -113,7 +113,6 @@ import coil3.compose.AsyncImage
 import com.nyyrox.aniverse.data.WatchHistoryItem
 import com.nyyrox.aniverse.data.WatchlistItem
 import com.nyyrox.aniverse.data.supabase.AuthState
-import com.nyyrox.aniverse.ui.theme.LocalThemeColors
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
@@ -132,6 +131,16 @@ import com.nyyrox.aniverse.ui.components.AniListSyncModalSheet
 import com.nyyrox.aniverse.ui.components.MalSyncModalSheet
 import com.nyyrox.aniverse.ui.components.decorations.AnimatedStreakBadge
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.graphicsLayer
+import com.nyyrox.aniverse.ui.theme.AniButton
+import com.nyyrox.aniverse.ui.theme.AniIconButton
+import com.nyyrox.aniverse.ui.theme.AniSwitch
+import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
+import com.nyyrox.aniverse.ui.theme.LocalAppColors
+import com.nyyrox.aniverse.ui.theme.ThemeMode
+import com.nyyrox.aniverse.ui.theme.aniGlass
+import com.styropyr0.prismal.PrismalGlass
 import com.nyyrox.aniverse.ui.components.BioFontSelectorPills
 import com.nyyrox.aniverse.ui.components.FavoriteAnimeShowcaseCard
 import com.nyyrox.aniverse.ui.components.AniListAnimePickerSheet
@@ -169,7 +178,6 @@ fun ProfileScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val themeColors = LocalThemeColors.current
     val themeSettings = LocalThemeSettings.current
 
     val activity = remember(context) {
@@ -236,1038 +244,355 @@ fun ProfileScreen(
     )
     val isBatterySaverActive = themeSettings.isPowerSavingEnabled || DisplayRefreshRateManager.isSystemPowerSaveMode(context)
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(OttBg),
-        contentPadding = PaddingValues(bottom = 110.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // ── 1. Header Profile Banner & Info ────────────────────────────────
-        item {
-            val isLoggedIn = vm.authState !is AuthState.LoggedOut
-            val displayName = vm.userProfile.displayName.ifBlank { "Guest" }
-            val email = vm.userProfile.email
-            val displayHandle: String = when {
-                vm.userProfile.username.isNotBlank() -> "@${vm.userProfile.username}"
-                !email.isNullOrBlank() -> email
-                else -> "Guest"
-            }
-            val bio = vm.userProfile.bio
-            val favoriteAnime = vm.userProfile.favoriteAnime
+    val c = LocalAppColors.current
+    val listState = rememberLazyListState()
+    val isLoggedIn = vm.authState !is AuthState.LoggedOut
+    val scrollPx: () -> Float = {
+        if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100000f
+    }
 
-            Column(
-                modifier = Modifier.fillMaxWidth()
+    Box(modifier.fillMaxSize()) {
+        GlassBackdropHost(background = { ProfileBanner(vm, scrollPx) }) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 110.dp)
             ) {
-                // Header Box containing Banner + naturally overlapping Avatar
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // 1. Cinematic Full-Bleed Banner covering status bar (210.dp)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(210.dp)
-                    ) {
-                        ProfileBannerRenderer(
-                            bannerThemeId = vm.userProfile.bannerThemeId,
-                            customBannerUrl = vm.userProfile.bannerUrl,
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        // Banner Overlay Animation (Sakura, Butterflies, Starlight, etc.)
-                        BannerOverlayRenderer(
-                            effectId = vm.userProfile.bannerEffectId,
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        // Top cinematic dark gradient (for status bar visibility)
+                // ── Header ────────────────────────────────────────────────
+                item {
+                    Box(Modifier.fillMaxWidth().height(242.dp)) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(90.dp)
-                                .align(Alignment.TopCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(Color(0xD9000000), Color.Transparent)
-                                    )
-                                )
-                        )
-
-                        // Bottom cinematic dark gradient fading into dark background
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, OttBg)
-                                    )
-                                )
-                        )
-
-                        // Action buttons in top-right
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .statusBarsPadding()
-                                .padding(top = 10.dp, end = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 20.dp)
+                                .size(84.dp)
+                                .clickable { showAvatarOptionsSheet = true }
                         ) {
-                            if (onOpenNotifications != null) {
-                                val unread = vm.unreadNotificationsCount
+                            AvatarDecorationRenderer(
+                                decorationId = vm.userProfile.avatarDecorationId,
+                                frameId = vm.userProfile.avatarFrameId,
+                                size = 84.dp
+                            ) {
+                                val hasDecoration = !vm.userProfile.avatarDecorationId.isNullOrBlank()
                                 Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
+                                    Modifier
+                                        .fillMaxSize()
                                         .clip(CircleShape)
-                                        .background(Color(0x99000000))
-                                        .border(1.dp, Color(0x35FFFFFF), CircleShape)
-                                        .clickable { onOpenNotifications() },
+                                        .background(c.surfaceElevated)
+                                        .border(if (hasDecoration) 1.dp else 3.dp, if (hasDecoration) c.glass.border else c.bg, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Notifications,
-                                        contentDescription = "Notifications",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    if (unread > 0) {
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(2.dp)
-                                                .size(7.dp)
-                                                .clip(CircleShape)
-                                                .background(OttPrimary)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Edit Banner circular pencil button in top-right
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x99000000))
-                                    .border(1.dp, Color(0x35FFFFFF), CircleShape)
-                                    .clickable { showBannerOptionsSheet = true },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit Banner",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // 2. Avatar overlapping banner bottom
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 20.dp, top = 168.dp)
-                            .size(84.dp)
-                            .clickable { showAvatarOptionsSheet = true }
-                    ) {
-                        AvatarDecorationRenderer(
-                            decorationId = vm.userProfile.avatarDecorationId,
-                            frameId = vm.userProfile.avatarFrameId,
-                            size = 84.dp
-                        ) {
-                            val hasDecoration = !vm.userProfile.avatarDecorationId.isNullOrBlank()
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF0A0C10))
-                                    .border(
-                                        width = if (hasDecoration) 1.dp else 3.dp,
-                                        color = if (hasDecoration) Color(0x33FFFFFF) else Color.White,
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (vm.userProfile.avatarUrl.isNotBlank()) {
-                                    AsyncImage(
-                                        model = vm.userProfile.avatarUrl,
-                                        contentDescription = "Avatar",
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(CircleShape),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(Color(0xFF2E3440), Color(0xFF191D24))
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = displayName.take(1).uppercase(),
-                                            fontSize = 30.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Small camera badge on bottom-right of avatar
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(Color.White)
-                                .border(1.5.dp, Color.Black, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Edit Avatar",
-                                tint = Color.Black,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 3. User Name & Edit Profile Row (Single clean Edit Profile button)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f, fill = false)) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            TextEffectRenderer(
-                                effectId = vm.userProfile.textEffectId,
-                                text = displayName,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            RoleBadgeRow(
-                                roles = vm.userProfile.roles,
-                                isAdmin = vm.userProfile.isAdmin
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = displayHandle,
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8),
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
-                    }
-
-                    Spacer(Modifier.width(8.dp))
-
-                    if (isLoggedIn) {
-                        Button(
-                            onClick = { showEditProfileModal = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x18FFFFFF)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x35FFFFFF)),
-                            shape = OttPillShape,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text("Edit Profile", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    } else {
-                        Button(
-                            onClick = { onLogin?.invoke() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                            shape = OttPillShape,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Text("Sign In", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // Bio & Favorite Anime
-                if (bio.isNotBlank() || favoriteAnime.isNotBlank()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 6.dp)
-                    ) {
-                        if (bio.isNotBlank()) {
-                            Text(
-                                text = bio,
-                                style = getBioTextStyle(vm.userProfile.bioFont)
-                            )
-                        }
-                        if (favoriteAnime.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            FavoriteAnimeShowcaseCard(
-                                favoriteAnime = favoriteAnime,
-                                onAnimeClick = onAnimeClick
-                            )
-                        }
-                    }
-                }
-
-                // 3.5 Level, EXP Progress & Daily Streak Card
-                val userExp = vm.userProfile.exp
-                val userLevel = vm.userProfile.level
-                val nextLvlBase = LevelAndStreakSystem.expForNextLevel(userLevel)
-                val progress = LevelAndStreakSystem.calculateLevelProgress(userExp)
-                val userStreak = vm.userProfile.streakCount
-                val longestStreak = vm.userProfile.longestStreak
-                val equippedTag = vm.userProfile.customTag?.takeIf {
-                    it.isNotBlank() && !it.equals("null", ignoreCase = true) && !it.equals("none", ignoreCase = true)
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF0F121A))
-                            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Level Badge (Escalating Kinetic Animations)
-                                AnimatedLevelThemeBadge(level = userLevel)
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                // Ninja Tag Pill with Level-Scaled Kinetic Overlay (clickable)
-                                Box(
-                                    modifier = Modifier.clickable { showNinjaTagsSheet = true }
-                                ) {
-                                    if (equippedTag != null) {
-                                        LevelRankTagBadge(
-                                            tag = equippedTag,
-                                            level = userLevel
+                                    if (vm.userProfile.avatarUrl.isNotBlank()) {
+                                        AsyncImage(
+                                            model = vm.userProfile.avatarUrl,
+                                            contentDescription = "Avatar",
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            contentScale = ContentScale.Crop
                                         )
                                     } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(Color(0x18FFFFFF))
-                                                .border(0.5.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
-                                        ) {
-                                            Text(
-                                                text = "+ Equip Tag",
-                                                color = Color(0xFF94A3B8),
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
+                                        Text(
+                                            text = vm.userProfile.displayName.ifBlank { "G" }.take(1).uppercase(),
+                                            fontSize = 30.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = c.textPrimary
+                                        )
                                     }
                                 }
                             }
+                            Box(
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(c.accent)
+                                    .border(2.dp, c.bg, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.CameraAlt, "Edit avatar", tint = c.onAccent, modifier = Modifier.size(12.dp))
+                            }
+                        }
+                    }
+                }
 
-                            // Daily Streak - Animated Badge
-                            AnimatedStreakBadge(
-                                streakCount = userStreak,
-                                isFullLabel = true
-                            )
+                item {
+                    val email = vm.userProfile.email
+                    val handle = when {
+                        vm.userProfile.username.isNotBlank() -> "@${vm.userProfile.username}"
+                        !email.isNullOrBlank() -> email
+                        else -> "Guest"
+                    }
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    TextEffectRenderer(
+                                        effectId = vm.userProfile.textEffectId,
+                                        text = vm.userProfile.displayName.ifBlank { "Guest" },
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    RoleBadgeRow(roles = vm.userProfile.roles, isAdmin = vm.userProfile.isAdmin)
+                                }
+                                Text(handle, fontSize = 13.sp, color = c.textSecondary)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            if (isLoggedIn) {
+                                AniButton(onClick = { showEditProfileModal = true }) {
+                                    Text("Edit profile", color = c.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            } else {
+                                AniButton(onClick = { onLogin?.invoke() }, primary = true) {
+                                    Text("Sign in", color = c.onAccent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // EXP Progress Bar
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "EXP: $userExp / $nextLvlBase",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8),
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "${(progress * 100).toInt()}%",
-                                fontSize = 11.sp,
-                                color = Color(0xFFE2E8F0),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        val bio = vm.userProfile.bio
+                        if (bio.isNotBlank()) {
+                            Spacer(Modifier.height(12.dp))
+                            Text(text = bio, style = getBioTextStyle(vm.userProfile.bioFont), color = c.textPrimary)
                         }
+                        val favoriteAnime = vm.userProfile.favoriteAnime
+                        if (favoriteAnime.isNotBlank()) {
+                            Spacer(Modifier.height(12.dp))
+                            FavoriteAnimeShowcaseCard(favoriteAnime = favoriteAnime, onAnimeClick = onAnimeClick)
+                        }
+                    }
+                }
 
-                        Spacer(modifier = Modifier.height(6.dp))
-
+                // ── Level, streak, stats: plain, no card ──────────────────
+                item {
+                    val level = vm.userProfile.level
+                    val exp = vm.userProfile.exp
+                    val progress = LevelAndStreakSystem.calculateLevelProgress(exp)
+                    val equippedTag = vm.userProfile.customTag?.takeIf {
+                        it.isNotBlank() && !it.equals("null", true) && !it.equals("none", true)
+                    }
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AnimatedLevelThemeBadge(level = level)
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.clickable { showNinjaTagsSheet = true }) {
+                                if (equippedTag != null) LevelRankTagBadge(tag = equippedTag, level = level)
+                                else Text("+ Equip tag", fontSize = 12.sp, color = c.textMuted)
+                            }
+                            Spacer(Modifier.weight(1f))
+                            AnimatedStreakBadge(streakCount = vm.userProfile.streakCount, isFullLabel = true)
+                        }
+                        Spacer(Modifier.height(12.dp))
                         LinearProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = Color(0xFFE11D48),
-                            trackColor = Color(0x28FFFFFF)
+                            modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
+                            color = c.accent,
+                            trackColor = c.skeleton
                         )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Spacer(Modifier.height(6.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(
-                                text = "Best streak: $longestStreak d · +$userStreak EXP bonus",
-                                fontSize = 10.sp,
-                                color = Color(0xFF64748B)
+                                "EXP $exp / ${LevelAndStreakSystem.expForNextLevel(level)} · Best streak ${vm.userProfile.longestStreak}d",
+                                fontSize = 11.sp, color = c.textMuted
                             )
                             Text(
-                                text = "Ninja Ranks ›",
-                                fontSize = 11.sp,
-                                color = Color(0xFF38BDF8),
-                                fontWeight = FontWeight.Bold,
+                                "Ranks",
+                                fontSize = 11.sp, color = c.textSecondary, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.clickable { showNinjaTagsSheet = true }
                             )
                         }
+
+                        Spacer(Modifier.height(20.dp))
+                        Row(Modifier.fillMaxWidth()) {
+                            Stat(vm.watchlist.count { it.watchlistStatus == WatchlistStatus.WATCHING }, "Watching", Modifier.weight(1f))
+                            Stat(vm.watchlist.count { it.watchlistStatus == WatchlistStatus.COMPLETED }, "Completed", Modifier.weight(1f))
+                            Stat(vm.watchlist.count { it.watchlistStatus == WatchlistStatus.PLAN_TO_WATCH }, "Planned", Modifier.weight(1f))
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 4. Monochrome Stats Row
-                val watchingCount = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.WATCHING }
-                val completedCount = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.COMPLETED }
-                val ptwCount = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.PLAN_TO_WATCH }
-
-                val statPill: @Composable (Int, String, Modifier) -> Unit = { count, label, mod ->
-                    Column(
-                        modifier = mod
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x12FFFFFF))
-                            .border(1.dp, Color(0x1EFFFFFF), RoundedCornerShape(14.dp))
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = count.toString(),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
+                item {
+                    TimeSpentSectionCard(
+                        record = vm.timeSpentRecord,
+                        onResetStats = { vm.resetTimeSpentStats() },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                    )
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    statPill(watchingCount, "Watching", Modifier.weight(1f))
-                    statPill(completedCount, "Completed", Modifier.weight(1f))
-                    statPill(ptwCount, "Plan to Watch", Modifier.weight(1f))
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 5. Time Spent & Activity Log Card
-                TimeSpentSectionCard(
-                    record = vm.timeSpentRecord,
-                    onResetStats = { vm.resetTimeSpentStats() },
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-            }
-        }
-
-        // ── Customization & Zenkai Locker ─────────────────────────────────
-        item {
-            ProfileSettingGroup(title = "Customization") {
-                ProfileSettingRow(
-                    icon = Icons.Default.Palette,
-                    title = "Zenkai Decoration Locker",
-                    subtitle = "Avatar frames, animated profile effects, banners & nameplates",
-                    badgeText = "20 Items",
-                    badgeColor = Color(0xFFE11D48),
-                    onClick = { onOpenDecorations?.invoke() }
-                )
-            }
-        }
-
-        // ── 2. Library & Content ──────────────────────────────────────────
-        item {
-            ProfileSettingGroup(title = "Library") {
-                ProfileSettingRow(
-                    icon = Icons.Default.Bookmark,
-                    title = "My Anime Watchlist",
-                    subtitle = "Anime saved to watch or plan to watch",
-                    badgeText = "${vm.watchlist.size}",
-                    onClick = { onSeeAllWatchlist?.invoke() }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.History,
-                    title = "Anime Watch History",
-                    subtitle = "Episode playback history & progress",
-                    badgeText = "${vm.history.size} recent",
-                    onClick = { onSeeAllWatchlist?.invoke() }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.AutoStories,
-                    title = "Saved Manga & Manhwa",
-                    subtitle = "Bookmarked manga collection & reading list",
-                    badgeText = "${vm.mangaBookmarks.size} saved",
-                    badgeColor = Color(0xFFE11D48),
-                    onClick = { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.MenuBook,
-                    title = "Manga Reading History",
-                    subtitle = "Recent chapters & reading progress checkpoints",
-                    badgeText = "${vm.mangaHistory.size} read",
-                    onClick = { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.AutoStories,
-                    title = "Novel Reading History",
-                    subtitle = "Recent light novel chapters & reading progress",
-                    badgeText = "${vm.novelHistoryList.size} read",
-                    badgeColor = Color(0xFF0284C7),
-                    onClick = { onOpenNovelHistory?.invoke() ?: onSeeAllWatchlist?.invoke() }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.Download,
-                    title = "Download & Storage Settings",
-                    subtitle = "Queue concurrency, public Movies folder, notifications",
-                    onClick = { showDownloadSettingsSheet = true }
-                )
-            }
-        }
-
-        // ── Saved Manga Shelf (Profile Showcase) ──────────────────────────
-        if (savedMangaList.isNotEmpty()) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoStories,
-                                contentDescription = null,
-                                tint = OttPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Saved Manga (${savedMangaList.size})",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                // ── Appearance ────────────────────────────────────────────
+                item {
+                    Section("Appearance") {
+                        ThemeModeSelector(
+                            current = themeSettings.mode,
+                            onChange = { vm.setThemeMode(it) }
+                        )
+                        RowDivider()
+                        SettingRow(Icons.Default.Palette, "Profile decorations", onClick = { onOpenDecorations?.invoke() })
+                        RowDivider()
+                        SettingRow(
+                            Icons.Default.Speed, "Refresh rate",
+                            subtitle = if (isBatterySaverActive) "Locked to 60 Hz by Battery Saver" else null,
+                            value = "$effectiveHz Hz",
+                            onClick = { showRefreshRateSheet = true }
+                        )
+                        RowDivider()
+                        SettingRow(
+                            Icons.Default.BatteryChargingFull, "Battery saver",
+                            subtitle = "Caps to 60 Hz, lighter rendering",
+                            trailing = { AniSwitch(themeSettings.isPowerSavingEnabled) { vm.setPowerSaving(it) } }
+                        )
+                        RowDivider()
+                        SettingRow(
+                            Icons.Default.MotionPhotosOff, "Reduced motion",
+                            trailing = { AniSwitch(themeSettings.isReducedMotionEnabled) { vm.setReducedMotion(it) } }
+                        )
+                        if (PrismalGlass.supportsRefraction) {
+                            RowDivider()
+                            SettingRow(
+                                Icons.Default.AutoAwesome, "Liquid glass",
+                                subtitle = "Turn off for lower GPU use",
+                                trailing = { AniSwitch(themeSettings.isGlassmorphismEnabled) { vm.setGlassmorphism(it) } }
                             )
                         }
-                        Text(
-                            text = "View All ›",
-                            fontSize = 12.sp,
-                            color = OttPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() }
-                        )
                     }
+                }
 
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(savedMangaList, key = { it.mangaId }) { bm ->
-                            ProfileMangaCard(
-                                item = bm,
-                                onClick = {
+                // ── Library ───────────────────────────────────────────────
+                item {
+                    Section("Library") {
+                        SettingRow(Icons.Default.Bookmark, "Watchlist", value = "${vm.watchlist.size}", onClick = { onSeeAllWatchlist?.invoke() })
+                        RowDivider()
+                        SettingRow(Icons.Default.History, "Watch history", value = "${vm.history.size}", onClick = { onSeeAllWatchlist?.invoke() })
+                        RowDivider()
+                        SettingRow(Icons.Default.AutoStories, "Saved manga", value = "${vm.mangaBookmarks.size}",
+                            onClick = { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() })
+                        RowDivider()
+                        SettingRow(Icons.Default.MenuBook, "Manga history", value = "${vm.mangaHistory.size}",
+                            onClick = { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() })
+                        RowDivider()
+                        SettingRow(Icons.Default.AutoStories, "Novel history", value = "${vm.novelHistoryList.size}",
+                            onClick = { onOpenNovelHistory?.invoke() ?: onSeeAllWatchlist?.invoke() })
+                        RowDivider()
+                        SettingRow(Icons.Default.Download, "Downloads & storage", onClick = { showDownloadSettingsSheet = true })
+                    }
+                }
+
+                if (savedMangaList.isNotEmpty()) {
+                    item {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(savedMangaList, key = { it.mangaId }) { bm ->
+                                ProfileMangaCard(item = bm, onClick = {
                                     vm.searchManga(bm.title)
                                     onMangaClick?.invoke(bm.mangaId)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── 3. Anime Tracking & Watchlist Sync ───────────────────────────
-        item {
-            ProfileSettingGroup(title = "Anime Tracking & Sync") {
-                val aniListAcc = vm.aniListAccount
-                ProfileSettingRow(
-                    icon = Icons.Default.Sync,
-                    title = "AniList",
-                    subtitle = if (aniListAcc != null) "Connected as @${aniListAcc.username}" else "Sync your AniList watchlist and history",
-                    badgeText = if (aniListAcc != null) "Linked" else "Connect",
-                    badgeColor = if (aniListAcc != null) Color(0xFF02A9FF) else Color(0x33FFFFFF),
-                    onClick = {
-                        showAniListSheet = true
-                    }
-                )
-                ProfileDivider()
-                val malAcc = vm.malAccount
-                ProfileSettingRow(
-                    icon = Icons.Default.SyncAlt,
-                    title = "MyAnimeList (MAL)",
-                    subtitle = if (malAcc != null) "Connected as @${malAcc.username}" else "Sync your MyAnimeList watchlist and history",
-                    badgeText = if (malAcc != null) "Linked" else "Connect",
-                    badgeColor = if (malAcc != null) Color(0xFF2E51A2) else Color(0x33FFFFFF),
-                    onClick = {
-                        showMalSheet = true
-                    }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.CloudSync,
-                    title = "Auto-Sync with Trackers",
-                    subtitle = "Automatically update AniList & MAL when watching episodes or changing status",
-                    trailing = {
-                        Switch(
-                            checked = vm.trackerSettings.isAutoSyncEnabled,
-                            onCheckedChange = { vm.updateTrackerSettings(vm.trackerSettings.copy(isAutoSyncEnabled = it)) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.Black,
-                                checkedTrackColor = Color.White,
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = Color(0x33FFFFFF)
-                            )
-                        )
-                    }
-                )
-            }
-        }
-
-        // ── Discord Rich Presence & Account ──────────────────────────────
-        item {
-            val discordAcc by com.nyyrox.aniverse.data.discord.DiscordAccountManager.accountState.collectAsState()
-            ProfileSettingGroup(title = "Discord Integration") {
-                ProfileSettingRow(
-                    icon = Icons.Default.PlayArrow,
-                    title = "Discord Rich Presence",
-                    subtitle = if (discordAcc != null) "Connected as @${discordAcc?.username} · Live Activity" else "Connect Discord to show what anime you're watching",
-                    badgeText = if (discordAcc != null) "Connected" else "Connect",
-                    badgeColor = if (discordAcc != null) Color(0xFF5865F2) else Color(0x33FFFFFF),
-                    onClick = {
-                        showDiscordSheet = true
-                    }
-                )
-            }
-        }
-
-        // ── 4. Display & Playback Settings ────────────────────────────────
-        item {
-            ProfileSettingGroup(title = "Display & Performance") {
-                ProfileSettingRow(
-                    icon = Icons.Default.Speed,
-                    title = "Display Refresh Rate",
-                    subtitle = if (isBatterySaverActive) "Locked to 60Hz (Battery Saver active)" else "Current: ${effectiveHz}Hz",
-                    badgeText = "${effectiveHz} Hz",
-                    badgeColor = if (isBatterySaverActive) Color(0xFF10B981) else Color.White,
-                    onClick = { showRefreshRateSheet = true }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.BatteryChargingFull,
-                    title = "Battery Saver (60Hz)",
-                    subtitle = "Caps refresh rate to 60Hz and reduces shader load",
-                    trailing = {
-                        Switch(
-                            checked = themeSettings.isPowerSavingEnabled,
-                            onCheckedChange = { vm.setPowerSaving(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.Black,
-                                checkedTrackColor = Color.White,
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = Color(0x33FFFFFF)
-                            )
-                        )
-                    }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.MotionPhotosOff,
-                    title = "Reduced Motion",
-                    subtitle = "Replaces spring physics with accessible fades",
-                    trailing = {
-                        Switch(
-                            checked = themeSettings.isReducedMotionEnabled,
-                            onCheckedChange = { vm.setReducedMotion(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.Black,
-                                checkedTrackColor = Color.White,
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = Color(0x33FFFFFF)
-                            )
-                        )
-                    }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.AutoAwesome,
-                    title = "Liquid Glassmorphism",
-                    subtitle = if (themeSettings.isGlassmorphismEnabled) "Prismal AGSL refraction, dispersion & backdrop blur" else "Optimized flat render (Lower GPU overhead & battery)",
-                    trailing = {
-                        com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
-                            checked = themeSettings.isGlassmorphismEnabled,
-                            onCheckedChange = { vm.setGlassmorphism(it) }
-                        )
-                    }
-                )
-            }
-        }
-
-        // ── 5. Privacy & Visibility Settings ──────────────────────────────
-        val isCurrentlyLoggedIn = vm.authState !is AuthState.LoggedOut
-        if (isCurrentlyLoggedIn) {
-            item {
-                ProfileSettingGroup(title = "Privacy & Visibility") {
-                    ProfileSettingRow(
-                        icon = Icons.Default.Lock,
-                        title = "Private Anime Watchlist",
-                        subtitle = "Hide saved anime watchlist from other community members",
-                        trailing = {
-                            Switch(
-                                checked = vm.userProfile.isWatchlistPrivate,
-                                onCheckedChange = { vm.updatePrivacySettings(isWatchlistPrivate = it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color(0x33FFFFFF)
-                                )
-                            )
-                        }
-                    )
-                    ProfileDivider()
-                    ProfileSettingRow(
-                        icon = Icons.Default.Lock,
-                        title = "Private Anime Watch History",
-                        subtitle = "Hide recent episode playback history from public profile",
-                        trailing = {
-                            Switch(
-                                checked = vm.userProfile.isWatchHistoryPrivate,
-                                onCheckedChange = { vm.updatePrivacySettings(isWatchHistoryPrivate = it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color(0x33FFFFFF)
-                                )
-                            )
-                        }
-                    )
-                    ProfileDivider()
-                    ProfileSettingRow(
-                        icon = Icons.Default.Lock,
-                        title = "Private Manga & Novel Reading",
-                        subtitle = "Hide manga bookmarks & novel reading history from public profile",
-                        trailing = {
-                            Switch(
-                                checked = vm.userProfile.isMangaPrivate || vm.userProfile.isNovelPrivate,
-                                onCheckedChange = { 
-                                    vm.updatePrivacySettings(isMangaPrivate = it, isNovelPrivate = it) 
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color(0x33FFFFFF)
-                                )
-                            )
-                        }
-                    )
-                }
-            }
-        }
-
-        // ── OWNER ADMINISTRATION & ROLE MANAGEMENT ──────────────────────────
-        if (vm.isCurrentUserOwner()) {
-            item {
-                var ownerUserQuery by remember { mutableStateOf("") }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF141722))
-                        .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "👑", fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "OWNER ADMINISTRATION",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFFF59E0B),
-                                letterSpacing = 0.5.sp
-                            )
-                            Text(
-                                text = "Search user by username or display name to promote/demote Admin & assign roles",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = ownerUserQuery,
-                        onValueChange = {
-                            ownerUserQuery = it
-                            vm.adminSearchUsers(it)
-                        },
-                        placeholder = {
-                            Text("Search username to manage roles...", color = OttTextMuted, fontSize = 12.sp)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
-                        },
-                        trailingIcon = {
-                            if (ownerUserQuery.isNotBlank()) {
-                                IconButton(onClick = {
-                                    ownerUserQuery = ""
-                                    vm.adminSearchUsers("")
-                                }) {
-                                    Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF10131B),
-                            unfocusedContainerColor = Color(0xFF090B10),
-                            focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-
-                    if (vm.isAdminSearching) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(8.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(color = Color(0xFFF59E0B), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        }
-                    } else if (vm.adminSearchResults.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF161A26))
-                                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                                .padding(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            vm.adminSearchResults.forEach { u ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            onOpenUserProfile?.invoke(u.id)
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    AsyncImage(
-                                        model = u.avatarUrl,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = u.displayName ?: u.username ?: "Otaku",
-                                            color = Color.White,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        val subtitle = listOfNotNull(
-                                            u.username?.let { "@$it" },
-                                            u.email
-                                        ).joinToString(" • ")
-                                        if (subtitle.isNotBlank()) {
-                                            Text(text = subtitle, color = Color(0xFF94A3B8), fontSize = 10.sp)
-                                        }
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color(0x22F59E0B))
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text("Open Profile 👑", color = Color(0xFFF59E0B), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                                })
                             }
                         }
                     }
                 }
-            }
-        }
 
-        // ── 6. App Updates & About ────────────────────────────────────────
-        item {
-            ProfileSettingGroup(title = "About & Updates") {
-                ProfileSettingRow(
-                    icon = Icons.Default.Info,
-                    title = "Check for Updates",
-                    subtitle = "Version ${com.nyyrox.aniverse.BuildConfig.VERSION_NAME} (Current Build)",
-                    onClick = { showChangelogs = true }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.History,
-                    title = "Changelogs",
-                    subtitle = "See what's new in all versions",
-                    onClick = { showChangelogs = true }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.Security,
-                    title = "DMCA & Legal Notice",
-                    subtitle = "Non-hosting indexer policy & copyright disclaimer",
-                    onClick = { showDmcaModal = true }
-                )
-            }
-        }
+                // ── Connections ───────────────────────────────────────────
+                item {
+                    val discordAcc by com.nyyrox.aniverse.data.discord.DiscordAccountManager.accountState.collectAsState()
+                    val ani = vm.aniListAccount
+                    val mal = vm.malAccount
+                    Section("Connections") {
+                        SettingRow(Icons.Default.Sync, "AniList", value = ani?.let { "@${it.username}" } ?: "Connect",
+                            onClick = { showAniListSheet = true })
+                        RowDivider()
+                        SettingRow(Icons.Default.SyncAlt, "MyAnimeList", value = mal?.let { "@${it.username}" } ?: "Connect",
+                            onClick = { showMalSheet = true })
+                        RowDivider()
+                        SettingRow(Icons.Default.PlayArrow, "Discord presence", value = discordAcc?.let { "@${it.username}" } ?: "Connect",
+                            onClick = { showDiscordSheet = true })
+                        RowDivider()
+                        SettingRow(
+                            Icons.Default.CloudSync, "Auto-sync",
+                            subtitle = "Update AniList & MAL while you watch",
+                            trailing = {
+                                AniSwitch(vm.trackerSettings.isAutoSyncEnabled) {
+                                    vm.updateTrackerSettings(vm.trackerSettings.copy(isAutoSyncEnabled = it))
+                                }
+                            }
+                        )
+                    }
+                }
 
-        // ── 5. Community & Links ──────────────────────────────────────────
-        item {
-            ProfileSettingGroup(title = "Community & Support") {
-                ProfileSettingRow(
-                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    title = "Join Discord Community",
-                    subtitle = "discord.gg/aXTfS6XGg",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/aXTfS6XGg"))
-                        context.startActivity(intent)
+                // ── Privacy ───────────────────────────────────────────────
+                if (isLoggedIn) {
+                    item {
+                        Section("Privacy") {
+                            SettingRow(Icons.Default.Lock, "Private watchlist",
+                                trailing = { AniSwitch(vm.userProfile.isWatchlistPrivate) { vm.updatePrivacySettings(isWatchlistPrivate = it) } })
+                            RowDivider()
+                            SettingRow(Icons.Default.Lock, "Private watch history",
+                                trailing = { AniSwitch(vm.userProfile.isWatchHistoryPrivate) { vm.updatePrivacySettings(isWatchHistoryPrivate = it) } })
+                            RowDivider()
+                            SettingRow(Icons.Default.Lock, "Private manga & novels",
+                                trailing = {
+                                    AniSwitch(vm.userProfile.isMangaPrivate || vm.userProfile.isNovelPrivate) {
+                                        vm.updatePrivacySettings(isMangaPrivate = it, isNovelPrivate = it)
+                                    }
+                                })
+                        }
                     }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    title = "Telegram Channel",
-                    subtitle = "t.me/StreamverseOfc",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))
-                        context.startActivity(intent)
-                    }
-                )
-                ProfileDivider()
-                ProfileSettingRow(
-                    icon = Icons.Default.Code,
-                    title = "GitHub Repository",
-                    subtitle = "Source code, issues & contributions",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Nyyrox/Zenkai"))
-                        context.startActivity(intent)
-                    }
-                )
-            }
-        }
+                }
 
-        // ── 7. Account & Session ──────────────────────────────────────────
-        if (isCurrentlyLoggedIn) {
-            val userEmailOrHandle = when {
-                !vm.userProfile.email.isNullOrBlank() -> vm.userProfile.email
-                vm.userProfile.username.isNotBlank() -> "@${vm.userProfile.username}"
-                else -> "Active session"
-            }
-            item {
-                ProfileSettingGroup(title = "Account") {
-                    ProfileSettingRow(
-                        icon = Icons.AutoMirrored.Filled.Logout,
-                        title = "Sign Out",
-                        subtitle = "Sign out from $userEmailOrHandle",
-                        onClick = { vm.signOut() },
-                        titleColor = Color(0xFFFF5252),
-                        iconTint = Color(0xFFFF5252)
+                // ── About & community ─────────────────────────────────────
+                item {
+                    Section("About") {
+                        SettingRow(Icons.Default.Info, "What's new", value = "v${com.nyyrox.aniverse.BuildConfig.VERSION_NAME}",
+                            onClick = { showChangelogs = true })
+                        RowDivider()
+                        SettingRow(Icons.Default.Security, "Legal & DMCA", onClick = { showDmcaModal = true })
+                        RowDivider()
+                        SettingRow(Icons.AutoMirrored.Filled.OpenInNew, "Discord",
+                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/aXTfS6XGg"))) })
+                        RowDivider()
+                        SettingRow(Icons.AutoMirrored.Filled.OpenInNew, "Telegram",
+                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))) })
+                        RowDivider()
+                        SettingRow(Icons.Default.Code, "GitHub",
+                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Nyyrox/Zenkai"))) })
+                    }
+                }
+
+                if (isLoggedIn) {
+                    item {
+                        Section("Account") {
+                            SettingRow(Icons.AutoMirrored.Filled.Logout, "Sign out", danger = true, onClick = { vm.signOut() })
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        "ZENKAI · v${com.nyyrox.aniverse.BuildConfig.VERSION_NAME}",
+                        fontSize = 11.sp, color = c.textMuted,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
             }
-        }
 
-        // ── 7. App Footer ─────────────────────────────────────────────────
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Pinned glass actions over the banner
+            Row(
+                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 8.dp, end = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "ZENKAI • v${com.nyyrox.aniverse.BuildConfig.VERSION_NAME}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF64748B)
-                )
-                Text(
-                    text = "Crafted for Otakus",
-                    fontSize = 10.sp,
-                    color = Color(0xFF475569)
-                )
+                if (onOpenNotifications != null) {
+                    Box {
+                        AniIconButton(Icons.Default.Notifications, "Notifications", onOpenNotifications)
+                        if (vm.unreadNotificationsCount > 0) {
+                            Box(Modifier.align(Alignment.TopEnd).padding(7.dp).size(7.dp).clip(CircleShape).background(c.accent))
+                        }
+                    }
+                }
+                AniIconButton(Icons.Default.Edit, "Edit banner", { showBannerOptionsSheet = true })
             }
         }
     }
@@ -1503,101 +828,6 @@ fun ProfileScreen(
                     }
                 }
 
-                val canManageRoles = vm.isCurrentUserOwner()
-                if (canManageRoles) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "ASSIGN DISPLAYED ROLES",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Black,
-                            color = OttTextMuted,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val roleChoices = listOf("OWNER" to "OWNER", "ADMIN" to "ADMIN", "MODERATOR" to "MOD")
-                            roleChoices.forEach { (rKey, rLabel) ->
-                                val isSelected = editRoles.contains(rKey)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) OttPrimary.copy(alpha = 0.25f) else Color(0x18FFFFFF))
-                                        .border(1.dp, if (isSelected) OttPrimary else Color(0x30FFFFFF), RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            editRoles = if (isSelected) editRoles - rKey else editRoles + rKey
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = rLabel,
-                                        color = if (isSelected) Color.White else Color(0xFF94A3B8),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Zenkai Closet & Customization Locker Button
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFE11D48).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                        .clickable {
-                            showEditProfileModal = false
-                            onOpenDecorations?.invoke()
-                        }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFE11D48)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Zenkai Decoration Locker",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Customise avatar frames, profile effects & banners",
-                                fontSize = 11.sp,
-                                color = Color(0xFFCAD5E2)
-                            )
-                        }
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = Color(0xFFE11D48),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Button(
@@ -1608,7 +838,7 @@ fun ProfileScreen(
                             bio = editBio,
                             bioFont = editBioFont,
                             favoriteAnime = editFavoriteAnime,
-                            roles = if (canManageRoles) editRoles.toList() else null
+                            roles = null
                         )
                         showEditProfileModal = false
                     },
@@ -1695,8 +925,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFE11D48).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                        .background(Color(0xFFA0A4B2).copy(alpha = 0.15f))
+                        .border(1.dp, Color(0xFFA0A4B2).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
                         .clickable {
                             showAvatarOptionsSheet = false
                             onOpenDecorations?.invoke()
@@ -1705,7 +935,7 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color(0xFFFF4D6D))
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White)
                     Column {
                         Text("Avatar & Text Effects", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Equip animated avatars & kinetic text effects", color = Color(0xFF94A3B8), fontSize = 11.sp)
@@ -1787,8 +1017,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFE11D48).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                        .background(Color(0xFFA0A4B2).copy(alpha = 0.15f))
+                        .border(1.dp, Color(0xFFA0A4B2).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
                         .clickable {
                             showBannerOptionsSheet = false
                             onOpenDecorations?.invoke()
@@ -1797,7 +1027,7 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color(0xFFFF4D6D))
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White)
                     Column {
                         Text("Zenkai Banner Themes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text("Choose from 16 dark, energy & anime themes", color = Color(0xFF94A3B8), fontSize = 11.sp)
@@ -2014,10 +1244,10 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isNoTagEquipped) Color(0xFFE11D48).copy(alpha = 0.2f) else Color(0x0AFFFFFF))
+                                .background(if (isNoTagEquipped) Color(0xFFA0A4B2).copy(alpha = 0.2f) else Color(0x0AFFFFFF))
                                 .border(
                                     1.dp,
-                                    if (isNoTagEquipped) Color(0xFFE11D48) else Color(0x15FFFFFF),
+                                    if (isNoTagEquipped) Color(0xFFA0A4B2) else Color(0x15FFFFFF),
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
@@ -2045,7 +1275,7 @@ fun ProfileScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0xFFE11D48))
+                                        .background(Color(0xFFA0A4B2))
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -2395,9 +1625,9 @@ fun ProfileScreen(
             confirmButton = {
                 Button(
                     onClick = { uploadNoticeMessage = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
                 ) {
-                    Text("OK", color = Color.White)
+                    Text("OK", color = Color.Black)
                 }
             },
             containerColor = Color(0xFF141720),
@@ -2406,141 +1636,135 @@ fun ProfileScreen(
     }
 }
 
-// ── Shared Profile Setting Composables ────────────────────────────────────────
+// ── Profile UI pieces ─────────────────────────────────────────────────────────
 
 @Composable
-private fun ProfileSettingGroup(
-    title: String,
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = modifier
+private fun ProfileBanner(vm: MainViewModel, scrollPx: () -> Float) {
+    val c = LocalAppColors.current
+    Box(
+        Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .height(200.dp)
+            .graphicsLayer { translationY = -scrollPx() }
     ) {
-        Text(
-            text = title.uppercase(),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF64748B),
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
+        ProfileBannerRenderer(
+            bannerThemeId = vm.userProfile.bannerThemeId,
+            customBannerUrl = vm.userProfile.bannerUrl,
+            modifier = Modifier.fillMaxSize()
         )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color(0x0EFFFFFF))
-                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(18.dp))
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ProfileSettingRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String? = null,
-    badgeText: String? = null,
-    badgeColor: Color = Color.White,
-    titleColor: Color = Color.White,
-    iconTint: Color = Color.White,
-    trailing: (@Composable () -> Unit)? = null,
-    onClick: (() -> Unit)? = null
-) {
-    val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (onClick != null) Modifier.clickable {
-                    AppHaptics.tick(context)
-                    onClick()
-                } else Modifier
-            )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        BannerOverlayRenderer(effectId = vm.userProfile.bannerEffectId, modifier = Modifier.fillMaxSize())
         Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0x14FFFFFF))
-                .border(1.dp, Color(0x1CFFFFFF), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(Modifier.width(14.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = titleColor
-            )
-            if (!subtitle.isNullOrBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
-                    lineHeight = 15.sp
-                )
-            }
-        }
-
-        if (badgeText != null) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x1AFFFFFF))
-                    .border(0.8.dp, Color(0x2AFFFFFF), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = badgeText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = badgeColor
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-        }
-
-        if (trailing != null) {
-            trailing()
-        } else if (onClick != null) {
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Color(0xFF64748B),
-                modifier = Modifier.size(18.dp)
-            )
-        }
+            Modifier.fillMaxWidth().height(90.dp).align(Alignment.TopCenter)
+                .background(Brush.verticalGradient(listOf(Color(0x99000000), Color.Transparent)))
+        )
+        Box(
+            Modifier.fillMaxWidth().height(110.dp).align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, c.bg)))
+        )
     }
 }
 
 @Composable
-private fun ProfileDivider() {
+private fun Stat(count: Int, label: String, modifier: Modifier = Modifier) {
+    val c = LocalAppColors.current
+    Column(modifier) {
+        Text(count.toString(), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary)
+        Text(label, fontSize = 12.sp, color = c.textMuted)
+    }
+}
+
+@Composable
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val c = LocalAppColors.current
+    Column(Modifier.fillMaxWidth().padding(top = 24.dp)) {
+        Text(
+            title,
+            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.textMuted, letterSpacing = 0.6.sp,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp)
+        )
+        content()
+    }
+}
+
+@Composable
+private fun RowDivider() {
     HorizontalDivider(
-        color = Color(0x10FFFFFF),
-        thickness = 1.dp,
-        modifier = Modifier.padding(horizontal = 16.dp)
+        color = LocalAppColors.current.glass.border.copy(alpha = 0.5f),
+        thickness = 0.5.dp,
+        modifier = Modifier.padding(start = 56.dp, end = 20.dp)
     )
 }
 
 @Composable
+private fun SettingRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    value: String? = null,
+    danger: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null
+) {
+    val c = LocalAppColors.current
+    val context = LocalContext.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { AppHaptics.tick(context); onClick() } else Modifier)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = if (danger) c.error else c.textSecondary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (danger) c.error else c.textPrimary)
+            if (!subtitle.isNullOrBlank()) {
+                Text(subtitle, fontSize = 12.sp, color = c.textMuted, lineHeight = 16.sp)
+            }
+        }
+        if (value != null) {
+            Text(value, fontSize = 13.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(6.dp))
+        }
+        when {
+            trailing != null -> trailing()
+            onClick != null -> Icon(Icons.Default.ChevronRight, null, tint = c.textMuted, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun ThemeModeSelector(current: ThemeMode, onChange: (ThemeMode) -> Unit) {
+    val c = LocalAppColors.current
+    val options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark")
+    Row(
+        Modifier
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .aniGlass(radius = 999.dp)
+            .padding(4.dp)
+    ) {
+        options.forEach { (mode, label) ->
+            val selected = mode == current
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(CircleShape)
+                    .background(if (selected) c.accent else Color.Transparent)
+                    .clickable { onChange(mode) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label, fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (selected) c.onAccent else c.textSecondary
+                )
+            }
+        }
+    }
+}
+
 private fun ProfileMangaCard(
     item: MangaBookmarkItem,
     onClick: () -> Unit
@@ -2559,8 +1783,6 @@ private fun ProfileMangaCard(
                 .width(115.dp)
                 .height(160.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color(0x15FFFFFF))
-                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
         ) {
             AsyncImage(
                 model = item.poster,
@@ -2595,7 +1817,7 @@ private fun ProfileMangaCard(
             text = item.title,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            color = Color.White,
+            color = LocalAppColors.current.textPrimary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 14.sp
