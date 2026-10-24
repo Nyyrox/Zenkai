@@ -182,7 +182,6 @@ fun ProfileScreen(
     val context = LocalContext.current
     // read straight from the ViewModel so toggles and theme mode update instantly
     val themeSettings = vm.themeSettings
-    val systemDark = isSystemInDarkTheme()
 
     val activity = remember(context) {
         var ctx = context
@@ -364,119 +363,12 @@ fun ProfileScreen(
                     }
                 }
 
-                // ── Level, streak & library stats ─────────────────────────
-                item {
-                    val level = vm.userProfile.level
-                    val exp = vm.userProfile.exp
-                    val progress = LevelAndStreakSystem.calculateLevelProgress(exp)
-                    val nextExp = LevelAndStreakSystem.expForNextLevel(level)
-                    val equippedTag = vm.userProfile.customTag?.takeIf {
-                        it.isNotBlank() && !it.equals("null", true) && !it.equals("none", true)
-                    }
-                    val watching = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.WATCHING }
-                    val completed = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.COMPLETED }
-                    val planned = vm.watchlist.count { it.watchlistStatus == WatchlistStatus.PLAN_TO_WATCH }
-                    val tile = c.skeleton.copy(alpha = 0.35f)
-
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp)
-                            .aniGlass(radius = 24.dp)
-                            .padding(16.dp)
-                    ) {
-                        // Level + rank tag
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            AnimatedLevelThemeBadge(level = level)
-                            Spacer(Modifier.width(8.dp))
-                            Box(Modifier.clickable { showNinjaTagsSheet = true }) {
-                                if (equippedTag != null) LevelRankTagBadge(tag = equippedTag, level = level)
-                                else Text("+ Equip tag", fontSize = 12.sp, color = c.textMuted)
-                            }
-                            Spacer(Modifier.weight(1f))
-                            Text(
-                                "Ranks",
-                                fontSize = 12.sp, color = c.textSecondary, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.clickable { showNinjaTagsSheet = true }
-                            )
-                        }
-
-                        Spacer(Modifier.height(14.dp))
-
-                        // EXP progress
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                            color = c.accent,
-                            trackColor = c.skeleton
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("EXP $exp / $nextExp", fontSize = 11.sp, color = c.textMuted)
-                            Text("${(progress * 100).toInt()}%", fontSize = 11.sp, color = c.textMuted)
-                        }
-
-                        Spacer(Modifier.height(16.dp))
-
-                        // Streaks
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Column(
-                                Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(tile)
-                                    .padding(12.dp)
-                            ) {
-                                Text("CURRENT STREAK", fontSize = 10.sp, color = c.textMuted, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
-                                Spacer(Modifier.height(8.dp))
-                                AnimatedStreakBadge(streakCount = vm.userProfile.streakCount, isFullLabel = true)
-                            }
-                            Column(
-                                Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(tile)
-                                    .padding(12.dp)
-                            ) {
-                                Text("BEST STREAK", fontSize = 10.sp, color = c.textMuted, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    "${vm.userProfile.longestStreak} days",
-                                    fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.textPrimary
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(10.dp))
-
-                        // Library stats
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(tile)
-                                .padding(vertical = 14.dp)
-                        ) {
-                            Stat(watching, "Watching", Modifier.weight(1f))
-                            Stat(completed, "Completed", Modifier.weight(1f))
-                            Stat(planned, "Planned", Modifier.weight(1f))
-                        }
-                    }
-                }
-
                 // ── Appearance ────────────────────────────────────────────
                 item {
                     Section("Appearance") {
                         ThemeModeSelector(
                             current = themeSettings.mode,
-                            onChange = { mode ->
-                                vm.setThemeMode(mode)
-                                ThemeRuntime.isLight = when (mode) {
-                                    ThemeMode.LIGHT -> true
-                                    ThemeMode.DARK -> false
-                                    ThemeMode.SYSTEM -> !systemDark
-                                }
-                            }
+                            onChange = { vm.setThemeMode(it) }
                         )
                         RowDivider()
                         SettingRow(Icons.Default.Palette, "Profile decorations", onClick = { onOpenDecorations?.invoke() })
@@ -1876,16 +1768,36 @@ private fun ProfileMangaCard(
     }
 }
 
-/** Plain Material switch: always visible and tappable, independent of the glass setting. */
+/** Custom iOS-style switch: green track when on, white thumb that slides. Not tied to the glass setting. */
 @Composable
 private fun AppSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
-    val c = LocalAppColors.current
-    androidx.compose.material3.Switch(
-        checked = checked,
-        onCheckedChange = onChange,
-        colors = androidx.compose.material3.SwitchDefaults.colors(
-            checkedTrackColor = c.accent,
-            checkedThumbColor = c.onAccent
-        )
+    val track by androidx.compose.animation.animateColorAsState(
+        targetValue = if (checked) Color(0xFF34C759) else Color(0xFF48484F),
+        label = "switchTrack"
     )
+    val thumbX by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (checked) 22.dp else 2.dp,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f),
+        label = "switchThumb"
+    )
+    Box(
+        Modifier
+            .width(52.dp)
+            .height(32.dp)
+            .clip(CircleShape)
+            .background(track)
+            .clickable(
+                interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
+                indication = null
+            ) { onChange(!checked) }
+    ) {
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = thumbX)
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+        )
+    }
 }
