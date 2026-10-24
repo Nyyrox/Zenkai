@@ -127,11 +127,19 @@ private class HomePalette(
     val skeleton: Color,
     val skeletonHi: Color,
     val glow: Color,
-    val rating: Color
+    val rating: Color,
+    val gradTop: Color,
+    val gradMid: Color,
+    val gradBot: Color
 ) {
     val accentBrush: Brush = Brush.horizontalGradient(listOf(accentA, accentB))
+    val pageBrush: Brush = Brush.verticalGradient(0f to gradTop, 0.40f to gradMid, 1f to gradBot)
 }
 
+/**
+ * Black & white UI. Red is only used for ratings (and the thin resume bar).
+ * Dark: burgundy-to-black page gradient. Light: warm white page gradient.
+ */
 @Composable
 private fun rememberHomePalette(): HomePalette {
     val c = LocalAppColors.current
@@ -142,33 +150,39 @@ private fun rememberHomePalette(): HomePalette {
         if (dark) HomePalette(
             dark = true, glassOn = glassOn, bg = c.bg,
             text = Color(0xFFFFFFFF),
-            textSub = Color(0xFFDCE0EE),
-            textMuted = Color(0xFFA6ADC4),
-            accentA = Color(0xFF9B8CFF),
-            accentB = Color(0xFFFF7AB8),
-            accentText = Color(0xFFB9AEFF),
-            onAccent = Color(0xFF120E2A),
-            flatFill = Color(0xE61C2030),
-            glassBorder = Color(0x40FFFFFF),
-            skeleton = Color(0xFF1E2333),
-            skeletonHi = Color(0xFF2C3248),
-            glow = Color(0xFF9B8CFF).copy(alpha = 0.30f),
-            rating = Color(0xFFFF4B5C)
+            textSub = Color(0xFFD6D0D3),
+            textMuted = Color(0xFF9D959A),
+            accentA = Color(0xFFFFFFFF),
+            accentB = Color(0xFFFFFFFF),
+            accentText = Color(0xFFB4ACB0),
+            onAccent = Color(0xFF0E0A0C),
+            flatFill = Color(0xE61E1619),
+            glassBorder = Color(0x33FFFFFF),
+            skeleton = Color(0xFF241A1F),
+            skeletonHi = Color(0xFF33262D),
+            glow = Color(0x14FFFFFF),
+            rating = Color(0xFFFF4757),
+            gradTop = Color(0xFF45172A),
+            gradMid = Color(0xFF1F0F16),
+            gradBot = Color(0xFF0B090B)
         ) else HomePalette(
             dark = false, glassOn = glassOn, bg = c.bg,
-            text = Color(0xFF0A0D18),
-            textSub = Color(0xFF272D42),
-            textMuted = Color(0xFF50586F),
-            accentA = Color(0xFF4A3AE6),
-            accentB = Color(0xFFC2185B),
-            accentText = Color(0xFF3B2BD1),
+            text = Color(0xFF0D0A0B),
+            textSub = Color(0xFF362F32),
+            textMuted = Color(0xFF6A6266),
+            accentA = Color(0xFF0D0A0B),
+            accentB = Color(0xFF0D0A0B),
+            accentText = Color(0xFF6A6266),
             onAccent = Color(0xFFFFFFFF),
-            flatFill = Color(0xEBFFFFFF),
-            glassBorder = Color(0x26000000),
-            skeleton = Color(0xFFDDE1EE),
-            skeletonHi = Color(0xFFF0F2FA),
-            glow = Color(0xFF4A3AE6).copy(alpha = 0.16f),
-            rating = Color(0xFFD0102A)
+            flatFill = Color(0xF2FFFFFF),
+            glassBorder = Color(0x24000000),
+            skeleton = Color(0xFFE6E0E2),
+            skeletonHi = Color(0xFFF3EFF0),
+            glow = Color(0x99FFFFFF),
+            rating = Color(0xFFD0102A),
+            gradTop = Color(0xFFF6E1E6),
+            gradMid = Color(0xFFF7F3F4),
+            gradBot = Color(0xFFF1EEEF)
         )
     }
 }
@@ -194,6 +208,10 @@ private fun GlyphIcon(icon: ImageVector, desc: String?, size: Dp, modifier: Modi
         Icon(icon, desc, tint = tint, modifier = Modifier.size(size))
     }
 }
+
+@Composable
+private fun Modifier.tap(onClick: () -> Unit): Modifier =
+    this.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
 
 @Composable
 private fun Modifier.pressable(onClick: () -> Unit): Modifier {
@@ -281,7 +299,7 @@ private fun SectionTitle(title: String, p: HomePalette, subtitle: String? = null
         if (onSeeAll != null) {
             Text(
                 "See all", color = p.accentText, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable(onClick = onSeeAll).padding(6.dp)
+                modifier = Modifier.tap(onSeeAll).padding(6.dp)
             )
         }
     }
@@ -357,7 +375,7 @@ private fun Top10Row(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> U
             Box(Modifier.width(if (idx >= 9) 196.dp else 164.dp).height(184.dp).pressable { onAnimeClick(anime.id) }) {
                 Text(
                     text = "${idx + 1}",
-                    color = p.accentA,
+                    color = p.text.copy(alpha = 0.30f),
                     fontSize = 104.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = (-6).sp,
@@ -417,10 +435,10 @@ private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: Ho
     }
 }
 
-// ── Hero: swipeable 3D card stack ────────────────────────────────────────────
+// ── Hero: small swipeable 3D card stack ─────────────────────────────────────
 
-private val HeroCardW = 232.dp
-private val HeroCardH = 340.dp
+private val HeroCardW = 176.dp
+private val HeroCardH = 258.dp
 
 @Composable
 private fun HomeHero(
@@ -429,8 +447,7 @@ private fun HomeHero(
     vm: MainViewModel,
     p: HomePalette,
     listScrolling: Boolean,
-    onAnimeClick: (Int) -> Unit,
-    onPlayClick: (animeId: Int, episode: Int) -> Unit
+    onAnimeClick: (Int) -> Unit
 ) {
     val reduced = LocalThemeSettings.current.isReducedMotionEnabled
     val dragging = pager.isScrollInProgress
@@ -449,23 +466,17 @@ private fun HomeHero(
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         // clears the floating top bar (separate file)
-        Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(68.dp))
-        Text(
-            "Watch today", color = p.textSub, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-            modifier = Modifier.align(Alignment.Start).padding(start = 22.dp)
-        )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(88.dp))
 
         HorizontalPager(
             state = pager,
             contentPadding = PaddingValues(horizontal = sidePad),
             pageSpacing = 0.dp,
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().height(HeroCardH + 28.dp)
+            modifier = Modifier.fillMaxWidth().height(HeroCardH + 12.dp)
         ) { page ->
             val anime = shows[page]
             LaunchedEffect(anime.id) { vm.loadTmdbArtwork(anime) }
-            val shape = RoundedCornerShape(24.dp)
             Box(
                 Modifier
                     .zIndex(-abs(page - pager.currentPage).toFloat())
@@ -474,19 +485,17 @@ private fun HomeHero(
                     .graphicsLayer {
                         val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
                         val a = abs(off).coerceAtMost(2f)
-                        val s = 1f - 0.14f * a.coerceAtMost(1f) - 0.05f * (a - 1f).coerceAtLeast(0f)
+                        val s = 1f - 0.13f * a.coerceAtMost(1f) - 0.05f * (a - 1f).coerceAtLeast(0f)
                         scaleX = s
                         scaleY = s
-                        rotationY = (off * 30f).coerceIn(-42f, 42f)
-                        translationX = off * size.width * 0.22f
-                        alpha = (1f - 0.32f * a).coerceIn(0.3f, 1f)
+                        rotationY = (off * 28f).coerceIn(-40f, 40f)
+                        translationX = off * size.width * 0.27f
+                        alpha = (1f - 0.35f * a).coerceIn(0.25f, 1f)
                         cameraDistance = 14f * density
                     }
-                    .shadow(20.dp, shape, ambientColor = p.accentA, spotColor = p.accentA)
-                    .clip(shape)
+                    .clip(RoundedCornerShape(18.dp))
                     .shimmer(p)
-                    .border(0.8.dp, p.glassBorder, shape)
-                    .clickable {
+                    .tap {
                         if (pager.currentPage == page) onAnimeClick(anime.id)
                         else scope.launch { pager.animateScrollToPage(page) }
                     }
@@ -498,110 +507,62 @@ private fun HomeHero(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
 
         Crossfade(targetState = current, label = "heroInfo") { idx ->
             val anime = shows[idx.coerceIn(0, shows.lastIndex)]
-            val artwork = vm.tmdbArtworks[anime.id]
-            val title = artwork?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+            val title = vm.tmdbArtworks[anime.id]?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+            val genres = anime.genres.take(2).joinToString(" • ")
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    "#${idx + 1} TRENDING", color = p.accentText, fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp
-                )
-                Spacer(Modifier.height(6.dp))
-                if (!artwork?.logoUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = artwork?.logoUrl, contentDescription = title,
-                        modifier = Modifier.heightIn(max = 52.dp).fillMaxWidth(0.6f),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Text(
-                        title, color = p.text, fontSize = 24.sp, lineHeight = 28.sp,
-                        fontWeight = FontWeight.Black, maxLines = 2,
-                        overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
-                    )
+                if (genres.isNotBlank()) {
+                    Text(genres, color = p.textMuted, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(3.dp))
                 }
-                Spacer(Modifier.height(6.dp))
+                Text(
+                    title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
+                    fontWeight = FontWeight.Bold, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(5.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Text(
-                        listOfNotNull(anime.genres.take(2).joinToString(" • ").ifBlank { null }, anime.displayFormat)
-                            .joinToString(" · "),
-                        color = p.textSub, fontSize = 13.sp, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
-                    )
+                    if (!anime.displayFormat.isNullOrBlank()) {
+                        Text(anime.displayFormat ?: "", color = p.textSub, fontSize = 13.sp, maxLines = 1)
+                    }
                     if (ratingText(anime) != null) {
-                        Text("  ·  ", color = p.textMuted, fontSize = 13.sp)
+                        if (!anime.displayFormat.isNullOrBlank()) Text("  ·  ", color = p.textMuted, fontSize = 13.sp)
                         RatingText(anime, p, 14.dp, 14.sp)
                     }
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GradientPill("Play", Icons.Default.PlayArrow, p, { onPlayClick(anime.id, 1) })
-                    GlassPill("Details", Icons.Default.Info, p, { onAnimeClick(anime.id) })
-                }
-            }
-        }
-
-        if (shows.size > 1) {
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                repeat(shows.size) { i ->
-                    val active = i == current
-                    Box(
-                        Modifier
-                            .height(4.dp)
-                            .width(if (active) 20.dp else 5.dp)
-                            .clip(CircleShape)
-                            .then(
-                                if (active) Modifier.background(p.accentBrush)
-                                else Modifier.background(p.textMuted.copy(alpha = 0.5f))
-                            )
-                    )
                 }
             }
         }
     }
 }
 
-/** Soft ambient glow behind the whole page (no images, no hard edges). It is what the glass refracts. */
+/** Page gradient (burgundy to black in dark, warm white in light) with a faint glow behind the cards. */
 @Composable
-private fun HomeBackdrop(state: LazyListState, p: HomePalette) {
-    Box(Modifier.fillMaxSize().background(p.bg)) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "home_hero_banner" }
-                    alpha = if (info == null) 0f else (1f + info.offset / (info.size * 1.2f)).coerceIn(0f, 1f)
-                }
-                .drawBehind {
-                    drawRect(
-                        Brush.radialGradient(
-                            listOf(p.glow, Color.Transparent),
-                            center = Offset(size.width * 0.5f, size.height * 0.30f),
-                            radius = size.width * 1.15f
-                        )
+private fun HomeBackdrop(p: HomePalette) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(p.pageBrush)
+            .drawBehind {
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(p.glow, Color.Transparent),
+                        center = Offset(size.width * 0.5f, size.height * 0.24f),
+                        radius = size.width * 0.9f
                     )
-                    drawRect(
-                        Brush.radialGradient(
-                            listOf(p.accentB.copy(alpha = if (p.dark) 0.16f else 0.09f), Color.Transparent),
-                            center = Offset(size.width * 0.1f, size.height * 0.55f),
-                            radius = size.width * 0.9f
-                        )
-                    )
-                }
-        )
-    }
+                )
+            }
+    )
 }
 
 // ── Episode feed item ────────────────────────────────────────────────────────
 
-/** 16:9 thumbnail (tap = play) with label / title / meta underneath (tap = details). No card, no icon backgrounds. */
+/** 16:9 thumbnail (tap = play) with label / title / meta underneath (tap = details). No card, no play button. */
 @Composable
 fun YouTubeStyleEpisodeCard(
     anime: Anime,
@@ -622,7 +583,6 @@ fun YouTubeStyleEpisodeCard(
     }
 
     val p = rememberHomePalette()
-    val durationText = remember(anime.duration) { "${anime.duration ?: 24}:00" }
     val title = tmdbTitle?.takeIf { it.isNotBlank() } ?: anime.displayTitle
     val headerTitle = if (anime.isMovie) title else "$title • Episode $episodeNumber"
     val thumb = remember(episodeStill, anime.banner, anime.cover) {
@@ -631,14 +591,14 @@ fun YouTubeStyleEpisodeCard(
             ?: anime.cover
     }
 
-    Column(modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 8.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 8.dp)) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .shimmer(p)
-                .clickable { onPlayClick(anime.id, episodeNumber) }
+                .tap { onPlayClick(anime.id, episodeNumber) }
         ) {
             SubcomposeAsyncImage(
                 model = thumb, contentDescription = null,
@@ -653,7 +613,7 @@ fun YouTubeStyleEpisodeCard(
             )
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color(0xB3000000))
+                    Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0x99000000))
                 )
             )
             if (!logoUrl.isNullOrBlank()) {
@@ -662,22 +622,21 @@ fun YouTubeStyleEpisodeCard(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 14.dp, bottom = 12.dp)
-                        .heightIn(max = 34.dp)
-                        .fillMaxWidth(0.5f),
+                        .heightIn(max = 30.dp)
+                        .fillMaxWidth(0.45f),
                     contentScale = ContentScale.Fit, alignment = Alignment.BottomStart
                 )
             }
-            GlyphIcon(Icons.Default.PlayArrow, "Play", 38.dp, Modifier.align(Alignment.Center))
             Text(
-                durationText, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
+                "${anime.duration ?: 24} min", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold,
                 style = TextStyle(shadow = ImgShadow),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp)
             )
         }
 
-        Column(Modifier.fillMaxWidth().clickable { onAnimeClick(anime.id) }.padding(top = 10.dp)) {
+        Column(Modifier.fillMaxWidth().tap { onAnimeClick(anime.id) }.padding(top = 10.dp)) {
             if (!badgeText.isNullOrBlank()) {
-                Text(badgeText, color = p.accentText, fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, maxLines = 1)
+                Text(badgeText, color = p.textMuted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, maxLines = 1)
                 Spacer(Modifier.height(3.dp))
             }
             Text(
@@ -799,56 +758,39 @@ private fun ContinueRow(
 @Composable
 private fun ContinueTile(e: ContinueEntry, p: HomePalette) {
     LaunchedEffect(e.key) { e.loadStill?.invoke() }
-    Box(
-        Modifier
-            .width(272.dp)
-            .aspectRatio(16f / 9f)
-            .pressable(e.onOpen)
-            .clip(RoundedCornerShape(16.dp))
-            .shimmer(p)
-    ) {
-        AsyncImage(
-            model = e.image(), contentDescription = null,
-            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
-            alignment = if (e.kind == ContinueKind.ANIME) Alignment.Center else Alignment.TopCenter
-        )
+    Column(Modifier.width(250.dp).pressable(e.onOpen)) {
         Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(0f to Color(0x66000000), 0.35f to Color.Transparent, 1f to Color(0xE6000000))
-            )
-        )
-        Text(
-            e.kind.label, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
-            style = TextStyle(shadow = ImgShadow),
-            modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp)
-        )
-        Box(
-            Modifier.align(Alignment.TopEnd).size(40.dp).clickable(onClick = e.onRemove),
-            contentAlignment = Alignment.Center
-        ) { GlyphIcon(Icons.Default.Close, "Remove", 16.dp) }
-
-        Row(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                .padding(start = 12.dp, end = 10.dp, bottom = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(14.dp))
+                .shimmer(p)
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    e.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = ImgShadow)
+            AsyncImage(
+                model = e.image(), contentDescription = null,
+                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
+                alignment = if (e.kind == ContinueKind.ANIME) Alignment.Center else Alignment.TopCenter
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(0f to Color(0x66000000), 0.3f to Color.Transparent)
                 )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    e.subtitle, color = Color(0xE6FFFFFF), fontSize = 12.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = ImgShadow)
-                )
+            )
+            Box(
+                Modifier.align(Alignment.TopEnd).size(40.dp).tap(e.onRemove),
+                contentAlignment = Alignment.Center
+            ) { GlyphIcon(Icons.Default.Close, "Remove", 16.dp) }
+            if (e.progress > 0f) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x66FFFFFF)))
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(e.progress).height(3.dp).background(p.rating))
             }
-            GlyphIcon(Icons.Default.PlayArrow, null, 30.dp)
         }
-        if (e.progress > 0f) {
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x59FFFFFF)))
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(e.progress).height(3.dp).background(p.accentBrush))
-        }
+        Spacer(Modifier.height(8.dp))
+        Text(e.title, color = p.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            "${e.kind.label} · ${e.subtitle}", color = p.textMuted, fontSize = 12.sp,
+            maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -897,7 +839,7 @@ private fun HomeSkeleton(p: HomePalette) {
     ) {
         item {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
+                Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(88.dp))
                 Box(Modifier.width(HeroCardW).height(HeroCardH).clip(RoundedCornerShape(24.dp)).shimmer(p))
             }
         }
@@ -941,7 +883,7 @@ fun HomeScreen(
 
     val p = rememberHomePalette()
 
-    Box(Modifier.fillMaxSize().background(p.bg)) {
+    Box(Modifier.fillMaxSize().background(p.pageBrush)) {
         if (vm.homeLoading && vm.trending.isEmpty()) {
             HomeSkeleton(p)
             return@Box
@@ -969,7 +911,7 @@ fun HomeScreen(
 
         if (p.glassOn) {
             GlassBackdropHost(
-                background = { HomeBackdrop(lazyListState, p) }
+                background = { HomeBackdrop(p) }
             ) {
                 HomeFeed(
                     vm, p, heroShows, pager, lazyListState,
@@ -977,7 +919,7 @@ fun HomeScreen(
                 )
             }
         } else {
-            HomeBackdrop(lazyListState, p)
+            HomeBackdrop(p)
             HomeFeed(
                 vm, p, heroShows, pager, lazyListState,
                 onAnimeClick, onPlayClick, onMangaClick, onMangaReadClick, onNovelClick, onNovelReadClick
@@ -1055,11 +997,20 @@ private fun HomeFeed(
         contentPadding = PaddingValues(bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (heroShows.isNotEmpty()) {
+            item(key = "home_hero_banner") {
+                HomeHero(
+                    shows = heroShows, pager = pager, vm = vm, p = p,
+                    listScrolling = lazyListState.isScrollInProgress,
+                    onAnimeClick = onAnimeClick
+                )
+            }
+        }
+
         if (vm.homeError != null && vm.trending.isNotEmpty()) {
             item(key = "home_error_note") {
                 Box(
                     Modifier
-                        .windowInsetsPadding(WindowInsets.statusBars)
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp, vertical = 2.dp)
                         .homeGlass(p, 14.dp)
@@ -1070,16 +1021,6 @@ private fun HomeFeed(
                         textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
-        }
-
-        if (heroShows.isNotEmpty()) {
-            item(key = "home_hero_banner") {
-                HomeHero(
-                    shows = heroShows, pager = pager, vm = vm, p = p,
-                    listScrolling = lazyListState.isScrollInProgress,
-                    onAnimeClick = onAnimeClick, onPlayClick = onPlayClick
-                )
             }
         }
 
@@ -1339,9 +1280,9 @@ fun OfflineHomeScreenContent(
                                 Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(p.skeleton),
                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                if (animeBytes > 0L) Box(Modifier.weight(animeBytes.toFloat()).fillMaxHeight().background(p.accentA))
-                                if (mangaBytes > 0L) Box(Modifier.weight(mangaBytes.toFloat()).fillMaxHeight().background(p.accentB))
-                                if (novelBytes > 0L) Box(Modifier.weight(novelBytes.toFloat()).fillMaxHeight().background(p.accentA.copy(alpha = 0.4f)))
+                                if (animeBytes > 0L) Box(Modifier.weight(animeBytes.toFloat()).fillMaxHeight().background(p.text))
+                                if (mangaBytes > 0L) Box(Modifier.weight(mangaBytes.toFloat()).fillMaxHeight().background(p.text.copy(alpha = 0.6f)))
+                                if (novelBytes > 0L) Box(Modifier.weight(novelBytes.toFloat()).fillMaxHeight().background(p.text.copy(alpha = 0.3f)))
                             }
                         }
                     }
@@ -1452,16 +1393,10 @@ fun OfflineHomeScreenContent(
     }
 
     if (p.glassOn) {
-        GlassBackdropHost(
-            background = {
-                Box(Modifier.fillMaxSize().background(p.bg)) {
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to p.glow, 0.5f to Color.Transparent)))
-                }
-            }
-        ) { content() }
+        GlassBackdropHost(background = { HomeBackdrop(p) }) { content() }
     } else {
-        Box(Modifier.fillMaxSize().background(p.bg)) {
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to p.glow, 0.5f to Color.Transparent)))
+        Box(Modifier.fillMaxSize()) {
+            HomeBackdrop(p)
             content()
         }
     }
@@ -1498,7 +1433,7 @@ private fun OfflineTile(
             )
             if (onPlay != null) {
                 Box(
-                    Modifier.align(Alignment.BottomEnd).size(48.dp).clickable(onClick = onPlay),
+                    Modifier.align(Alignment.BottomEnd).size(48.dp).tap(onPlay),
                     contentAlignment = Alignment.Center
                 ) { GlyphIcon(Icons.Default.PlayArrow, "Play", 30.dp) }
             }
