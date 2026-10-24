@@ -1,6 +1,26 @@
 package com.nyyrox.aniverse.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.runtime.Stable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.unit.Dp
+import com.nyyrox.aniverse.ui.screens.HomePalette
+import com.nyyrox.aniverse.ui.screens.rememberHomePalette
+import kotlin.math.abs
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -123,8 +143,170 @@ import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 
+/**
+ * Watches the vertical scroll direction of whatever list is on screen (through nested scroll) so the top bar and
+ * the bottom dock can collapse / expand without any screen having to expose its scroll state.
+ * Attach [connection] with Modifier.nestedScroll around the screen container.
+ */
+@Stable
+class ChromeScrollState {
+    /** True while the user reads down the page (content moving up): dock collapses, top bar goes compact. */
+    var scrollingDown by mutableStateOf(false)
+        private set
+
+    /** True once the page has been scrolled a little away from the top. */
+    var pastTop by mutableStateOf(false)
+        private set
+
+    private var offsetPx = 0f
+    private var runPx = 0f
+
+    val bottomCollapsed: Boolean get() = scrollingDown
+
+    /** Full top bar (menu, logo, search) shows after scrolling away from the top and swiping back up. */
+    val topExpanded: Boolean get() = pastTop && !scrollingDown
+
+    fun reset() {
+        offsetPx = 0f
+        runPx = 0f
+        scrollingDown = false
+        pastTop = false
+    }
+
+    fun expandBottom() {
+        runPx = 0f
+        scrollingDown = false
+    }
+
+    val connection = object : NestedScrollConnection {
+        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+            val dy = available.y
+            if (abs(dy) < 0.5f) return Offset.Zero
+            // dy > 0: finger moving down (content reveals the top). dy < 0: finger moving up (reading on).
+            offsetPx = (offsetPx - dy).coerceAtLeast(0f)
+            val past = offsetPx > 80f
+            if (past != pastTop) pastTop = past
+            if (dy * runPx < 0f) runPx = 0f
+            runPx += dy
+            if (offsetPx < 24f) {
+                if (scrollingDown) scrollingDown = false
+            } else if (runPx < -28f && !scrollingDown) {
+                scrollingDown = true
+            } else if (runPx > 20f && scrollingDown) {
+                scrollingDown = false
+            }
+            return Offset.Zero
+        }
+    }
+}
+
+@Composable
+fun rememberChromeScrollState(): ChromeScrollState = remember { ChromeScrollState() }
+
+/** Glass (or flat when glass is off) surface that follows the light / dark palette. */
+private fun Modifier.ottGlass(p: HomePalette, shape: Shape): Modifier = this
+    .clip(shape)
+    .background(
+        if (p.glassOn) {
+            Brush.verticalGradient(
+                if (p.dark) listOf(Color(0x38FFFFFF), Color(0x16FFFFFF))
+                else listOf(Color(0xD9FFFFFF), Color(0x99FFFFFF))
+            )
+        } else {
+            SolidColor(if (p.dark) Color(0xFF1A1D26) else Color(0xFFF1F2F6))
+        }
+    )
+    .border(1.dp, p.glassBorder, shape)
+
+@Composable
+private fun OttGlassCircle(
+    p: HomePalette,
+    size: Dp,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val s by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "ottCirclePress"
+    )
+    Box(
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer { scaleX = s; scaleY = s }
+            .ottGlass(p, CircleShape)
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+        content = content
+    )
+}
+
+@Composable
+private fun AvatarOrIcon(
+    tab: NavTabItem,
+    selected: Boolean,
+    p: HomePalette,
+    userAvatarUrl: String?,
+    avatarDecorationId: String?,
+    avatarFrameId: String?,
+    avatarSize: Dp,
+    iconSize: Dp
+) {
+    if (tab.route == "profile") {
+        AvatarDecorationRenderer(
+            decorationId = avatarDecorationId,
+            frameId = avatarFrameId,
+            size = avatarSize
+        ) {
+            if (!userAvatarUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = userAvatarUrl,
+                    contentDescription = tab.label,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .border(
+                            width = if (selected) 1.5.dp else 0.5.dp,
+                            color = if (selected) p.text else p.text.copy(alpha = 0.4f),
+                            shape = CircleShape
+                        ),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = tab.icon,
+                    contentDescription = tab.label,
+                    tint = if (selected) p.text else p.textMuted,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
+        }
+    } else {
+        Icon(
+            imageVector = tab.icon,
+            contentDescription = tab.label,
+            tint = if (selected) p.text else p.textMuted,
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+/**
+ * Top bar. [expanded] = hamburger + ZENKAI logo + search + profile; otherwise only the profile bubble stays.
+ * Everything morphs with springs, and follows the glass toggle and the light / dark palette.
+ */
 @Composable
 fun OttTopBar(
+    expanded: Boolean = true,
+    userAvatarUrl: String? = null,
+    avatarDecorationId: String? = null,
+    avatarFrameId: String? = null,
     watchlistCount: Int = 0,
     onMenuClick: () -> Unit = {},
     onSearchClick: () -> Unit,
@@ -132,57 +314,93 @@ fun OttTopBar(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val p = rememberHomePalette()
+    val fraction by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label = "topBarExpand"
+    )
+    val scrim = p.gradTop
+    val enter = fadeIn(tween(220)) + scaleIn(initialScale = 0.6f) +
+        expandHorizontally(spring(dampingRatio = 0.85f, stiffness = 380f), expandFrom = Alignment.Start)
+    val exit = fadeOut(tween(140)) + scaleOut(targetScale = 0.6f) +
+        shrinkHorizontally(spring(dampingRatio = 0.9f, stiffness = 420f), shrinkTowards = Alignment.Start)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xE6040406),
-                        Color(0x99040406),
-                        Color(0x33040406),
-                        Color.Transparent
-                    )
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to scrim.copy(alpha = 0.92f),
+                        0.55f to scrim.copy(alpha = 0.55f),
+                        1f to scrim.copy(alpha = 0f)
+                    ),
+                    alpha = fraction
                 )
-            )
+            }
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 22.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Three-line Hamburger Navigation Action
-            OttGlassIconButton(
-                onClick = onMenuClick,
-                size = 40.dp
-            ) {
-                Icon(
-                    Icons.Default.Menu,
-                    contentDescription = "Open Navigation Menu",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+            AnimatedVisibility(visible = expanded, enter = enter, exit = exit) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OttGlassCircle(p, 40.dp, onMenuClick) {
+                        Icon(
+                            Icons.Default.Menu,
+                            contentDescription = "Open Navigation Menu",
+                            tint = p.text,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
+                }
             }
-
-            Spacer(Modifier.width(12.dp))
-
-            // OTT Brand Typography (Logo icon removed on Homescreen)
-            AniverseLogo(showIcon = false)
 
             Spacer(Modifier.weight(1f))
 
-            // Glass Search Action
-            OttGlassIconButton(
-                onClick = onSearchClick,
-                size = 40.dp
-            ) {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = "Search Anime",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+            AnimatedVisibility(visible = expanded, enter = enter, exit = exit) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OttGlassCircle(p, 40.dp, onSearchClick) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Search Anime",
+                            tint = p.text,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+            }
+
+            OttGlassCircle(p, 40.dp, onProfileClick) {
+                AvatarDecorationRenderer(
+                    decorationId = avatarDecorationId,
+                    frameId = avatarFrameId,
+                    size = 32.dp
+                ) {
+                    if (!userAvatarUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = userAvatarUrl,
+                            contentDescription = "Profile",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = "Profile",
+                            tint = p.text,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -365,6 +583,42 @@ private data class NavTabItem(
     val label: String
 )
 
+private val DockTabs = listOf(
+    NavTabItem("home", Icons.Default.Home, "Anime"),
+    NavTabItem("airing", Icons.Default.CalendarMonth, "Schedule"),
+    NavTabItem("manga", Icons.Default.AutoStories, "Manga"),
+    NavTabItem("novel", Icons.AutoMirrored.Filled.MenuBook, "Novel"),
+    NavTabItem("profile", Icons.Default.Person, "Profile")
+)
+
+@Composable
+private fun DockTabContent(
+    tab: NavTabItem,
+    selected: Boolean,
+    p: HomePalette,
+    userAvatarUrl: String?,
+    avatarDecorationId: String?,
+    avatarFrameId: String?,
+    showLabel: Boolean = true
+) {
+    AvatarOrIcon(tab, selected, p, userAvatarUrl, avatarDecorationId, avatarFrameId, avatarSize = 22.dp, iconSize = 20.dp)
+    if (showLabel) {
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = tab.label,
+            fontSize = 10.5.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) p.text else p.textMuted,
+            maxLines = 1
+        )
+    }
+}
+
+/**
+ * Bottom dock. [collapsed] shrinks the full bar into one round button showing only the current tab
+ * (like the Apple Music bar); tapping that button or scrolling back up springs it open again.
+ * Glass on -> liquid glass, glass off -> flat themed surface. Both follow light / dark.
+ */
 @Composable
 fun OttBottomDock(
     currentRoute: String,
@@ -373,207 +627,175 @@ fun OttBottomDock(
     avatarDecorationId: String? = null,
     avatarFrameId: String? = null,
     backdrop: com.styropyr0.prismal.PrismalBackdrop? = null,
+    collapsed: Boolean = false,
+    onExpand: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val themeColors = LocalThemeColors.current
-    val themeSettings = LocalThemeSettings.current
-
-    val tabs = remember {
-        listOf(
-            NavTabItem("home", Icons.Default.Home, "Anime"),
-            NavTabItem("airing", Icons.Default.CalendarMonth, "Schedule"),
-            NavTabItem("manga", Icons.Default.AutoStories, "Manga"),
-            NavTabItem("novel", Icons.AutoMirrored.Filled.MenuBook, "Novel"),
-            NavTabItem("profile", Icons.Default.Person, "Profile")
-        )
-    }
-
+    val p = rememberHomePalette()
+    val tabs = DockTabs
     val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.let { if (it >= 0) it else 0 }
-    val isGlassEnabled = themeSettings.isGlassmorphismEnabled
+    val activeTab = tabs[activeIndex]
+    val glassOn = p.glassOn
+    val ambientBackdrop = backdrop ?: com.styropyr0.prismal.LocalPrismalBackdrop.current ?: com.styropyr0.prismal.sources.emptyGlassSource()
 
-    if (isGlassEnabled) {
-        val ambientBackdrop = backdrop ?: com.styropyr0.prismal.LocalPrismalBackdrop.current ?: com.styropyr0.prismal.sources.emptyGlassSource()
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            PrismalGlassBottomTabs(
-                selectedTabIndex = { activeIndex },
-                onTabSelected = { idx ->
-                    if (idx in tabs.indices) {
-                        onNavigate(tabs[idx].route)
-                    }
-                },
-                backdrop = ambientBackdrop,
-                tabsCount = tabs.size,
-                specular = { PrismalSpecular.Default },
-                tintDropletContent = false,
-                modifier = Modifier.fillMaxWidth()
+    val f by animateFloatAsState(
+        targetValue = if (collapsed) 0f else 1f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 320f),
+        label = "dockExpand"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        // Full dock: scales down toward the bottom-left button while it fades out.
+        if (f > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0.06f, 1f)
+                        val sc = 0.18f + 0.82f * f
+                        scaleX = sc
+                        scaleY = sc
+                        alpha = ((f - 0.1f) / 0.6f).coerceIn(0f, 1f)
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                val highlightedIndex = LocalPrismalBottomTabHighlightedIndex.current
-                for ((index, tab) in tabs.withIndex()) {
-                    val isSelected = highlightedIndex() == index
-
-                    PrismalGlassBottomTab(
-                        onClick = { onNavigate(tab.route) }
+                if (glassOn) {
+                    PrismalGlassBottomTabs(
+                        selectedTabIndex = { activeIndex },
+                        onTabSelected = { idx ->
+                            if (idx in tabs.indices) onNavigate(tabs[idx].route)
+                        },
+                        backdrop = ambientBackdrop,
+                        tabsCount = tabs.size,
+                        specular = { PrismalSpecular.Default },
+                        tintDropletContent = false,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (tab.route == "profile") {
-                            AvatarDecorationRenderer(
-                                decorationId = avatarDecorationId,
-                                frameId = avatarFrameId,
-                                size = 22.dp
-                            ) {
-                                if (!userAvatarUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = userAvatarUrl,
-                                        contentDescription = tab.label,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(CircleShape)
-                                            .border(
-                                                width = if (isSelected) 1.5.dp else 0.5.dp,
-                                                color = if (isSelected) Color.White else Color(0x66FFFFFF),
-                                                shape = CircleShape
-                                            ),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.label,
-                                        tint = if (isSelected) Color.White else Color(0x80A0A5B0),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                        val highlightedIndex = LocalPrismalBottomTabHighlightedIndex.current
+                        for ((index, tab) in tabs.withIndex()) {
+                            val isSelected = highlightedIndex() == index
+                            PrismalGlassBottomTab(onClick = { onNavigate(tab.route) }) {
+                                DockTabContent(tab, isSelected, p, userAvatarUrl, avatarDecorationId, avatarFrameId)
                             }
-                        } else {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.label,
-                                tint = if (isSelected) Color.White else Color(0x80A0A5B0),
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = tab.label,
-                            fontSize = 10.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else Color(0x80A0A5B0),
-                            maxLines = 1
-                        )
+                    }
+                } else {
+                    FlatDockBar(
+                        tabs = tabs,
+                        activeIndex = activeIndex,
+                        p = p,
+                        userAvatarUrl = userAvatarUrl,
+                        avatarDecorationId = avatarDecorationId,
+                        avatarFrameId = avatarFrameId,
+                        onNavigate = onNavigate
+                    )
+                }
+            }
+        }
+
+        // Collapsed button: only the current tab.
+        if (f < 0.99f) {
+            Box(
+                modifier = Modifier.graphicsLayer {
+                    val sc = 0.6f + 0.4f * (1f - f)
+                    scaleX = sc
+                    scaleY = sc
+                    alpha = ((0.7f - f) / 0.5f).coerceIn(0f, 1f)
+                }
+            ) {
+                if (glassOn) {
+                    PrismalGlassBottomTabs(
+                        selectedTabIndex = { 0 },
+                        onTabSelected = { onExpand() },
+                        backdrop = ambientBackdrop,
+                        tabsCount = 1,
+                        specular = { PrismalSpecular.Default },
+                        tintDropletContent = false,
+                        modifier = Modifier.width(72.dp)
+                    ) {
+                        PrismalGlassBottomTab(onClick = onExpand) {
+                            DockTabContent(activeTab, true, p, userAvatarUrl, avatarDecorationId, avatarFrameId, showLabel = false)
+                        }
+                    }
+                } else {
+                    val context = LocalContext.current
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .shadow(4.dp, CircleShape)
+                            .ottGlass(p, CircleShape)
+                            .clickable {
+                                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                onExpand()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        DockTabContent(activeTab, true, p, userAvatarUrl, avatarDecorationId, avatarFrameId, showLabel = false)
                     }
                 }
             }
         }
-    } else {
-        // Flat, optimized high-performance dock when glassmorphism is disabled in settings
-        val animatedIndex by animateFloatAsState(
-            targetValue = activeIndex.toFloat(),
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-            label = "flat_dock_spring"
-        )
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .shadow(4.dp, RoundedCornerShape(32.dp))
-                .clip(RoundedCornerShape(32.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF0F121C),
-                            Color(0xFF0B0D14)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    color = Color(0x22FFFFFF),
-                    shape = RoundedCornerShape(32.dp)
-                )
-                .padding(horizontal = 6.dp, vertical = 6.dp)
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val totalWidth = maxWidth
-                val itemWidth = totalWidth / tabs.size
-                val pillPaddingH = 3.dp
-                val pillWidth = itemWidth - (pillPaddingH * 2)
+    }
+}
 
-                Box(
-                    modifier = Modifier
-                        .offset(x = (itemWidth * animatedIndex) + pillPaddingH)
-                        .width(pillWidth)
-                        .height(46.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color(0x30FFFFFF))
-                        .border(1.dp, Color(0x38FFFFFF), RoundedCornerShape(24.dp))
-                )
+/** Flat, cheap dock used when glassmorphism is off. Uses the palette, so light theme works too. */
+@Composable
+private fun FlatDockBar(
+    tabs: List<NavTabItem>,
+    activeIndex: Int,
+    p: HomePalette,
+    userAvatarUrl: String?,
+    avatarDecorationId: String?,
+    avatarFrameId: String?,
+    onNavigate: (String) -> Unit
+) {
+    val animatedIndex by animateFloatAsState(
+        targetValue = activeIndex.toFloat(),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "flat_dock_spring"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(32.dp))
+            .ottGlass(p, RoundedCornerShape(32.dp))
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val itemWidth = maxWidth / tabs.size
+            val pillPaddingH = 3.dp
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    tabs.forEachIndexed { index, tab ->
-                        val isActive = index == activeIndex
-                        Column(
-                            modifier = Modifier
-                                .width(itemWidth)
-                                .height(46.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .clickable { onNavigate(tab.route) },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (tab.route == "profile") {
-                                AvatarDecorationRenderer(
-                                    decorationId = avatarDecorationId,
-                                    frameId = avatarFrameId,
-                                    size = 22.dp
-                                ) {
-                                    if (!userAvatarUrl.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = userAvatarUrl,
-                                            contentDescription = tab.label,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(CircleShape)
-                                                .border(
-                                                    width = if (isActive) 1.5.dp else 0.5.dp,
-                                                    color = if (isActive) Color.White else Color(0x66FFFFFF),
-                                                    shape = CircleShape
-                                                ),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = tab.icon,
-                                            contentDescription = tab.label,
-                                            tint = if (isActive) Color.White else Color(0x80A0A5B0),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                            } else {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = if (isActive) Color.White else Color(0x80A0A5B0),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = tab.label,
-                                fontSize = 10.5.sp,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isActive) Color.White else Color(0x80A0A5B0)
-                            )
-                        }
+            Box(
+                modifier = Modifier
+                    .offset(x = (itemWidth * animatedIndex) + pillPaddingH)
+                    .width(itemWidth - pillPaddingH * 2)
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(p.text.copy(alpha = 0.12f))
+                    .border(1.dp, p.glassBorder, RoundedCornerShape(24.dp))
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    Column(
+                        modifier = Modifier
+                            .width(itemWidth)
+                            .height(46.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .clickable { onNavigate(tab.route) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        DockTabContent(tab, index == activeIndex, p, userAvatarUrl, avatarDecorationId, avatarFrameId)
                     }
                 }
             }
@@ -1276,7 +1498,8 @@ fun OttGenrePill(
 fun ZenkaiLogo(
     modifier: Modifier = Modifier,
     size: Int = 22,
-    showIcon: Boolean = false
+    showIcon: Boolean = false,
+    tint: Color? = null
 ) {
     val logoHeight = size.dp
     Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
@@ -1284,6 +1507,7 @@ fun ZenkaiLogo(
             painter = painterResource(id = R.drawable.zenkai_navbar_logo),
             contentDescription = "ZENKAI",
             contentScale = ContentScale.Fit,
+            colorFilter = tint?.let { ColorFilter.tint(it) },
             modifier = Modifier.height(logoHeight)
         )
     }
@@ -1293,9 +1517,10 @@ fun ZenkaiLogo(
 fun AniverseLogo(
     modifier: Modifier = Modifier,
     size: Int = 22,
-    showIcon: Boolean = true
+    showIcon: Boolean = true,
+    tint: Color? = null
 ) {
-    ZenkaiLogo(modifier = modifier, size = size, showIcon = showIcon)
+    ZenkaiLogo(modifier = modifier, size = size, showIcon = showIcon, tint = tint)
 }
 
 @Composable
