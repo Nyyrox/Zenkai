@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -44,6 +45,7 @@ import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import com.styropyr0.prismal.LocalPrismalBackdrop
 import com.nyyrox.aniverse.ui.components.OttNavDrawer
 import com.nyyrox.aniverse.ui.components.OttTopBar
+import com.nyyrox.aniverse.ui.components.rememberChromeScrollState
 import com.nyyrox.aniverse.ui.screens.AiringScreen
 import com.nyyrox.aniverse.ui.screens.AvatarPickerScreen
 import com.nyyrox.aniverse.ui.screens.BannerPickerScreen
@@ -128,6 +130,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
 
     var navStack by remember { mutableStateOf(listOf("home")) }
     val currentRoute = navStack.last()
+    // Scroll direction of the visible screen drives the collapsing top bar and bottom dock.
+    val chrome = rememberChromeScrollState()
+    LaunchedEffect(currentRoute) { chrome.reset() }
     var isDrawerOpen by remember { mutableStateOf(false) }
     val sharedPosterCoordinator = rememberSharedPosterCoordinator()
 
@@ -451,6 +456,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .nestedScroll(chrome.connection)
                             .prismalGlassLayer(appBackdropLayer)
                     ) {
                         AnimatedContent(
@@ -906,9 +912,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     // Transparent Dark Gradient Top Bar overlay (Only on home, manga, novel - NOT profile or airing)
                     if (isRootRoute && currentRoute != "profile" && currentRoute != "airing" && currentRoute != "browse") {
                         OttTopBar(
+                            expanded = chrome.topExpanded,
+                            userAvatarUrl = vm.userProfile.avatarUrl,
+                            avatarDecorationId = vm.userProfile.avatarDecorationId,
+                            avatarFrameId = vm.userProfile.avatarFrameId,
                             onMenuClick = { isDrawerOpen = true },
                             onSearchClick = { push("search") },
                             onWatchlistClick = { push("watchlist") },
+                            onProfileClick = { switchTab("profile") },
                             modifier = Modifier.align(Alignment.TopCenter)
                         )
                     }
@@ -935,6 +946,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             avatarDecorationId = vm.userProfile.avatarDecorationId,
                             avatarFrameId = vm.userProfile.avatarFrameId,
                             backdrop = appBackdropLayer,
+                            collapsed = chrome.bottomCollapsed,
+                            onExpand = { chrome.expandBottom() },
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
