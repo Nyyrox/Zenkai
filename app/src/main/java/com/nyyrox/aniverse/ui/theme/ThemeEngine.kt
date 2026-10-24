@@ -4,7 +4,11 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -116,6 +120,14 @@ data class ThemeSettings(
     val isGlassmorphismEnabled: Boolean = true,
     val mode: ThemeMode = ThemeMode.DARK
 )
+
+/**
+ * Single source of truth for the light/dark choice. The root theme reads THIS, so it works even if a call site
+ * rebuilds ThemeSettings without `mode`. MainViewModel sets it on startup (from saved prefs) and on every change.
+ */
+object ThemeModeState {
+    var mode by mutableStateOf(ThemeMode.DARK)
+}
 
 // ---------------- NEW: AppColors ----------------
 data class GlassTokens(val tint: Color, val border: Color)
@@ -298,19 +310,23 @@ val LocalThemeColors = compositionLocalOf { getThemeColors(AnimeTheme.GOJO_LIMIT
 
 @Composable
 fun ThemeEngineProvider(settings: ThemeSettings, content: @Composable () -> Unit) {
-    val dark = when (settings.mode) {
+    val activeMode = ThemeModeState.mode
+    val dark = when (activeMode) {
         ThemeMode.DARK -> true
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme() // auto-switches on system change
     }
+    val effective = remember(settings, activeMode) { settings.copy(mode = activeMode) }
     val colors = remember(settings.theme, dark) { appColorsFor(settings.theme, dark) }
     val legacy = remember(settings.theme, dark) { getThemeColors(settings.theme, dark) }
+    // keep OttInk() and other ThemeRuntime readers in sync with the real mode
+    SideEffect { ThemeRuntime.isLight = !dark }
     CompositionLocalProvider(
         LocalIsDark provides dark,
         LocalAppColors provides colors,
         LocalAnimeTheme provides settings.theme,
         LocalThemeColors provides legacy,
-        LocalThemeSettings provides settings,
+        LocalThemeSettings provides effective,
         content = content
     )
 }
