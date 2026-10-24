@@ -50,6 +50,22 @@ val OttCardBottomGradient = Brush.verticalGradient(
     0.0f to Color.Transparent, 0.5f to Color(0x80040406), 1.0f to Color(0xF5040406)
 )
 
+// ---- Old "blood" palette, restored for unmigrated screens (BrowseScreen etc.). Real brand red = LocalAppColors.current.brand. ----
+@Deprecated("Use LocalAppColors.current.brand") val OttBloodPrimary = Color(0xFFFF1E27) // Arterial vivid blood red
+@Deprecated("Use LocalAppColors.current.brand") val OttBloodDark = Color(0xFF8A0303)    // Deep coagulated crimson
+@Deprecated("Use LocalAppColors.current.bg") val OttBloodBg = Color(0xFF080204)         // Dark obsidian blood
+@Deprecated("Use LocalAppColors.current.surface") val OttBloodSurface = Color(0xFF160508)
+@Deprecated("Use LocalAppColors.current.glass.border") val OttBloodBorder = Color(0x50FF1E27)
+@Deprecated("Use LocalAppColors.current.brand")
+val OttBloodGradient = Brush.horizontalGradient(listOf(Color(0xFF8A0303), Color(0xFFFF1E27), Color(0xFFC4121A)))
+@Deprecated("Use LocalAppColors.current.brand")
+val OttBloodFlowGradient = Brush.linearGradient(
+    listOf(
+        Color(0xFF8A0303), Color(0xFFFF1E27), Color(0xFFC4121A),
+        Color(0xFF5A0207), Color(0xFFFF2A32), Color(0xFF8A0303)
+    )
+)
+
 @Composable
 private fun materialScheme(): ColorScheme {
     val c = LocalAppColors.current
