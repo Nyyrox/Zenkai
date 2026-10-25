@@ -231,6 +231,15 @@ fun MangaDetailScreen(
 
     val backdropUrl = info?.banner ?: info?.poster
 
+    val isScrolledPastHero by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 180 }
+    }
+    val topBarAlpha by animateFloatAsState(
+        targetValue = if (isScrolledPastHero) 1f else 0f,
+        animationSpec = tween(220),
+        label = "mangaTopBarAlpha"
+    )
+
     GlassBackdropHost(
         background = { HomeBackdrop(p) }
     ) {
@@ -246,7 +255,8 @@ fun MangaDetailScreen(
                         Spacer(Modifier.height(16.dp))
                         Row(
                             Modifier
-                                .homeGlass(p, radius = 999.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(p.chipBg)
                                 .clickable {
                                     loading = true
                                     error = null
@@ -397,7 +407,8 @@ fun MangaDetailScreen(
                                         items(info?.genres ?: emptyList()) { genre ->
                                             Box(
                                                 Modifier
-                                                    .homeGlass(p, radius = 999.dp)
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(p.chipBg)
                                                     .padding(horizontal = 12.dp, vertical = 5.dp)
                                             ) {
                                                 Text(
@@ -456,7 +467,8 @@ fun MangaDetailScreen(
                                     // Bookmark Toggle
                                     Row(
                                         modifier = Modifier
-                                            .homeGlass(p, radius = 999.dp)
+                                            .clip(CircleShape)
+                                            .background(p.chipBg)
                                             .clickable {
                                                 val added = vm.toggleMangaBookmark(
                                                     mangaId = currentMangaId,
@@ -480,7 +492,8 @@ fun MangaDetailScreen(
                                     // Share
                                     Row(
                                         modifier = Modifier
-                                            .homeGlass(p, radius = 999.dp)
+                                            .clip(CircleShape)
+                                            .background(p.chipBg)
                                             .clickable {
                                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                     type = "text/plain"
@@ -506,7 +519,8 @@ fun MangaDetailScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .homeGlass(p, radius = 14.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(p.chipBg)
                                             .clickable {
                                                 info?.relatedAnimeId?.let { onAnimeClick(it) }
                                             }
@@ -699,13 +713,12 @@ fun MangaDetailScreen(
                                         val isSelected = activeSource == srcInfo.source
                                         Row(
                                             modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
                                                 .then(
                                                     if (isSelected) {
-                                                        Modifier
-                                                            .clip(CircleShape)
-                                                            .background(p.accentBrush)
+                                                        Modifier.background(p.accentBrush)
                                                     } else {
-                                                        Modifier.homeGlass(p, radius = 999.dp)
+                                                        Modifier.background(p.chipBg)
                                                     }
                                                 )
                                                 .clickable { selectSource(srcInfo) }
@@ -763,7 +776,8 @@ fun MangaDetailScreen(
                                 Box(
                                     modifier = Modifier
                                         .width(130.dp)
-                                        .homeGlass(p, radius = 999.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(p.chipBg)
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -788,7 +802,8 @@ fun MangaDetailScreen(
                                 // Asc / Desc sort button
                                 Row(
                                     modifier = Modifier
-                                        .homeGlass(p, radius = 999.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(p.chipBg)
                                         .clickable { sortAscending = !sortAscending }
                                         .padding(horizontal = 10.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -909,26 +924,70 @@ fun MangaDetailScreen(
                 }
             }
 
-            // Top Sticky Back Button
+            // Smooth Sticky Top Bar
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .align(Alignment.TopCenter)
             ) {
+                // Top scrim for contrast when at top
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(88.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0x99000000), Color(0x33000000), Color.Transparent)
+                            )
+                        )
+                )
+
+                // Background fade on scroll
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = topBarAlpha }
+                        .background(p.bg.copy(alpha = 0.96f))
+                )
+
                 Row(
                     Modifier
-                        .homeGlass(p, radius = 999.dp)
-                        .clickable { onBack() }
-                        .padding(8.dp),
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .height(52.dp)
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = p.text,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(
+                        Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(p.chipBg)
+                            .clickable { onBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = p.text,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    if (isScrolledPastHero) {
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = info?.title ?: "",
+                            color = p.text,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .graphicsLayer { alpha = topBarAlpha }
+                        )
+                    }
                 }
             }
         }

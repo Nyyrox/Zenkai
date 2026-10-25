@@ -446,7 +446,8 @@ private fun MangaHero(
 
                         Row(
                             Modifier
-                                .homeGlass(p, radius = 999.dp)
+                                .clip(CircleShape)
+                                .background(p.chipBg)
                                 .clickable { onBookmark(manga) }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -868,7 +869,8 @@ private fun MangaFeedError(
             Spacer(Modifier.height(16.dp))
             Row(
                 Modifier
-                    .homeGlass(p, radius = 999.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(p.chipBg)
                     .clickable(onClick = onRetry)
                     .padding(horizontal = 20.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically

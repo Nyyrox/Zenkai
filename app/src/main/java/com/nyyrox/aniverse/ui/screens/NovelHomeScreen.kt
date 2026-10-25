@@ -41,7 +41,7 @@ import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
@@ -150,6 +150,12 @@ fun NovelHomeScreen(
         vm.refreshStorageData()
     }
 
+    val heroNovels = remember(vm.novelRankings, vm.novelPopular, vm.novelLightNovels, vm.novelLatest) {
+        vm.novelRankings.ifEmpty { vm.novelPopular }
+            .ifEmpty { vm.novelLightNovels }
+            .ifEmpty { vm.novelLatest }
+    }
+
     GlassBackdropHost(
         background = { HomeBackdrop(p) }
     ) {
@@ -173,7 +179,6 @@ fun NovelHomeScreen(
                     }
                 } else {
                     // 1. 3D Coverflow Hero Banner (covers full top area behind status bars)
-                    val heroNovels = vm.novelRankings.ifEmpty { vm.novelPopular }
                     if (heroNovels.isNotEmpty()) {
                         item("hero") {
                             NovelHero(
@@ -185,6 +190,10 @@ fun NovelHomeScreen(
                                     vm.toggleNovelBookmark(novel.slug)
                                 }
                             )
+                        }
+                    } else {
+                        item("top_clearance") {
+                            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(64.dp))
                         }
                     }
 
@@ -296,7 +305,8 @@ private fun NovelSourceSwitcher(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .homeGlass(p, radius = 999.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(p.chipBg)
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -308,21 +318,13 @@ private fun NovelSourceSwitcher(
             ) {
                 items(displaySources) { src ->
                     val isSelected = src == activeSource
-                    val animBg by animateColorAsState(
-                        targetValue = if (isSelected) p.chipActiveBg else Color.Transparent,
-                        animationSpec = tween(200),
-                        label = "srcTabBg"
-                    )
-                    val animText by animateColorAsState(
-                        targetValue = if (isSelected) p.chipActiveText else p.textSub,
-                        animationSpec = tween(200),
-                        label = "srcTabText"
-                    )
-
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
-                            .background(animBg)
+                            .then(
+                                if (isSelected) Modifier.background(p.accentBrush)
+                                else Modifier
+                            )
                             .clickable { onSourceSelect(src) }
                             .padding(horizontal = 14.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center
@@ -335,20 +337,20 @@ private fun NovelSourceSwitcher(
                                 text = src.displayName,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = animText
+                                color = if (isSelected) p.onAccent else p.textSub
                             )
                             if (src.badge != null) {
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(4.dp))
-                                        .background(if (isSelected) p.accentText.copy(alpha = 0.25f) else p.chipBg)
+                                        .background(if (isSelected) p.onAccent.copy(alpha = 0.20f) else p.chipBg)
                                         .padding(horizontal = 4.dp, vertical = 1.5.dp)
                                 ) {
                                     Text(
                                         text = src.badge,
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) p.accentText else p.textMuted
+                                        color = if (isSelected) p.onAccent else p.textMuted
                                     )
                                 }
                             }
@@ -549,14 +551,15 @@ private fun NovelHero(
                                 .padding(horizontal = 22.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = p.onAccent, modifier = Modifier.size(17.dp))
+                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = p.onAccent, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Read Novel", color = p.onAccent, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Row(
                             Modifier
-                                .homeGlass(p, radius = 999.dp)
+                                .clip(CircleShape)
+                                .background(p.chipBg)
                                 .clickable { onBookmark(novel) }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -614,7 +617,8 @@ private fun NovelContinueRow(
                 Row(
                     modifier = Modifier
                         .width(260.dp)
-                        .homeGlass(p, radius = 14.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(p.chipBg)
                         .clickable { onReadClick(item.slug, item.lastChapterSlug) }
                         .padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -729,7 +733,8 @@ private fun NovelRankTile(
         NovelPosterTile(
             title = novel.title,
             image = novel.cover,
-            meta = novel.rating?.let { "★ $it" } ?: novel.stats ?: novel.source,
+            rating = novel.rating,
+            subtitle = novel.stats ?: novel.source.uppercase(),
             p = p,
             onClick = onClick
         )
@@ -761,7 +766,8 @@ private fun NovelRailSection(
                 NovelPosterTile(
                     title = novel.title,
                     image = novel.cover,
-                    meta = novel.rating?.let { "★ $it" } ?: novel.stats ?: novel.source,
+                    rating = novel.rating,
+                    subtitle = novel.stats ?: novel.source.uppercase(),
                     p = p,
                     onClick = { onNovelClick(novel.slug) }
                 )
@@ -776,7 +782,8 @@ private fun NovelRailSection(
 private fun NovelPosterTile(
     title: String,
     image: String,
-    meta: String?,
+    rating: String? = null,
+    subtitle: String? = null,
     p: HomePalette,
     onClick: () -> Unit
 ) {
@@ -799,20 +806,21 @@ private fun NovelPosterTile(
                 contentScale = ContentScale.Crop
             )
 
-            // Rating pill (top-end)
-            if (!meta.isNullOrBlank()) {
+            // Rating pill (top-end, only for actual star ratings e.g. "★ 4.8")
+            if (!rating.isNullOrBlank()) {
+                val cleanRating = if (rating.startsWith("★")) rating else "★ $rating"
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color(0xB3000000))
-                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                        .background(Color(0xCC000000))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = meta,
-                        color = if (meta.contains("★")) p.rating else Color.White,
-                        fontSize = 9.sp,
+                        text = cleanRating,
+                        color = p.rating,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -831,12 +839,12 @@ private fun NovelPosterTile(
             lineHeight = 16.sp
         )
 
-        if (!meta.isNullOrBlank()) {
+        if (!subtitle.isNullOrBlank()) {
             Spacer(Modifier.height(2.dp))
             Text(
-                text = meta,
-                color = p.textSub,
-                fontSize = 10.5.sp,
+                text = subtitle,
+                color = p.textMuted,
+                fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -978,7 +986,8 @@ private fun NovelFeedError(error: String, p: HomePalette, onRetry: () -> Unit) {
         Spacer(Modifier.height(18.dp))
         Row(
             Modifier
-                .homeGlass(p, radius = 999.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(p.chipBg)
                 .clickable { onRetry() }
                 .padding(horizontal = 22.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically

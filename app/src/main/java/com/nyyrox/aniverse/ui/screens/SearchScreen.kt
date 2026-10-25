@@ -27,7 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -150,25 +150,30 @@ fun SearchScreen(
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(42.dp)
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(p.chipBg)
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = p.text,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
-                        .homeGlass(p, radius = 24.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(p.chipBg)
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -235,29 +240,23 @@ fun SearchScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp, vertical = 6.dp)
-                    .homeGlass(p, radius = 999.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(p.chipBg)
                     .padding(3.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SearchTab.entries.forEach { tab ->
                     val isSelected = tab == selectedTab
-                    val animBg by animateColorAsState(
-                        targetValue = if (isSelected) p.chipActiveBg else Color.Transparent,
-                        animationSpec = tween(200),
-                        label = "searchTabBg"
-                    )
-                    val animText by animateColorAsState(
-                        targetValue = if (isSelected) p.chipActiveText else p.textSub,
-                        animationSpec = tween(200),
-                        label = "searchTabText"
-                    )
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(999.dp))
-                            .background(animBg)
+                            .then(
+                                if (isSelected) Modifier.background(p.accentBrush)
+                                else Modifier
+                            )
                             .clickable { selectedTab = tab }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -269,17 +268,17 @@ fun SearchScreen(
                             val icon = when (tab) {
                                 SearchTab.ANIME -> Icons.Default.Movie
                                 SearchTab.MANGA -> Icons.Default.AutoStories
-                                SearchTab.NOVEL -> Icons.Default.MenuBook
+                                SearchTab.NOVEL -> Icons.AutoMirrored.Filled.MenuBook
                             }
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
-                                tint = animText,
+                                tint = if (isSelected) p.onAccent else p.textSub,
                                 modifier = Modifier.size(15.dp)
                             )
                             Text(
                                 text = tab.label,
-                                color = animText,
+                                color = if (isSelected) p.onAccent else p.textSub,
                                 fontSize = 13.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
@@ -307,13 +306,14 @@ fun SearchScreen(
                             Box(
                                 modifier = Modifier
                                     .size(68.dp)
-                                    .homeGlass(p, radius = 34.dp),
+                                    .clip(CircleShape)
+                                    .background(p.chipBg),
                                 contentAlignment = Alignment.Center
                             ) {
                                 val icon = when (selectedTab) {
                                     SearchTab.ANIME -> Icons.Default.Movie
                                     SearchTab.MANGA -> Icons.Default.AutoStories
-                                    SearchTab.NOVEL -> Icons.Default.MenuBook
+                                    SearchTab.NOVEL -> Icons.AutoMirrored.Filled.MenuBook
                                 }
                                 Icon(
                                     icon,

@@ -1503,10 +1503,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 com.nyyrox.aniverse.util.UserPreferences.saveActiveNovelSource(getApplication(), source.id)
             } catch (_: Exception) {}
         }
-        novelRankings = emptyList()
-        novelPopular = emptyList()
-        novelLatest = emptyList()
-        novelLightNovels = emptyList()
+
+
+
+
         loadNovelHome(force = true)
     }
 

@@ -66,9 +66,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -186,7 +189,8 @@ fun NovelDetailScreen(
                         Spacer(Modifier.height(14.dp))
                         Row(
                             Modifier
-                                .homeGlass(p, radius = 999.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(p.chipBg)
                                 .clickable { vm.loadNovelDetail(novelSlug) }
                                 .padding(horizontal = 20.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -223,38 +227,9 @@ fun NovelDetailScreen(
                     // 1. Hero Section
                     item(key = "novel_hero") {
                         Box(modifier = Modifier.fillMaxWidth()) {
-                            // Backdrop artwork with gradient fade
-                            AsyncImage(
-                                model = rememberNovelImageRequest(backdropUrl),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(420.dp)
-                                    .blur(22.dp)
-                                    .graphicsLayer {
-                                        val offset = listState.firstVisibleItemScrollOffset
-                                        translationY = offset * 0.40f
-                                        alpha = (1f - (offset / 500f)).coerceIn(0.15f, 0.55f)
-                                        scaleX = 1.15f
-                                        scaleY = 1.15f
-                                    },
-                                contentScale = ContentScale.Crop
-                            )
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(420.dp)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color.Transparent,
-                                                p.gradTop.copy(alpha = 0.4f),
-                                                p.bg
-                                            )
-                                        )
-                                    )
-                            )
+                            if (backdropUrl != null) {
+                                NovelDetailBackdropArt(backdropUrl, p, Modifier.matchParentSize())
+                            }
 
                             Column(
                                 modifier = Modifier
@@ -432,7 +407,8 @@ fun NovelDetailScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .homeGlass(p, radius = 14.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(p.chipBg)
                                             .clickable {
                                                 onAnimeClick(relAnime.id)
                                             }
@@ -462,7 +438,8 @@ fun NovelDetailScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .homeGlass(p, radius = 14.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(p.chipBg)
                                             .clickable {
                                                 onMangaClick(relManga.id.toString())
                                             }
@@ -574,7 +551,7 @@ fun NovelDetailScreen(
                                             .clip(RoundedCornerShape(999.dp))
                                             .then(
                                                 if (isSelected) Modifier.background(p.chipActiveBg)
-                                                else Modifier.homeGlass(p, radius = 999.dp)
+                                                else Modifier.background(p.chipBg)
                                             )
                                             .clickable { selectedTab = index }
                                             .padding(vertical = 8.dp),
@@ -605,8 +582,9 @@ fun NovelDetailScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(38.dp)
-                                            .homeGlass(p, radius = 10.dp)
-                                            .padding(horizontal = 10.dp),
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(p.chipBg)
+                                            .padding(horizontal = 12.dp),
                                         contentAlignment = Alignment.CenterStart
                                     ) {
                                         Row(
@@ -658,9 +636,10 @@ fun NovelDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .height(38.dp)
-                                            .homeGlass(p, radius = 10.dp)
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(p.chipBg)
                                             .clickable { isReversedOrder = !isReversedOrder }
-                                            .padding(horizontal = 10.dp),
+                                            .padding(horizontal = 12.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Row(
@@ -699,7 +678,8 @@ fun NovelDetailScreen(
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .homeGlass(p, radius = 999.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(p.chipBg)
                                         .clickable {
                                             val targetChapters = displayChapters.take(10).map { it.slug to it.title }
                                             vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
@@ -716,7 +696,8 @@ fun NovelDetailScreen(
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .homeGlass(p, radius = 999.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(p.chipBg)
                                         .clickable {
                                             val targetChapters = displayChapters.map { it.slug to it.title }
                                             vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
@@ -761,14 +742,12 @@ fun NovelDetailScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 3.dp)
-                                        .clip(RoundedCornerShape(10.dp))
                                         .then(
-                                            if (isCurrent) Modifier.background(p.accentA.copy(alpha = 0.16f))
-                                            else Modifier.homeGlass(p, radius = 10.dp)
+                                            if (isCurrent) Modifier.background(p.chipBg)
+                                            else Modifier
                                         )
                                         .clickable { onReadChapter(novelSlug, ch.slug) }
-                                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                                        .padding(horizontal = 18.dp, vertical = 11.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -857,7 +836,8 @@ fun NovelDetailScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 10.dp)
-                                            .homeGlass(p, radius = 999.dp)
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(p.chipBg)
                                             .clickable(enabled = !vm.novelChaptersLoading) {
                                                 vm.loadMoreNovelChapters(novelSlug)
                                             }
@@ -886,7 +866,8 @@ fun NovelDetailScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 18.dp, vertical = 8.dp)
-                                        .homeGlass(p, radius = 14.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(p.chipBg)
                                         .clickable { synopsisExpanded = !synopsisExpanded }
                                         .padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -957,23 +938,47 @@ fun NovelDetailScreen(
                     }
                 }
 
-                // Sticky Top Bar overlay (Back button, Title on scroll, Bookmark)
+                // Smooth Sticky Top Bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .align(Alignment.TopCenter)
                 ) {
+                    // Top scrim for contrast when at top
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(88.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0x99000000), Color(0x33000000), Color.Transparent)
+                                )
+                            )
+                    )
+
+                    // Background fade on scroll
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer { alpha = if (isScrolledPastHero) 1f else 0f }
+                            .background(p.bg.copy(alpha = 0.96f))
+                    )
+
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .height(52.dp)
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = handleBack,
+                        Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .homeGlass(p, radius = 20.dp)
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(p.chipBg)
+                                .clickable { handleBack() },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -983,27 +988,30 @@ fun NovelDetailScreen(
                             )
                         }
 
-                        AnimatedVisibility(
-                            visible = isScrolledPastHero,
-                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                        ) {
+                        if (isScrolledPastHero) {
+                            Spacer(Modifier.width(12.dp))
                             Text(
                                 text = novel.title,
                                 color = p.text,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
+                        } else {
+                            Spacer(Modifier.weight(1f))
                         }
 
-                        IconButton(
-                            onClick = {
-                                vm.toggleNovelBookmark(novelSlug)
-                            },
+                        Spacer(Modifier.width(8.dp))
+
+                        Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .homeGlass(p, radius = 20.dp)
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(p.chipBg)
+                                .clickable { vm.toggleNovelBookmark(novelSlug) },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -1107,5 +1115,46 @@ private fun NovelRelatedMediaTile(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+// ── Detail Blurred Backdrop Art ──────────────────────────────────────────────
+
+@Composable
+private fun NovelDetailBackdropArt(url: String, p: HomePalette, modifier: Modifier) {
+    val ctx = LocalContext.current
+    val req = remember(url) { coil3.request.ImageRequest.Builder(ctx).data(url).size(96, 144).build() }
+
+    Box(
+        modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    Brush.verticalGradient(0.40f to Color.Black, 0.95f to Color.Transparent),
+                    blendMode = BlendMode.DstIn
+                )
+            }
+    ) {
+        AsyncImage(
+            model = req,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(26.dp)
+                .graphicsLayer {
+                    scaleX = 1.25f
+                    scaleY = 1.25f
+                    alpha = if (p.dark) 0.50f else 0.40f
+                }
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(listOf(p.gradTop.copy(alpha = 0.35f), Color.Transparent))
+                )
+        )
     }
 }

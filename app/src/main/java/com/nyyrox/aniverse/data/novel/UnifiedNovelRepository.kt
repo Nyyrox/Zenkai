@@ -1,8 +1,12 @@
 package com.nyyrox.aniverse.data.novel
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withTimeoutOrNull
 
 class UnifiedNovelRepository(
     val lnori: LnoriRepository = LnoriRepository(),
@@ -51,7 +55,7 @@ class UnifiedNovelRepository(
 
     override suspend fun getLightNovels(page: Int): List<NovelItem> = currentRepo.getLightNovels(page)
 
-    override suspend fun search(query: String, page: Int): List<NovelItem> {
+    override suspend fun search(query: String, page: Int): List<NovelItem> = coroutineScope {
         val candidates = mutableListOf(query.trim())
         if (query.contains("class room", ignoreCase = true)) {
             candidates.add(query.replace("class room", "classroom", ignoreCase = true))
@@ -70,41 +74,46 @@ class UnifiedNovelRepository(
             candidates.add(words.take(2).joinToString(" "))
         }
 
-        val allResults = mutableListOf<NovelItem>()
-        // 1. Search active source with candidates
-        for (q in candidates.distinct()) {
-            try {
-                val res = currentRepo.search(q, page)
-                for (item in res) {
-                    if (allResults.none { it.slug == item.slug }) {
-                        allResults.add(item)
-                    }
-                }
-            } catch (_: Exception) {}
-            if (allResults.isNotEmpty()) break
-        }
-
-        if (allResults.isNotEmpty()) return allResults
-
-        // 2. Fallback: Search across other repositories (prioritizing Lnori, FreeWebNovel and NovelFire for light novels)
-        val otherRepos = listOf(lnori, freeWebNovel, novelFire, novelFull, royalRoad, wuxiaWorld)
-            .filter { it.source != _activeSource.value }
-
-        for (repo in otherRepos) {
-            for (q in candidates.distinct()) {
-                try {
-                    val fallbackResults = repo.search(q, page)
-                    for (item in fallbackResults) {
-                        if (allResults.none { it.slug == item.slug }) {
-                            allResults.add(item)
+        // Search across ALL sources in parallel: Lnori, NovelFull, NovelFire, FreeWebNovel, RoyalRoad, WuxiaWorld
+        val targetRepos = listOf(lnori, novelFull, novelFire, freeWebNovel, royalRoad, wuxiaWorld)
+        val deferredList = targetRepos.map { repo ->
+            async {
+                val resultsForRepo = mutableListOf<NovelItem>()
+                for (q in candidates.distinct()) {
+                    try {
+                        withTimeoutOrNull(5000L) {
+                            val res = repo.search(q, page)
+                            for (item in res) {
+                                if (resultsForRepo.none { it.slug == item.slug }) {
+                                    resultsForRepo.add(item)
+                                }
+                            }
                         }
-                    }
-                } catch (_: Exception) {}
-                if (allResults.isNotEmpty()) break
+                    } catch (_: Exception) {}
+                    if (resultsForRepo.isNotEmpty()) break
+                }
+                resultsForRepo
             }
-            if (allResults.isNotEmpty()) break
         }
-        return allResults
+
+        val allResults = mutableListOf<NovelItem>()
+        val seenSlugs = mutableSetOf<String>()
+        val seenKeys = mutableSetOf<String>()
+
+        val searchOutputs = deferredList.awaitAll()
+        for (repoResults in searchOutputs) {
+            for (item in repoResults) {
+                val normTitle = item.title.lowercase().replace("[^a-z0-9]".toRegex(), "")
+                val key = "$normTitle:${item.source}"
+                if (item.slug !in seenSlugs && key !in seenKeys) {
+                    seenSlugs.add(item.slug)
+                    seenKeys.add(key)
+                    allResults.add(item)
+                }
+            }
+        }
+
+        allResults
     }
 
     override suspend fun getDetail(slug: String): NovelDetail? {
