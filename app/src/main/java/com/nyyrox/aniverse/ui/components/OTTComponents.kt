@@ -10,6 +10,11 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Stable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.unit.lerp
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -198,7 +203,7 @@ class ChromeScrollState {
 fun rememberChromeScrollState(): ChromeScrollState = remember { ChromeScrollState() }
 
 /** Glass (or flat when glass is off) surface that follows the light / dark palette. */
-private fun Modifier.ottGlass(p: HomePalette, shape: Shape): Modifier = this
+internal fun Modifier.ottGlass(p: HomePalette, shape: Shape): Modifier = this
     .clip(shape)
     .background(
         if (p.glassOn) {
@@ -292,9 +297,135 @@ private fun AvatarOrIcon(
 }
 
 /**
- * Top bar. Visible at the top of the page: hamburger + ZENKAI logo on the left, profile bubble on the right.
- * While reading down the page ([expanded] = false) the menu and logo fade away and only the profile bubble stays.
- * Driven by one slow spring so nothing jumps; follows the glass toggle and light / dark palette.
+ * Three lines that morph into an X. [progress] 0 = menu, 1 = close. Read inside the draw scope,
+ * so animating it never recomposes anything.
+ */
+@Composable
+fun AnimatedMenuIcon(
+    progress: () -> Float,
+    color: Color,
+    modifier: Modifier = Modifier.size(20.dp)
+) {
+    Canvas(modifier) {
+        val t = progress().coerceIn(0f, 1f)
+        val stroke = 2.dp.toPx()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val half = size.width * 0.42f * (1f + 0.1f * t)
+        val gap = size.height * 0.27f * (1f - t)
+
+        val topY = cy - gap
+        rotate(degrees = 45f * t, pivot = Offset(cx, topY)) {
+            drawLine(color, Offset(cx - half, topY), Offset(cx + half, topY), stroke, StrokeCap.Round)
+        }
+        val botY = cy + gap
+        rotate(degrees = -45f * t, pivot = Offset(cx, botY)) {
+            drawLine(color, Offset(cx - half, botY), Offset(cx + half, botY), stroke, StrokeCap.Round)
+        }
+        val midHalf = size.width * 0.42f * (1f - 0.6f * t)
+        drawLine(
+            color.copy(alpha = color.alpha * (1f - t)),
+            Offset(cx - midHalf, cy), Offset(cx + midHalf, cy), stroke, StrokeCap.Round
+        )
+    }
+}
+
+/** Hamburger button: the lines tilt a little while pressed and become an X as [openProgress] goes to 1. */
+@Composable
+internal fun MenuLinesButton(
+    color: Color,
+    openProgress: () -> Float,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    size: Dp = 36.dp
+) {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val press = animateFloatAsState(
+        targetValue = if (pressed) 0.38f else 0f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 450f),
+        label = "menuLinesPress"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.86f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "menuLinesScale"
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = source, indication = null, enabled = enabled) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedMenuIcon(progress = { maxOf(openProgress(), press.value) }, color = color)
+    }
+}
+
+/** Round profile avatar button used inside the top bar and the menu header. */
+@Composable
+internal fun OttProfileBubble(
+    p: HomePalette,
+    avatarUrl: String?,
+    decorationId: String?,
+    frameId: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp
+) {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "profileBubblePress"
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        AvatarDecorationRenderer(
+            decorationId = decorationId,
+            frameId = frameId,
+            size = size - 4.dp
+        ) {
+            if (!avatarUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "Profile",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = "Profile",
+                    tint = p.text,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Top bar. One glass shape that morphs: a round profile bubble when reading down the page, stretching left into a
+ * full pill (hamburger + ZENKAI logo + profile) when you are at the top or swipe back up. Nothing fades in on its own,
+ * the content is simply revealed as the shape grows. Follows the glass toggle and light / dark palette.
  */
 @Composable
 fun OttTopBar(
@@ -312,12 +443,12 @@ fun OttTopBar(
     val p = rememberHomePalette()
     val fraction by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 170f),
-        label = "topBarExpand"
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 220f),
+        label = "topBarMorph"
     )
     val scrim = p.gradTop
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .drawBehind {
@@ -333,62 +464,51 @@ fun OttTopBar(
             .statusBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        val fullWidth = maxWidth
+        val barHeight = 44.dp
+        val pillWidth = lerp(barHeight, fullWidth, fraction.coerceIn(0f, 1f))
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .width(pillWidth)
+                .height(barHeight)
+                .ottGlass(p, CircleShape)
         ) {
-            if (fraction > 0.01f) {
+            // Laid out at full width and anchored to the right, so the shape only reveals / hides it.
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .requiredWidth(fullWidth)
+                    .fillMaxHeight()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
                     modifier = Modifier.graphicsLayer {
-                        val f = fraction.coerceIn(0f, 1f)
-                        alpha = f
-                        translationX = -(1f - f) * 28.dp.toPx()
-                        val sc = 0.88f + 0.12f * f
-                        scaleX = sc
-                        scaleY = sc
-                        transformOrigin = TransformOrigin(0f, 0.5f)
+                        alpha = ((fraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
                     },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OttGlassCircle(p, 40.dp, onMenuClick) {
-                        Icon(
-                            Icons.Default.Menu,
-                            contentDescription = "Open Navigation Menu",
-                            tint = p.text,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
+                    MenuLinesButton(
+                        color = p.text,
+                        openProgress = { 0f },
+                        onClick = onMenuClick,
+                        enabled = expanded
+                    )
+                    Spacer(Modifier.width(8.dp))
                     AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
                 }
-            }
 
-            Spacer(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
 
-            OttGlassCircle(p, 40.dp, onProfileClick) {
-                AvatarDecorationRenderer(
+                OttProfileBubble(
+                    p = p,
+                    avatarUrl = userAvatarUrl,
                     decorationId = avatarDecorationId,
                     frameId = avatarFrameId,
-                    size = 32.dp
-                ) {
-                    if (!userAvatarUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = userAvatarUrl,
-                            contentDescription = "Profile",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = "Profile",
-                            tint = p.text,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
+                    onClick = onProfileClick
+                )
             }
         }
     }
