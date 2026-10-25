@@ -1,5 +1,7 @@
 package com.nyyrox.aniverse.data
 
+import com.nyyrox.aniverse.data.manga.MangaCard
+import com.nyyrox.aniverse.data.manga.MangaHome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -32,6 +34,12 @@ class AniListRepository {
 
         suspend fun fetchMangaDetails(title: String? = null, anilistId: Int? = null): JSONObject? =
             defaultInstance.fetchMangaDetails(title, anilistId)
+
+        suspend fun fetchMangaHome(): MangaHome =
+            defaultInstance.fetchMangaHome()
+
+        suspend fun searchManga(query: String, page: Int = 1): List<MangaCard> =
+            defaultInstance.searchManga(query, page)
     }
 
     private suspend fun post(query: String, variables: JSONObject = JSONObject()): JSONObject =
@@ -791,6 +799,150 @@ class AniListRepository {
         )
     }
 
+    private fun parseMangaCard(o: JSONObject): MangaCard {
+        val titleObj = o.optJSONObject("title")
+        val english = optCleanString(titleObj, "english")
+        val romaji = optCleanString(titleObj, "romaji")
+        val userPreferred = optCleanString(titleObj, "userPreferred")
+        val native = optCleanString(titleObj, "native")
+        val title = english ?: romaji ?: userPreferred ?: native ?: "Unknown Manga"
+
+        val coverObj = o.optJSONObject("coverImage")
+        val poster = optCleanString(coverObj, "extraLarge")
+            ?: optCleanString(coverObj, "large")
+            ?: optCleanString(coverObj, "medium")
+
+        val banner = optCleanString(o, "bannerImage")
+        val desc = optCleanString(o, "description")?.replace(Regex("<[^>]*>"), "")?.trim()
+        val format = optCleanString(o, "format")
+        val score = o.optInt("averageScore").takeIf { it > 0 }
+        val rating = score?.let { String.format(Locale.US, "%.1f", it / 10.0) }
+        val genres = buildList {
+            val a = o.optJSONArray("genres")
+            if (a != null) {
+                for (i in 0 until a.length()) {
+                    val g = a.optString(i).trim()
+                    if (g.isNotBlank() && !g.equals("null", ignoreCase = true)) add(g)
+                }
+            }
+        }
+        val idInt = o.optInt("id")
+        val chs = o.optInt("chapters").takeIf { it > 0 }
+
+        return MangaCard(
+            id = idInt.toString(),
+            title = title,
+            poster = poster,
+            type = format ?: "Manga",
+            chapter = chs?.let { "$it Chs" },
+            updated = null,
+            source = "anilist",
+            banner = banner,
+            rating = rating,
+            score = score?.toDouble()?.let { it / 10.0 },
+            genres = genres,
+            description = desc,
+            anilistId = idInt,
+            format = format
+        )
+    }
+
+    suspend fun fetchMangaHome(): MangaHome = withContext(Dispatchers.IO) {
+        try {
+            val query = """
+                query {
+                  trending: Page(page: 1, perPage: 15) {
+                    media(type: MANGA, sort: [TRENDING_DESC]) {
+                      id title { english romaji userPreferred native }
+                      coverImage { extraLarge large medium }
+                      bannerImage description format status averageScore genres chapters
+                    }
+                  }
+                  popular: Page(page: 1, perPage: 20) {
+                    media(type: MANGA, sort: [POPULARITY_DESC]) {
+                      id title { english romaji userPreferred native }
+                      coverImage { extraLarge large medium }
+                      bannerImage description format status averageScore genres chapters
+                    }
+                  }
+                  topRated: Page(page: 1, perPage: 20) {
+                    media(type: MANGA, sort: [SCORE_DESC]) {
+                      id title { english romaji userPreferred native }
+                      coverImage { extraLarge large medium }
+                      bannerImage description format status averageScore genres chapters
+                    }
+                  }
+                  manhwa: Page(page: 1, perPage: 20) {
+                    media(type: MANGA, countryOfOrigin: "KR", sort: [TRENDING_DESC]) {
+                      id title { english romaji userPreferred native }
+                      coverImage { extraLarge large medium }
+                      bannerImage description format status averageScore genres chapters
+                    }
+                  }
+                }
+            """.trimIndent()
+            val response = post(query)
+            val data = response.optJSONObject("data")
+
+            fun parseMediaList(pageKey: String): List<MangaCard> {
+                val mediaArr = data?.optJSONObject(pageKey)?.optJSONArray("media") ?: return emptyList()
+                return buildList {
+                    for (i in 0 until mediaArr.length()) {
+                        val m = mediaArr.optJSONObject(i) ?: continue
+                        add(parseMangaCard(m))
+                    }
+                }
+            }
+
+            val trending = parseMediaList("trending")
+            val popular = parseMediaList("popular")
+            val topRated = parseMediaList("topRated")
+            val manhwa = parseMediaList("manhwa")
+
+            MangaHome(
+                trending = trending,
+                popular = popular,
+                topRated = topRated,
+                manhwa = manhwa,
+                latest = manhwa
+            )
+        } catch (_: Exception) {
+            MangaHome()
+        }
+    }
+
+    suspend fun searchManga(queryText: String, page: Int = 1, perPage: Int = 24): List<MangaCard> = withContext(Dispatchers.IO) {
+        if (queryText.isBlank()) return@withContext emptyList()
+        try {
+            val query = """
+                query(${'$'}search: String, ${'$'}page: Int, ${'$'}perPage: Int) {
+                  Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                    media(type: MANGA, search: ${'$'}search, sort: [SEARCH_MATCH, POPULARITY_DESC]) {
+                      id title { english romaji userPreferred native }
+                      coverImage { extraLarge large medium }
+                      bannerImage description format status averageScore genres chapters
+                    }
+                  }
+                }
+            """.trimIndent()
+            val vars = JSONObject().apply {
+                put("search", queryText.trim())
+                put("page", page)
+                put("perPage", perPage)
+            }
+            val response = post(query, vars)
+            val mediaArr = response.optJSONObject("data")?.optJSONObject("Page")?.optJSONArray("media") ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until mediaArr.length()) {
+                    val m = mediaArr.optJSONObject(i) ?: continue
+                    add(parseMangaCard(m))
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     suspend fun fetchMangaDetails(title: String? = null, anilistId: Int? = null): JSONObject? = withContext(Dispatchers.IO) {
         if (title.isNullOrBlank() && (anilistId == null || anilistId <= 0)) return@withContext null
         try {
@@ -800,7 +952,7 @@ class AniListRepository {
                     id
                     idMal
                     title { romaji english userPreferred native }
-                    coverImage { extraLarge large }
+                    coverImage { extraLarge large medium }
                     bannerImage
                     description
                     genres
@@ -809,7 +961,27 @@ class AniListRepository {
                     chapters
                     volumes
                     format
-                    source
+                    countryOfOrigin
+                    startDate { year month day }
+                    characters(perPage: 12, sort: [ROLE, RELEVANCE]) {
+                      nodes {
+                        name { full userPreferred }
+                        image { large medium }
+                      }
+                    }
+                    relations {
+                      edges {
+                        relationType
+                        node {
+                          id
+                          type
+                          title { userPreferred english romaji }
+                          coverImage { large }
+                          format
+                          status
+                        }
+                      }
+                    }
                     staff(perPage: 6, sort: [RELEVANCE]) {
                       edges {
                         role

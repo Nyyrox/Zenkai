@@ -28,7 +28,28 @@ data class MangaCard(
     val type: String? = "Manga",
     val chapter: String? = null,
     val updated: String? = null,
-    val source: String = "weebcentral"
+    val source: String = "anilist",
+    val banner: String? = null,
+    val rating: String? = null,
+    val score: Double? = null,
+    val genres: List<String> = emptyList(),
+    val description: String? = null,
+    val anilistId: Int? = null,
+    val format: String? = null
+)
+
+data class MangaCharacter(
+    val name: String,
+    val role: String? = null,
+    val image: String? = null
+)
+
+data class AvailableSourceInfo(
+    val source: MangaSource,
+    val matchedId: String,
+    val matchedTitle: String,
+    val chapterCount: Int? = null,
+    val latestChapter: String? = null
 )
 
 data class MangaInfo(
@@ -41,11 +62,15 @@ data class MangaInfo(
     val status: String? = null,
     val rating: String? = null,
     val genres: List<String> = emptyList(),
-    val source: String = "weebcentral",
+    val source: String = "anilist",
     val banner: String? = null,
     val anilistId: Int? = null,
     val totalChapters: Int? = null,
-    val authors: List<String> = emptyList()
+    val authors: List<String> = emptyList(),
+    val characters: List<MangaCharacter> = emptyList(),
+    val relatedAnimeId: Int? = null,
+    val relatedAnimeTitle: String? = null,
+    val availableSources: List<AvailableSourceInfo> = emptyList()
 )
 
 data class MangaChapter(
@@ -61,6 +86,9 @@ data class MangaChapter(
 
 data class MangaHome(
     val trending: List<MangaCard> = emptyList(),
+    val popular: List<MangaCard> = emptyList(),
+    val topRated: List<MangaCard> = emptyList(),
+    val manhwa: List<MangaCard> = emptyList(),
     val latest: List<MangaCard> = emptyList(),
     val newRelease: List<MangaCard> = emptyList()
 )
@@ -107,4 +135,3 @@ enum class MangaReaderMode {
     val isPaged: Boolean get() = this == HORIZONTAL_RTL || this == HORIZONTAL_LTR || this == HORIZONTAL_PAGED
     val isRtl: Boolean get() = this == HORIZONTAL_RTL || this == HORIZONTAL_PAGED
 }
-

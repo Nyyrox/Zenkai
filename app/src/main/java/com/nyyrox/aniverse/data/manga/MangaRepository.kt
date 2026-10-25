@@ -3,6 +3,7 @@ package com.nyyrox.aniverse.data.manga
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -134,10 +135,70 @@ object MangaRepository {
     }
 
     // ── 1. HOME ─────────────────────────────────────────────────────────────
-    suspend fun getHome(): MangaHome = currentRepo.getHome()
+    suspend fun getHome(): MangaHome = withContext(Dispatchers.IO) {
+        try {
+            val aniHome = aniListRepo.fetchMangaHome()
+            if (aniHome.trending.isNotEmpty() || aniHome.popular.isNotEmpty()) {
+                return@withContext aniHome
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "AniList getHome failed, falling back to ${activeSource.value}: ${e.message}")
+        }
+        currentRepo.getHome()
+    }
 
     // ── 2. SEARCH ───────────────────────────────────────────────────────────
-    suspend fun search(query: String): List<MangaCard> = currentRepo.search(query)
+    suspend fun search(query: String): List<MangaCard> = withContext(Dispatchers.IO) {
+        try {
+            val ani = aniListRepo.searchManga(query)
+            if (ani.isNotEmpty()) {
+                return@withContext ani
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "AniList search failed, falling back to ${activeSource.value}: ${e.message}")
+        }
+        currentRepo.search(query)
+    }
+
+    // ── 2.2 SOURCE AVAILABILITY & DIRECT CHAPTER FETCH ───────────────────────
+    suspend fun findAvailableSources(
+        title: String,
+        altTitles: List<String> = emptyList()
+    ): List<AvailableSourceInfo> = withContext(Dispatchers.IO) {
+        val candidates = (listOf(title) + altTitles)
+            .map { it.trim() }
+            .filter { it.isNotBlank() && it.length >= 2 }
+            .distinct()
+
+        repositories.entries.map { (source, repo) ->
+            async {
+                for (cand in candidates) {
+                    try {
+                        val results = repo.search(cand)
+                        if (results.isNotEmpty()) {
+                            val best = results.find { it.title.equals(cand, ignoreCase = true) }
+                                ?: results.find { it.title.contains(cand, ignoreCase = true) }
+                                ?: results.first()
+                            val chapters = try { repo.getChapters(best.id) } catch (_: Exception) { emptyList() }
+                            return@async AvailableSourceInfo(
+                                source = source,
+                                matchedId = best.id,
+                                matchedTitle = best.title,
+                                chapterCount = if (chapters.isNotEmpty()) chapters.size else null,
+                                latestChapter = chapters.firstOrNull()?.number
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
+                null
+            }
+        }.awaitAll().filterNotNull()
+    }
+
+    suspend fun getChaptersForSource(source: MangaSource, mangaId: String): List<MangaChapter> = withContext(Dispatchers.IO) {
+        val repo = getRepoForSource(source)
+        repo.getChapters(mangaId)
+    }
 
     // ── 2.5 RESOLUTION ─────────────────────────────────────────────────────
     suspend fun resolveMangaDetails(
@@ -148,7 +209,7 @@ object MangaRepository {
         val isNumericAniListId = mangaId.isNotBlank() && mangaId.all { it.isDigit() } && mangaId.length <= 8
         val aniId = if (isNumericAniListId) mangaId.toIntOrNull() else null
 
-        // 1. If it's a numeric AniList ID or we have titleFallback, query AniList for metadata first
+        // 1. Fetch AniList metadata
         val aniData: JSONObject? = try {
             aniListRepo.fetchMangaDetails(
                 title = titleFallback?.takeIf { !isNumericAniListId },
@@ -164,6 +225,8 @@ object MangaRepository {
             val usr = t.optString("userPreferred").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
             eng ?: rom ?: usr
         }
+        val aniRomajiTitle: String? = aniData?.optJSONObject("title")?.optString("romaji")
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         val aniCover: String? = aniData?.optJSONObject("coverImage")?.let { c ->
             val xl = c.optString("extraLarge").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
             val l = c.optString("large").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
@@ -197,6 +260,47 @@ object MangaRepository {
             }
         }
 
+        // Parse characters from AniList
+        val aniCharacters: List<MangaCharacter> = buildList {
+            val charNodes = aniData?.optJSONObject("characters")?.optJSONArray("nodes")
+            if (charNodes != null) {
+                for (i in 0 until charNodes.length()) {
+                    val cn = charNodes.optJSONObject(i) ?: continue
+                    val name = cn.optJSONObject("name")?.let {
+                        it.optString("full").takeIf { s -> s.isNotBlank() } ?: it.optString("userPreferred")
+                    }
+                    val img = cn.optJSONObject("image")?.let {
+                        it.optString("large").takeIf { s -> s.isNotBlank() } ?: it.optString("medium")
+                    }
+                    if (!name.isNullOrBlank()) {
+                        add(MangaCharacter(name = name, image = img))
+                    }
+                }
+            }
+        }
+
+        // Parse anime adaptation relations
+        var relAnimeId: Int? = null
+        var relAnimeTitle: String? = null
+        val relEdges = aniData?.optJSONObject("relations")?.optJSONArray("edges")
+        if (relEdges != null) {
+            for (i in 0 until relEdges.length()) {
+                val node = relEdges.optJSONObject(i)?.optJSONObject("node")
+                if (node?.optString("type") == "ANIME") {
+                    val aid = node.optInt("id")
+                    if (aid > 0) {
+                        relAnimeId = aid
+                        relAnimeTitle = node.optJSONObject("title")?.let { t ->
+                            t.optString("english").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                                ?: t.optString("romaji").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                                ?: t.optString("userPreferred")
+                        }
+                        break
+                    }
+                }
+            }
+        }
+
         // 2. Direct fetch if NOT purely numeric AniList ID and has recognized prefix
         if (!isNumericAniListId && (mangaId.startsWith("md_") || mangaId.startsWith("ck_") || mangaId.startsWith("mh_") || mangaId.startsWith("as_") || mangaId.startsWith("wc_"))) {
             val repo = getRepoForSource(src)
@@ -206,7 +310,6 @@ object MangaRepository {
             val chapters = chaptersDeferred.await()
 
             if (info != null) {
-                // Enrich with AniList using info.title if not yet queried
                 val effectiveAni = aniData ?: try {
                     if (info.title.isNotBlank() && info.title != "Unknown") {
                         aniListRepo.fetchMangaDetails(title = info.title)
@@ -256,32 +359,26 @@ object MangaRepository {
                     }
                 }.ifEmpty { aniAuthors }
 
+                // Find available sources for cross-source switcher on details page
+                val availSources = findAvailableSources(curAniTitle ?: info.title, listOfNotNull(aniRomajiTitle, info.altTitle))
+
                 var resolvedChapters = chapters
                 var resolvedId = mangaId
 
-                // If chapters are completely empty from the selected source, search other sources for readable chapters!
-                if (resolvedChapters.isEmpty()) {
-                    val searchQuery = curAniTitle ?: info.title
-                    val otherSources = repositories.keys.filter { it != src }
-                    for (otherSrc in otherSources) {
-                        val otherRepo = repositories[otherSrc] ?: continue
-                        try {
-                            val searchResults = otherRepo.search(searchQuery)
-                            if (searchResults.isNotEmpty()) {
-                                val match = searchResults.find { it.title.equals(searchQuery, ignoreCase = true) } ?: searchResults.first()
-                                val altChs = otherRepo.getChapters(match.id)
-                                if (altChs.size > resolvedChapters.size) {
-                                    resolvedChapters = altChs
-                                    resolvedId = match.id
-                                    break
-                                }
-                            }
-                        } catch (_: Exception) {}
-                    }
+                if (resolvedChapters.isEmpty() && availSources.isNotEmpty()) {
+                    val firstAvail = availSources.first()
+                    try {
+                        val altChs = getChaptersForSource(firstAvail.source, firstAvail.matchedId)
+                        if (altChs.isNotEmpty()) {
+                            resolvedChapters = altChs
+                            resolvedId = firstAvail.matchedId
+                        }
+                    } catch (_: Exception) {}
                 }
 
                 val enrichedInfo = info.copy(
                     title = curAniTitle ?: info.title,
+                    altTitle = aniRomajiTitle ?: info.altTitle,
                     poster = curAniCover ?: info.poster,
                     banner = curAniBanner ?: info.banner ?: curAniCover ?: info.poster,
                     description = if (info.description.isBlank()) (curAniDesc ?: "") else info.description,
@@ -291,53 +388,54 @@ object MangaRepository {
                     type = info.type ?: curAniFormat ?: "Manga",
                     anilistId = aniId ?: effectiveAni?.optInt("id")?.takeIf { it > 0 },
                     totalChapters = curAniChapters ?: info.totalChapters,
-                    authors = if (info.authors.isEmpty()) curAniAuthors else info.authors
+                    authors = if (info.authors.isEmpty()) curAniAuthors else info.authors,
+                    characters = aniCharacters,
+                    relatedAnimeId = relAnimeId,
+                    relatedAnimeTitle = relAnimeTitle,
+                    availableSources = availSources
                 )
                 return@withContext Triple(resolvedId, enrichedInfo, resolvedChapters)
             }
         }
 
-        // 3. Fallback resolution via query candidate: search active source first, then others
-        val queryCandidate = aniTitle?.trim()
+        // 3. Resolution via title or numeric AniList ID: search all sources for availability
+        val searchTarget = aniTitle?.trim()
             ?.ifBlank { null }
             ?: titleFallback?.trim()?.ifBlank { null }
             ?: extractSlugTitle(mangaId)
             ?: mangaId.takeIf { !isNumericAniListId && it.length < 30 }
 
-        if (!queryCandidate.isNullOrBlank() && queryCandidate.length >= 2) {
-            val orderedSources = listOf(_activeSource.value) + repositories.keys.filter { it != _activeSource.value }
-            for (s in orderedSources) {
-                val repo = repositories[s] ?: continue
-                try {
-                    val searchResults = repo.search(queryCandidate)
-                    if (searchResults.isNotEmpty()) {
-                        val bestMatch = searchResults.find { it.title.equals(queryCandidate, ignoreCase = true) }
-                            ?: searchResults.first()
-                        val rawInfo = repo.getInfo(bestMatch.id)
-                        val chapters = repo.getChapters(bestMatch.id)
-                        if (chapters.isNotEmpty() || rawInfo != null) {
-                            val resolvedInfo = MangaInfo(
-                                id = bestMatch.id,
-                                title = aniTitle ?: rawInfo?.title ?: bestMatch.title,
-                                poster = aniCover ?: rawInfo?.poster ?: bestMatch.poster,
-                                banner = aniBanner ?: rawInfo?.banner ?: aniCover ?: rawInfo?.poster,
-                                description = rawInfo?.description?.takeIf { it.isNotBlank() } ?: (aniDesc ?: ""),
-                                genres = rawInfo?.genres?.takeIf { it.isNotEmpty() } ?: aniGenres,
-                                status = rawInfo?.status ?: aniStatus,
-                                rating = rawInfo?.rating ?: aniScore,
-                                type = rawInfo?.type ?: aniFormat ?: bestMatch.type ?: "Manga",
-                                source = s.id,
-                                anilistId = aniId ?: aniData?.optInt("id")?.takeIf { it > 0 },
-                                totalChapters = aniChapters ?: rawInfo?.totalChapters,
-                                authors = rawInfo?.authors?.takeIf { it.isNotEmpty() } ?: aniAuthors
-                            )
-                            return@withContext Triple(bestMatch.id, resolvedInfo, chapters)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Search resolution failed for source ${s.displayName}: ${e.message}")
-                }
-            }
+        val availSources = if (!searchTarget.isNullOrBlank() && searchTarget.length >= 2) {
+            findAvailableSources(searchTarget, listOfNotNull(aniRomajiTitle))
+        } else emptyList()
+
+        if (availSources.isNotEmpty()) {
+            val primary = availSources.find { it.source == _activeSource.value } ?: availSources.first()
+            val repo = getRepoForSource(primary.source)
+            val primaryInfo = try { repo.getInfo(primary.matchedId) } catch (_: Exception) { null }
+            val primaryChapters = try { repo.getChapters(primary.matchedId) } catch (_: Exception) { emptyList() }
+
+            val resolvedInfo = MangaInfo(
+                id = primary.matchedId,
+                title = aniTitle ?: primaryInfo?.title ?: primary.matchedTitle,
+                altTitle = aniRomajiTitle ?: primaryInfo?.altTitle,
+                poster = aniCover ?: primaryInfo?.poster,
+                banner = aniBanner ?: primaryInfo?.banner ?: aniCover ?: primaryInfo?.poster,
+                description = primaryInfo?.description?.takeIf { it.isNotBlank() } ?: (aniDesc ?: ""),
+                genres = primaryInfo?.genres?.takeIf { it.isNotEmpty() } ?: aniGenres,
+                status = primaryInfo?.status ?: aniStatus,
+                rating = primaryInfo?.rating ?: aniScore,
+                type = primaryInfo?.type ?: aniFormat ?: "Manga",
+                source = primary.source.id,
+                anilistId = aniId ?: aniData?.optInt("id")?.takeIf { it > 0 },
+                totalChapters = aniChapters ?: primaryInfo?.totalChapters,
+                authors = primaryInfo?.authors?.takeIf { it.isNotEmpty() } ?: aniAuthors,
+                characters = aniCharacters,
+                relatedAnimeId = relAnimeId,
+                relatedAnimeTitle = relAnimeTitle,
+                availableSources = availSources
+            )
+            return@withContext Triple(primary.matchedId, resolvedInfo, primaryChapters)
         }
 
         val fallbackInfo = if (aniData != null && !aniTitle.isNullOrBlank()) {
@@ -345,6 +443,7 @@ object MangaRepository {
             MangaInfo(
                 id = mangaId,
                 title = aniTitle,
+                altTitle = aniRomajiTitle,
                 poster = aniCover,
                 banner = aniBanner,
                 description = aniDesc ?: "",
@@ -355,7 +454,11 @@ object MangaRepository {
                 source = "anilist",
                 anilistId = fallbackAniId,
                 totalChapters = aniChapters,
-                authors = aniAuthors
+                authors = aniAuthors,
+                characters = aniCharacters,
+                relatedAnimeId = relAnimeId,
+                relatedAnimeTitle = relAnimeTitle,
+                availableSources = emptyList()
             )
         } else null
 

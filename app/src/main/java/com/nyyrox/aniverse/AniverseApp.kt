@@ -804,7 +804,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         val cm = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(mId)
                                         val cc = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chId)
                                         push("manga_reader:$cm:$cc")
-                                    }
+                                    },
+                                    onAnimeClick = { vm.openAnimeDetail(it) }
                                 )
                             }
                         }
