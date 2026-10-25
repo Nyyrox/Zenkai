@@ -1123,37 +1123,28 @@ private fun NovelRelatedMediaTile(
 @Composable
 private fun NovelDetailBackdropArt(url: String, p: HomePalette, modifier: Modifier) {
     val ctx = LocalContext.current
-    val req = remember(url) { coil3.request.ImageRequest.Builder(ctx).data(url).size(96, 144).build() }
+    val req = remember(url) { coil3.request.ImageRequest.Builder(ctx).data(url).size(120, 180).build() }
 
-    Box(
-        modifier
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    Brush.verticalGradient(0.40f to Color.Black, 0.95f to Color.Transparent),
-                    blendMode = BlendMode.DstIn
-                )
-            }
-    ) {
+    Box(modifier) {
         AsyncImage(
             model = req,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .blur(26.dp)
                 .graphicsLayer {
-                    scaleX = 1.25f
-                    scaleY = 1.25f
-                    alpha = if (p.dark) 0.50f else 0.40f
+                    alpha = if (p.dark) 0.35f else 0.25f
                 }
         )
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(listOf(p.gradTop.copy(alpha = 0.35f), Color.Transparent))
+                    Brush.verticalGradient(
+                        0f to p.gradTop.copy(alpha = 0.85f),
+                        0.45f to p.gradMid.copy(alpha = 0.95f),
+                        1f to p.gradBot
+                    )
                 )
         )
     }

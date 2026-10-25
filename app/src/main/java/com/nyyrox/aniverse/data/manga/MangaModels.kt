@@ -11,6 +11,7 @@ enum class MangaSource(
     COMICK("comick", "ComicK", "https://comick.art", "Manhwa & Manga"),
     MANHUA("manhua", "Manhua", "https://comick.art", "Cultivation & Action"),
     ASURA("asura", "Asura Scans", "https://asuracomic.net", "Action / Regression"),
+    DEMONIC_SCANS("demonicscans", "Demonic Scans", "https://demonicscans.org", "Action / Manhwa"),
     WEEBCENTRAL("weebcentral", "WeebCentral", "https://weebcentral.com", "Classic"),
     MANGADEX("mangadex", "MangaDex", "https://mangadex.org", "Multilingual");
 
@@ -18,6 +19,7 @@ enum class MangaSource(
         fun fromId(id: String?): MangaSource {
             if (id.isNullOrBlank()) return COMICK
             if (id.equals("mh", ignoreCase = true)) return MANHUA
+            if (id.equals("ds", ignoreCase = true) || id.equals("demonic", ignoreCase = true)) return DEMONIC_SCANS
             return entries.find { it.id.equals(id, ignoreCase = true) } ?: COMICK
         }
     }

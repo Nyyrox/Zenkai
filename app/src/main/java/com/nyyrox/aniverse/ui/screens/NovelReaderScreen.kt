@@ -1,4 +1,11 @@
 package com.nyyrox.aniverse.ui.screens
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -95,6 +102,8 @@ import com.nyyrox.aniverse.ui.theme.OttTextPrimary
 import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
+import androidx.compose.foundation.gestures.scrollBy
 
 @Composable
 fun NovelPaperBackground(
@@ -345,6 +354,34 @@ fun NovelReaderScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val pagerState = rememberPagerState(pageCount = { paragraphCount })
+    var isAutoScrolling by remember { mutableStateOf(false) }
+    var autoScrollSpeed by remember { mutableFloatStateOf(2.0f) }
+    var autoFlipSeconds by remember { mutableIntStateOf(5) }
+
+    LaunchedEffect(isAutoScrolling, autoScrollSpeed, settings.isContinuousScroll) {
+        if (isAutoScrolling && settings.isContinuousScroll) {
+            while (isAutoScrolling) {
+                listState.scrollBy(autoScrollSpeed * 2.0f)
+                kotlinx.coroutines.delay(16L)
+            }
+        }
+    }
+
+    LaunchedEffect(isAutoScrolling, autoFlipSeconds, settings.isContinuousScroll, pagerState.currentPage, paragraphCount) {
+        if (isAutoScrolling && !settings.isContinuousScroll) {
+            while (isAutoScrolling) {
+                kotlinx.coroutines.delay(autoFlipSeconds * 1000L)
+                if (!isAutoScrolling) break
+                val next = pagerState.currentPage + 1
+                if (next < paragraphCount) {
+                    pagerState.animateScrollToPage(next)
+                } else {
+                    isAutoScrolling = false
+                    break
+                }
+            }
+        }
+    }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         when {
@@ -407,7 +444,6 @@ fun NovelReaderScreen(
                         .size(38.dp)
                         .clip(CircleShape)
                         .background(Color(0x60000000))
-                        .border(1.dp, Color(0x35FFFFFF), CircleShape)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -433,7 +469,6 @@ fun NovelReaderScreen(
                         .size(38.dp)
                         .clip(CircleShape)
                         .background(Color(0x60000000))
-                        .border(1.dp, Color(0x35FFFFFF), CircleShape)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -763,6 +798,113 @@ fun NovelReaderScreen(
                 }
             }
 
+            // Floating Auto-Scroll Speed & Timer Control Pill
+            AnimatedVisibility(
+                visible = isAutoScrolling,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (hudVisible) 80.dp else 24.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color(0xF0181316))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x33FFFFFF))
+                            .clickable { isAutoScrolling = !isAutoScrolling },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isAutoScrolling) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    if (settings.isContinuousScroll) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "-",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable { autoScrollSpeed = (autoScrollSpeed - 0.5f).coerceAtLeast(0.5f) }
+                                    .padding(horizontal = 4.dp)
+                            )
+                            Text(
+                                text = "%.1fx".format(java.util.Locale.US, autoScrollSpeed),
+                                color = OttPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "+",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable { autoScrollSpeed = (autoScrollSpeed + 0.5f).coerceAtMost(6.0f) }
+                                    .padding(horizontal = 4.dp)
+                            )
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "-",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable { autoFlipSeconds = (autoFlipSeconds - 1).coerceAtLeast(2) }
+                                    .padding(horizontal = 4.dp)
+                            )
+                            Text(
+                                text = "${autoFlipSeconds}s",
+                                color = OttPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "+",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable { autoFlipSeconds = (autoFlipSeconds + 1).coerceAtMost(30) }
+                                    .padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x22FFFFFF))
+                            .clickable { isAutoScrolling = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Stop",
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+
             // Bottom Navigation HUD Overlay
             AnimatedVisibility(
                 visible = hudVisible,
@@ -773,43 +915,140 @@ fun NovelReaderScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xE6000000))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    Color(0xCC070A0F),
+                                    Color(0xF2070A0F)
+                                )
+                            )
+                        )
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(
-                        onClick = { content.prevChapterSlug?.let { onSelectChapter(it) } },
-                        enabled = content.prevChapterSlug != null
+                    // Prev Chapter Button
+                    Box(
+                        modifier = Modifier
+                            .clip(OttPillShape)
+                            .background(if (content.prevChapterSlug != null) Color(0x28FFFFFF) else Color.Transparent)
+                            .clickable(enabled = content.prevChapterSlug != null) {
+                                content.prevChapterSlug?.let { onSelectChapter(it) }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Icon(
-                            Icons.Default.ChevronLeft,
-                            contentDescription = "Previous Chapter",
-                            tint = if (content.prevChapterSlug != null) Color.White else Color(0x40FFFFFF)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.ChevronLeft,
+                                contentDescription = "Previous Chapter",
+                                tint = if (content.prevChapterSlug != null) Color.White else Color(0x40FFFFFF),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Prev",
+                                fontSize = 11.sp,
+                                color = if (content.prevChapterSlug != null) Color.White else Color(0x40FFFFFF),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
 
-                    Text(
-                        text = "${(readingProgress * 100).toInt()}%",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = effectiveSecondaryColor
-                    )
-
-                    IconButton(
-                        onClick = { content.nextChapterSlug?.let { onSelectChapter(it) } },
-                        enabled = content.nextChapterSlug != null
+                    // Center: Auto-Scroll Pill Toggle + Mode & Progress
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Next Chapter",
-                            tint = if (content.nextChapterSlug != null) Color.White else Color(0x40FFFFFF)
-                        )
+                        // Auto-Scroll Pill Toggle
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (isAutoScrolling) OttPrimary else Color(0x28FFFFFF))
+                                .clickable { isAutoScrolling = !isAutoScrolling }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(
+                                    imageVector = if (isAutoScrolling) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
+                                    contentDescription = "Auto Scroll",
+                                    tint = if (isAutoScrolling) Color.Black else Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = if (isAutoScrolling) "Auto On" else "Auto Scroll",
+                                    color = if (isAutoScrolling) Color.Black else Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Mode indicator (Continuous / Paged)
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color(0x20FFFFFF))
+                                .clickable {
+                                    vm.updateNovelReaderSettings(settings.copy(isContinuousScroll = !settings.isContinuousScroll))
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = if (settings.isContinuousScroll) "Scroll" else "Paged",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+
+                        // Progress Badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x18FFFFFF))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (settings.isContinuousScroll) {
+                                    "${(readingProgress * 100).toInt()}%"
+                                } else {
+                                    "${pagerState.currentPage + 1}/$paragraphCount"
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = effectiveSecondaryColor
+                            )
+                        }
+                    }
+
+                    // Next Chapter Button
+                    Box(
+                        modifier = Modifier
+                            .clip(OttPillShape)
+                            .background(if (content.nextChapterSlug != null) Color(0x28FFFFFF) else Color.Transparent)
+                            .clickable(enabled = content.nextChapterSlug != null) {
+                                content.nextChapterSlug?.let { onSelectChapter(it) }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Next",
+                                fontSize = 11.sp,
+                                color = if (content.nextChapterSlug != null) Color.White else Color(0x40FFFFFF),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = "Next Chapter",
+                                tint = if (content.nextChapterSlug != null) Color.White else Color(0x40FFFFFF),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
-
             // ── Top Level Reader Customization Sheet ───────────────────────
             if (showSettingsSheet) {
                 ModalBottomSheet(
@@ -847,11 +1086,6 @@ fun NovelReaderScreen(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(if (isSelected) settings.theme.accentColor.copy(alpha = 0.2f) else Color(0x14FFFFFF))
-                                            .border(
-                                                width = if (isSelected) 1.5.dp else 1.dp,
-                                                color = if (isSelected) settings.theme.accentColor else Color(0x25FFFFFF),
-                                                shape = RoundedCornerShape(10.dp)
-                                            )
                                             .clickable {
                                                 vm.updateNovelReaderSettings(settings.copy(pageStyle = style))
                                             }
@@ -887,11 +1121,6 @@ fun NovelReaderScreen(
                                             .height(44.dp)
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(th.backgroundColor)
-                                            .border(
-                                                width = if (isSelected) 2.dp else 1.dp,
-                                                color = if (isSelected) th.accentColor else Color(0x30FFFFFF),
-                                                shape = RoundedCornerShape(10.dp)
-                                            )
                                             .clickable {
                                                 vm.updateNovelReaderSettings(settings.copy(theme = th))
                                             },
@@ -929,11 +1158,6 @@ fun NovelReaderScreen(
                                         modifier = Modifier
                                             .clip(OttPillShape)
                                             .background(if (isSelected) settings.theme.accentColor.copy(alpha = 0.22f) else Color(0x14FFFFFF))
-                                            .border(
-                                                width = if (isSelected) 1.5.dp else 1.dp,
-                                                color = if (isSelected) settings.theme.accentColor else Color(0x25FFFFFF),
-                                                shape = OttPillShape
-                                            )
                                             .clickable {
                                                 vm.updateNovelReaderSettings(settings.copy(customTextColor = textColorOpt))
                                             }
@@ -945,7 +1169,6 @@ fun NovelReaderScreen(
                                                 .size(14.dp)
                                                 .clip(CircleShape)
                                                 .background(displayColor)
-                                                .border(0.8.dp, Color(0x55FFFFFF), CircleShape)
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         Text(
@@ -1151,7 +1374,6 @@ fun NovelReaderScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(if (isCurrent) Color(0x25E50914) else Color(0x0EFFFFFF))
-                                    .border(1.dp, if (isCurrent) Color(0x70E50914) else Color.Transparent, RoundedCornerShape(10.dp))
                                     .clickable {
                                         showChapterDrawer = false
                                         onSelectChapter(ch.slug)

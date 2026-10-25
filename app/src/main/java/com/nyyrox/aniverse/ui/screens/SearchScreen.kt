@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,7 @@ import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.manga.MangaCard
 import com.nyyrox.aniverse.data.manga.MangaRepository
 import com.nyyrox.aniverse.data.novel.NovelItem
+import com.nyyrox.aniverse.data.novel.NovelSource
 import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -95,9 +97,10 @@ fun SearchScreen(
     var animeResults by remember { mutableStateOf<List<Anime>>(emptyList()) }
     var mangaResults by remember { mutableStateOf<List<MangaCard>>(emptyList()) }
     var novelResults by remember { mutableStateOf<List<NovelItem>>(emptyList()) }
+    var selectedNovelSource by remember { mutableStateOf<NovelSource?>(null) }
     var isSearching by remember { mutableStateOf(false) }
 
-    LaunchedEffect(query, selectedTab) {
+    LaunchedEffect(query, selectedTab, selectedNovelSource) {
         val q = query.trim()
         if (q.isBlank()) {
             animeResults = emptyList()
@@ -120,7 +123,7 @@ fun SearchScreen(
                 }
                 SearchTab.NOVEL -> {
                     novelResults = withContext(Dispatchers.IO) {
-                        vm.novelRepo.search(q, 1)
+                        vm.novelRepo.search(q, 1, selectedNovelSource)
                     }
                 }
             }
@@ -135,8 +138,8 @@ fun SearchScreen(
         }
     }
 
-    GlassBackdropHost(
-        background = { HomeBackdrop(p) }
+    Box(
+        modifier = Modifier.fillMaxSize().background(p.pageBrush)
     ) {
         Column(
             modifier = Modifier
@@ -281,6 +284,60 @@ fun SearchScreen(
                                 color = if (isSelected) p.onAccent else p.textSub,
                                 fontSize = 13.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Novel Source Selector (when in Novel search tab)
+            if (selectedTab == SearchTab.NOVEL) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        val isAll = selectedNovelSource == null
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .then(if (isAll) Modifier.background(p.accentBrush) else Modifier.background(p.chipBg))
+                                .clickable { selectedNovelSource = null }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "All Sources",
+                                color = if (isAll) p.onAccent else p.text,
+                                fontSize = 12.sp,
+                                fontWeight = if (isAll) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                    val novelSources = listOf(
+                        NovelSource.LNORI,
+                        NovelSource.NOVEL_FULL,
+                        NovelSource.NOVEL_FIRE,
+                        NovelSource.FREE_WEB_NOVEL,
+                        NovelSource.ROYAL_ROAD,
+                        NovelSource.WUXIA_WORLD
+                    )
+                    items(novelSources) { src ->
+                        val isSel = selectedNovelSource == src
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .then(if (isSel) Modifier.background(p.accentBrush) else Modifier.background(p.chipBg))
+                                .clickable { selectedNovelSource = if (isSel) null else src }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = src.displayName,
+                                color = if (isSel) p.onAccent else p.text,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
                             )
                         }
                     }

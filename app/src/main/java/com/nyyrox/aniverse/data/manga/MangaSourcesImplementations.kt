@@ -517,7 +517,7 @@ class ComicKRepository(
 
         // Concurrently fetch remaining pages (up to 15 pages = 900 chapters)
         if (lastPage > 1) {
-            val pagesToFetch = (2..minOf(lastPage, 15)).toList()
+            val pagesToFetch = (2..minOf(lastPage, 60)).toList()
             val deferredPages = pagesToFetch.map { p ->
                 async {
                     val pUrl = if (isEn) "$baseUrl/api/comics/$slug/chapter-list?lang=en&page=$p"
@@ -1363,3 +1363,212 @@ class WeebCentralRepository(
     }
 }
 
+
+// ============================================================================
+// 5. DEMONIC SCANS REPOSITORY (https://demonicscans.org)
+// ============================================================================
+class DemonicScansRepository(
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .build()
+) : IMangaSourceRepository {
+    override val source: MangaSource = MangaSource.DEMONIC_SCANS
+    private val baseUrl = "https://demonicscans.org"
+    private val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+    private suspend fun fetchHtml(url: String): String = withContext(Dispatchers.IO) {
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", userAgent)
+                .header("Referer", "$baseUrl/")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.string().orEmpty() else ""
+            }
+        } catch (e: Exception) {
+            Log.w("DemonicScansRepo", "Failed to fetch $url: ${e.message}")
+            ""
+        }
+    }
+
+    override suspend fun getHome(): MangaHome = withContext(Dispatchers.IO) {
+        val html = fetchHtml(baseUrl)
+        if (html.isBlank()) return@withContext MangaHome()
+
+        val cards = parseMangaCards(html)
+        val trending = cards.take(10)
+        val latest = cards.drop(10).take(20).ifEmpty { cards.take(20) }
+
+        MangaHome(
+            trending = trending,
+            popular = cards.take(15),
+            topRated = trending,
+            manhwa = cards,
+            latest = latest,
+            newRelease = latest
+        )
+    }
+
+    override suspend fun search(query: String): List<MangaCard> = withContext(Dispatchers.IO) {
+        val enc = URLEncoder.encode(query.trim(), "UTF-8")
+        val html = fetchHtml("$baseUrl/search.php?manga=$enc")
+        if (html.isBlank()) return@withContext emptyList()
+
+        val list = mutableListOf<MangaCard>()
+        val linkRegex = Regex("""(?s)<a[^>]*href="(/manga/[^"]+)"[^>]*>.*?<img[^>]*src="([^"]+)"[^>]*>.*?<div>([^<]+)</div>""", RegexOption.IGNORE_CASE)
+        linkRegex.findAll(html).forEach { match ->
+            val href = match.groupValues[1]
+            val img = match.groupValues[2]
+            val title = cleanHtmlText(match.groupValues[3])
+            val slug = href.removePrefix("/manga/").trim()
+            if (slug.isNotBlank() && title.isNotBlank()) {
+                list.add(
+                    MangaCard(
+                        id = "ds_$slug",
+                        title = title,
+                        poster = img,
+                        type = "Manhwa",
+                        source = source.id
+                    )
+                )
+            }
+        }
+        list
+    }
+
+    override suspend fun getInfo(mangaId: String): MangaInfo? = withContext(Dispatchers.IO) {
+        val slug = mangaId.removePrefix("ds_")
+        val html = fetchHtml("$baseUrl/manga/$slug")
+        if (html.isBlank()) return@withContext null
+
+        val h1Match = Regex("""<h1[^>]*>([^<]+)</h1>""", RegexOption.IGNORE_CASE).find(html)
+        val ogTitleMatch = Regex("""<meta\s+property="og:title"\s+content="([^"]+)"""", RegexOption.IGNORE_CASE).find(html)
+        val title = cleanHtmlText(h1Match?.groupValues?.get(1) ?: ogTitleMatch?.groupValues?.get(1) ?: slug.replace("-", " "))
+
+        val ogImgMatch = Regex("""<meta\s+property="og:image"\s+content="([^"]+)"""", RegexOption.IGNORE_CASE).find(html)
+        val coverImgMatch = Regex("""<img[^>]*class="[^"]*cover[^"]*"[^>]*src="([^"]+)"""", RegexOption.IGNORE_CASE).find(html)
+        var poster = coverImgMatch?.groupValues?.get(1) ?: ogImgMatch?.groupValues?.get(1)
+        if (poster != null && !poster.startsWith("http")) {
+            poster = "$baseUrl${if (poster.startsWith("/")) "" else "/"}$poster"
+        }
+
+        val ogDescMatch = Regex("""<meta\s+property="og:description"\s+content="([^"]+)"""", RegexOption.IGNORE_CASE).find(html)
+        val desc = cleanHtmlText(ogDescMatch?.groupValues?.get(1) ?: "")
+
+        val genres = mutableListOf<String>()
+        val genreRegex = Regex("""href="/(?:advanced|genre)\.php\?[^"]*genre=([^"&]+)"""", RegexOption.IGNORE_CASE)
+        genreRegex.findAll(html).forEach { m ->
+            val g = m.groupValues[1].replace("+", " ").trim()
+            if (g.isNotBlank() && g !in genres) genres.add(g)
+        }
+
+        MangaInfo(
+            id = "ds_$slug",
+            title = title,
+            poster = poster,
+            description = desc,
+            type = "Manhwa",
+            status = if (html.contains("Ongoing", ignoreCase = true)) "Ongoing" else if (html.contains("Completed", ignoreCase = true)) "Completed" else null,
+            genres = genres,
+            source = source.id
+        )
+    }
+
+    override suspend fun getChapters(mangaId: String): List<MangaChapter> = withContext(Dispatchers.IO) {
+        val slug = mangaId.removePrefix("ds_")
+        val html = fetchHtml("$baseUrl/manga/$slug")
+        if (html.isBlank()) return@withContext emptyList()
+
+        val chapters = mutableListOf<MangaChapter>()
+        val chRegex = Regex("""(?s)<a[^>]*href="(/chaptered\.php\?manga=(\d+)&(?:amp;)?chapter=([^"&]+))"[^>]*>(.*?)</a>""", RegexOption.IGNORE_CASE)
+
+        chRegex.findAll(html).forEach { match ->
+            val numericMangaId = match.groupValues[2]
+            val rawNum = match.groupValues[3]
+            val inner = match.groupValues[4]
+
+            if (inner.contains("Read First Chap", ignoreCase = true)) return@forEach
+
+            val dateMatch = Regex("""\b(\d{4}-\d{2}-\d{2})\b""").find(inner)
+            val releaseDate = dateMatch?.groupValues?.get(1)
+
+            val chNum = rawNum.trim()
+            if (chNum.isNotBlank() && chNum != "0") {
+                chapters.add(
+                    MangaChapter(
+                        number = chNum,
+                        title = "Chapter $chNum",
+                        chapterId = "ds_${numericMangaId}__${chNum}",
+                        releaseDate = releaseDate,
+                        url = "$baseUrl/chaptered.php?manga=$numericMangaId&chapter=$chNum",
+                        source = source.id
+                    )
+                )
+            }
+        }
+
+        val distinct = chapters.distinctBy { it.number }
+        distinct.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
+    }
+
+    override suspend fun getPages(chapterId: String): List<String> = withContext(Dispatchers.IO) {
+        val clean = chapterId.removePrefix("ds_ch_").removePrefix("ds_")
+        val parts = clean.split("__")
+        val numericMangaId = parts.getOrNull(0) ?: ""
+        val chNum = parts.getOrNull(1) ?: "1"
+
+        val url = "$baseUrl/chaptered.php?manga=$numericMangaId&chapter=$chNum"
+        val html = fetchHtml(url)
+        if (html.isBlank()) return@withContext emptyList()
+
+        val pages = mutableListOf<String>()
+        val imgRegex = Regex("""<img[^>]+src=["'](https?://[^"']+)["']""", RegexOption.IGNORE_CASE)
+        imgRegex.findAll(html).forEach { m ->
+            val src = m.groupValues[1]
+            if ((src.contains("demoniclibs.com") || src.contains("cdn") || src.contains("storage")) &&
+                !src.contains("logo") && !src.contains("free_ads") && !src.contains("icon")) {
+                pages.add(src)
+            }
+        }
+        pages.distinct()
+    }
+
+    private fun parseMangaCards(html: String): List<MangaCard> {
+        val list = mutableListOf<MangaCard>()
+        val regex = Regex("""(?s)<a[^>]*href="(/manga/[^"]+)"[^>]*title="([^"]+)"[^>]*>.*?<img[^>]*src="([^"]+)"[^>]*>""", RegexOption.IGNORE_CASE)
+        regex.findAll(html).forEach { match ->
+            val href = match.groupValues[1]
+            val title = cleanHtmlText(match.groupValues[2])
+            val img = match.groupValues[3]
+            val slug = href.removePrefix("/manga/").trim()
+            if (slug.isNotBlank() && title.isNotBlank()) {
+                list.add(
+                    MangaCard(
+                        id = "ds_$slug",
+                        title = title,
+                        poster = img,
+                        type = "Manhwa",
+                        source = source.id
+                    )
+                )
+            }
+        }
+        return list.distinctBy { it.id }
+    }
+
+    private fun cleanHtmlText(text: String): String {
+        return text
+            .replace(Regex("<[^>]+>"), " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&#39;", "'")
+            .replace("&quot;", "\"")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+}

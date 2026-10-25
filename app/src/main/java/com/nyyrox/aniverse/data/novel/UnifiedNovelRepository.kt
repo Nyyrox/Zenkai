@@ -55,7 +55,9 @@ class UnifiedNovelRepository(
 
     override suspend fun getLightNovels(page: Int): List<NovelItem> = currentRepo.getLightNovels(page)
 
-    override suspend fun search(query: String, page: Int): List<NovelItem> = coroutineScope {
+    override suspend fun search(query: String, page: Int): List<NovelItem> = search(query, page, null)
+
+    suspend fun search(query: String, page: Int = 1, source: NovelSource? = null): List<NovelItem> = coroutineScope {
         val candidates = mutableListOf(query.trim())
         if (query.contains("class room", ignoreCase = true)) {
             candidates.add(query.replace("class room", "classroom", ignoreCase = true))
@@ -74,8 +76,12 @@ class UnifiedNovelRepository(
             candidates.add(words.take(2).joinToString(" "))
         }
 
-        // Search across ALL sources in parallel: Lnori, NovelFull, NovelFire, FreeWebNovel, RoyalRoad, WuxiaWorld
-        val targetRepos = listOf(lnori, novelFull, novelFire, freeWebNovel, royalRoad, wuxiaWorld)
+        // If source specified, query that source; otherwise search across ALL sources in parallel
+        val targetRepos = if (source != null) {
+            listOfNotNull(repositories[source])
+        } else {
+            listOf(lnori, novelFull, novelFire, freeWebNovel, royalRoad, wuxiaWorld)
+        }
         val deferredList = targetRepos.map { repo ->
             async {
                 val resultsForRepo = mutableListOf<NovelItem>()

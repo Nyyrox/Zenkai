@@ -20,6 +20,7 @@ object MangaRepository {
     val comicK = ComicKRepository()
     val manhua = ManhuaRepository(comicK)
     val asura = AsuraScansRepository()
+    val demonicScans = DemonicScansRepository()
     val weebCentral = WeebCentralRepository()
 
     private val repositories = mapOf<MangaSource, IMangaSourceRepository>(
@@ -27,6 +28,7 @@ object MangaRepository {
         MangaSource.COMICK to comicK,
         MangaSource.MANHUA to manhua,
         MangaSource.ASURA to asura,
+        MangaSource.DEMONIC_SCANS to demonicScans,
         MangaSource.WEEBCENTRAL to weebCentral
     )
 
@@ -83,6 +85,7 @@ object MangaRepository {
             id.startsWith("ck_") -> MangaSource.COMICK
             id.startsWith("mh_") -> MangaSource.MANHUA
             id.startsWith("as_") -> MangaSource.ASURA
+            id.startsWith("ds_") -> MangaSource.DEMONIC_SCANS
             id.startsWith("wc_") -> MangaSource.WEEBCENTRAL
             else -> _activeSource.value
         }
@@ -90,7 +93,7 @@ object MangaRepository {
 
     fun cleanWeebId(id: String): String {
         val s = id.trim().substringBefore("?").substringBefore("#")
-        if (s.startsWith("md_") || s.startsWith("ck_") || s.startsWith("mh_") || s.startsWith("as_") || s.startsWith("wc_")) {
+        if (s.startsWith("md_") || s.startsWith("ck_") || s.startsWith("mh_") || s.startsWith("as_") || s.startsWith("ds_") || s.startsWith("wc_")) {
             return s
         }
         if (s.contains("/series/")) {
@@ -121,6 +124,9 @@ object MangaRepository {
         if (s.startsWith("as_")) {
             return s.removePrefix("as_").replace("-", " ").replace("_", " ").trim()
         }
+        if (s.startsWith("ds_")) {
+            return s.removePrefix("ds_").replace("-", " ").replace("_", " ").trim()
+        }
         if (s.startsWith("wc_") && s.contains("_")) {
             val parts = s.removePrefix("wc_").split("_")
             if (parts.size >= 2) {
@@ -135,7 +141,7 @@ object MangaRepository {
 
     fun cleanChapterId(chapterId: String): String {
         val s = chapterId.trim().substringBefore("?").substringBefore("#")
-        if (s.startsWith("md_") || s.startsWith("ck_") || s.startsWith("mh_") || s.startsWith("as_") || s.startsWith("wc_")) {
+        if (s.startsWith("md_") || s.startsWith("ck_") || s.startsWith("mh_") || s.startsWith("as_") || s.startsWith("ds_") || s.startsWith("wc_")) {
             return s
         }
         if (s.contains("/chapters/")) {
@@ -219,7 +225,7 @@ object MangaRepository {
                                 matchedId = best.id,
                                 matchedTitle = best.title,
                                 chapterCount = if (chapters.isNotEmpty()) chapters.size else null,
-                                latestChapter = chapters.firstOrNull()?.number
+                                latestChapter = chapters.lastOrNull()?.number ?: chapters.firstOrNull()?.number
                             )
                         }
                     } catch (_: Exception) {}
@@ -320,7 +326,7 @@ object MangaRepository {
         var relAnimeTitle: String? = relAnime?.title
 
         // 2. Direct fetch if NOT purely numeric AniList ID and has recognized prefix
-        if (!isNumericAniListId && (mangaId.startsWith("md_") || mangaId.startsWith("ck_") || mangaId.startsWith("mh_") || mangaId.startsWith("as_") || mangaId.startsWith("wc_"))) {
+        if (!isNumericAniListId && (mangaId.startsWith("md_") || mangaId.startsWith("ck_") || mangaId.startsWith("mh_") || mangaId.startsWith("as_") || mangaId.startsWith("ds_") || mangaId.startsWith("wc_"))) {
             val repo = getRepoForSource(src)
             val infoDeferred = async { repo.getInfo(mangaId) }
             val chaptersDeferred = async { repo.getChapters(mangaId) }
