@@ -924,19 +924,6 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         )
                     }
 
-                    // Navigation Drawer (Opened via 3-line hamburger menu)
-                    OttNavDrawer(
-                        isOpen = isDrawerOpen,
-                        onDismiss = { isDrawerOpen = false },
-                        onNavigate = { target ->
-                            if (listOf("home", "airing", "manga", "novel", "profile").contains(target)) {
-                                switchTab(target)
-                            } else {
-                                push(target)
-                            }
-                        }
-                    )
-
                     // Fixed Glassmorphic Bottom Dock (5 primary tabs: Home, Browse, Manga, Novel, Profile)
                     if (isRootRoute) {
                         OttBottomDock(
@@ -952,6 +939,22 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
+
+                    // Navigation menu: drawn after the dock so its scrim and card sit on top of both bars.
+                    OttNavDrawer(
+                        isOpen = isDrawerOpen,
+                        onDismiss = { isDrawerOpen = false },
+                        onNavigate = { target ->
+                            if (listOf("home", "airing", "manga", "novel", "profile").contains(target)) {
+                                switchTab(target)
+                            } else {
+                                push(target)
+                            }
+                        },
+                        userAvatarUrl = vm.userProfile.avatarUrl,
+                        avatarDecorationId = vm.userProfile.avatarDecorationId,
+                        avatarFrameId = vm.userProfile.avatarFrameId
+                    )
 
                     // Compulsory username setup overlay for logged in users who do not have a username yet
                     if (vm.authState is AuthState.LoggedIn && (vm.isUsernameSetupRequired || vm.userProfile.username.isBlank()) && !vm.authLoading && currentRoute != "login") {
