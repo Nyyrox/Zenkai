@@ -11,7 +11,7 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Stable
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.lerp
@@ -128,6 +128,10 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import com.styropyr0.prismal.shapes.PrismalCapsule
 import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
@@ -216,6 +220,85 @@ internal fun Modifier.ottGlass(p: HomePalette, shape: Shape): Modifier = this
         }
     )
     .border(1.dp, p.glassBorder, shape)
+
+/** Shared capsule shape (kept as one instance so glass modifiers are not rebuilt on every recomposition). */
+internal val OttCapsuleShape: () -> Shape = { PrismalCapsule() }
+
+/**
+ * Prismal liquid glass using the same recipe as [PrismalGlassBottomTabs] (blur + edge refraction + specular rim +
+ * depth shadow + neutral 40% container), themed by the app palette instead of the system theme.
+ */
+@Composable
+internal fun rememberOttGlass(
+    backdrop: PrismalBackdrop,
+    p: HomePalette,
+    shape: () -> Shape = OttCapsuleShape,
+    refractionHeight: Dp = 16.dp,
+    refractionAmount: Dp = 16.dp,
+    surfaceColor: Color? = null,
+    layerBlock: (GraphicsLayerScope.() -> Unit)? = null
+): Modifier {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val container = surfaceColor
+        ?: (if (p.dark) Color(0xFF121212) else Color(0xFFFAFAFA)).copy(alpha = 0.4f)
+    return remember(backdrop, density, container, refractionHeight, refractionAmount, shape, layerBlock) {
+        Modifier.drawPrismalGlass(
+            backdrop = backdrop,
+            shape = shape,
+            effects = {
+                applyPrismalGlassEffects(
+                    density = density,
+                    adaptiveLuminance = false,
+                    luminance = 0.5f,
+                    blurRadiusPx = with(density) { 8.dp.toPx() },
+                    refractionHeightPx = with(density) { refractionHeight.toPx() },
+                    refractionAmountPx = with(density) { refractionAmount.toPx() }
+                )
+            },
+            depthShadow = null,
+            layerBlock = layerBlock,
+            onDrawSurface = { drawRect(container) }
+        )
+    }
+}
+
+/** Round liquid-glass button with a spring press. Falls back to a flat themed circle when glass is off. */
+@Composable
+internal fun GlassCircleButton(
+    p: HomePalette,
+    backdrop: PrismalBackdrop,
+    size: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale = animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "glassCirclePress"
+    )
+    val scaleBlock: GraphicsLayerScope.() -> Unit = remember { { scaleX = scale.value; scaleY = scale.value } }
+    val glass = rememberOttGlass(backdrop, p, OttCapsuleShape, size / 3, size / 3, layerBlock = scaleBlock)
+    val surface = if (p.glassOn) {
+        glass.clip(CircleShape)
+    } else {
+        Modifier.graphicsLayer(scaleBlock).shadow(4.dp, CircleShape).ottGlass(p, CircleShape)
+    }
+    Box(
+        modifier = modifier
+            .size(size)
+            .then(surface)
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+        content = content
+    )
+}
 
 @Composable
 private fun OttGlassCircle(
@@ -468,19 +551,24 @@ fun OttTopBar(
         val barHeight = 44.dp
         val pillWidth = lerp(barHeight, fullWidth, fraction.coerceIn(0f, 1f))
 
+        val backdrop = com.styropyr0.prismal.LocalPrismalBackdrop.current
+            ?: com.styropyr0.prismal.sources.emptyGlassSource()
+        val glass = rememberOttGlass(backdrop, p, OttCapsuleShape, 16.dp, 16.dp)
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .width(pillWidth)
                 .height(barHeight)
-                .ottGlass(p, CircleShape)
+                .then(if (p.glassOn) glass.clip(CircleShape) else Modifier.ottGlass(p, CircleShape))
         ) {
             // Laid out at full width and anchored to the right, so the shape only reveals / hides it.
             Row(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .requiredWidth(fullWidth)
                     .fillMaxHeight()
+                    // Lets the row be wider than the pill and pins its right edge to the pill's right edge,
+                    // so the profile bubble stays put while the pill shrinks onto it.
+                    .wrapContentWidth(Alignment.End, unbounded = true)
+                    .width(fullWidth)
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -721,44 +809,6 @@ private fun DockTabContent(
     }
 }
 
-/** Single round glass button: the collapsed dock and the separate search button. */
-@Composable
-private fun DockSingleButton(
-    p: HomePalette,
-    glassOn: Boolean,
-    backdrop: com.styropyr0.prismal.PrismalBackdrop,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    if (glassOn) {
-        PrismalGlassBottomTabs(
-            selectedTabIndex = { 0 },
-            onTabSelected = { onClick() },
-            backdrop = backdrop,
-            tabsCount = 1,
-            specular = { PrismalSpecular.Default },
-            tintDropletContent = false,
-            modifier = modifier.width(64.dp)
-        ) {
-            PrismalGlassBottomTab(onClick = onClick) { content() }
-        }
-    } else {
-        val context = LocalContext.current
-        Box(
-            modifier = modifier
-                .size(58.dp)
-                .shadow(4.dp, CircleShape)
-                .ottGlass(p, CircleShape)
-                .clickable {
-                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                    onClick()
-                },
-            contentAlignment = Alignment.Center
-        ) { content() }
-    }
-}
-
 /**
  * Bottom dock: a tab pill (Anime / Schedule / Manga / Novel) plus a separate round search button, like the
  * Apple Music bar. [collapsed] shrinks the pill into one round button showing only the current tab; tapping it or
@@ -820,6 +870,15 @@ fun OttBottomDock(
                     contentAlignment = Alignment.Center
                 ) {
                     if (glassOn) {
+                        val baseConfig = LocalConfiguration.current
+                        val themedConfig = remember(baseConfig, p.dark) {
+                            android.content.res.Configuration(baseConfig).apply {
+                                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                                    (if (p.dark) android.content.res.Configuration.UI_MODE_NIGHT_YES
+                                    else android.content.res.Configuration.UI_MODE_NIGHT_NO)
+                            }
+                        }
+                        CompositionLocalProvider(LocalConfiguration provides themedConfig) {
                         PrismalGlassBottomTabs(
                             selectedTabIndex = { activeIndex },
                             onTabSelected = { idx ->
@@ -838,6 +897,7 @@ fun OttBottomDock(
                                     DockTabContent(tab, isSelected, p, userAvatarUrl, avatarDecorationId, avatarFrameId)
                                 }
                             }
+                        }
                         }
                     } else {
                         FlatDockBar(
@@ -863,7 +923,7 @@ fun OttBottomDock(
                         alpha = ((0.8f - f) / 0.6f).coerceIn(0f, 1f)
                     }
                 ) {
-                    DockSingleButton(p, glassOn, ambientBackdrop, onExpand) {
+                    GlassCircleButton(p, ambientBackdrop, 64.dp, onExpand) {
                         DockTabContent(activeTab, true, p, userAvatarUrl, avatarDecorationId, avatarFrameId, showLabel = false)
                     }
                 }
@@ -873,7 +933,7 @@ fun OttBottomDock(
         Spacer(Modifier.width(10.dp))
 
         // Search: its own round button next to the pill.
-        DockSingleButton(p, glassOn, ambientBackdrop, onSearchClick) {
+        GlassCircleButton(p, ambientBackdrop, 64.dp, onSearchClick) {
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",

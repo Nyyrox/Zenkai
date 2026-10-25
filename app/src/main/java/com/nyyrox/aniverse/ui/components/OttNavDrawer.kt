@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,9 +31,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Forum
@@ -49,20 +49,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nyyrox.aniverse.ui.screens.HomePalette
 import com.nyyrox.aniverse.ui.screens.rememberHomePalette
+import com.styropyr0.prismal.LocalPrismalBackdrop
+import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
+import com.styropyr0.prismal.sources.emptyGlassSource
 import kotlin.math.roundToInt
 
 private const val DISCORD_INVITE_URL = "https://discord.gg/kHxHzZtH7"
@@ -76,19 +78,21 @@ private data class DrawerEntry(
 )
 
 private val DrawerEntries = listOf(
-    DrawerEntry(Icons.Default.Explore, "Browse Catalog", "Filter anime by genres, seasons & year", "browse"),
-    DrawerEntry(Icons.Default.Schedule, "Airing Schedule", "Weekly broadcast calendar & release times", "airing"),
-    DrawerEntry(Icons.Default.Bookmark, "Watchlist & Library", "Saved anime, manga & light novels", "watchlist"),
-    DrawerEntry(Icons.Default.DownloadDone, "Offline Downloads", "Read novels and manga chapters offline", "downloads"),
-    DrawerEntry(Icons.Default.Forum, "Discord Community", "Join our Discord server & enable Rich Presence", "discord_hub"),
-    DrawerEntry(Icons.Default.Groups, "Watch Together", "Host or join live anime sync watch rooms", "watchtogether"),
-    DrawerEntry(Icons.Default.Person, "Profile & Settings", "Display themes, playback and preferences", "profile")
+    DrawerEntry(Icons.Default.Explore, "Browse Catalog", "Genres, seasons & year", "browse"),
+    DrawerEntry(Icons.Default.Schedule, "Airing Schedule", "Weekly release calendar", "airing"),
+    DrawerEntry(Icons.Default.Bookmark, "Watchlist & Library", "Saved anime, manga & novels", "watchlist"),
+    DrawerEntry(Icons.Default.DownloadDone, "Offline Downloads", "Read and watch offline", "downloads"),
+    DrawerEntry(Icons.Default.Forum, "Discord Community", "Join the server, Rich Presence", "discord_hub"),
+    DrawerEntry(Icons.Default.Groups, "Watch Together", "Sync watch rooms with friends", "watchtogether"),
+    DrawerEntry(Icons.Default.Person, "Profile & Settings", "Themes, playback & preferences", "profile")
 )
 
+private val DrawerGlassShape: () -> Shape = { PrismalRoundedRectangle(28.dp) }
+
 /**
- * Menu. The hamburger pill in the top bar grows downward into this card (pill -> card) while its three lines
+ * Menu. The hamburger pill in the top bar grows downward into a Prismal liquid-glass card while its three lines
  * turn into an X; closing plays the same motion backwards into the pill. Rows slide in one after another.
- * Glass on -> translucent liquid-glass card, glass off -> flat card. Both follow light / dark.
+ * Glass on -> real liquid glass (same recipe as the dock), glass off -> flat card. Both follow light / dark.
  */
 @Composable
 fun OttNavDrawer(
@@ -109,12 +113,12 @@ fun OttNavDrawer(
     if (!isOpen && progress.value < 0.005f) return
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Scrim
+        // Light scrim, so the glass card still sees the page behind it.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
-                .background(Color.Black.copy(alpha = if (p.dark) 0.55f else 0.32f))
+                .background(Color.Black.copy(alpha = if (p.dark) 0.40f else 0.18f))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -144,34 +148,9 @@ fun OttNavDrawer(
     }
 }
 
-private fun Modifier.panelSurface(p: HomePalette, shape: Shape): Modifier = this
-    .clip(shape)
-    .background(
-        if (p.glassOn) {
-            Brush.verticalGradient(
-                if (p.dark) listOf(Color(0xF01B1E2A), Color(0xF00D0F16))
-                else listOf(Color(0xF8FFFFFF), Color(0xF3F1F2F8))
-            )
-        } else {
-            SolidColor(if (p.dark) Color(0xFF12141C) else Color(0xFFF7F8FB))
-        }
-    )
-    .border(
-        1.dp,
-        if (p.glassOn) {
-            Brush.verticalGradient(
-                if (p.dark) listOf(Color(0x55FFFFFF), Color(0x0FFFFFFF))
-                else listOf(Color(0xFFFFFFFF), Color(0x22000000))
-            )
-        } else {
-            SolidColor(p.glassBorder)
-        },
-        shape
-    )
-
 /** Fades and lifts a row in once the panel is far enough open; [index] sets the order. */
 private fun Modifier.stagger(progress: State<Float>, index: Int): Modifier = graphicsLayer {
-    val a = ((progress.value - 0.15f - index * 0.04f) / 0.3f).coerceIn(0f, 1f)
+    val a = ((progress.value - 0.15f - index * 0.05f) / 0.3f).coerceIn(0f, 1f)
     alpha = a
     translationY = (1f - a) * 14.dp.toPx()
 }
@@ -188,18 +167,32 @@ private fun DrawerPanel(
 ) {
     val context = LocalContext.current
     val barHeightPx = with(LocalDensity.current) { 44.dp.roundToPx() }
-    // 28dp is more than half of the 44dp collapsed height, so it renders as a full pill that turns into a card.
-    val shape = RoundedCornerShape(28.dp)
+    val backdrop = LocalPrismalBackdrop.current ?: emptyGlassSource()
+
+    // Same material as Prismal's own glass menu: neutral, readable, and still see-through.
+    val surface = if (p.dark) Color(0xFF1C1C1E).copy(alpha = 0.78f) else Color.White.copy(alpha = 0.70f)
+    val glass = rememberOttGlass(
+        backdrop = backdrop,
+        p = p,
+        shape = DrawerGlassShape,
+        refractionHeight = 22.dp,
+        refractionAmount = 22.dp,
+        surfaceColor = surface
+    )
+    val cardShape = RoundedCornerShape(28.dp)
+    val cardModifier = if (p.glassOn) {
+        glass.clip(cardShape)
+    } else {
+        Modifier
+            .clip(cardShape)
+            .background(if (p.dark) Color(0xFF1A1A1C) else Color(0xFFF7F7F9))
+            .border(0.8.dp, p.glassBorder, cardShape)
+    }
 
     Layout(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                shadowElevation = 24.dp.toPx() * progress.value.coerceIn(0f, 1f)
-                this.shape = shape
-                clip = false
-            }
-            .panelSurface(p, shape)
+            .then(cardModifier)
             // Swallow taps on the card so they do not reach the scrim.
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
         content = {
@@ -238,23 +231,34 @@ private fun DrawerPanel(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 14.dp)
                 ) {
-                    Spacer(Modifier.height(8.dp))
-                    SectionLabel("EXPLORE & SECTIONS", Modifier.stagger(progress, 0), p)
+                    Spacer(Modifier.height(10.dp))
+                    SectionLabel("EXPLORE", Modifier.stagger(progress, 0), p)
 
-                    DrawerEntries.forEachIndexed { i, entry ->
-                        DrawerNavItem(
-                            p = p,
-                            entry = entry,
-                            modifier = Modifier.stagger(progress, i + 1),
-                            onClick = {
-                                onDismiss()
-                                onNavigate(entry.target)
-                            }
-                        )
+                    // One grouped list instead of seven separate cards.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .stagger(progress, 1)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(p.text.copy(alpha = 0.06f))
+                            .padding(vertical = 4.dp)
+                    ) {
+                        DrawerEntries.forEachIndexed { i, entry ->
+                            DrawerRow(
+                                p = p,
+                                entry = entry,
+                                showDivider = i != DrawerEntries.lastIndex,
+                                modifier = Modifier.stagger(progress, 1 + i),
+                                onClick = {
+                                    onDismiss()
+                                    onNavigate(entry.target)
+                                }
+                            )
+                        }
                     }
 
-                    Spacer(Modifier.height(10.dp))
-                    SectionLabel("OFFICIAL COMMUNITY", Modifier.stagger(progress, DrawerEntries.size + 1), p)
+                    Spacer(Modifier.height(14.dp))
+                    SectionLabel("COMMUNITY", Modifier.stagger(progress, DrawerEntries.size + 1), p)
 
                     Row(
                         modifier = Modifier
@@ -296,84 +300,94 @@ private fun DrawerPanel(
 private fun SectionLabel(text: String, modifier: Modifier, p: HomePalette) {
     Text(
         text = text,
-        fontSize = 10.5.sp,
-        fontWeight = FontWeight.Black,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
         color = p.textMuted,
-        letterSpacing = 1.sp,
-        modifier = modifier.padding(start = 6.dp, top = 4.dp, bottom = 6.dp)
+        letterSpacing = 1.2.sp,
+        modifier = modifier.padding(start = 8.dp, bottom = 8.dp)
     )
 }
 
-/** Glass (or flat) row with a spring press. Used for menu rows and community buttons. */
 @Composable
-private fun PressRow(
+private fun DrawerRow(
     p: HomePalette,
-    shape: Shape,
+    entry: DrawerEntry,
+    showDivider: Boolean,
     modifier: Modifier,
-    onClick: () -> Unit,
-    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
-    content: @Composable RowScope.() -> Unit
+    onClick: () -> Unit
 ) {
     val context = LocalContext.current
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
+    val rowBg by animateColorAsState(
+        targetValue = if (pressed) p.text.copy(alpha = 0.10f) else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "drawerRowBg"
+    )
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
+        targetValue = if (pressed) 0.985f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "drawerRowPress"
+        label = "drawerRowScale"
     )
-    Row(
-        modifier = modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .ottGlass(p, shape)
-            .clickable(interactionSource = source, indication = null) {
-                com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                onClick()
-            },
-        horizontalArrangement = horizontalArrangement,
-        verticalAlignment = Alignment.CenterVertically,
-        content = content
-    )
-}
 
-@Composable
-private fun DrawerNavItem(
-    p: HomePalette,
-    entry: DrawerEntry,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    PressRow(
-        p = p,
-        shape = RoundedCornerShape(20.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        onClick = onClick
-    ) {
-        Box(
+    Column(modifier = modifier) {
+        Row(
             modifier = Modifier
-                .padding(start = 10.dp, top = 10.dp, bottom = 10.dp)
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(p.text.copy(alpha = 0.10f)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(RoundedCornerShape(18.dp))
+                .background(rowBg)
+                .clickable(interactionSource = source, indication = null) {
+                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                    onClick()
+                }
+                .padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(entry.icon, contentDescription = null, tint = p.text, modifier = Modifier.size(19.dp))
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(p.text.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(entry.icon, contentDescription = null, tint = p.text, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = entry.title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = p.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = entry.subtitle,
+                    fontSize = 12.sp,
+                    color = p.textSub,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = p.textMuted,
+                modifier = Modifier.size(20.dp)
+            )
         }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = entry.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = p.text)
-            Text(text = entry.subtitle, fontSize = 11.5.sp, color = p.textSub)
+        if (showDivider) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 66.dp, end = 14.dp)
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(p.text.copy(alpha = 0.10f))
+            )
         }
-        Icon(
-            Icons.AutoMirrored.Filled.ArrowForward,
-            contentDescription = null,
-            tint = p.textMuted,
-            modifier = Modifier
-                .padding(horizontal = 14.dp)
-                .size(15.dp)
-        )
     }
 }
 
@@ -385,16 +399,31 @@ private fun CommunityButton(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
-    PressRow(
-        p = p,
-        shape = CircleShape,
-        modifier = modifier.height(50.dp),
-        onClick = onClick,
-        horizontalArrangement = Arrangement.Center
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "communityPress"
+    )
+    Row(
+        modifier = modifier
+            .height(50.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(p.text.copy(alpha = if (pressed) 0.16f else 0.09f))
+            .border(0.8.dp, p.text.copy(alpha = 0.14f), CircleShape)
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = p.text, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(text = label, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = p.text)
+        Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.text)
     }
 }
 
