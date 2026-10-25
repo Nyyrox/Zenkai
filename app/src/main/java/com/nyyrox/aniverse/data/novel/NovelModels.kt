@@ -2,6 +2,7 @@ package com.nyyrox.aniverse.data.novel
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import com.nyyrox.aniverse.data.MediaRelation
 
 data class NovelItem(
     val slug: String,
@@ -24,6 +25,9 @@ data class NovelDetail(
     val genres: List<String> = emptyList(),
     val synopsis: String = "",
     val firstChapterSlug: String? = null,
+    val banner: String? = null,
+    val anilistId: Int? = null,
+    val relations: List<MediaRelation> = emptyList(),
     val source: String = "novelfire"
 )
 

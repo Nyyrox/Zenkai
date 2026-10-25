@@ -9,7 +9,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,11 +26,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,14 +41,14 @@ import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,9 +64,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -83,18 +82,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.nyyrox.aniverse.data.MediaRelation
 import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
 import com.nyyrox.aniverse.ui.animation.SharedTransitionPhase
-import com.nyyrox.aniverse.ui.theme.OttAccentGold
-import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttCardShape
-import com.nyyrox.aniverse.ui.theme.OttHeroGradient
-import com.nyyrox.aniverse.ui.theme.OttPillShape
-import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.OttSecondary
-import com.nyyrox.aniverse.ui.theme.OttTextMuted
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
-import com.nyyrox.aniverse.ui.theme.OttTextSecondary
+import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
+import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
@@ -104,10 +96,14 @@ fun NovelDetailScreen(
     novelSlug: String,
     onBack: () -> Unit,
     onReadChapter: (novelSlug: String, chapterSlug: String) -> Unit,
+    onAnimeClick: ((Int) -> Unit)? = null,
+    onMangaClick: ((String) -> Unit)? = null,
+    onNovelClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coordinator = LocalSharedPosterCoordinator.current
+    val p = rememberHomePalette()
     val listState = rememberLazyListState()
 
     val handleBack: () -> Unit = {
@@ -140,16 +136,15 @@ fun NovelDetailScreen(
     var isReversedOrder by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    // Header collapse tracking for sticky top app bar
     val isScrolledPastHero by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 280
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 240
         }
     }
 
     val navbarAlpha by animateFloatAsState(
         targetValue = if (isScrolledPastHero) 1f else 0f,
-        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
         label = "navbarAlpha"
     )
 
@@ -163,550 +158,617 @@ fun NovelDetailScreen(
         label = "novelStickyTopOffset"
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(OttBg)
-            .then(
-                if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
-                    Modifier.graphicsLayer { alpha = coordinator.progress.value }
-                } else Modifier
-            )
+    GlassBackdropHost(
+        background = { HomeBackdrop(p) }
     ) {
-        if (vm.novelDetailLoading && novel == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OttPrimary, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
-            }
-            return@Box
-        }
-
-        if (vm.novelDetailError != null && novel == null) {
-            Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Failed to Load", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
-                    Spacer(Modifier.height(6.dp))
-                    Text(vm.novelDetailError ?: "Unable to fetch novel details", fontSize = 12.sp, color = OttTextSecondary, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(14.dp))
-                    Button(
-                        onClick = { vm.loadNovelDetail(novelSlug) },
-                        colors = ButtonDefaults.buttonColors(containerColor = OttPrimary, contentColor = Color.Black),
-                        shape = OttPillShape
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Retry", fontWeight = FontWeight.Bold)
-                    }
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .then(
+                    if (coordinator?.phase == SharedTransitionPhase.BACKWARD) {
+                        Modifier.graphicsLayer { alpha = coordinator.progress.value }
+                    } else Modifier
+                )
+        ) {
+            if (vm.novelDetailLoading && novel == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = p.accentA, modifier = Modifier.size(36.dp), strokeWidth = 2.5.dp)
                 }
-            }
-            return@Box
-        }
-
-        if (novel != null) {
-            val displayChapters = remember(vm.novelChapters, chapterSearch, isReversedOrder) {
-                var list = vm.novelChapters
-                if (chapterSearch.isNotBlank()) {
-                    list = list.filter {
-                        it.title.contains(chapterSearch, ignoreCase = true) || it.slug.contains(chapterSearch, ignoreCase = true)
-                    }
-                }
-                if (isReversedOrder) list.reversed() else list
+                return@Box
             }
 
-            // ── 1. MAIN SCROLLABLE CONTAINER ──────────────────────────────────────────
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 90.dp)
-            ) {
-                // ── Hero Section (Spans ~55-60% of viewport with generous spacing) ───────
-                item(key = "novel_hero") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                    ) {
-                        // Ambient Backdrop Cover with Vignette
-                        AsyncImage(
-                            model = rememberNovelImageRequest(effectiveCover),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(460.dp)
-                                .graphicsLayer {
-                                    val offset = listState.firstVisibleItemScrollOffset
-                                    translationY = offset * 0.45f
-                                    alpha = (1f - (offset / 550f)).coerceIn(0.12f, 1f)
-                                },
-                            contentScale = ContentScale.Crop
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(460.dp)
-                                .background(OttHeroGradient)
-                        )
-
-                        // Hero Foreground Content
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(top = 54.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+            if (vm.novelDetailError != null && novel == null) {
+                Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Failed to Load", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = p.text)
+                        Spacer(Modifier.height(6.dp))
+                        Text(vm.novelDetailError ?: "Unable to fetch novel details", fontSize = 13.sp, color = p.textSub, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            Modifier
+                                .homeGlass(p, radius = 999.dp)
+                                .clickable { vm.loadNovelDetail(novelSlug) }
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Artwork + Meta Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = p.text, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Retry", fontWeight = FontWeight.Bold, color = p.text)
+                        }
+                    }
+                }
+                return@Box
+            }
+
+            if (novel != null) {
+                val displayChapters = remember(vm.novelChapters, chapterSearch, isReversedOrder) {
+                    var list = vm.novelChapters
+                    if (chapterSearch.isNotBlank()) {
+                        list = list.filter {
+                            it.title.contains(chapterSearch, ignoreCase = true) || it.slug.contains(chapterSearch, ignoreCase = true)
+                        }
+                    }
+                    if (isReversedOrder) list.reversed() else list
+                }
+
+                val backdropUrl = novel.banner ?: effectiveCover
+                val relAnime = novel.relations.firstOrNull { it.type.equals("ANIME", ignoreCase = true) }
+                val relManga = novel.relations.firstOrNull { it.type.equals("MANGA", ignoreCase = true) }
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 90.dp)
+                ) {
+                    // 1. Hero Section
+                    item(key = "novel_hero") {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            // Backdrop artwork with gradient fade
+                            AsyncImage(
+                                model = rememberNovelImageRequest(backdropUrl),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(420.dp)
+                                    .blur(22.dp)
+                                    .graphicsLayer {
+                                        val offset = listState.firstVisibleItemScrollOffset
+                                        translationY = offset * 0.40f
+                                        alpha = (1f - (offset / 500f)).coerceIn(0.15f, 0.55f)
+                                        scaleX = 1.15f
+                                        scaleY = 1.15f
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(420.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color.Transparent,
+                                                p.gradTop.copy(alpha = 0.4f),
+                                                p.bg
+                                            )
+                                        )
+                                    )
+                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .statusBarsPadding()
+                                    .padding(top = 52.dp, start = 18.dp, end = 18.dp, bottom = 14.dp)
                             ) {
-                                // Prominent Poster Card (Target of shared-element transition)
-                                Box(
-                                    modifier = Modifier
-                                        .width(125.dp)
-                                        .height(180.dp)
-                                        .onGloballyPositioned { coords ->
-                                            coordinator?.updateTargetBounds(coords.boundsInWindow())
-                                        }
-                                        .clip(OttCardShape)
-                                        .background(Color(0x20FFFFFF))
-                                        .border(1.dp, Color(0x35FFFFFF), OttCardShape)
-                                        .shadow(12.dp, OttCardShape)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    AsyncImage(
-                                        model = rememberNovelImageRequest(effectiveCover),
-                                        contentDescription = novel.title,
+                                    // Poster Cover (Clean, rounded, no card border)
+                                    Box(
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .graphicsLayer {
-                                                this.alpha = if (coordinator?.phase == SharedTransitionPhase.FORWARD) 0f else 1f
-                                            },
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-
-                                // Metadata Details Column
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .graphicsLayer {
-                                            if (coordinator != null && (coordinator.phase == SharedTransitionPhase.FORWARD || coordinator.phase == SharedTransitionPhase.BACKWARD)) {
-                                                val p = coordinator.progress.value
-                                                alpha = p
-                                                translationX = (1f - p) * 32.dp.toPx()
-                                            } else {
-                                                alpha = 1f
-                                                translationX = 0f
+                                            .width(120.dp)
+                                            .height(175.dp)
+                                            .onGloballyPositioned { coords ->
+                                                coordinator?.updateTargetBounds(coords.boundsInWindow())
                                             }
-                                        },
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = novel.title,
-                                        fontSize = 19.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = OttTextPrimary,
-                                        maxLines = 3,
-                                        lineHeight = 23.sp,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-
-                                    if (!novel.author.isNullOrBlank()) {
-                                        Text(
-                                            text = "By ${novel.author}",
-                                            fontSize = 12.sp,
-                                            color = OttSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .shadow(12.dp, RoundedCornerShape(14.dp))
+                                            .shimmer(p)
+                                    ) {
+                                        AsyncImage(
+                                            model = rememberNovelImageRequest(effectiveCover),
+                                            contentDescription = novel.title,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .graphicsLayer {
+                                                    this.alpha = if (coordinator?.phase == SharedTransitionPhase.FORWARD) 0f else 1f
+                                                },
+                                            contentScale = ContentScale.Crop
                                         )
                                     }
 
-                                    // Badges FlowRow
-                                    FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    // Metadata Column
+                                    Column(
+                                        modifier = Modifier.weight(1f),
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(OttPillShape)
-                                                .background(Color(0x2538BDF8))
-                                                .border(0.8.dp, Color(0x6038BDF8), OttPillShape)
-                                                .padding(horizontal = 7.dp, vertical = 2.dp)
-                                        ) {
+                                        Text(
+                                            text = novel.title,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = ZenkaiFontFamily,
+                                            color = p.text,
+                                            maxLines = 3,
+                                            lineHeight = 22.sp,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        if (!novel.author.isNullOrBlank()) {
                                             Text(
-                                                text = "LIGHT NOVEL",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF7DD3FC),
-                                                softWrap = false,
-                                                maxLines = 1
+                                                text = "By ${novel.author}",
+                                                fontSize = 12.sp,
+                                                color = p.textSub,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
 
-                                        if (!novel.status.isNullOrBlank()) {
+                                        // Badges Row
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .clip(OttPillShape)
-                                                    .background(Color(0x2510B981))
-                                                    .border(0.8.dp, Color(0x6010B981), OttPillShape)
-                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(p.chipBg)
+                                                    .padding(horizontal = 8.dp, vertical = 2.5.dp)
                                             ) {
                                                 Text(
-                                                    text = novel.status.uppercase(),
+                                                    text = novel.source.uppercase(),
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF6EE7B7),
-                                                    softWrap = false,
-                                                    maxLines = 1
+                                                    color = p.accentText
                                                 )
                                             }
-                                        }
 
-                                        if (!novel.chaptersCount.isNullOrBlank()) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(OttPillShape)
-                                                    .background(Color(0x18FFFFFF))
-                                                    .border(0.8.dp, Color(0x25FFFFFF), OttPillShape)
-                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${novel.chaptersCount} CHS",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = OttTextMuted,
-                                                    softWrap = false,
-                                                    maxLines = 1
-                                                )
+                                            if (!novel.status.isNullOrBlank()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(999.dp))
+                                                        .background(p.chipBg)
+                                                        .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                                                ) {
+                                                    Text(
+                                                        text = novel.status.uppercase(),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = p.textSub
+                                                    )
+                                                }
                                             }
-                                        }
 
-                                        if (!novel.rating.isNullOrBlank()) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .clip(OttPillShape)
-                                                    .background(Color(0x25F59E0B))
-                                                    .border(0.8.dp, Color(0x60F59E0B), OttPillShape)
-                                                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Star,
-                                                    contentDescription = null,
-                                                    tint = OttAccentGold,
-                                                    modifier = Modifier.size(10.dp)
-                                                )
-                                                Text(
-                                                    text = novel.rating,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = OttAccentGold
-                                                )
+                                            if (!novel.chaptersCount.isNullOrBlank()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(999.dp))
+                                                        .background(p.chipBg)
+                                                        .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "${novel.chaptersCount} CHS",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = p.textSub
+                                                    )
+                                                }
+                                            }
+
+                                            if (!novel.rating.isNullOrBlank()) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(999.dp))
+                                                        .background(p.chipBg)
+                                                        .padding(horizontal = 8.dp, vertical = 2.5.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = p.rating,
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Text(
+                                                        text = novel.rating,
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = p.rating
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            Spacer(Modifier.height(14.dp))
+                                Spacer(Modifier.height(14.dp))
 
-                            // Primary Action Button (Start / Continue Reading)
-                            val targetChapterSlug = lastReadChapter ?: displayChapters.firstOrNull()?.slug ?: novel.firstChapterSlug
-                            Button(
-                                onClick = {
-                                    targetChapterSlug?.let { onReadChapter(novelSlug, it) }
-                                },
-                                enabled = targetChapterSlug != null,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                shape = OttPillShape,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.AutoStories,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = Color.Black
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = if (lastReadChapter != null) "Continue Reading" else "Start Reading Ch. 1",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = Color.Black
-                                )
-                            }
-
-                            // Expandable Synopsis Snippet
-                            if (!novel.synopsis.isNullOrBlank()) {
-                                Spacer(Modifier.height(10.dp))
-                                Text(
-                                    text = novel.synopsis,
-                                    fontSize = 12.sp,
-                                    color = OttTextSecondary,
-                                    maxLines = if (synopsisExpanded) Int.MAX_VALUE else 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    lineHeight = 16.sp,
-                                    modifier = Modifier.clickable { synopsisExpanded = !synopsisExpanded }
-                                )
-                                Text(
-                                    text = if (synopsisExpanded) "Show Less" else "Read More...",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OttPrimary,
-                                    modifier = Modifier.clickable { synopsisExpanded = !synopsisExpanded }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // ── Sticky Header: Segmented Tabs & Chapter Filters ──────────────────
-                stickyHeader(key = "novel_sticky_tabs") {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(OttBg)
-                            .padding(top = stickyTopOffset)
-                            .padding(vertical = 6.dp)
-                    ) {
-                        // Tabs
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val isVolumeBased = novel?.source == "lnori" || displayChapters.any { it.title.startsWith("Volume", ignoreCase = true) }
-                            val chaptersTabTitle = if (isVolumeBased) "Volumes (${displayChapters.size})" else "Chapters (${displayChapters.size})"
-                            listOf(chaptersTabTitle, "Overview & Info").forEachIndexed { index, tabTitle ->
-                                val isSelected = selectedTab == index
-                                Box(
+                                // Primary Action: Start / Continue Reading Button
+                                val targetChapterSlug = lastReadChapter ?: displayChapters.firstOrNull()?.slug ?: novel.firstChapterSlug
+                                Row(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .clip(OttPillShape)
-                                        .background(if (isSelected) Color.White else Color(0x14FFFFFF))
-                                        .border(
-                                            1.dp,
-                                            if (isSelected) Color.White else Color(0x22FFFFFF),
-                                            OttPillShape
-                                        )
-                                        .clickable { selectedTab = index }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(p.accentBrush)
+                                        .clickable(enabled = targetChapterSlug != null) {
+                                            targetChapterSlug?.let { onReadChapter(novelSlug, it) }
+                                        }
+                                        .padding(vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    Icon(
+                                        Icons.Default.AutoStories,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = p.onAccent
+                                    )
+                                    Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = tabTitle,
-                                        color = if (isSelected) Color.Black else Color.White,
+                                        text = if (lastReadChapter != null) "Continue Reading" else "Start Reading Ch. 1",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
+                                        fontSize = 14.sp,
+                                        color = p.onAccent
+                                    )
+                                }
+
+                                // Quick Action CTA: Watch Anime Adaptation (if available)
+                                if (relAnime != null && onAnimeClick != null) {
+                                    Spacer(Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .homeGlass(p, radius = 14.dp)
+                                            .clickable {
+                                                onAnimeClick(relAnime.id)
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = p.rating,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = "Watch Anime Adaptation",
+                                            color = p.text,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                // Quick Action CTA: Read Manga Adaptation (if available)
+                                if (relManga != null && onMangaClick != null) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .homeGlass(p, radius = 14.dp)
+                                            .clickable {
+                                                onMangaClick(relManga.id.toString())
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoStories,
+                                            contentDescription = null,
+                                            tint = p.accentText,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = "Read Manga Adaptation",
+                                            color = p.text,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                // Expandable Synopsis
+                                if (novel.synopsis.isNotBlank()) {
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        text = novel.synopsis,
+                                        fontSize = 12.5.sp,
+                                        color = p.textSub,
+                                        maxLines = if (synopsisExpanded) Int.MAX_VALUE else 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                        lineHeight = 17.sp,
+                                        modifier = Modifier.clickable { synopsisExpanded = !synopsisExpanded }
+                                    )
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        text = if (synopsisExpanded) "Show Less" else "Read More...",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = p.accentText,
+                                        modifier = Modifier.clickable { synopsisExpanded = !synopsisExpanded }
                                     )
                                 }
                             }
                         }
+                    }
 
-                        // Search & Sort Bar (Only in Chapters tab)
-                        if (selectedTab == 0) {
-                            Spacer(Modifier.height(8.dp))
+                    // 2. Related Media Section (Anime adaptations, Manga adaptations, Related Novels)
+                    if (novel.relations.isNotEmpty()) {
+                        item(key = "novel_relations") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = "Related Media",
+                                    color = p.text,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 18.dp)
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 18.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    items(novel.relations, key = { "${it.type}_${it.id}" }) { rel ->
+                                        NovelRelatedMediaTile(
+                                            item = rel,
+                                            p = p,
+                                            onClick = {
+                                                when {
+                                                    rel.type.equals("ANIME", ignoreCase = true) -> onAnimeClick?.invoke(rel.id)
+                                                    rel.type.equals("MANGA", ignoreCase = true) -> onMangaClick?.invoke(rel.id.toString())
+                                                    else -> onNovelClick?.invoke(rel.title)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Sticky Tabs & Chapter Filter Bar
+                    stickyHeader(key = "novel_sticky_tabs") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(p.bg)
+                                .padding(top = stickyTopOffset)
+                                .padding(vertical = 6.dp)
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Search Field
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(38.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0x16FFFFFF))
-                                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
-                                        .padding(horizontal = 10.dp),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                val isVolumeBased = novel.source == "lnori" || displayChapters.any { it.title.startsWith("Volume", ignoreCase = true) }
+                                val chaptersTabTitle = if (isVolumeBased) "Volumes (${displayChapters.size})" else "Chapters (${displayChapters.size})"
+                                listOf(chaptersTabTitle, "Overview & Info").forEachIndexed { index, tabTitle ->
+                                    val isSelected = selectedTab == index
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .then(
+                                                if (isSelected) Modifier.background(p.chipActiveBg)
+                                                else Modifier.homeGlass(p, radius = 999.dp)
+                                            )
+                                            .clickable { selectedTab = index }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(
-                                            Icons.Default.Search,
-                                            contentDescription = null,
-                                            tint = OttSecondary,
-                                            modifier = Modifier.size(15.dp)
+                                        Text(
+                                            text = tabTitle,
+                                            color = if (isSelected) p.chipActiveText else p.textSub,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 12.sp
                                         )
-                                        Box(modifier = Modifier.weight(1f)) {
-                                            if (chapterSearch.isEmpty()) {
-                                                Text(
-                                                    text = "Filter chapters...",
-                                                    color = OttTextMuted,
-                                                    fontSize = 12.sp
+                                    }
+                                }
+                            }
+
+                            // Search & Sort Bar (in Chapters tab)
+                            if (selectedTab == 0) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Search Filter Input
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(38.dp)
+                                            .homeGlass(p, radius = 10.dp)
+                                            .padding(horizontal = 10.dp),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Search,
+                                                contentDescription = null,
+                                                tint = p.textMuted,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                if (chapterSearch.isEmpty()) {
+                                                    Text(
+                                                        text = "Filter chapters...",
+                                                        color = p.textMuted,
+                                                        fontSize = 12.sp
+                                                    )
+                                                }
+                                                BasicTextField(
+                                                    value = chapterSearch,
+                                                    onValueChange = { chapterSearch = it },
+                                                    singleLine = true,
+                                                    textStyle = TextStyle(
+                                                        color = p.text,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Normal
+                                                    ),
+                                                    cursorBrush = SolidColor(p.accentA),
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                                 )
                                             }
-                                            BasicTextField(
-                                                value = chapterSearch,
-                                                onValueChange = { chapterSearch = it },
-                                                singleLine = true,
-                                                textStyle = TextStyle(
-                                                    color = Color.White,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Normal
-                                                ),
-                                                cursorBrush = SolidColor(OttPrimary),
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                            )
+                                            if (chapterSearch.isNotEmpty()) {
+                                                Icon(
+                                                    Icons.Default.Clear,
+                                                    contentDescription = "Clear",
+                                                    tint = p.textMuted,
+                                                    modifier = Modifier
+                                                        .size(15.dp)
+                                                        .clickable { chapterSearch = "" }
+                                                )
+                                            }
                                         }
-                                        if (chapterSearch.isNotEmpty()) {
+                                    }
+
+                                    // Sort Order Toggle
+                                    Box(
+                                        modifier = Modifier
+                                            .height(38.dp)
+                                            .homeGlass(p, radius = 10.dp)
+                                            .clickable { isReversedOrder = !isReversedOrder }
+                                            .padding(horizontal = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
                                             Icon(
-                                                Icons.Default.Clear,
-                                                contentDescription = "Clear",
-                                                tint = Color.Gray,
-                                                modifier = Modifier
-                                                    .size(15.dp)
-                                                    .clickable { chapterSearch = "" }
+                                                Icons.Default.SwapVert,
+                                                contentDescription = null,
+                                                tint = p.accentText,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Text(
+                                                text = if (!isReversedOrder) "1 → N" else "N → 1",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = p.text
                                             )
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
 
-                                // Sort Order Toggle
+                    // 4. Tab 0: Chapters List Content
+                    if (selectedTab == 0) {
+                        // Batch Download Controls Row
+                        item(key = "novel_batch_downloads") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .homeGlass(p, radius = 999.dp)
+                                        .clickable {
+                                            val targetChapters = displayChapters.take(10).map { it.slug to it.title }
+                                            vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
+                                        }
+                                        .padding(vertical = 7.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = p.text, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Download 10", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text)
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .homeGlass(p, radius = 999.dp)
+                                        .clickable {
+                                            val targetChapters = displayChapters.map { it.slug to it.title }
+                                            vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
+                                        }
+                                        .padding(vertical = 7.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = p.text, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Download All (${displayChapters.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text)
+                                }
+                            }
+                        }
+
+                        if (displayChapters.isEmpty()) {
+                            item(key = "novel_no_chapters") {
                                 Box(
                                     modifier = Modifier
-                                        .height(38.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0x16FFFFFF))
-                                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
-                                        .clickable { isReversedOrder = !isReversedOrder }
-                                        .padding(horizontal = 10.dp),
+                                        .fillMaxWidth()
+                                        .padding(vertical = 40.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.SwapVert,
-                                            contentDescription = null,
-                                            tint = OttPrimary,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Text(
-                                            text = if (!isReversedOrder) "1 → N" else "N → 1",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Tab 0: Chapters List Content ──────────────────────────────────────
-                if (selectedTab == 0) {
-                    // Batch Download Controls Row
-                    item(key = "novel_batch_downloads") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(OttPillShape)
-                                    .background(Color(0x14FFFFFF))
-                                    .border(1.dp, Color(0x25FFFFFF), OttPillShape)
-                                    .clickable {
-                                        val targetChapters = displayChapters.take(10).map { it.slug to it.title }
-                                        vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
-                                    }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                                    Text("Download 10", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(OttPillShape)
-                                    .background(Color(0x14FFFFFF))
-                                    .border(1.dp, Color(0x25FFFFFF), OttPillShape)
-                                    .clickable {
-                                        val targetChapters = displayChapters.map { it.slug to it.title }
-                                        vm.downloadNovelChaptersBatch(novelSlug, novel.title, effectiveCover ?: "", targetChapters)
-                                    }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                                    Text("Download All (${displayChapters.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                }
-                            }
-                        }
-                    }
-
-                    if (displayChapters.isEmpty()) {
-                        item(key = "novel_no_chapters") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 40.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (chapterSearch.isNotBlank()) "No chapters matching '$chapterSearch'" else "No chapters found",
-                                    color = OttTextMuted,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    } else {
-                        items(displayChapters, key = { it.slug }) { ch ->
-                            val isCurrent = lastReadChapter == ch.slug
-                            val isDownloaded = remember(downloadTasks, ch.slug) {
-                                vm.downloadManager.isNovelChapterDownloaded(novelSlug, ch.slug)
-                            }
-                            val activeTask = remember(downloadTasks, ch.slug) {
-                                downloadTasks.find { it.itemId == novelSlug && it.chapterId == ch.slug }
-                            }
-                            val isDownloading = activeTask?.status == com.nyyrox.aniverse.data.download.DownloadStatus.DOWNLOADING || activeTask?.status == com.nyyrox.aniverse.data.download.DownloadStatus.QUEUED
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (isCurrent) Color(0x20E50914)
-                                        else Color(0x10FFFFFF)
+                                    Text(
+                                        text = if (chapterSearch.isNotBlank()) "No chapters matching '$chapterSearch'" else "No chapters found",
+                                        color = p.textMuted,
+                                        fontSize = 13.sp
                                     )
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isCurrent) Color(0x80E50914) else Color(0x18FFFFFF),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { onReadChapter(novelSlug, ch.slug) }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                            ) {
+                                }
+                            }
+                        } else {
+                            items(displayChapters, key = { it.slug }) { ch ->
+                                val isCurrent = lastReadChapter == ch.slug
+                                val isDownloaded = remember(downloadTasks, ch.slug) {
+                                    vm.downloadManager.isNovelChapterDownloaded(novelSlug, ch.slug)
+                                }
+                                val activeTask = remember(downloadTasks, ch.slug) {
+                                    downloadTasks.find { it.itemId == novelSlug && it.chapterId == ch.slug }
+                                }
+                                val isDownloading = activeTask?.status == com.nyyrox.aniverse.data.download.DownloadStatus.DOWNLOADING || activeTask?.status == com.nyyrox.aniverse.data.download.DownloadStatus.QUEUED
+
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 3.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .then(
+                                            if (isCurrent) Modifier.background(p.accentA.copy(alpha = 0.16f))
+                                            else Modifier.homeGlass(p, radius = 10.dp)
+                                        )
+                                        .clickable { onReadChapter(novelSlug, ch.slug) }
+                                        .padding(horizontal = 14.dp, vertical = 11.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -714,11 +776,10 @@ fun NovelDetailScreen(
                                     if (!ch.cover.isNullOrBlank()) {
                                         Box(
                                             modifier = Modifier
-                                                .width(46.dp)
-                                                .height(66.dp)
+                                                .width(44.dp)
+                                                .height(64.dp)
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0x20FFFFFF))
-                                                .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
+                                                .shimmer(p)
                                         ) {
                                             AsyncImage(
                                                 model = rememberNovelImageRequest(ch.cover),
@@ -733,15 +794,15 @@ fun NovelDetailScreen(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = ch.title,
-                                            fontSize = 13.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isCurrent) Color(0xFFFFB3B3) else Color.White
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isCurrent) p.accentText else p.text
                                         )
                                         if (!ch.releaseTime.isNullOrBlank()) {
                                             Text(
                                                 text = ch.releaseTime,
                                                 fontSize = 11.sp,
-                                                color = OttTextMuted,
+                                                color = p.textMuted,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -750,116 +811,65 @@ fun NovelDetailScreen(
 
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        // Share Chapter Button
+                                        // Share Chapter
                                         IconButton(
                                             onClick = {
                                                 val chNumMatch = Regex("\\d+").find(ch.slug) ?: Regex("\\d+").find(ch.title)
                                                 val chNum = chNumMatch?.value?.toIntOrNull()
                                                 val chParam = if (chNum != null) "?ch=$chNum" else ""
-                                                val chShareUrl = "https://zenkai-auth-worker.ammhfoo.workers.dev/s/novel/$novelSlug$chParam"
                                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                     type = "text/plain"
-                                                    putExtra(
-                                                        Intent.EXTRA_TEXT,
-                                                        "Read ${novel.title} ${ch.title} on ZENKAI: $chShareUrl"
-                                                    )
+                                                    putExtra(Intent.EXTRA_SUBJECT, "${novel.title} - ${ch.title}")
+                                                    putExtra(Intent.EXTRA_TEXT, "Read ${novel.title} ${ch.title} on Zenkai:\nhttps://zenkai.app/novel/$novelSlug$chParam")
                                                 }
                                                 context.startActivity(Intent.createChooser(shareIntent, "Share Chapter"))
                                             },
                                             modifier = Modifier.size(28.dp)
                                         ) {
-                                            Icon(
-                                                Icons.Default.Share,
-                                                contentDescription = "Share Chapter",
-                                                tint = Color(0x75FFFFFF),
-                                                modifier = Modifier.size(15.dp)
-                                            )
+                                            Icon(Icons.Default.Share, contentDescription = "Share", tint = p.textMuted, modifier = Modifier.size(15.dp))
                                         }
 
-                                        if (isDownloading && activeTask != null) {
-                                            Text(
-                                                text = "${activeTask.percentage}%",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White
-                                            )
-                                            CircularProgressIndicator(
-                                                color = Color.White,
-                                                strokeWidth = 2.dp,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        } else {
-                                            IconButton(
-                                                onClick = {
-                                                    if (!isDownloaded) {
-                                                        vm.downloadNovelChapter(novelSlug, novel.title, effectiveCover ?: "", ch.slug, ch.title)
-                                                    }
-                                                },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.DownloadDone,
-                                                    contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                                                    tint = if (isDownloaded) Color.White else Color(0x55FFFFFF),
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-
-                                        if (isCurrent) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(OttPillShape)
-                                                    .background(Color(0x30E50914))
-                                                    .border(0.8.dp, Color(0x80E50914), OttPillShape)
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = "READING",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Color(0xFFFF8A8A)
-                                                )
+                                        // Download Status
+                                        IconButton(
+                                            onClick = {
+                                                if (!isDownloaded && !isDownloading) {
+                                                    vm.downloadNovelChapter(novelSlug, novel.title, effectiveCover ?: "", ch.slug, ch.title)
+                                                }
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            when {
+                                                isDownloading -> CircularProgressIndicator(color = p.accentA, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                                isDownloaded -> Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = p.rating, modifier = Modifier.size(16.dp))
+                                                else -> Icon(Icons.Default.Download, contentDescription = "Download", tint = p.textMuted, modifier = Modifier.size(16.dp))
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        // Load More Chapters Button
-                        if (vm.novelChaptersPage < vm.novelChaptersMaxPage) {
-                            item(key = "novel_load_more") {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                            // Pagination: Load More Chapters Button
+                            if (vm.novelChaptersPage < vm.novelChaptersMaxPage) {
+                                item(key = "novel_load_more") {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(44.dp)
-                                            .clip(OttPillShape)
-                                            .background(Color(0x20FFFFFF))
-                                            .border(1.dp, Color(0x30FFFFFF), OttPillShape)
+                                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                                            .homeGlass(p, radius = 999.dp)
                                             .clickable(enabled = !vm.novelChaptersLoading) {
                                                 vm.loadMoreNovelChapters(novelSlug)
-                                            },
+                                            }
+                                            .padding(vertical = 11.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (vm.novelChaptersLoading) {
-                                            CircularProgressIndicator(
-                                                color = Color.White,
-                                                strokeWidth = 2.dp,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                            CircularProgressIndicator(color = p.accentA, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                         } else {
                                             Text(
                                                 text = "Load More Chapters (Page ${vm.novelChaptersPage + 1} of ${vm.novelChaptersMaxPage})",
-                                                color = Color.White,
+                                                color = p.text,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.5.sp
                                             )
@@ -868,81 +878,77 @@ fun NovelDetailScreen(
                                 }
                             }
                         }
-                    }
-                } else {
-                    // ── Tab 1: Overview & Info Content ────────────────────────────────────
-                    if (novel.synopsis.isNotBlank()) {
-                        item(key = "novel_synopsis_card") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0x10FFFFFF))
-                                    .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
-                                    .clickable { synopsisExpanded = !synopsisExpanded }
-                                    .padding(16.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    } else {
+                        // 5. Tab 1: Overview & Genres Content
+                        if (novel.synopsis.isNotBlank()) {
+                            item(key = "novel_synopsis_card") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 18.dp, vertical = 8.dp)
+                                        .homeGlass(p, radius = 14.dp)
+                                        .clickable { synopsisExpanded = !synopsisExpanded }
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     Text(
                                         text = "SYNOPSIS",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 1.sp,
-                                        color = OttSecondary
+                                        color = p.accentText
                                     )
                                     Text(
                                         text = novel.synopsis,
                                         fontSize = 12.5.sp,
-                                        color = Color(0xFFCAD5E2),
+                                        color = p.textSub,
                                         lineHeight = 18.sp,
                                         maxLines = if (synopsisExpanded) Int.MAX_VALUE else 6,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = if (synopsisExpanded) "Show Less" else "Read More...",
-                                        color = OttPrimary,
+                                        color = p.accentText,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                         }
-                    }
 
-                    if (novel.genres.isNotEmpty()) {
-                        item(key = "novel_genres_card") {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "GENRES",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp,
-                                    color = OttSecondary
-                                )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        if (novel.genres.isNotEmpty()) {
+                            item(key = "novel_genres_card") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    novel.genres.forEach { genre ->
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(OttPillShape)
-                                                .background(Color(0x18FFFFFF))
-                                                .border(1.dp, Color(0x28FFFFFF), OttPillShape)
-                                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                                        ) {
-                                            Text(
-                                                text = genre,
-                                                fontSize = 11.sp,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Medium
-                                            )
+                                    Text(
+                                        text = "GENRES",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp,
+                                        color = p.textMuted
+                                    )
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        novel.genres.forEach { genre ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(p.chipBg)
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = genre,
+                                                    fontSize = 11.sp,
+                                                    color = p.text,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -950,127 +956,156 @@ fun NovelDetailScreen(
                         }
                     }
                 }
-            }
 
-            // ── 2. COLLAPSING TOP APP BAR WITH SHOW NAME & CHAPTER COUNT ──────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .background(Color(0xF00A0C14).copy(alpha = navbarAlpha))
-                    .drawBehind {
-                        if (navbarAlpha > 0.05f) {
-                            drawLine(
-                                color = Color(0x18FFFFFF).copy(alpha = navbarAlpha),
-                                start = Offset(0f, size.height),
-                                end = Offset(size.width, size.height),
-                                strokeWidth = 1f
-                            )
-                        }
-                    }
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Sticky Top Bar overlay (Back button, Title on scroll, Bookmark)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    // Back Button
-                    IconButton(
-                        onClick = handleBack,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x60000000))
-                            .border(1.dp, Color(0x35FFFFFF), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    // Centered Show Name + Chapter Count in Navbar
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                            .graphicsLayer { alpha = navbarAlpha },
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = novel.title,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        val isVolumeBased = novel.source == "lnori" || displayChapters.any { it.title.startsWith("Volume", ignoreCase = true) }
-                        Text(
-                            text = "${displayChapters.size} ${if (isVolumeBased) "Volumes" else "Chapters"}",
-                            fontSize = 11.sp,
-                            color = OttAccentGold,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    // Action Buttons (Share & Bookmark)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         IconButton(
-                            onClick = {
-                                val shareIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(
-                                        Intent.EXTRA_TEXT,
-                                        "Read ${novel.title} on ZENKAI: https://zenkai-auth-worker.ammhfoo.workers.dev/s/novel/$novelSlug"
-                                    )
-                                    type = "text/plain"
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Novel"))
-                            },
+                            onClick = handleBack,
                             modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x60000000))
-                                .border(1.dp, Color(0x35FFFFFF), CircleShape)
+                                .size(40.dp)
+                                .homeGlass(p, radius = 20.dp)
                         ) {
                             Icon(
-                                Icons.Default.Share,
-                                contentDescription = "Share",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = p.text,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = isScrolledPastHero,
+                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+                        ) {
+                            Text(
+                                text = novel.title,
+                                color = p.text,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
                         IconButton(
-                            onClick = { vm.toggleNovelBookmark(novelSlug) },
+                            onClick = {
+                                vm.toggleNovelBookmark(novelSlug)
+                            },
                             modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(if (isBookmarked) Color(0x30E50914) else Color(0x60000000))
-                                .border(
-                                    1.dp,
-                                    if (isBookmarked) Color(0x80E50914) else Color(0x35FFFFFF),
-                                    CircleShape
-                                )
+                                .size(40.dp)
+                                .homeGlass(p, radius = 20.dp)
                         ) {
                             Icon(
                                 imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                 contentDescription = "Bookmark",
-                                tint = if (isBookmarked) Color(0xFFFF8A8A) else Color.White,
-                                modifier = Modifier.size(18.dp)
+                                tint = if (isBookmarked) p.accentText else p.text,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NovelRelatedMediaTile(
+    item: MediaRelation,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(115.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(115.dp)
+                .height(168.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .shimmer(p)
+        ) {
+            AsyncImage(
+                model = item.cover,
+                contentDescription = item.displayTitle,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // Relation Type Badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xB3000000))
+                    .padding(horizontal = 6.dp, vertical = 2.5.dp)
+            ) {
+                Text(
+                    text = item.displayRelationType.uppercase(),
+                    color = Color.White,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Media Type Badge
+            val mediaType = when {
+                item.type.equals("ANIME", ignoreCase = true) -> "ANIME"
+                item.type.equals("MANGA", ignoreCase = true) -> "MANGA"
+                else -> "NOVEL"
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = mediaType,
+                    color = p.accentText,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = item.displayTitle,
+            color = p.text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 15.sp
+        )
+
+        val meta = item.format ?: item.type
+        if (meta.isNotBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = meta.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+                color = p.textSub,
+                fontSize = 10.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

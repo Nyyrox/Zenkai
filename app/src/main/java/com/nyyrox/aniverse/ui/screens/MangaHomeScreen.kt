@@ -119,7 +119,6 @@ fun MangaHomeScreen(
     onDownloadsClick: (() -> Unit)? = null
 ) {
     val p = rememberHomePalette()
-    var searchQuery by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
@@ -131,56 +130,11 @@ fun MangaHomeScreen(
         background = { HomeBackdrop(p) }
     ) {
         Box(Modifier.fillMaxSize()) {
-            if (searchQuery.isNotBlank()) {
-                // Search Overlay / Results Mode
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(top = 16.dp)
-                ) {
-                    MangaSearchInput(
-                        query = searchQuery,
-                        onQueryChange = {
-                            searchQuery = it
-                            vm.searchManga(it)
-                        },
-                        p = p
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    MangaSearchResultsView(
-                        isLoading = vm.mangaSearchLoading,
-                        results = vm.mangaSearchResults,
-                        p = p,
-                        onMangaClick = onMangaClick
-                    )
-                }
-            } else {
-                // Normal Feed with 3D Hero Banner + AniList Rails
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Floating Search Header
-                    item("search_header") {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .windowInsetsPadding(WindowInsets.statusBars)
-                                .padding(top = 16.dp)
-                        ) {
-                            MangaSearchInput(
-                                query = searchQuery,
-                                onQueryChange = {
-                                    searchQuery = it
-                                    vm.searchManga(it)
-                                },
-                                p = p
-                            )
-                        }
-                    }
-
-                    // Loading & Error states
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Loading & Error states
                     if (vm.mangaHomeLoading && vm.mangaHome.trending.isEmpty()) {
                         item("skeleton") {
                             MangaFeedSkeleton(p)
@@ -299,137 +253,6 @@ fun MangaHomeScreen(
             }
         }
     }
-}
-
-// ── Search Input ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun MangaSearchInput(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    p: HomePalette
-) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .homeGlass(p, radius = 999.dp)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = "Search",
-                tint = p.textMuted,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = p.text,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                cursorBrush = SolidColor(p.accentA),
-                modifier = Modifier.weight(1f),
-                decorationBox = { innerTextField ->
-                    if (query.isEmpty()) {
-                        Text(
-                            "Search manga, manhwa & comics...",
-                            color = p.textMuted,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Normal
-                        )
-                    }
-                    innerTextField()
-                }
-            )
-            if (query.isNotEmpty()) {
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    Icons.Default.Clear,
-                    contentDescription = "Clear",
-                    tint = p.textMuted,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clickable { onQueryChange("") }
-                )
-            }
-        }
-    }
-}
-
-// ── Search Results Grid ──────────────────────────────────────────────────────
-
-@Composable
-private fun MangaSearchResultsView(
-    isLoading: Boolean,
-    results: List<MangaCard>,
-    p: HomePalette,
-    onMangaClick: (String) -> Unit
-) {
-    if (isLoading && results.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 80.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(
-                color = p.accentA,
-                strokeWidth = 2.5.dp,
-                modifier = Modifier.size(34.dp)
-            )
-        }
-    } else if (results.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 80.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = null,
-                    tint = p.textMuted,
-                    modifier = Modifier.size(42.dp)
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "No manga found",
-                    color = p.textSub,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 108.dp),
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 120.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            itemsIndexed(results, key = { idx, item -> "srch_${item.id}_$idx" }) { _, card ->
-                PosterTile(
-                    title = card.title,
-                    image = card.poster,
-                    meta = card.rating?.let { "★ $it" } ?: (card.format ?: card.type),
-                    p = p,
-                    onClick = { onMangaClick(card.id) }
-                )
-            }
-        }
-    }
-}
 
 // ── Hero Banner: 3D Coverflow Stack ──────────────────────────────────────────
 
@@ -488,7 +311,7 @@ private fun MangaHero(
         HeroPosterBackdrop(shows[current].poster, p, Modifier.matchParentSize())
 
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
 
             // 3D Carousel Cards
             Box(

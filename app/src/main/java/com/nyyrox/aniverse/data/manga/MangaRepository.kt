@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import com.nyyrox.aniverse.data.MediaRelation
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -33,6 +34,39 @@ object MangaRepository {
     val activeSource: StateFlow<MangaSource> = _activeSource.asStateFlow()
 
     private val aniListRepo by lazy { com.nyyrox.aniverse.data.AniListRepository() }
+
+    fun parseRelations(data: JSONObject?): List<MediaRelation> = buildList {
+        val relEdges = data?.optJSONObject("relations")?.optJSONArray("edges") ?: return@buildList
+        for (i in 0 until relEdges.length()) {
+            val edge = relEdges.optJSONObject(i) ?: continue
+            val relType = edge.optString("relationType")
+            val node = edge.optJSONObject("node") ?: continue
+            val relId = node.optInt("id")
+            val nodeType = node.optString("type")
+            val titleObj = node.optJSONObject("title")
+            val relTitle = titleObj?.optString("english")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                ?: titleObj?.optString("userPreferred")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                ?: titleObj?.optString("romaji").orEmpty()
+            val romaji = titleObj?.optString("romaji")
+            val relCover = node.optJSONObject("coverImage")?.optString("large").orEmpty()
+            val relFormat = node.optString("format")
+            val relStatus = node.optString("status")
+            if (relId > 0 && relTitle.isNotBlank()) {
+                add(
+                    MediaRelation(
+                        id = relId,
+                        type = nodeType,
+                        relationType = relType,
+                        title = relTitle,
+                        romajiTitle = romaji,
+                        cover = relCover,
+                        format = relFormat,
+                        status = relStatus
+                    )
+                )
+            }
+        }
+    }
 
     fun setSource(source: MangaSource) {
         _activeSource.value = source
@@ -279,27 +313,11 @@ object MangaRepository {
             }
         }
 
-        // Parse anime adaptation relations
-        var relAnimeId: Int? = null
-        var relAnimeTitle: String? = null
-        val relEdges = aniData?.optJSONObject("relations")?.optJSONArray("edges")
-        if (relEdges != null) {
-            for (i in 0 until relEdges.length()) {
-                val node = relEdges.optJSONObject(i)?.optJSONObject("node")
-                if (node?.optString("type") == "ANIME") {
-                    val aid = node.optInt("id")
-                    if (aid > 0) {
-                        relAnimeId = aid
-                        relAnimeTitle = node.optJSONObject("title")?.let { t ->
-                            t.optString("english").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-                                ?: t.optString("romaji").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-                                ?: t.optString("userPreferred")
-                        }
-                        break
-                    }
-                }
-            }
-        }
+        // Parse media relations from AniList
+        val aniRelations = parseRelations(aniData)
+        val relAnime = aniRelations.firstOrNull { it.type.equals("ANIME", ignoreCase = true) }
+        var relAnimeId: Int? = relAnime?.id
+        var relAnimeTitle: String? = relAnime?.title
 
         // 2. Direct fetch if NOT purely numeric AniList ID and has recognized prefix
         if (!isNumericAniListId && (mangaId.startsWith("md_") || mangaId.startsWith("ck_") || mangaId.startsWith("mh_") || mangaId.startsWith("as_") || mangaId.startsWith("wc_"))) {
@@ -376,6 +394,13 @@ object MangaRepository {
                     } catch (_: Exception) {}
                 }
 
+                val curAniRelations = if (effectiveAni != null && effectiveAni != aniData) {
+                    parseRelations(effectiveAni).ifEmpty { aniRelations }
+                } else aniRelations
+                val curRelAnime = curAniRelations.firstOrNull { it.type.equals("ANIME", ignoreCase = true) }
+                val curRelAnimeId = curRelAnime?.id ?: relAnimeId
+                val curRelAnimeTitle = curRelAnime?.title ?: relAnimeTitle
+
                 val enrichedInfo = info.copy(
                     title = curAniTitle ?: info.title,
                     altTitle = aniRomajiTitle ?: info.altTitle,
@@ -390,9 +415,10 @@ object MangaRepository {
                     totalChapters = curAniChapters ?: info.totalChapters,
                     authors = if (info.authors.isEmpty()) curAniAuthors else info.authors,
                     characters = aniCharacters,
-                    relatedAnimeId = relAnimeId,
-                    relatedAnimeTitle = relAnimeTitle,
-                    availableSources = availSources
+                    relatedAnimeId = curRelAnimeId,
+                    relatedAnimeTitle = curRelAnimeTitle,
+                    availableSources = availSources,
+                    relations = curAniRelations
                 )
                 return@withContext Triple(resolvedId, enrichedInfo, resolvedChapters)
             }
@@ -433,7 +459,8 @@ object MangaRepository {
                 characters = aniCharacters,
                 relatedAnimeId = relAnimeId,
                 relatedAnimeTitle = relAnimeTitle,
-                availableSources = availSources
+                availableSources = availSources,
+                relations = aniRelations
             )
             return@withContext Triple(primary.matchedId, resolvedInfo, primaryChapters)
         }
@@ -458,7 +485,8 @@ object MangaRepository {
                 characters = aniCharacters,
                 relatedAnimeId = relAnimeId,
                 relatedAnimeTitle = relAnimeTitle,
-                availableSources = emptyList()
+                availableSources = emptyList(),
+                relations = aniRelations
             )
         } else null
 

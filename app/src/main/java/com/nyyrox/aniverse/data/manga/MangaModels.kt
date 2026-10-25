@@ -1,5 +1,7 @@
 package com.nyyrox.aniverse.data.manga
 
+import com.nyyrox.aniverse.data.MediaRelation
+
 enum class MangaSource(
     val id: String,
     val displayName: String,
@@ -70,7 +72,8 @@ data class MangaInfo(
     val characters: List<MangaCharacter> = emptyList(),
     val relatedAnimeId: Int? = null,
     val relatedAnimeTitle: String? = null,
-    val availableSources: List<AvailableSourceInfo> = emptyList()
+    val availableSources: List<AvailableSourceInfo> = emptyList(),
+    val relations: List<MediaRelation> = emptyList()
 )
 
 data class MangaChapter(

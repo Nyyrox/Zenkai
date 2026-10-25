@@ -1596,11 +1596,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val cDeferred = async { novelRepo.getChapters(slug, 1) }
                     val fetchedDetail = dDeferred.await()
                     val (chapters, maxP) = cDeferred.await()
-                    selectedNovel = fetchedDetail
+                    val enrichedDetail = if (fetchedDetail != null) {
+                        val ani = try {
+                            AniListRepository.fetchMangaDetails(title = fetchedDetail.title)
+                        } catch (_: Exception) { null }
+                        if (ani != null) {
+                            val aniBanner = ani.optString("bannerImage").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                            val aniScore = ani.optInt("averageScore").takeIf { it > 0 }?.let { "$it%" }
+                            val aniDesc = ani.optString("description")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                                ?.replace(Regex("<[^>]*>"), "")?.trim()
+                            val aniCover = ani.optJSONObject("coverImage")?.let { c ->
+                                c.optString("extraLarge").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                                    ?: c.optString("large").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                            }
+                            val aniRelations = MangaRepository.parseRelations(ani)
+                            fetchedDetail.copy(
+                                cover = aniCover ?: fetchedDetail.cover,
+                                banner = aniBanner ?: fetchedDetail.banner,
+                                rating = aniScore ?: fetchedDetail.rating,
+                                synopsis = if (fetchedDetail.synopsis.isBlank() || fetchedDetail.synopsis.length < 50) (aniDesc ?: fetchedDetail.synopsis) else fetchedDetail.synopsis,
+                                anilistId = ani.optInt("id").takeIf { it > 0 },
+                                relations = aniRelations
+                            )
+                        } else {
+                            fetchedDetail
+                        }
+                    } else null
+                    selectedNovel = enrichedDetail
                     novelChapters = chapters
                     novelChaptersMaxPage = maxP
-                    if (fetchedDetail != null) {
-                        novelDetailCache[slug] = CachedNovelDetail(fetchedDetail, chapters, maxP)
+                    if (enrichedDetail != null) {
+                        novelDetailCache[slug] = CachedNovelDetail(enrichedDetail, chapters, maxP)
                     }
                 }
             } catch (e: Exception) {

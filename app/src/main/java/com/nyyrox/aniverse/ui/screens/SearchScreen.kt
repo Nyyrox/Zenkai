@@ -1,5 +1,8 @@
 package com.nyyrox.aniverse.ui.screens
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,246 +55,410 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nyyrox.aniverse.data.Anime
-import com.nyyrox.aniverse.ui.theme.OttAccentGold
-import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttTextMuted
+import com.nyyrox.aniverse.data.manga.MangaCard
+import com.nyyrox.aniverse.data.manga.MangaRepository
+import com.nyyrox.aniverse.data.novel.NovelItem
+import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.util.Locale
+
+enum class SearchTab(val label: String) {
+    ANIME("Anime"),
+    MANGA("Manga"),
+    NOVEL("Novels")
+}
 
 @Composable
 fun SearchScreen(
     vm: MainViewModel,
+    initialTab: String = "anime",
     onBack: () -> Unit,
-    onAnimeClick: (Int) -> Unit
+    onAnimeClick: (Int) -> Unit,
+    onMangaClick: ((String) -> Unit)? = null,
+    onNovelClick: ((String) -> Unit)? = null
 ) {
+    val p = rememberHomePalette()
+    var selectedTab by remember(initialTab) {
+        mutableStateOf(
+            when (initialTab.lowercase()) {
+                "manga" -> SearchTab.MANGA
+                "novel", "novels" -> SearchTab.NOVEL
+                else -> SearchTab.ANIME
+            }
+        )
+    }
+
     var query by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<Anime>>(emptyList()) }
+    var animeResults by remember { mutableStateOf<List<Anime>>(emptyList()) }
+    var mangaResults by remember { mutableStateOf<List<MangaCard>>(emptyList()) }
+    var novelResults by remember { mutableStateOf<List<NovelItem>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
 
-    LaunchedEffect(query) {
+    LaunchedEffect(query, selectedTab) {
         val q = query.trim()
         if (q.isBlank()) {
-            searchResults = emptyList()
+            animeResults = emptyList()
+            mangaResults = emptyList()
+            novelResults = emptyList()
             isSearching = false
             return@LaunchedEffect
         }
         isSearching = true
         delay(350)
         try {
-            val results = vm.searchAniListAnime(q)
-            searchResults = results
+            when (selectedTab) {
+                SearchTab.ANIME -> {
+                    animeResults = vm.searchAniListAnime(q)
+                }
+                SearchTab.MANGA -> {
+                    mangaResults = withContext(Dispatchers.IO) {
+                        MangaRepository.search(q)
+                    }
+                }
+                SearchTab.NOVEL -> {
+                    novelResults = withContext(Dispatchers.IO) {
+                        vm.novelRepo.search(q, 1)
+                    }
+                }
+            }
         } catch (_: Exception) {
-            searchResults = emptyList()
+            when (selectedTab) {
+                SearchTab.ANIME -> animeResults = emptyList()
+                SearchTab.MANGA -> mangaResults = emptyList()
+                SearchTab.NOVEL -> novelResults = emptyList()
+            }
         } finally {
             isSearching = false
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(OttBg)
-            .statusBarsPadding()
+    GlassBackdropHost(
+        background = { HomeBackdrop(p) }
     ) {
-        // Search Bar Row
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(42.dp)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(Modifier.width(6.dp))
-
-            Box(
+            // Top Bar: Back Button + Glass Search Input
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xFF1E1F24))
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.CenterStart
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(42.dp)
                 ) {
                     Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(20.dp)
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = p.text,
+                        modifier = Modifier.size(24.dp)
                     )
+                }
 
-                    Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(6.dp))
 
-                    BasicTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        textStyle = TextStyle(
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        cursorBrush = SolidColor(Color.White),
-                        decorationBox = { innerTextField ->
-                            if (query.isEmpty()) {
-                                Text(
-                                    text = "Search by title, genre, or studio...",
-                                    color = Color(0xFF757575),
-                                    fontSize = 14.sp
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .homeGlass(p, radius = 24.dp)
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = p.textMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+
+                        Spacer(Modifier.width(10.dp))
+
+                        BasicTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = p.text,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            cursorBrush = SolidColor(p.accentA),
+                            decorationBox = { innerTextField ->
+                                if (query.isEmpty()) {
+                                    val hint = when (selectedTab) {
+                                        SearchTab.ANIME -> "Search anime by title, genre..."
+                                        SearchTab.MANGA -> "Search manga, manhwa & comics..."
+                                        SearchTab.NOVEL -> "Search web & light novels..."
+                                    }
+                                    Text(
+                                        text = hint,
+                                        color = p.textMuted,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+
+                        if (query.isNotEmpty()) {
+                            IconButton(
+                                onClick = { query = "" },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Clear",
+                                    tint = p.textMuted,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
-                            innerTextField()
                         }
+                    }
+                }
+            }
+
+            // Liquid Glass Segmented Tab Switcher (Anime / Manga / Novels)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 6.dp)
+                    .homeGlass(p, radius = 999.dp)
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SearchTab.entries.forEach { tab ->
+                    val isSelected = tab == selectedTab
+                    val animBg by animateColorAsState(
+                        targetValue = if (isSelected) p.chipActiveBg else Color.Transparent,
+                        animationSpec = tween(200),
+                        label = "searchTabBg"
+                    )
+                    val animText by animateColorAsState(
+                        targetValue = if (isSelected) p.chipActiveText else p.textSub,
+                        animationSpec = tween(200),
+                        label = "searchTabText"
                     )
 
-                    if (query.isNotEmpty()) {
-                        IconButton(
-                            onClick = { query = "" },
-                            modifier = Modifier.size(28.dp)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(animBg)
+                            .clickable { selectedTab = tab }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            val icon = when (tab) {
+                                SearchTab.ANIME -> Icons.Default.Movie
+                                SearchTab.MANGA -> Icons.Default.AutoStories
+                                SearchTab.NOVEL -> Icons.Default.MenuBook
+                            }
                             Icon(
-                                Icons.Default.Clear,
-                                contentDescription = "Clear",
-                                tint = Color(0xFFA0A4B2),
-                                modifier = Modifier.size(18.dp)
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = animText,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = tab.label,
+                                color = animText,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
                         }
                     }
                 }
             }
-        }
 
-        // Search Content Area
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            when {
-                query.isBlank() -> {
-                    // Empty Search Landing State
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Box(
+            // Search Content View
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 4.dp)
+            ) {
+                when {
+                    query.isBlank() -> {
+                        // Empty Search Landing State
+                        Column(
                             modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x16FFFFFF)),
+                                .fillMaxSize()
+                                .padding(horizontal = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .homeGlass(p, radius = 34.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val icon = when (selectedTab) {
+                                    SearchTab.ANIME -> Icons.Default.Movie
+                                    SearchTab.MANGA -> Icons.Default.AutoStories
+                                    SearchTab.NOVEL -> Icons.Default.MenuBook
+                                }
+                                Icon(
+                                    icon,
+                                    contentDescription = null,
+                                    tint = p.accentText,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+
+                            Spacer(Modifier.height(18.dp))
+
+                            val title = when (selectedTab) {
+                                SearchTab.ANIME -> "Explore Anime"
+                                SearchTab.MANGA -> "Discover Manga & Manhwa"
+                                SearchTab.NOVEL -> "Read Web & Light Novels"
+                            }
+                            Text(
+                                text = title,
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.text,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+
+                            val subtitle = when (selectedTab) {
+                                SearchTab.ANIME -> "Search thousands of series, movies and OVAs powered by AniList."
+                                SearchTab.MANGA -> "Search across top manga, manhwa & comics from AniList and sources."
+                                SearchTab.NOVEL -> "Search thousands of web novels, light novels and translations."
+                            }
+                            Text(
+                                text = subtitle,
+                                fontSize = 13.sp,
+                                color = p.textSub,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+
+                    isSearching -> {
+                        // Loading State
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = null,
-                                tint = Color(0x70FFFFFF),
-                                modifier = Modifier.size(36.dp)
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = p.accentA,
+                                    strokeWidth = 2.5.dp,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Text(
+                                    text = "Searching ${selectedTab.label.lowercase()}...",
+                                    fontSize = 13.sp,
+                                    color = p.textSub
+                                )
+                            }
                         }
-
-                        Spacer(Modifier.height(20.dp))
-
-                        Text(
-                            text = "Find Your Next Obsession",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        Text(
-                            text = "Search by title, genre, or studio to discover your next favorite series.",
-                            fontSize = 13.5.sp,
-                            color = Color(0xFF888B96),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 19.sp
-                        )
                     }
-                }
 
-                isSearching -> {
-                    // Loading State
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    selectedTab == SearchTab.ANIME && animeResults.isEmpty() ||
+                    selectedTab == SearchTab.MANGA && mangaResults.isEmpty() ||
+                    selectedTab == SearchTab.NOVEL && novelResults.isEmpty() -> {
+                        // No Results State
                         Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                strokeWidth = 3.dp,
-                                modifier = Modifier.size(38.dp)
-                            )
                             Text(
-                                text = "Searching anime...",
+                                text = "No results found for \"$query\"",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.text,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Text(
+                                text = "Check for typos or try searching with a different title or keyword.",
                                 fontSize = 13.sp,
-                                color = OttTextMuted
+                                color = p.textSub,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
-                }
 
-                searchResults.isEmpty() -> {
-                    // No Results State
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "No results found for \"$query\"",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        Text(
-                            text = "Check for typos or try searching with a different keyword.",
-                            fontSize = 13.sp,
-                            color = Color(0xFF888B96),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                else -> {
-                    // Results List (matching reference screenshot media_1791110331827.jpg)
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(searchResults, key = { it.id }) { anime ->
-                            SearchResultCard(
-                                anime = anime,
-                                onClick = { onAnimeClick(anime.id) }
-                            )
+                    else -> {
+                        // Results List for Active Tab
+                        Crossfade(targetState = selectedTab, label = "searchResultsCrossfade") { tab ->
+                            when (tab) {
+                                SearchTab.ANIME -> {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        items(animeResults, key = { "anime_${it.id}" }) { anime ->
+                                            SearchResultAnimeItem(
+                                                anime = anime,
+                                                p = p,
+                                                onClick = { onAnimeClick(anime.id) }
+                                            )
+                                        }
+                                    }
+                                }
+                                SearchTab.MANGA -> {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        items(mangaResults, key = { "manga_${it.id}" }) { manga ->
+                                            SearchResultMangaItem(
+                                                manga = manga,
+                                                p = p,
+                                                onClick = { onMangaClick?.invoke(manga.id) }
+                                            )
+                                        }
+                                    }
+                                }
+                                SearchTab.NOVEL -> {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        items(novelResults, key = { "novel_${it.slug}" }) { novel ->
+                                            SearchResultNovelItem(
+                                                novel = novel,
+                                                p = p,
+                                                onClick = { onNovelClick?.invoke(novel.slug) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -298,22 +468,23 @@ fun SearchScreen(
 }
 
 @Composable
-private fun SearchResultCard(
+private fun SearchResultAnimeItem(
     anime: Anime,
+    p: HomePalette,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Poster Cover
         AsyncImage(
             model = anime.cover,
             contentDescription = anime.title,
             modifier = Modifier
-                .size(width = 72.dp, height = 98.dp)
+                .size(width = 70.dp, height = 96.dp)
                 .clip(RoundedCornerShape(12.dp)),
             contentScale = ContentScale.Crop
         )
@@ -326,9 +497,9 @@ private fun SearchResultCard(
         ) {
             Text(
                 text = anime.displayTitle,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = p.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -339,8 +510,8 @@ private fun SearchResultCard(
             if (genresText.isNotBlank()) {
                 Text(
                     text = genresText,
-                    fontSize = 13.sp,
-                    color = Color(0xFF8E8E93),
+                    fontSize = 12.5.sp,
+                    color = p.textSub,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -349,73 +520,267 @@ private fun SearchResultCard(
                 Spacer(Modifier.height(6.dp))
             }
 
-            // Badges Row: Rating pill, Format pill, Year pill
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Score / Rating Pill: White bg, Star icon + score
                 val score = anime.score
                 if (score != null && score > 0) {
                     val formattedScore = String.format(Locale.US, "%.1f", score / 10f)
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.White)
-                            .padding(horizontal = 9.dp, vertical = 3.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Default.Star,
                                 contentDescription = null,
-                                tint = Color(0xFFFFA000),
-                                modifier = Modifier.size(13.dp)
+                                tint = p.rating,
+                                modifier = Modifier.size(12.dp)
                             )
                             Spacer(Modifier.width(3.dp))
                             Text(
                                 text = formattedScore,
-                                fontSize = 11.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Black
+                                color = p.text
                             )
                         }
                     }
                 }
 
-                // Format Pill: White bg, black text
                 val format = if (anime.isMovie) "Movie" else anime.displayFormat
                 if (format.isNotBlank()) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.White)
-                            .padding(horizontal = 9.dp, vertical = 3.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
                     ) {
                         Text(
                             text = format,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = p.textSub
                         )
                     }
                 }
 
-                // Year Pill: Dark bg, white text
                 val year = anime.seasonYear
                 if (year != null && year > 0) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(Color(0xFF26272C))
-                            .padding(horizontal = 9.dp, vertical = 3.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
                     ) {
                         Text(
                             text = "$year",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = p.textMuted
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchResultMangaItem(
+    manga: MangaCard,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = manga.poster,
+            contentDescription = manga.title,
+            modifier = Modifier
+                .size(width = 70.dp, height = 96.dp)
+                .clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(Modifier.width(14.dp))
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = manga.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = p.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            val genresText = manga.genres.take(3).joinToString(", ")
+            if (genresText.isNotBlank()) {
+                Text(
+                    text = genresText,
+                    fontSize = 12.5.sp,
+                    color = p.textSub,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(8.dp))
+            } else {
+                Spacer(Modifier.height(6.dp))
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!manga.rating.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = p.rating,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = manga.rating,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.text
+                            )
+                        }
+                    }
+                }
+
+                val fmt = manga.format ?: manga.type ?: "MANGA"
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(p.chipBg)
+                        .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                ) {
+                    Text(
+                        text = fmt.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textSub
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchResultNovelItem(
+    novel: NovelItem,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = rememberNovelImageRequest(novel.cover),
+            contentDescription = novel.title,
+            modifier = Modifier
+                .size(width = 70.dp, height = 96.dp)
+                .clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(Modifier.width(14.dp))
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = novel.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = p.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            val statsText = novel.stats ?: novel.rating ?: novel.source
+            Text(
+                text = statsText,
+                fontSize = 12.5.sp,
+                color = p.textSub,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!novel.rating.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = p.rating,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = novel.rating,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.text
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(p.chipBg)
+                        .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                ) {
+                    Text(
+                        text = novel.source.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textSub
+                    )
                 }
             }
         }

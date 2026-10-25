@@ -1,75 +1,83 @@
 package com.nyyrox.aniverse.ui.screens
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import com.nyyrox.aniverse.ui.animation.mediaCardPhysics
-import com.nyyrox.aniverse.ui.animation.staggeredEntrance
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import com.nyyrox.aniverse.ui.components.OttGlassIconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import com.nyyrox.aniverse.ui.animation.LocalSharedPosterCoordinator
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -80,17 +88,21 @@ import coil3.request.crossfade
 import com.nyyrox.aniverse.data.novel.NovelHistoryItem
 import com.nyyrox.aniverse.data.novel.NovelItem
 import com.nyyrox.aniverse.data.novel.NovelSource
-import com.nyyrox.aniverse.ui.theme.OttAccentGold
-import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttCardBottomGradient
-import com.nyyrox.aniverse.ui.theme.OttCardShape
-import com.nyyrox.aniverse.ui.theme.OttPillShape
-import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.OttSurfaceElevated
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
-import com.nyyrox.aniverse.ui.theme.OttTextSecondary
+import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
+import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.ui.theme.ZenkaiFontFamily
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.sin
+
+private val HeroCardW = 200.dp
+private val HeroCardH = 292.dp
+private val HeroCardShape = RoundedCornerShape(14.dp)
+private const val TWO_PI = (2.0 * Math.PI).toFloat()
 
 @Composable
 fun rememberNovelImageRequest(url: String?): Any? {
@@ -130,191 +142,133 @@ fun NovelHomeScreen(
     onDownloadsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
+    val p = rememberHomePalette()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         vm.loadNovelHome()
         vm.refreshStorageData()
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(OttBg)
+    GlassBackdropHost(
+        background = { HomeBackdrop(p) }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(top = 58.dp)
-        ) {
-            // Novel Header & Search Bar
-            NovelSearchHeader(
-                query = searchQuery,
-                onQueryChange = {
-                    searchQuery = it
-                    vm.searchNovels(it)
-                },
-                onClear = {
-                    searchQuery = ""
-                    vm.searchNovels("")
-                    focusManager.clearFocus()
-                },
-                activeSource = vm.activeNovelSource,
-                onSourceSelect = { src ->
-                    vm.setNovelSource(src)
-                    if (searchQuery.isNotBlank()) {
-                        vm.searchNovels(searchQuery)
+        Box(modifier = modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Loading / Error states
+                if (vm.novelHomeLoading && vm.novelRankings.isEmpty() && vm.novelPopular.isEmpty()) {
+                    item("skeleton") {
+                        NovelFeedSkeleton(p)
                     }
-                },
-                onDownloadsClick = onDownloadsClick
-            )
-
-            if (searchQuery.isNotBlank()) {
-                // Search Results Grid
-                if (vm.novelSearchLoading) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = OttPrimary, modifier = Modifier.size(36.dp))
-                    }
-                } else if (vm.novelSearchResults.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "No web novels found for \"$searchQuery\"",
-                            color = OttTextSecondary,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
+                } else if (vm.novelHomeError != null && vm.novelRankings.isEmpty()) {
+                    item("error") {
+                        NovelFeedError(
+                            error = vm.novelHomeError ?: "Unable to fetch novels",
+                            p = p,
+                            onRetry = { vm.loadNovelHome() }
                         )
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 100.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        items(vm.novelSearchResults, key = { it.slug }) { item ->
-                            NovelGridCard(novel = item, onClick = { onNovelClick(item.slug) })
+                    // 1. 3D Coverflow Hero Banner (covers full top area behind status bars)
+                    val heroNovels = vm.novelRankings.ifEmpty { vm.novelPopular }
+                    if (heroNovels.isNotEmpty()) {
+                        item("hero") {
+                            NovelHero(
+                                shows = heroNovels,
+                                p = p,
+                                listScrolling = listState.isScrollInProgress,
+                                onNovelClick = onNovelClick,
+                                onBookmark = { novel ->
+                                    vm.toggleNovelBookmark(novel.slug)
+                                }
+                            )
                         }
                     }
-                }
-            } else {
-                // Main Novel Content (Rankings, Popular, Latest, Genres)
-                if (vm.novelHomeLoading && vm.novelRankings.isEmpty() && vm.novelPopular.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = OttPrimary, modifier = Modifier.size(36.dp))
+
+                    // 2. Liquid Glass Source Switcher (No card containers, no borders)
+                    item("source_switcher") {
+                        NovelSourceSwitcher(
+                            activeSource = vm.activeNovelSource,
+                            onSourceSelect = { src ->
+                                vm.setNovelSource(src)
+                            },
+                            p = p
+                        )
                     }
-                } else if (vm.novelHomeError != null && vm.novelRankings.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Connection Issue", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = OttTextPrimary)
-                            Spacer(Modifier.height(6.dp))
-                            Text(vm.novelHomeError ?: "Unable to fetch novels from ${vm.activeNovelSource.displayName}", fontSize = 12.sp, color = OttTextSecondary, textAlign = TextAlign.Center)
-                            Spacer(Modifier.height(14.dp))
-                            Button(
-                                onClick = { vm.loadNovelHome() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                                shape = OttPillShape
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Retry", fontWeight = FontWeight.Bold)
-                            }
+
+                    // 3. Continue Reading (if user has active novel history)
+                    if (vm.novelHistoryList.isNotEmpty()) {
+                        item("continue_reading") {
+                            NovelContinueRow(
+                                history = vm.novelHistoryList,
+                                p = p,
+                                onNovelClick = onNovelClick,
+                                onReadClick = { nSlug, chSlug ->
+                                    onReadClick?.invoke(nSlug, chSlug) ?: onNovelClick(nSlug)
+                                },
+                                onRemove = { vm.removeNovelHistory(it) }
+                            )
                         }
                     }
-                } else {
-                    LazyColumn(
-                        state = vm.novelLazyListState,
-                        contentPadding = PaddingValues(bottom = 100.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        // 0. Continue Reading (if user has active novel history)
-                        if (vm.novelHistoryList.isNotEmpty()) {
-                            item {
-                                Box(modifier = Modifier.staggeredEntrance(index = 0)) {
-                                    NovelContinueReadingRow(
-                                        history = vm.novelHistoryList,
-                                        onNovelClick = onNovelClick,
-                                        onReadClick = { nSlug, chSlug ->
-                                            onReadClick?.invoke(nSlug, chSlug) ?: onNovelClick(nSlug)
-                                        },
-                                        onRemove = { vm.removeNovelHistory(it) }
-                                    )
-                                }
-                            }
-                        }
 
-                        // 1. Featured Top Novel Banner (Top 1 in Rankings)
-                        if (vm.novelRankings.isNotEmpty()) {
-                            val topNovel = vm.novelRankings.first()
-                            item {
-                                Box(modifier = Modifier.staggeredEntrance(index = 1)) {
-                                    NovelHeroCard(novel = topNovel, onClick = { onNovelClick(topNovel.slug) })
-                                }
-                            }
+                    // 4. Top Web Novels (Rankings 1..10 with numerals)
+                    if (vm.novelRankings.isNotEmpty()) {
+                        item("rankings") {
+                            NovelRankingSection(
+                                title = "Top Web Novels",
+                                subtitle = "Highest ranked across ${vm.activeNovelSource.displayName}",
+                                novels = vm.novelRankings,
+                                p = p,
+                                onNovelClick = onNovelClick
+                            )
                         }
+                    }
 
-                        // 2. Rankings Carousel / Row
-                        if (vm.novelRankings.isNotEmpty()) {
-                            item {
-                                Column(modifier = Modifier.staggeredEntrance(index = 2)) {
-                                    NovelSectionHeader(
-                                        title = "Top Web Novels",
-                                        subtitle = "Highest ranked across ${vm.activeNovelSource.displayName}"
-                                    )
-                                    NovelRankingsRow(novels = vm.novelRankings, onNovelClick = onNovelClick)
-                                }
-                            }
+                    // 5. Light Novels Section
+                    if (vm.novelLightNovels.isNotEmpty()) {
+                        item("light_novels") {
+                            NovelRailSection(
+                                title = "Light Novels",
+                                subtitle = "Japanese & Korean translated series",
+                                novels = vm.novelLightNovels,
+                                p = p,
+                                onNovelClick = onNovelClick
+                            )
                         }
+                    }
 
-                        // 2.5 Light Novels Section
-                        if (vm.novelLightNovels.isNotEmpty()) {
-                            item {
-                                Column(modifier = Modifier.staggeredEntrance(index = 3)) {
-                                    NovelSectionHeader(
-                                        title = "Light Novels",
-                                        subtitle = "Japanese & Korean translated light novels"
-                                    )
-                                    NovelHorizontalRow(novels = vm.novelLightNovels, onNovelClick = onNovelClick)
-                                }
-                            }
+                    // 6. Popular Novels
+                    if (vm.novelPopular.isNotEmpty()) {
+                        item("popular") {
+                            NovelRailSection(
+                                title = "Popular Reads",
+                                subtitle = "Most read by the community",
+                                novels = vm.novelPopular,
+                                p = p,
+                                onNovelClick = onNovelClick
+                            )
                         }
+                    }
 
-                        // 3. Genre Filter Chips
-                        item {
-                            Box(modifier = Modifier.staggeredEntrance(index = 4)) {
-                                NovelGenreChips(
-                                    selectedGenre = vm.selectedNovelGenre ?: "All",
-                                    onSelectGenre = { vm.filterNovelsByGenre(it) }
-                                )
-                            }
+                    // 7. Latest Releases
+                    if (vm.novelLatest.isNotEmpty()) {
+                        item("latest") {
+                            NovelRailSection(
+                                title = "Latest Updates",
+                                subtitle = "Freshly updated chapters",
+                                novels = vm.novelLatest,
+                                p = p,
+                                onNovelClick = onNovelClick
+                            )
                         }
+                    }
 
-                        // 4. Popular Novels
-                        if (vm.novelPopular.isNotEmpty()) {
-                            item {
-                                Column(modifier = Modifier.staggeredEntrance(index = 5)) {
-                                    NovelSectionHeader(
-                                        title = if (vm.selectedNovelGenre == "All") "Popular Reads" else "${vm.selectedNovelGenre} Novels",
-                                        subtitle = "Most read by community"
-                                    )
-                                    NovelHorizontalRow(novels = vm.novelPopular, onNovelClick = onNovelClick)
-                                }
-                            }
-                        }
-
-                        // 5. Latest Releases
-                        if (vm.novelLatest.isNotEmpty()) {
-                            item {
-                                Column(modifier = Modifier.staggeredEntrance(index = 6)) {
-                                    NovelSectionHeader(
-                                        title = "Latest Updates",
-                                        subtitle = "Freshly released chapters"
-                                    )
-                                    NovelHorizontalRow(novels = vm.novelLatest, onNovelClick = onNovelClick)
-                                }
-                            }
-                        }
+                    // Bottom padding to clear dock
+                    item("bottom_pad") {
+                        Spacer(Modifier.height(110.dp))
                     }
                 }
             }
@@ -322,159 +276,79 @@ fun NovelHomeScreen(
     }
 }
 
+// ── Liquid Glass Source Switcher ───────────────────────────────────────────────
+
 @Composable
-private fun NovelSearchHeader(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClear: () -> Unit,
+private fun NovelSourceSwitcher(
     activeSource: NovelSource,
     onSourceSelect: (NovelSource) -> Unit,
-    onDownloadsClick: (() -> Unit)?
+    p: HomePalette
 ) {
+    val displaySources = remember {
+        NovelSource.entries.filter { it != NovelSource.WEB_NOVEL }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text("Search ${activeSource.displayName}...", fontSize = 13.sp, color = OttTextSecondary) },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = OttTextSecondary, modifier = Modifier.size(18.dp))
-                },
-                trailingIcon = {
-                    if (query.isNotBlank()) {
-                        IconButton(onClick = onClear) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = OttPillShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0x22FFFFFF),
-                    unfocusedContainerColor = Color(0x14FFFFFF),
-                    focusedBorderColor = Color(0x55FFFFFF),
-                    unfocusedBorderColor = Color(0x20FFFFFF),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                ),
-                modifier = Modifier.weight(1f).height(50.dp)
-            )
-
-            if (onDownloadsClick != null) {
-                OttGlassIconButton(
-                    onClick = onDownloadsClick,
-                    size = 46.dp
-                ) {
-                    Icon(
-                        Icons.Default.DownloadDone,
-                        contentDescription = "Downloads",
-                        tint = OttAccentGold,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        // Redesigned Novel Sources Floating Glass Segmented Dock Bar
-        val displaySources = remember {
-            NovelSource.entries.filter { it != NovelSource.WEB_NOVEL }
-        }
-        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0x18FFFFFF))
-                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
-                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .homeGlass(p, radius = 999.dp)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(horizontal = 2.dp)
             ) {
                 items(displaySources) { src ->
                     val isSelected = src == activeSource
-                    val sourceGradient = when (src) {
-                        NovelSource.LNORI -> Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF4F46E5)))
-                        NovelSource.NOVEL_FULL -> Brush.horizontalGradient(listOf(Color(0xFFFF7A45), Color(0xFFFF5722)))
-                        NovelSource.NOVEL_FIRE -> Brush.horizontalGradient(listOf(Color(0xFFE50914), Color(0xFFB71C1C)))
-                        NovelSource.FREE_WEB_NOVEL -> Brush.horizontalGradient(listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)))
-                        NovelSource.ROYAL_ROAD -> Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF1D4ED8)))
-                        NovelSource.WUXIA_WORLD -> Brush.horizontalGradient(listOf(Color(0xFF059669), Color(0xFF047857)))
-                        else -> Brush.horizontalGradient(listOf(OttPrimary, OttPrimary))
-                    }
-                    val iconColor = when (src) {
-                        NovelSource.LNORI -> Color(0xFF818CF8)
-                        NovelSource.NOVEL_FULL -> Color(0xFFFF7A45)
-                        NovelSource.NOVEL_FIRE -> Color(0xFFE50914)
-                        NovelSource.FREE_WEB_NOVEL -> Color(0xFFA78BFA)
-                        NovelSource.ROYAL_ROAD -> Color(0xFF3B82F6)
-                        NovelSource.WUXIA_WORLD -> Color(0xFF10B981)
-                        else -> OttPrimary
-                    }
-                    val icon = when (src) {
-                        NovelSource.LNORI -> Icons.Default.AutoStories
-                        NovelSource.NOVEL_FULL -> Icons.Default.MenuBook
-                        NovelSource.NOVEL_FIRE -> Icons.Default.Whatshot
-                        NovelSource.FREE_WEB_NOVEL -> Icons.Default.AutoStories
-                        NovelSource.ROYAL_ROAD -> Icons.Default.Star
-                        NovelSource.WUXIA_WORLD -> Icons.Default.AutoStories
-                        else -> Icons.Default.MenuBook
-                    }
+                    val animBg by animateColorAsState(
+                        targetValue = if (isSelected) p.chipActiveBg else Color.Transparent,
+                        animationSpec = tween(200),
+                        label = "srcTabBg"
+                    )
+                    val animText by animateColorAsState(
+                        targetValue = if (isSelected) p.chipActiveText else p.textSub,
+                        animationSpec = tween(200),
+                        label = "srcTabText"
+                    )
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .then(
-                                if (isSelected) Modifier.background(sourceGradient)
-                                else Modifier.background(Color(0x10FFFFFF))
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) Color(0x60FFFFFF) else Color(0x18FFFFFF),
-                                shape = RoundedCornerShape(14.dp)
-                            )
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(animBg)
                             .clickable { onSourceSelect(src) }
-                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = if (isSelected) Color.White else iconColor,
-                                modifier = Modifier.size(14.dp)
-                            )
                             Text(
                                 text = src.displayName,
                                 fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                                color = Color.White
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = animText
                             )
                             if (src.badge != null) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(5.dp))
-                                        .background(if (isSelected) Color(0x35000000) else Color(0x20FFFFFF))
-                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (isSelected) p.accentText.copy(alpha = 0.25f) else p.chipBg)
+                                        .padding(horizontal = 4.dp, vertical = 1.5.dp)
                                 ) {
                                     Text(
                                         text = src.badge,
-                                        fontSize = 8.5.sp,
+                                        fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else Color(0xB3FFFFFF)
+                                        color = if (isSelected) p.accentText else p.textMuted
                                     )
                                 }
                             }
@@ -486,517 +360,632 @@ private fun NovelSearchHeader(
     }
 }
 
+// ── 3D Coverflow Hero Banner ──────────────────────────────────────────────────
+
 @Composable
-private fun NovelHeroCard(
-    novel: NovelItem,
-    onClick: () -> Unit
+private fun NovelHero(
+    shows: List<NovelItem>,
+    p: HomePalette,
+    listScrolling: Boolean,
+    onNovelClick: (String) -> Unit,
+    onBookmark: (NovelItem) -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(180.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-    ) {
-        AsyncImage(
-            model = rememberNovelImageRequest(novel.cover),
-            contentDescription = novel.title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+    val reduced = LocalThemeSettings.current.isReducedMotionEnabled
+    val n = shows.size
+    val scope = rememberCoroutineScope()
+    var position by remember { mutableFloatStateOf(0f) }
+    var dragging by remember { mutableStateOf(false) }
+    var animJob by remember { mutableStateOf<Job?>(null) }
+    val scrollingNow by rememberUpdatedState(listScrolling)
+    val center by remember { derivedStateOf { floor(position + 0.5f).toInt() } }
+    val current = Math.floorMod(center, n)
+    val travel = with(LocalDensity.current) { (HeroCardW * 0.70f).toPx() }
 
-        // Gradient overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xF506080E), Color(0xCC06080E), Color(0x5506080E), Color.Transparent)
-                    )
-                )
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(OttPillShape)
-                    .background(Color(0x33FF1E27))
-                    .border(0.8.dp, Color(0x88FF1E27), OttPillShape)
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Icon(Icons.Default.Whatshot, contentDescription = null, tint = Color(0xFFFF4D55), modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("RANK #1 NOVEL", fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = Color.White)
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = novel.title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            novel.stats?.let { stats ->
-                Text(
-                    text = stats,
-                    fontSize = 11.5.sp,
-                    color = OttTextSecondary,
-                    maxLines = 1
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(OttPillShape)
-                    .background(Color.White)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Icon(Icons.Default.MenuBook, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Read Now", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-            }
+    fun animateTo(target: Float, velocity: Float = 0f) {
+        animJob?.cancel()
+        animJob = scope.launch {
+            animate(
+                initialValue = position, targetValue = target, initialVelocity = velocity,
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 170f)
+            ) { v, _ -> position = v }
         }
     }
-}
 
-@Composable
-private fun NovelSectionHeader(
-    title: String,
-    subtitle: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 4.dp)
-    ) {
-        Text(
-            text = title,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Black,
-            color = OttTextPrimary
-        )
-        Text(
-            text = subtitle,
-            fontSize = 11.sp,
-            color = OttTextSecondary
-        )
+    fun settle(fingerVelocityPx: Float) {
+        val v = -fingerVelocityPx / travel
+        val nearest = floor(position + 0.5f)
+        val target = floor(position + v * 0.15f + 0.5f).coerceIn(nearest - 1f, nearest + 1f)
+        animateTo(target, v)
     }
-}
 
-@Composable
-private fun NovelRankingsRow(
-    novels: List<NovelItem>,
-    onNovelClick: (String) -> Unit
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        itemsIndexed(novels.take(10), key = { _, n -> n.slug }) { index, novel ->
-            val isTen = index == 9
-            Row(
-                modifier = Modifier
-                    .width(if (isTen) 220.dp else 185.dp)
-                    .clickable { onNovelClick(novel.slug) },
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    text = "${index + 1}",
-                    fontSize = if (isTen) 68.sp else 74.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0x38FFFFFF),
-                    modifier = Modifier
-                        .padding(bottom = 6.dp)
-                        .width(if (isTen) 76.dp else 46.dp),
-                    textAlign = TextAlign.Center,
-                    softWrap = false,
-                    letterSpacing = if (isTen) (-2).sp else 0.sp
-                )
-
-                NovelCard(novel = novel, onClick = { onNovelClick(novel.slug) })
-            }
+    LaunchedEffect(n, dragging, reduced) {
+        if (n < 2 || dragging || reduced) return@LaunchedEffect
+        while (true) {
+            delay(6000)
+            if (!scrollingNow) animateTo(floor(position + 0.5f) + 1f)
         }
     }
-}
 
-@Composable
-private fun NovelHorizontalRow(
-    novels: List<NovelItem>,
-    onNovelClick: (String) -> Unit
-) {
-    val uniqueNovels = remember(novels) { novels.distinctBy { it.slug } }
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        itemsIndexed(uniqueNovels, key = { idx, novel -> "novel_${novel.slug}_$idx" }) { _, novel ->
-            NovelCard(novel = novel, onClick = { onNovelClick(novel.slug) })
-        }
-    }
-}
-
-@Composable
-private fun NovelCard(
-    novel: NovelItem,
-    onClick: () -> Unit
-) {
-    val coordinator = LocalSharedPosterCoordinator.current
-    val itemKey = "novel_${novel.slug}"
-    val isSharedActive = coordinator?.isItemActive(itemKey) == true
-    var cardBounds by remember { mutableStateOf<Rect?>(null) }
-
-    Column(
-        modifier = Modifier
-            .width(140.dp)
-            .mediaCardPhysics(pressScale = 0.95f, enableTilt = true)
-            .clickable {
-                val bounds = cardBounds
-                if (coordinator != null && bounds != null && bounds.width > 0) {
-                    coordinator.startForwardTransition(
-                        itemKey = itemKey,
-                        posterUrl = novel.cover,
-                        bounds = bounds,
-                        onNavigate = onClick
-                    )
-                } else {
-                    onClick()
-                }
-            }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .onGloballyPositioned { coords ->
-                    cardBounds = coords.boundsInWindow()
-                }
-                .clip(OttCardShape)
-                .background(Color(0x15FFFFFF))
-                .border(1.dp, Color(0x22FFFFFF), OttCardShape)
-        ) {
-            AsyncImage(
-                model = rememberNovelImageRequest(novel.cover),
-                contentDescription = novel.title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        this.alpha = if (isSharedActive) 0f else 1f
-                    },
-                contentScale = ContentScale.Crop
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(OttCardBottomGradient)
-            )
-
-            novel.rating?.let { rate ->
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xB3000000))
-                        .border(0.5.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(10.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text(text = rate, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = novel.title,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                novel.stats?.let {
-                    Text(
-                        text = it,
-                        fontSize = 10.sp,
-                        color = OttTextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NovelGridCard(
-    novel: NovelItem,
-    onClick: () -> Unit
-) {
-    val coordinator = LocalSharedPosterCoordinator.current
-    val itemKey = "novel_${novel.slug}"
-    val isSharedActive = coordinator?.isItemActive(itemKey) == true
-    var cardBounds by remember { mutableStateOf<Rect?>(null) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                val bounds = cardBounds
-                if (coordinator != null && bounds != null && bounds.width > 0) {
-                    coordinator.startForwardTransition(
-                        itemKey = itemKey,
-                        posterUrl = novel.cover,
-                        bounds = bounds,
-                        onNavigate = onClick
-                    )
-                } else {
-                    onClick()
-                }
-            }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .onGloballyPositioned { coords ->
-                    cardBounds = coords.boundsInWindow()
-                }
-                .clip(OttCardShape)
-                .background(Color(0x15FFFFFF))
-                .border(1.dp, Color(0x22FFFFFF), OttCardShape)
-        ) {
-            AsyncImage(
-                model = rememberNovelImageRequest(novel.cover),
-                contentDescription = novel.title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        this.alpha = if (isSharedActive) 0f else 1f
-                    },
-                contentScale = ContentScale.Crop
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(OttCardBottomGradient)
-            )
-
-            novel.rating?.let { rate ->
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xB3000000))
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = OttAccentGold, modifier = Modifier.size(9.dp))
-                    Spacer(Modifier.width(2.dp))
-                    Text(text = rate, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        Text(
-            text = novel.title,
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun NovelGenreChips(
-    selectedGenre: String,
-    onSelectGenre: (String) -> Unit
-) {
-    val genres = listOf(
-        "All", "Fantasy", "Action", "Romance", "Sci-fi",
-        "Martial Arts", "Slice of Life", "Supernatural", "Video Games", "Josei"
+    val breath = rememberInfiniteTransition(label = "breath")
+    val phase by breath.animateFloat(
+        initialValue = 0f, targetValue = TWO_PI,
+        animationSpec = infiniteRepeatable(tween(5600, easing = LinearEasing)),
+        label = "phase"
     )
 
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(genres) { genre ->
-            val isSelected = genre == selectedGenre
+    Box(Modifier.fillMaxWidth()) {
+        HeroNovelPosterBackdrop(shows[current].cover, p, Modifier.matchParentSize())
+
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
+
+            // 3D Carousel Cards
             Box(
-                modifier = Modifier
-                    .clip(OttPillShape)
-                    .background(if (isSelected) Color.White else Color(0x18FFFFFF))
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) Color.White else Color(0x28FFFFFF),
-                        shape = OttPillShape
-                    )
-                    .clickable { onSelectGenre(genre) }
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                Modifier
+                    .fillMaxWidth()
+                    .height(HeroCardH + 32.dp)
+                    .draggable(
+                        orientation = Orientation.Horizontal,
+                        enabled = n > 1,
+                        state = rememberDraggableState { d -> position -= d / travel },
+                        onDragStarted = { dragging = true; animJob?.cancel() },
+                        onDragStopped = { v -> dragging = false; settle(v) }
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = genre,
-                    fontSize = 11.5.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) Color.Black else OttTextSecondary
-                )
+                val order = if (n < 2) listOf(center)
+                else (center - 2..center + 2).sortedByDescending { abs(it - center) }
+
+                for (i in order) {
+                    val novel = shows[Math.floorMod(i, n)]
+                    key(i) {
+                        Box(
+                            Modifier
+                                .width(HeroCardW)
+                                .height(HeroCardH)
+                                .graphicsLayer {
+                                    val x = i - position
+                                    val ax = abs(x)
+                                    val a = ax.coerceAtMost(1f)
+                                    val side = if (x < 0f) -1f else 1f
+                                    val bw = if (reduced) 0f else sin(phase + i * 1.3f)
+                                    translationX = side * 0.26f * a * size.width
+                                    translationY = (a * 6f + bw * (1.5f + 2.5f * a)) * density
+                                    rotationY = -side * 30f * a
+                                    rotationZ = side * a * 4f + bw * 0.7f * (0.3f + a)
+                                    val sc = 1f - 0.08f * a + bw * 0.006f
+                                    scaleX = sc
+                                    scaleY = sc
+                                    alpha = when {
+                                        ax <= 1f -> 1f
+                                        ax >= 2f -> 0f
+                                        else -> 2f - ax
+                                    }
+                                    cameraDistance = 18f * density
+                                }
+                                .shadow(12.dp, HeroCardShape, clip = false)
+                                .clip(HeroCardShape)
+                                .shimmer(p)
+                                .clickable {
+                                    if (i == center) onNovelClick(novel.slug) else animateTo(i.toFloat())
+                                }
+                        ) {
+                            AsyncImage(
+                                model = rememberNovelImageRequest(novel.cover),
+                                contentDescription = novel.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            // Dim background cards for depth
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = 0.32f * abs(i - position).coerceAtMost(1f) }
+                                    .background(Color.Black)
+                            )
+                        }
+                    }
+                }
             }
+
+            Spacer(Modifier.height(18.dp))
+
+            // Metadata & Action Buttons for Current Card
+            Crossfade(targetState = current, label = "heroNovelInfo") { idx ->
+                val novel = shows[Math.floorMod(idx, n)]
+
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = novel.title,
+                        color = p.text,
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ZenkaiFontFamily,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = novel.source.uppercase(),
+                            color = p.accentText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (!novel.rating.isNullOrBlank()) {
+                            Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
+                            Icon(Icons.Default.Star, contentDescription = null, tint = p.rating, modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(novel.rating, color = p.rating, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        if (!novel.stats.isNullOrBlank()) {
+                            Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
+                            Text(novel.stats, color = p.textSub, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Clean Glass CTAs: "Read Novel" & "Bookmark"
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            Modifier
+                                .clip(CircleShape)
+                                .background(p.accentBrush)
+                                .clickable { onNovelClick(novel.slug) }
+                                .padding(horizontal = 22.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = p.onAccent, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Read Novel", color = p.onAccent, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            Modifier
+                                .homeGlass(p, radius = 999.dp)
+                                .clickable { onBookmark(novel) }
+                                .padding(horizontal = 18.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.BookmarkBorder, contentDescription = null, tint = p.text, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Bookmark", color = p.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
         }
     }
 }
 
+// ── Continue Reading Row ──────────────────────────────────────────────────────
+
 @Composable
-private fun NovelContinueReadingRow(
+private fun NovelContinueRow(
     history: List<NovelHistoryItem>,
+    p: HomePalette,
     onNovelClick: (String) -> Unit,
     onReadClick: (novelSlug: String, chapterSlug: String) -> Unit,
     onRemove: (String) -> Unit
 ) {
-    Column {
-        NovelSectionHeader(
-            title = "Continue Reading",
-            subtitle = "Jump back into your web novels"
-        )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.History, contentDescription = null, tint = p.accentText, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Continue Reading",
+                color = p.text,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = ZenkaiFontFamily
+            )
+        }
+        Spacer(Modifier.height(10.dp))
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            contentPadding = PaddingValues(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(history, key = { it.slug }) { item ->
-                Column(
+            items(history, key = { "hist_${it.slug}" }) { item ->
+                Row(
                     modifier = Modifier
-                        .width(200.dp)
-                        .clip(OttCardShape)
-                        .background(Color(0x14FFFFFF))
-                        .border(1.dp, Color(0x22FFFFFF), OttCardShape)
+                        .width(260.dp)
+                        .homeGlass(p, radius = 14.dp)
                         .clickable { onReadClick(item.slug, item.lastChapterSlug) }
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(115.dp)
+                        Modifier
+                            .size(width = 54.dp, height = 76.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .shimmer(p)
                     ) {
-                        if (item.cover.isNotBlank()) {
-                            AsyncImage(
-                                model = rememberNovelImageRequest(item.cover),
-                                contentDescription = item.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color(0xFF161822)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.MenuBook,
-                                    contentDescription = null,
-                                    tint = Color(0x40FFFFFF),
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0x55000000))
+                        AsyncImage(
+                            model = rememberNovelImageRequest(item.cover),
+                            contentDescription = item.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
                         )
-
-                        // Center Read Button
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xCC000000))
-                                .border(1.dp, Color(0x40FFFFFF), CircleShape)
-                                .align(Alignment.Center),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.MenuBook,
-                                contentDescription = "Read",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        // Remove button at top-right
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp)
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x88000000))
-                                .clickable { onRemove(item.slug) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Remove",
-                                tint = Color(0xCCFFFFFF),
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
                     }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp)
-                    ) {
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
                         Text(
                             text = item.title,
-                            fontSize = 12.5.sp,
+                            color = p.text,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(Modifier.height(2.dp))
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             text = item.lastChapterTitle,
-                            fontSize = 10.5.sp,
-                            color = OttTextSecondary,
+                            color = p.accentText,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(Modifier.height(6.dp))
+                        Row(
+                            Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(p.accentBrush)
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = p.onAccent, modifier = Modifier.size(11.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text("Resume", color = p.onAccent, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+// ── Top 10 Rankings Section ───────────────────────────────────────────────────
+
+@Composable
+private fun NovelRankingSection(
+    title: String,
+    subtitle: String,
+    novels: List<NovelItem>,
+    p: HomePalette,
+    onNovelClick: (String) -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    ) {
+        SectionTitle(title = title, subtitle = subtitle, p = p)
+        Spacer(Modifier.height(10.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            itemsIndexed(novels.take(10), key = { idx, item -> "top_${item.slug}_$idx" }) { idx, novel ->
+                NovelRankTile(
+                    rank = idx + 1,
+                    novel = novel,
+                    p = p,
+                    onClick = { onNovelClick(novel.slug) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NovelRankTile(
+    rank: Int,
+    novel: NovelItem,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        // Large Stylized Rank Number
+        Text(
+            text = "$rank",
+            fontSize = 58.sp,
+            fontWeight = FontWeight.Black,
+            fontFamily = ZenkaiFontFamily,
+            color = p.textMuted.copy(alpha = 0.55f),
+            modifier = Modifier.padding(end = 4.dp)
+        )
+
+        NovelPosterTile(
+            title = novel.title,
+            image = novel.cover,
+            meta = novel.rating?.let { "★ $it" } ?: novel.stats ?: novel.source,
+            p = p,
+            onClick = onClick
+        )
+    }
+}
+
+// ── Horizontal Rail Section ───────────────────────────────────────────────────
+
+@Composable
+private fun NovelRailSection(
+    title: String,
+    subtitle: String,
+    novels: List<NovelItem>,
+    p: HomePalette,
+    onNovelClick: (String) -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    ) {
+        SectionTitle(title = title, subtitle = subtitle, p = p)
+        Spacer(Modifier.height(10.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            items(novels, key = { it.slug }) { novel ->
+                NovelPosterTile(
+                    title = novel.title,
+                    image = novel.cover,
+                    meta = novel.rating?.let { "★ $it" } ?: novel.stats ?: novel.source,
+                    p = p,
+                    onClick = { onNovelClick(novel.slug) }
+                )
+            }
+        }
+    }
+}
+
+// ── Novel Poster Tile Component ───────────────────────────────────────────────
+
+@Composable
+private fun NovelPosterTile(
+    title: String,
+    image: String,
+    meta: String?,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(120.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(120.dp)
+                .height(175.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .shimmer(p)
+        ) {
+            AsyncImage(
+                model = rememberNovelImageRequest(image),
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // Rating pill (top-end)
+            if (!meta.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color(0xB3000000))
+                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                ) {
+                    Text(
+                        text = meta,
+                        color = if (meta.contains("★")) p.rating else Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = title,
+            color = p.text,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 16.sp
+        )
+
+        if (!meta.isNullOrBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = meta,
+                color = p.textSub,
+                fontSize = 10.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+// ── Section Title ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun SectionTitle(title: String, subtitle: String, p: HomePalette) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp)
+    ) {
+        Text(
+            text = title,
+            color = p.text,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = ZenkaiFontFamily
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = subtitle,
+            color = p.textSub,
+            fontSize = 12.sp
+        )
+    }
+}
+
+// ── Ambient Blurred Backdrop ──────────────────────────────────────────────────
+
+@Composable
+private fun HeroNovelPosterBackdrop(poster: String?, p: HomePalette, modifier: Modifier) {
+    Crossfade(
+        targetState = poster,
+        modifier = modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Black,
+                        0.55f to Color.Black.copy(alpha = 0.85f),
+                        0.82f to Color.Black.copy(alpha = 0.35f),
+                        1f to Color.Transparent
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            },
+        label = "heroNovelBg"
+    ) { url ->
+        Box(Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = rememberNovelImageRequest(url),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(26.dp)
+                    .graphicsLayer {
+                        scaleX = 1.25f
+                        scaleY = 1.25f
+                        alpha = if (p.dark) 0.50f else 0.38f
+                    }
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(listOf(p.gradTop.copy(alpha = 0.35f), Color.Transparent))
+                    )
+            )
+        }
+    }
+}
+
+// ── Skeletons & Errors ────────────────────────────────────────────────────────
+
+@Composable
+private fun NovelFeedSkeleton(p: HomePalette) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(top = 96.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier
+                .width(HeroCardW)
+                .height(HeroCardH)
+                .clip(HeroCardShape)
+                .shimmer(p)
+        )
+        Spacer(Modifier.height(18.dp))
+        Box(
+            Modifier
+                .width(220.dp)
+                .height(20.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .shimmer(p)
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            repeat(3) {
+                Box(
+                    Modifier
+                        .width(120.dp)
+                        .height(175.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .shimmer(p)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NovelFeedError(error: String, p: HomePalette, onRetry: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = 32.dp, vertical = 120.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Connection Issue", color = p.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(error, color = p.textSub, fontSize = 13.5.sp, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(18.dp))
+        Row(
+            Modifier
+                .homeGlass(p, radius = 999.dp)
+                .clickable { onRetry() }
+                .padding(horizontal = 22.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null, tint = p.text, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Retry", color = p.text, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

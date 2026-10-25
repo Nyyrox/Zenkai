@@ -157,6 +157,9 @@ internal class HomePalette(
 ) {
     val accentBrush: Brush = Brush.horizontalGradient(listOf(accentA, accentB))
     val pageBrush: Brush = Brush.verticalGradient(0f to gradTop, 0.40f to gradMid, 1f to gradBot)
+    val chipBg: Color get() = if (dark) Color(0x22FFFFFF) else Color(0x18000000)
+    val chipActiveBg: Color get() = accentA
+    val chipActiveText: Color get() = onAccent
 }
 
 /**

@@ -522,11 +522,19 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
-                                screen == "search" -> {
+                                screen.startsWith("search") -> {
+                                    val initialTab = when {
+                                        screen.endsWith(":manga") -> "manga"
+                                        screen.endsWith(":novel") -> "novel"
+                                        else -> "anime"
+                                    }
                                     SearchScreen(
                                         vm = vm,
+                                        initialTab = initialTab,
                                         onBack = { pop() },
-                                        onAnimeClick = { vm.openAnimeDetail(it) }
+                                        onAnimeClick = { vm.openAnimeDetail(it) },
+                                        onMangaClick = { vm.openMangaDetail(it) },
+                                        onNovelClick = { vm.openNovelDetail(it) }
                                     )
                                 }
 
@@ -805,7 +813,17 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         val cc = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chId)
                                         push("manga_reader:$cm:$cc")
                                     },
-                                    onAnimeClick = { vm.openAnimeDetail(it) }
+                                    onAnimeClick = { animeId ->
+                                        vm.closeMangaDetail()
+                                        vm.openAnimeDetail(animeId)
+                                    },
+                                    onNovelClick = { novelSlug ->
+                                        vm.closeMangaDetail()
+                                        vm.openNovelDetail(novelSlug)
+                                    },
+                                    onMangaClick = { newMangaId ->
+                                        vm.openMangaDetail(newMangaId)
+                                    }
                                 )
                             }
                         }
@@ -830,6 +848,17 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     },
                                     onReadChapter = { nSlug, chSlug ->
                                         push("novel_reader:$nSlug:$chSlug")
+                                    },
+                                    onAnimeClick = { animeId ->
+                                        vm.closeNovelDetail()
+                                        vm.openAnimeDetail(animeId)
+                                    },
+                                    onMangaClick = { mangaId ->
+                                        vm.closeNovelDetail()
+                                        vm.openMangaDetail(mangaId)
+                                    },
+                                    onNovelClick = { newSlug ->
+                                        vm.openNovelDetail(newSlug)
                                     }
                                 )
                             }
@@ -919,6 +948,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             avatarDecorationId = vm.userProfile.avatarDecorationId,
                             avatarFrameId = vm.userProfile.avatarFrameId,
                             onMenuClick = { isDrawerOpen = true },
+                            onSearchClick = {
+                                push(if (currentRoute == "manga") "search:manga" else if (currentRoute == "novel") "search:novel" else "search")
+                            },
                             onWatchlistClick = { push("watchlist") },
                             onProfileClick = { switchTab("profile") },
                             modifier = Modifier.align(Alignment.TopCenter)
@@ -936,7 +968,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             backdrop = appBackdropLayer,
                             collapsed = chrome.bottomCollapsed,
                             onExpand = { chrome.expandBottom() },
-                            onSearchClick = { push("search") },
+                            onSearchClick = {
+                                push(if (currentRoute == "manga") "search:manga" else if (currentRoute == "novel") "search:novel" else "search")
+                            },
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }

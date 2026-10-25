@@ -103,7 +103,9 @@ fun MangaDetailScreen(
     mangaId: String,
     onBack: () -> Unit,
     onReadChapter: (mangaId: String, chapterId: String) -> Unit,
-    onAnimeClick: ((Int) -> Unit)? = null
+    onAnimeClick: ((Int) -> Unit)? = null,
+    onNovelClick: ((String) -> Unit)? = null,
+    onMangaClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val p = rememberHomePalette()
@@ -621,6 +623,44 @@ fun MangaDetailScreen(
                         }
                     }
 
+                    // 3.5 Related Media Section (Anime adaptations, Light Novels, Spinoffs, Sequels/Prequels)
+                    if (!info?.relations.isNullOrEmpty()) {
+                        item("relations") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = "Related Media",
+                                    color = p.text,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 20.dp)
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    items(info?.relations ?: emptyList(), key = { "${it.type}_${it.id}" }) { rel ->
+                                        RelatedMediaTile(
+                                            item = rel,
+                                            p = p,
+                                            onClick = {
+                                                when {
+                                                    rel.type.equals("ANIME", ignoreCase = true) -> onAnimeClick?.invoke(rel.id)
+                                                    rel.type.equals("NOVEL", ignoreCase = true) || rel.format.equals("NOVEL", ignoreCase = true) || rel.format.equals("LIGHT_NOVEL", ignoreCase = true) -> onNovelClick?.invoke(rel.title)
+                                                    else -> onMangaClick?.invoke(rel.id.toString())
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // 4. AVAILABLE SOURCES SECTION (Interactive Liquid Glass Switcher)
                     item("available_sources") {
                         val avail = info?.availableSources ?: emptyList()
@@ -933,5 +973,96 @@ private fun DetailBackdropArt(url: String, p: HomePalette, modifier: Modifier) {
                     Brush.verticalGradient(listOf(p.gradTop.copy(alpha = 0.35f), Color.Transparent))
                 )
         )
+    }
+}
+
+@Composable
+private fun RelatedMediaTile(
+    item: com.nyyrox.aniverse.data.MediaRelation,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(115.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(115.dp)
+                .height(168.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .shimmer(p)
+        ) {
+            AsyncImage(
+                model = item.cover,
+                contentDescription = item.displayTitle,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // Relation Type Badge (top-start)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xB3000000))
+                    .padding(horizontal = 6.dp, vertical = 2.5.dp)
+            ) {
+                Text(
+                    text = item.displayRelationType.uppercase(),
+                    color = Color.White,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Media Type Badge (bottom-end)
+            val mediaType = when {
+                item.type.equals("ANIME", ignoreCase = true) -> "ANIME"
+                item.type.equals("NOVEL", ignoreCase = true) || item.format.equals("NOVEL", ignoreCase = true) || item.format.equals("LIGHT_NOVEL", ignoreCase = true) -> "NOVEL"
+                else -> "MANGA"
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = mediaType,
+                    color = p.accentText,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = item.displayTitle,
+            color = p.text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 15.sp
+        )
+
+        val meta = item.format ?: item.type
+        if (meta.isNotBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = meta.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+                color = p.textSub,
+                fontSize = 10.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
