@@ -947,24 +947,6 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         }
                     }
 
-                    // Transparent Dark Gradient Top Bar overlay (Only on home, manga, novel - NOT profile or airing)
-                    if (isRootRoute && currentRoute != "profile" && currentRoute != "browse") {
-                        OttTopBar(
-                            // Schedule has its own header: keep only the profile bubble there.
-                            expanded = chrome.topExpanded && currentRoute != "airing",
-                            userAvatarUrl = vm.userProfile.avatarUrl,
-                            avatarDecorationId = vm.userProfile.avatarDecorationId,
-                            avatarFrameId = vm.userProfile.avatarFrameId,
-                            onMenuClick = { isDrawerOpen = true },
-                            onSearchClick = {
-                                push(if (currentRoute == "manga") "search:manga" else if (currentRoute == "novel") "search:novel" else "search")
-                            },
-                            onWatchlistClick = { push("watchlist") },
-                            onProfileClick = { switchTab("profile") },
-                            modifier = Modifier.align(Alignment.TopCenter)
-                        )
-                    }
-
                     // Fixed Glassmorphic Bottom Dock (5 primary tabs: Home, Browse, Manga, Novel, Profile)
                     if (isRootRoute) {
                         OttBottomDock(
@@ -983,21 +965,37 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         )
                     }
 
-                    // Navigation menu: drawn after the dock so its scrim and card sit on top of both bars.
-                    OttNavDrawer(
-                        isOpen = isDrawerOpen,
-                        onDismiss = { isDrawerOpen = false },
-                        onNavigate = { target ->
-                            if (listOf("home", "airing", "manga", "novel", "profile").contains(target)) {
-                                switchTab(target)
-                            } else {
-                                push(target)
-                            }
-                        },
-                        userAvatarUrl = vm.userProfile.avatarUrl,
-                        avatarDecorationId = vm.userProfile.avatarDecorationId,
-                        avatarFrameId = vm.userProfile.avatarFrameId
-                    )
+                    // Unified Expandable Top Bar & Navigation Drawer
+                    // When closed: sleek 44dp top bar. When menu is clicked: that same bar smoothly expands downward into the drawer menu.
+                    if (isRootRoute && currentRoute != "profile" && currentRoute != "browse") {
+                        OttTopBar(
+                            // Schedule has its own header: keep only the profile bubble there.
+                            expanded = chrome.topExpanded && currentRoute != "airing",
+                            userAvatarUrl = vm.userProfile.avatarUrl,
+                            avatarDecorationId = vm.userProfile.avatarDecorationId,
+                            avatarFrameId = vm.userProfile.avatarFrameId,
+                            isMenuOpen = isDrawerOpen,
+                            onMenuClick = { isDrawerOpen = true },
+                            onDismissMenu = { isDrawerOpen = false },
+                            onNavigate = { target ->
+                                isDrawerOpen = false
+                                if (listOf("home", "airing", "manga", "novel", "profile").contains(target)) {
+                                    switchTab(target)
+                                } else {
+                                    push(target)
+                                }
+                            },
+                            onSearchClick = {
+                                push(if (currentRoute == "manga") "search:manga" else if (currentRoute == "novel") "search:novel" else "search")
+                            },
+                            onWatchlistClick = { push("watchlist") },
+                            onProfileClick = {
+                                isDrawerOpen = false
+                                switchTab("profile")
+                            },
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
 
                     // Compulsory username setup overlay for logged in users who do not have a username yet
                     if (vm.authState is AuthState.LoggedIn && (vm.isUsernameSetupRequired || vm.userProfile.username.isBlank()) && !vm.authLoading && currentRoute != "login") {

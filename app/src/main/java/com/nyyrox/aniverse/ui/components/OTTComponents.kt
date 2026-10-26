@@ -517,89 +517,30 @@ fun OttTopBar(
     avatarDecorationId: String? = null,
     avatarFrameId: String? = null,
     watchlistCount: Int = 0,
+    isMenuOpen: Boolean = false,
     onMenuClick: () -> Unit = {},
+    onDismissMenu: () -> Unit = {},
+    onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onWatchlistClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val p = rememberHomePalette()
-    val fraction by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 220f),
-        label = "topBarMorph"
-    )
-    val scrim = p.gradTop
-
-    BoxWithConstraints(
+    ExpandableOttTopBar(
+        expanded = expanded,
+        userAvatarUrl = userAvatarUrl,
+        avatarDecorationId = avatarDecorationId,
+        avatarFrameId = avatarFrameId,
+        watchlistCount = watchlistCount,
+        isMenuOpen = isMenuOpen,
+        onMenuClick = onMenuClick,
+        onDismissMenu = onDismissMenu,
+        onNavigate = onNavigate,
+        onSearchClick = onSearchClick,
+        onWatchlistClick = onWatchlistClick,
+        onProfileClick = onProfileClick,
         modifier = modifier
-            .fillMaxWidth()
-            .drawBehind {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to scrim.copy(alpha = 0.92f),
-                        0.55f to scrim.copy(alpha = 0.55f),
-                        1f to scrim.copy(alpha = 0f)
-                    ),
-                    alpha = fraction.coerceIn(0f, 1f)
-                )
-            }
-            .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp)
-    ) {
-        val fullWidth = maxWidth
-        val barHeight = 44.dp
-        val pillWidth = lerp(barHeight, fullWidth, fraction.coerceIn(0f, 1f))
-
-        val backdrop = com.styropyr0.prismal.LocalPrismalBackdrop.current
-            ?: com.styropyr0.prismal.sources.emptyGlassSource()
-        val glass = rememberOttGlass(backdrop, p, OttCapsuleShape, 16.dp, 16.dp)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .width(pillWidth)
-                .height(barHeight)
-                .then(if (p.glassOn) glass.clip(CircleShape) else Modifier.ottGlass(p, CircleShape))
-        ) {
-            // Laid out at full width and anchored to the right, so the shape only reveals / hides it.
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    // Lets the row be wider than the pill and pins its right edge to the pill's right edge,
-                    // so the profile bubble stays put while the pill shrinks onto it.
-                    .wrapContentWidth(Alignment.End, unbounded = true)
-                    .width(fullWidth)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.graphicsLayer {
-                        alpha = ((fraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
-                    },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MenuLinesButton(
-                        color = p.text,
-                        openProgress = { 0f },
-                        onClick = onMenuClick,
-                        enabled = expanded
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
-                }
-
-                Spacer(Modifier.weight(1f))
-
-                OttProfileBubble(
-                    p = p,
-                    avatarUrl = userAvatarUrl,
-                    decorationId = avatarDecorationId,
-                    frameId = avatarFrameId,
-                    onClick = onProfileClick
-                )
-            }
-        }
-    }
+    )
 }
 
 /** Premium liquid glass icon button with spring press haptics and glass gradient refraction. */

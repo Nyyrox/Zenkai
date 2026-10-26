@@ -70,7 +70,7 @@ private data class StarParticle(
 fun ZenkaiCommunityCard(
     modifier: Modifier = Modifier,
     telegramUrl: String = "https://t.me/StreamverseOfc",
-    discordUrl: String = "https://discord.gg/aXTfS6XGg"
+    discordUrl: String = "https://discord.gg/kHxHzZtH7"
 ) {
     // Generate fixed random star distribution
     val stars = remember {

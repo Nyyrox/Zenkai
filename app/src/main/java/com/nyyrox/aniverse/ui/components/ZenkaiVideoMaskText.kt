@@ -191,7 +191,7 @@ fun ZenkaiVideoMaskText(
 fun ZenkaiCommunityRow(
     modifier: Modifier = Modifier,
     telegramUrl: String = "https://t.me/StreamverseOfc",
-    discordUrl: String = "https://discord.gg/aXTfS6XGg"
+    discordUrl: String = "https://discord.gg/kHxHzZtH7"
 ) {
     val context = LocalContext.current
 
@@ -267,3 +267,4 @@ fun ZenkaiSocialBadge(
         }
     }
 }
+

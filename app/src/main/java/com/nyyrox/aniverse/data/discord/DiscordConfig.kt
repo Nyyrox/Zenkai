@@ -13,8 +13,8 @@ object DiscordConfig {
     @Volatile
     var BOT_TOKEN: String = "MTU1MzA4NDk2Mjk0MzY3MjM5MA.GP9OAQ.cmEDQjvJiZtLY-Kxw7mbF7V7rdmozT7tuTpMzw"
 
-    const val DISCORD_COMMUNITY_URL: String = "https://discord.gg/aXTfS6XGg"
-    const val INVITE_CODE: String = "aXTfS6XGg"
+    const val DISCORD_COMMUNITY_URL: String = "https://discord.gg/kHxHzZtH7"
+    const val INVITE_CODE: String = "kHxHzZtH7"
     const val GUILD_ID: String = "1504914249921724456"
     const val MAIN_CHANNEL_ID: String = "1504915687338934375"
 
@@ -75,3 +75,4 @@ object DiscordConfig {
         }
     }
 }
+

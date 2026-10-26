@@ -15,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,6 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -59,6 +63,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import com.nyyrox.aniverse.ui.screens.HomePalette
 import com.nyyrox.aniverse.ui.screens.rememberHomePalette
@@ -90,9 +95,259 @@ private val DrawerEntries = listOf(
 private val DrawerGlassShape: () -> Shape = { PrismalRoundedRectangle(28.dp) }
 
 /**
- * Menu. The hamburger pill in the top bar grows downward into a Prismal liquid-glass card while its three lines
- * turn into an X; closing plays the same motion backwards into the pill. Rows slide in one after another.
- * Glass on -> real liquid glass (same recipe as the dock), glass off -> flat card. Both follow light / dark.
+ * Unified Expandable Top Bar & Navigation Drawer.
+ * When closed, it is the sleek 44dp top bar pill with hamburger icon, ZENKAI logo and profile bubble.
+ * When menu is clicked, that exact bar smoothly expands downwards into the liquid-glass navigation menu,
+ * and the hamburger lines morph into an 'X'.
+ */
+@Composable
+fun ExpandableOttTopBar(
+    expanded: Boolean = true,
+    userAvatarUrl: String? = null,
+    avatarDecorationId: String? = null,
+    avatarFrameId: String? = null,
+    watchlistCount: Int = 0,
+    isMenuOpen: Boolean = false,
+    onMenuClick: () -> Unit = {},
+    onDismissMenu: () -> Unit = {},
+    onNavigate: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
+    onWatchlistClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val p = rememberHomePalette()
+    val context = LocalContext.current
+    val fraction by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 220f),
+        label = "topBarMorph"
+    )
+    val menuProgress = animateFloatAsState(
+        targetValue = if (isMenuOpen) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 260f),
+        label = "drawerProgress"
+    )
+
+    BackHandler(enabled = isMenuOpen) { onDismissMenu() }
+
+    val barHeightPx = with(LocalDensity.current) { 44.dp.roundToPx() }
+    val backdrop = LocalPrismalBackdrop.current ?: emptyGlassSource()
+    val scrim = p.gradTop
+
+    val isAnimatingMenu = isMenuOpen || menuProgress.value > 0.005f
+    val effectiveFraction = if (isAnimatingMenu) 1f else fraction
+
+    Box(
+        modifier = if (isAnimatingMenu) {
+            Modifier.fillMaxSize()
+        } else {
+            modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+        }
+    ) {
+        // Scrim background when menu is opening / open
+        if (isAnimatingMenu) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = menuProgress.value.coerceIn(0f, 1f) }
+                    .background(Color.Black.copy(alpha = if (p.dark) 0.40f else 0.18f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = isMenuOpen
+                    ) { onDismissMenu() }
+            )
+        }
+
+        // Top gradient scrim for status bar readability
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .align(Alignment.TopCenter)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0f to scrim.copy(alpha = 0.92f),
+                            0.55f to scrim.copy(alpha = 0.55f),
+                            1f to scrim.copy(alpha = 0f)
+                        ),
+                        alpha = maxOf(fraction, menuProgress.value).coerceIn(0f, 1f)
+                    )
+                }
+        )
+
+        // The bar / panel that expands downwards in-place
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .then(if (isAnimatingMenu) Modifier.navigationBarsPadding() else Modifier)
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 6.dp,
+                    bottom = if (isAnimatingMenu) 12.dp else 16.dp
+                )
+        ) {
+            val fullWidth = maxWidth
+            val barHeight = 44.dp
+            val pillWidth = lerp(barHeight, fullWidth, effectiveFraction.coerceIn(0f, 1f))
+
+            val surface = if (p.dark) Color(0xFF1C1C1E).copy(alpha = 0.78f) else Color.White.copy(alpha = 0.70f)
+            val cardRadius = lerp(22.dp, 28.dp, menuProgress.value)
+            val cardShape = RoundedCornerShape(cardRadius)
+
+            val glass = rememberOttGlass(
+                backdrop = backdrop,
+                p = p,
+                shape = if (isAnimatingMenu) DrawerGlassShape else OttCapsuleShape,
+                refractionHeight = if (isAnimatingMenu) 22.dp else 16.dp,
+                refractionAmount = if (isAnimatingMenu) 22.dp else 16.dp,
+                surfaceColor = if (isAnimatingMenu) surface else null
+            )
+
+            val cardModifier = if (p.glassOn) {
+                glass.clip(cardShape)
+            } else {
+                Modifier
+                    .clip(cardShape)
+                    .background(if (p.dark) Color(0xFF1A1A1C) else Color(0xFFF7F7F9))
+                    .border(0.8.dp, p.glassBorder, cardShape)
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .width(pillWidth)
+            ) {
+                Layout(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(cardModifier)
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+                    content = {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // Header Row: Hamburger Lines -> 'X', ZENKAI logo, Profile bubble
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(barHeight)
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.graphicsLayer {
+                                        alpha = ((effectiveFraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
+                                    },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    MenuLinesButton(
+                                        color = p.text,
+                                        openProgress = { menuProgress.value },
+                                        onClick = {
+                                            if (isMenuOpen) onDismissMenu() else onMenuClick()
+                                        },
+                                        enabled = expanded || isMenuOpen
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
+                                }
+
+                                Spacer(Modifier.weight(1f))
+
+                                OttProfileBubble(
+                                    p = p,
+                                    avatarUrl = userAvatarUrl,
+                                    decorationId = avatarDecorationId,
+                                    frameId = avatarFrameId,
+                                    onClick = {
+                                        if (isMenuOpen) onDismissMenu()
+                                        onProfileClick()
+                                    }
+                                )
+                            }
+
+                            // Drawer Content: only measured and revealed when menu expands
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 14.dp)
+                            ) {
+                                Spacer(Modifier.height(10.dp))
+                                SectionLabel("EXPLORE", Modifier.stagger(menuProgress, 0), p)
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .stagger(menuProgress, 1)
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .background(p.text.copy(alpha = 0.06f))
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    DrawerEntries.forEachIndexed { i, entry ->
+                                        DrawerRow(
+                                            p = p,
+                                            entry = entry,
+                                            showDivider = i != DrawerEntries.lastIndex,
+                                            modifier = Modifier.stagger(menuProgress, 1 + i),
+                                            onClick = {
+                                                onDismissMenu()
+                                                onNavigate(entry.target)
+                                            }
+                                        )
+                                    }
+                                }
+
+                                Spacer(Modifier.height(14.dp))
+                                SectionLabel("COMMUNITY", Modifier.stagger(menuProgress, DrawerEntries.size + 1), p)
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .stagger(menuProgress, DrawerEntries.size + 2),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CommunityButton(
+                                        p = p,
+                                        icon = Icons.AutoMirrored.Filled.Send,
+                                        label = "Telegram",
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { openUrl(context, TELEGRAM_URL) }
+                                    )
+                                    CommunityButton(
+                                        p = p,
+                                        icon = Icons.Default.Forum,
+                                        label = "Discord",
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { openUrl(context, DISCORD_INVITE_URL) }
+                                    )
+                                }
+                                Spacer(Modifier.height(18.dp))
+                            }
+                        }
+                    }
+                ) { measurables, constraints ->
+                    val placeable = measurables.first().measure(
+                        constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
+                    )
+                    val collapsed = barHeightPx.coerceAtMost(placeable.height)
+                    val t = menuProgress.value.coerceIn(0f, 1f)
+                    val h = (collapsed + (placeable.height - collapsed) * t).roundToInt()
+                    layout(placeable.width, h) { placeable.place(0, 0) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Backward compatibility alias for OttNavDrawer
  */
 @Composable
 fun OttNavDrawer(
@@ -103,48 +358,16 @@ fun OttNavDrawer(
     avatarDecorationId: String? = null,
     avatarFrameId: String? = null
 ) {
-    val p = rememberHomePalette()
-    val progress = animateFloatAsState(
-        targetValue = if (isOpen) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = 260f),
-        label = "drawerProgress"
-    )
-    BackHandler(enabled = isOpen) { onDismiss() }
-    if (!isOpen && progress.value < 0.005f) return
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Light scrim, so the glass card still sees the page behind it.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
-                .background(Color.Black.copy(alpha = if (p.dark) 0.40f else 0.18f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    enabled = isOpen
-                ) { onDismiss() }
+    if (isOpen) {
+        ExpandableOttTopBar(
+            expanded = true,
+            userAvatarUrl = userAvatarUrl,
+            avatarDecorationId = avatarDecorationId,
+            avatarFrameId = avatarFrameId,
+            isMenuOpen = true,
+            onDismissMenu = onDismiss,
+            onNavigate = onNavigate
         )
-
-        // Same origin as the top bar pill: status bar + 6dp, 16dp side margins.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            DrawerPanel(
-                p = p,
-                progress = progress,
-                onDismiss = onDismiss,
-                onNavigate = onNavigate,
-                avatarUrl = userAvatarUrl,
-                decorationId = avatarDecorationId,
-                frameId = avatarFrameId
-            )
-        }
     }
 }
 
@@ -153,147 +376,6 @@ private fun Modifier.stagger(progress: State<Float>, index: Int): Modifier = gra
     val a = ((progress.value - 0.15f - index * 0.05f) / 0.3f).coerceIn(0f, 1f)
     alpha = a
     translationY = (1f - a) * 14.dp.toPx()
-}
-
-@Composable
-private fun DrawerPanel(
-    p: HomePalette,
-    progress: State<Float>,
-    onDismiss: () -> Unit,
-    onNavigate: (String) -> Unit,
-    avatarUrl: String?,
-    decorationId: String?,
-    frameId: String?
-) {
-    val context = LocalContext.current
-    val barHeightPx = with(LocalDensity.current) { 44.dp.roundToPx() }
-    val backdrop = LocalPrismalBackdrop.current ?: emptyGlassSource()
-
-    // Same material as Prismal's own glass menu: neutral, readable, and still see-through.
-    val surface = if (p.dark) Color(0xFF1C1C1E).copy(alpha = 0.78f) else Color.White.copy(alpha = 0.70f)
-    val glass = rememberOttGlass(
-        backdrop = backdrop,
-        p = p,
-        shape = DrawerGlassShape,
-        refractionHeight = 22.dp,
-        refractionAmount = 22.dp,
-        surfaceColor = surface
-    )
-    val cardShape = RoundedCornerShape(28.dp)
-    val cardModifier = if (p.glassOn) {
-        glass.clip(cardShape)
-    } else {
-        Modifier
-            .clip(cardShape)
-            .background(if (p.dark) Color(0xFF1A1A1C) else Color(0xFFF7F7F9))
-            .border(0.8.dp, p.glassBorder, cardShape)
-    }
-
-    Layout(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(cardModifier)
-            // Swallow taps on the card so they do not reach the scrim.
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
-        content = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Header: lines -> X, logo, profile. Lines up with the top bar pill underneath.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MenuLinesButton(
-                        color = p.text,
-                        openProgress = { progress.value },
-                        onClick = onDismiss
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
-                    Spacer(Modifier.weight(1f))
-                    OttProfileBubble(
-                        p = p,
-                        avatarUrl = avatarUrl,
-                        decorationId = decorationId,
-                        frameId = frameId,
-                        onClick = {
-                            onDismiss()
-                            onNavigate("profile")
-                        }
-                    )
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 14.dp)
-                ) {
-                    Spacer(Modifier.height(10.dp))
-                    SectionLabel("EXPLORE", Modifier.stagger(progress, 0), p)
-
-                    // One grouped list instead of seven separate cards.
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .stagger(progress, 1)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(p.text.copy(alpha = 0.06f))
-                            .padding(vertical = 4.dp)
-                    ) {
-                        DrawerEntries.forEachIndexed { i, entry ->
-                            DrawerRow(
-                                p = p,
-                                entry = entry,
-                                showDivider = i != DrawerEntries.lastIndex,
-                                modifier = Modifier.stagger(progress, 1 + i),
-                                onClick = {
-                                    onDismiss()
-                                    onNavigate(entry.target)
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(14.dp))
-                    SectionLabel("COMMUNITY", Modifier.stagger(progress, DrawerEntries.size + 1), p)
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .stagger(progress, DrawerEntries.size + 2),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        CommunityButton(
-                            p = p,
-                            icon = Icons.AutoMirrored.Filled.Send,
-                            label = "Telegram",
-                            modifier = Modifier.weight(1f),
-                            onClick = { openUrl(context, TELEGRAM_URL) }
-                        )
-                        CommunityButton(
-                            p = p,
-                            icon = Icons.Default.Forum,
-                            label = "Discord",
-                            modifier = Modifier.weight(1f),
-                            onClick = { openUrl(context, DISCORD_INVITE_URL) }
-                        )
-                    }
-                    Spacer(Modifier.height(18.dp))
-                }
-            }
-        }
-    ) { measurables, constraints ->
-        val placeable = measurables.first().measure(
-            constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
-        )
-        val collapsed = barHeightPx.coerceAtMost(placeable.height)
-        val t = progress.value.coerceIn(0f, 1f)
-        val h = (collapsed + (placeable.height - collapsed) * t).roundToInt()
-        layout(placeable.width, h) { placeable.place(0, 0) }
-    }
 }
 
 @Composable

@@ -493,7 +493,7 @@ fun ProfileScreen(
                         SettingRow(Icons.Default.Security, "Legal & DMCA", onClick = { showDmcaModal = true })
                         RowDivider()
                         SettingRow(Icons.AutoMirrored.Filled.OpenInNew, "Discord",
-                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/aXTfS6XGg"))) })
+                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))) })
                         RowDivider()
                         SettingRow(Icons.AutoMirrored.Filled.OpenInNew, "Telegram",
                             onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))) })
@@ -1801,3 +1801,4 @@ private fun AppSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
         )
     }
 }
+

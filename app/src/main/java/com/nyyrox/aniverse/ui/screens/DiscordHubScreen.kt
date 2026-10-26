@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -13,16 +12,49 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,17 +76,14 @@ import com.nyyrox.aniverse.data.discord.DiscordGuildInfo
 import com.nyyrox.aniverse.data.discord.DiscordRepository
 import com.nyyrox.aniverse.ui.components.DiscordIntegrationSheet
 import com.nyyrox.aniverse.ui.components.DiscordLoginModal
-import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttTextMuted
 import kotlinx.coroutines.launch
-
-private val HubCardBg = Color(0xFF131722)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscordHubScreen(
     onBack: () -> Unit
 ) {
+    val p = rememberHomePalette()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var guildInfo by remember { mutableStateOf<DiscordGuildInfo?>(null) }
@@ -80,8 +109,10 @@ fun DiscordHubScreen(
         loadData()
     }
 
+    val cardBg = if (p.dark) Color(0xFF131722) else p.flatFill
+
     Scaffold(
-        containerColor = OttBg,
+        containerColor = p.bg,
         topBar = {
             TopAppBar(
                 title = {
@@ -90,12 +121,12 @@ fun DiscordHubScreen(
                             text = "Discord Community",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = p.text
                         )
                         Text(
                             text = "Official ZENKAI Server Hub",
                             fontSize = 11.sp,
-                            color = OttTextMuted
+                            color = p.textMuted
                         )
                     }
                 },
@@ -104,7 +135,7 @@ fun DiscordHubScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = p.text
                         )
                     }
                 },
@@ -113,11 +144,11 @@ fun DiscordHubScreen(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = Color.White.copy(alpha = 0.8f)
+                            tint = p.textSub
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = OttBg)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = p.bg)
             )
         }
     ) { padding ->
@@ -134,8 +165,8 @@ fun DiscordHubScreen(
                 DiscordHeroCard(
                     guildInfo = guildInfo,
                     isLoading = isLoading,
+                    p = p,
                     onOpenInApp = {
-                        // Open Discord community directly in-app via WebView
                         val guildId = guildInfo?.guildId ?: DiscordConfig.GUILD_ID
                         val channelId = guildInfo?.channelId ?: DiscordConfig.MAIN_CHANNEL_ID
                         communityWebViewUrl = "https://discord.com/channels/$guildId/$channelId"
@@ -153,7 +184,7 @@ fun DiscordHubScreen(
                     text = "COMMUNITY CHANNELS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = p.textMuted,
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
@@ -161,14 +192,15 @@ fun DiscordHubScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(HubCardBg)
-                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
+                        .background(cardBg)
+                        .border(1.dp, p.glassBorder, RoundedCornerShape(16.dp))
                         .padding(vertical = 6.dp)
                 ) {
                     DiscordChannelRow(
                         icon = Icons.Default.Forum,
                         name = "#general-chat",
                         description = "Chat with otaku anime fans worldwide",
+                        p = p,
                         onClick = {
                             val guildId = guildInfo?.guildId ?: DiscordConfig.GUILD_ID
                             val channelId = guildInfo?.channelId ?: DiscordConfig.MAIN_CHANNEL_ID
@@ -176,21 +208,23 @@ fun DiscordHubScreen(
                             showCommunityWebView = true
                         }
                     )
-                    HorizontalDivider(color = Color(0x12FFFFFF), modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(color = p.glassBorder, modifier = Modifier.padding(horizontal = 16.dp))
                     DiscordChannelRow(
                         icon = Icons.Default.Notifications,
                         name = "#announcements",
                         description = "Instant release notifications & updates",
+                        p = p,
                         onClick = {
                             communityWebViewUrl = "https://discord.com/channels/${DiscordConfig.GUILD_ID}/${DiscordConfig.MAIN_CHANNEL_ID}"
                             showCommunityWebView = true
                         }
                     )
-                    HorizontalDivider(color = Color(0x12FFFFFF), modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(color = p.glassBorder, modifier = Modifier.padding(horizontal = 16.dp))
                     DiscordChannelRow(
                         icon = Icons.Default.PlayArrow,
                         name = "#anime-requests",
                         description = "Request missing anime series and movies",
+                        p = p,
                         onClick = {
                             communityWebViewUrl = "https://discord.com/channels/${DiscordConfig.GUILD_ID}/${DiscordConfig.MAIN_CHANNEL_ID}"
                             showCommunityWebView = true
@@ -205,12 +239,13 @@ fun DiscordHubScreen(
                     text = "DISCORD RICH PRESENCE",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = p.textMuted,
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
                 DiscordRpcStatusCard(
                     account = accountState,
+                    p = p,
                     onConfigureClick = {
                         if (accountState != null) {
                             showIntegrationSheet = true
@@ -227,7 +262,7 @@ fun DiscordHubScreen(
                     text = "WHY JOIN ZENKAI DISCORD?",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = p.textMuted,
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
@@ -235,25 +270,28 @@ fun DiscordHubScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(HubCardBg)
-                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
+                        .background(cardBg)
+                        .border(1.dp, p.glassBorder, RoundedCornerShape(16.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DiscordPerkRow(
                         icon = Icons.Default.Check,
                         title = "Live Streaming Activity",
-                        description = "Show what anime episode you're streaming directly on your Discord profile."
+                        description = "Show what anime episode you're streaming directly on your Discord profile.",
+                        p = p
                     )
                     DiscordPerkRow(
                         icon = Icons.Default.Check,
                         title = "Direct Anime Requests",
-                        description = "Request new anime titles and report dead streams directly to the admin team."
+                        description = "Request new anime titles and report dead streams directly to the admin team.",
+                        p = p
                     )
                     DiscordPerkRow(
                         icon = Icons.Default.Check,
                         title = "Exclusive Otaku Roles",
-                        description = "Earn badges, level up, and participate in community anime watch parties."
+                        description = "Earn badges, level up, and participate in community anime watch parties.",
+                        p = p
                     )
                 }
             }
@@ -268,6 +306,7 @@ fun DiscordHubScreen(
     if (showCommunityWebView) {
         DiscordCommunityWebView(
             url = communityWebViewUrl,
+            p = p,
             onDismiss = { showCommunityWebView = false },
             onOpenExternal = { DiscordConfig.launchDiscordInvite(context) }
         )
@@ -279,25 +318,22 @@ fun DiscordHubScreen(
         )
     }
 
-    // Fix: pass onSuccess so accountState StateFlow triggers immediate UI refresh
     if (showLoginModal) {
         DiscordLoginModal(
             onDismiss = { showLoginModal = false },
             onSuccess = {
                 showLoginModal = false
-                loadData() // refresh guild member count too
+                loadData()
             }
         )
     }
 }
 
-// ── In-App Discord Community WebView Dialog ───────────────────────────────────
-// Opens Discord web interface directly inside the app.
-// User must log in via Discord web (separate from OAuth RPC login).
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun DiscordCommunityWebView(
     url: String,
+    p: HomePalette,
     onDismiss: () -> Unit,
     onOpenExternal: () -> Unit
 ) {
@@ -313,18 +349,17 @@ private fun DiscordCommunityWebView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.85f))
-                .padding(top = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF0D0F14))
+                    .background(if (p.dark) Color(0xFF0D0F14) else p.bg)
             ) {
                 // Header bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1A1D2E))
+                        .background(if (p.dark) Color(0xFF1A1D2E) else p.flatFill)
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -341,16 +376,15 @@ private fun DiscordCommunityWebView(
                     Text(
                         text = "ZENKAI Discord Community",
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = p.text,
                         fontSize = 14.sp,
                         modifier = Modifier.weight(1f)
                     )
-                    // Open in external Discord app
                     IconButton(onClick = onOpenExternal, modifier = Modifier.size(36.dp)) {
                         Icon(
                             Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = "Open in Discord App",
-                            tint = Color.White.copy(alpha = 0.7f),
+                            tint = p.textSub,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -358,12 +392,11 @@ private fun DiscordCommunityWebView(
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Color.White
+                            tint = p.text
                         )
                     }
                 }
 
-                // Discord Web inside WebView
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
@@ -376,7 +409,6 @@ private fun DiscordCommunityWebView(
                             settings.domStorageEnabled = true
                             settings.databaseEnabled = true
                             settings.mediaPlaybackRequiresUserGesture = false
-                            // Use a desktop user agent so Discord web loads properly
                             settings.userAgentString =
                                 "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             webViewClient = WebViewClient()
@@ -389,11 +421,11 @@ private fun DiscordCommunityWebView(
     }
 }
 
-
 @Composable
 private fun DiscordHeroCard(
     guildInfo: DiscordGuildInfo?,
     isLoading: Boolean,
+    p: HomePalette,
     onOpenInApp: () -> Unit,
     onOpenExternal: () -> Unit
 ) {
@@ -408,6 +440,8 @@ private fun DiscordHeroCard(
         label = "pulseAlpha"
     )
 
+    val heroBgBottom = if (p.dark) Color(0xFF131722) else p.flatFill
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -416,14 +450,14 @@ private fun DiscordHeroCard(
                 Brush.verticalGradient(
                     colors = listOf(
                         Color(0xFF5865F2).copy(alpha = 0.28f),
-                        Color(0xFF131722)
+                        heroBgBottom
                     )
                 )
             )
             .border(
                 1.dp,
                 Brush.verticalGradient(
-                    listOf(Color(0xFF5865F2).copy(alpha = 0.6f), Color(0x22FFFFFF))
+                    listOf(Color(0xFF5865F2).copy(alpha = 0.6f), p.glassBorder)
                 ),
                 RoundedCornerShape(20.dp)
             )
@@ -467,11 +501,10 @@ private fun DiscordHeroCard(
                         text = guildInfo?.name ?: "ZENKAI",
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color.White
+                        color = p.text
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Pulsing online dot
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
@@ -494,7 +527,7 @@ private fun DiscordHeroCard(
             Text(
                 text = "Join our official Discord community for fast anime updates, episode discussions, and live Rich Presence on your profile.",
                 fontSize = 12.5.sp,
-                color = Color.White.copy(alpha = 0.75f),
+                color = p.textSub,
                 lineHeight = 18.sp
             )
 
@@ -533,12 +566,15 @@ private fun DiscordHeroCard(
                     .fillMaxWidth()
                     .height(42.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5865F2).copy(alpha = 0.6f))
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (p.dark) Color(0xFF5865F2).copy(alpha = 0.6f) else Color(0xFF5865F2)
+                )
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
-                    tint = Color(0xFF5865F2),
+                    tint = if (p.dark) Color(0xFF7289DA) else Color(0xFF5865F2),
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.width(8.dp))
@@ -546,7 +582,7 @@ private fun DiscordHeroCard(
                     text = "Open in Discord App",
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
-                    color = Color(0xFF5865F2)
+                    color = if (p.dark) Color(0xFF7289DA) else Color(0xFF5865F2)
                 )
             }
         }
@@ -558,6 +594,7 @@ private fun DiscordChannelRow(
     icon: ImageVector,
     name: String,
     description: String,
+    p: HomePalette,
     onClick: () -> Unit
 ) {
     Row(
@@ -584,19 +621,19 @@ private fun DiscordChannelRow(
                 text = name,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = p.text
             )
             Text(
                 text = description,
                 fontSize = 11.sp,
-                color = OttTextMuted
+                color = p.textMuted
             )
         }
 
         Icon(
             Icons.AutoMirrored.Filled.OpenInNew,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.35f),
+            tint = p.textMuted,
             modifier = Modifier.size(16.dp)
         )
     }
@@ -605,14 +642,16 @@ private fun DiscordChannelRow(
 @Composable
 private fun DiscordRpcStatusCard(
     account: com.nyyrox.aniverse.data.discord.DiscordAccount?,
+    p: HomePalette,
     onConfigureClick: () -> Unit
 ) {
+    val cardBg = if (p.dark) Color(0xFF131722) else p.flatFill
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(HubCardBg)
-            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
+            .background(cardBg)
+            .border(1.dp, p.glassBorder, RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Row(
@@ -625,12 +664,12 @@ private fun DiscordRpcStatusCard(
                     text = if (account != null) "Connected as @${account.username}" else "Discord Account",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = p.text
                 )
                 Text(
                     text = if (account != null) "Rich Presence Active (Watching Zenkai)" else "Connect to broadcast your watching activity",
                     fontSize = 11.5.sp,
-                    color = if (account != null) Color(0xFF23A55A) else OttTextMuted
+                    color = if (account != null) Color(0xFF23A55A) else p.textMuted
                 )
             }
 
@@ -638,7 +677,7 @@ private fun DiscordRpcStatusCard(
                 onClick = onConfigureClick,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (account != null) Color(0x22FFFFFF) else Color(0xFF5865F2)
+                    containerColor = if (account != null) p.chipBg else Color(0xFF5865F2)
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             ) {
@@ -646,7 +685,7 @@ private fun DiscordRpcStatusCard(
                     text = if (account != null) "Settings" else "Connect",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = if (account != null) p.text else Color.White
                 )
             }
         }
@@ -657,7 +696,8 @@ private fun DiscordRpcStatusCard(
 private fun DiscordPerkRow(
     icon: ImageVector,
     title: String,
-    description: String
+    description: String,
+    p: HomePalette
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -680,13 +720,13 @@ private fun DiscordPerkRow(
                 text = title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = p.text
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = description,
                 fontSize = 11.5.sp,
-                color = Color.White.copy(alpha = 0.65f),
+                color = p.textSub,
                 lineHeight = 16.sp
             )
         }
