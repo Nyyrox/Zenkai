@@ -300,6 +300,324 @@ class MangaDexRepository(
 }
 
 // ============================================================================
+// 1.5 UNIFIED MANGA WORKER GATEWAY
+// (WeebCentral, ComicK, Manhua, Asura Scans & Demonic Scans proxy handler)
+// ============================================================================
+internal object WorkerMangaHelper {
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .build()
+
+    val WORKER_ORIGIN: String
+        get() = com.nyyrox.aniverse.data.config.DynamicConfigManager.getWorkerUrl(
+            "manga_worker_origin",
+            "https://brhgxkmnoken-mud-a7f7nyroxx.ammhfoo.workers.dev"
+        )
+
+    fun cleanId(id: String): String {
+        var s = id.trim().substringBefore("?").substringBefore("#")
+        s = s.removePrefix("wc_").removePrefix("ck_").removePrefix("mh_").removePrefix("as_").removePrefix("ds_").removePrefix("md_")
+        if (s.contains("/series/")) {
+            s = s.substringAfter("/series/").substringBefore("/").substringBefore("_")
+        }
+        val ulidMatch = Regex("""\b([0-9A-HJ-KM-NP-TV-Z]{26})\b""", RegexOption.IGNORE_CASE).find(s)
+        if (ulidMatch != null) return ulidMatch.groupValues[1]
+        return s.split("_").firstOrNull()?.split("/")?.firstOrNull() ?: s
+    }
+
+    fun cleanChapId(chapterId: String): String {
+        var s = chapterId.trim().substringBefore("?").substringBefore("#")
+        s = s.removePrefix("wc_chapter_").removePrefix("wc_").removePrefix("ck_chapter_").removePrefix("ck_")
+            .removePrefix("mh_chapter_").removePrefix("mh_").removePrefix("as_chapter_").removePrefix("as_")
+            .removePrefix("ds_chapter_").removePrefix("ds_").removePrefix("md_chapter_").removePrefix("md_")
+        if (s.contains("/chapters/")) {
+            s = s.substringAfter("/chapters/").substringBefore("/")
+        }
+        val ulidMatch = Regex("""\b([0-9A-HJ-KM-NP-TV-Z]{26})\b""", RegexOption.IGNORE_CASE).find(s)
+        if (ulidMatch != null) return ulidMatch.groupValues[1]
+        return s
+    }
+
+    suspend fun search(query: String, source: MangaSource): List<MangaCard> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isBlank()) return@withContext emptyList()
+        val enc = URLEncoder.encode(q, "UTF-8")
+        val sourceParam = if (source != MangaSource.WEEBCENTRAL) "&source=${source.id}" else ""
+        val url = "$WORKER_ORIGIN/?action=search&q=$enc$sourceParam"
+
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0 Aniverse/1.0")
+                .build()
+            client.newCall(req).execute().use { res ->
+                if (res.isSuccessful) {
+                    val body = res.body?.string().orEmpty()
+                    if (body.isNotBlank()) {
+                        val json = JSONObject(body)
+                        val arr = json.optJSONArray("results") ?: json.optJSONArray("data")
+                        return@withContext parseCardsArray(arr, source)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("WorkerManga", "Worker search failed for ${source.id}: ${e.message}")
+        }
+        emptyList()
+    }
+
+    suspend fun getChapters(mangaId: String, source: MangaSource): List<MangaChapter> = withContext(Dispatchers.IO) {
+        val cid = cleanId(mangaId)
+        if (cid.isBlank()) return@withContext emptyList()
+        val sourceParam = if (source != MangaSource.WEEBCENTRAL) "&source=${source.id}" else ""
+        val url = "$WORKER_ORIGIN/?action=chapters&id=$cid$sourceParam"
+
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            client.newCall(req).execute().use { res ->
+                if (res.isSuccessful) {
+                    val body = res.body?.string().orEmpty().trim()
+                    if (body.isNotBlank()) {
+                        val arr = when {
+                            body.startsWith("[") -> JSONArray(body)
+                            body.startsWith("{") -> {
+                                val obj = JSONObject(body)
+                                obj.optJSONArray("chapters") ?: obj.optJSONArray("results") ?: obj.optJSONArray("data") ?: obj.optJSONArray("value")
+                            }
+                            else -> null
+                        }
+                        if (arr != null) {
+                            val prefix = when (source) {
+                                MangaSource.WEEBCENTRAL -> "wc_"
+                                MangaSource.COMICK -> "ck_"
+                                MangaSource.MANHUA -> "mh_"
+                                MangaSource.ASURA -> "as_"
+                                MangaSource.DEMONIC_SCANS -> "ds_"
+                                MangaSource.MANGADEX -> "md_"
+                            }
+                            val chapters = mutableListOf<MangaChapter>()
+                            for (i in 0 until arr.length()) {
+                                val obj = arr.getJSONObject(i)
+                                val rawChapId = obj.optString("chapterId").ifBlank { obj.optString("id") }
+                                val cleanChId = cleanChapId(rawChapId)
+                                val numStr = obj.optString("number").ifBlank { obj.optString("chapter", "${i + 1}") }
+                                val titleStr = obj.optString("title").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                                chapters.add(
+                                    MangaChapter(
+                                        number = numStr,
+                                        title = titleStr,
+                                        chapterId = "$prefix$cleanChId",
+                                        releaseDate = obj.optString("releaseDate").ifBlank { obj.optString("date") }.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) },
+                                        url = "",
+                                        source = source.id
+                                    )
+                                )
+                            }
+                            if (chapters.isNotEmpty()) {
+                                return@withContext chapters.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("WorkerManga", "Worker getChapters failed for ${source.id}: ${e.message}")
+        }
+        emptyList()
+    }
+
+    suspend fun getPages(chapterId: String, source: MangaSource): List<String> = withContext(Dispatchers.IO) {
+        val cleanChId = cleanChapId(chapterId)
+        if (cleanChId.isBlank()) return@withContext emptyList()
+        val sourceParam = if (source != MangaSource.WEEBCENTRAL) "&source=${source.id}" else ""
+        val url = "$WORKER_ORIGIN/?action=pages&chapterId=$cleanChId$sourceParam"
+
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            client.newCall(req).execute().use { res ->
+                if (res.isSuccessful) {
+                    val body = res.body?.string().orEmpty()
+                    val pages = parsePagesFromBody(body)
+                    if (pages.isNotEmpty()) return@withContext pages
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("WorkerManga", "Worker getPages failed for ${source.id}: ${e.message}")
+        }
+        emptyList()
+    }
+
+    suspend fun getInfo(mangaId: String, source: MangaSource): MangaInfo? = withContext(Dispatchers.IO) {
+        val cid = cleanId(mangaId)
+        if (cid.isBlank()) return@withContext null
+        val sourceParam = if (source != MangaSource.WEEBCENTRAL) "&source=${source.id}" else ""
+        val url = "$WORKER_ORIGIN/?action=info&id=$cid$sourceParam"
+
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            client.newCall(req).execute().use { res ->
+                if (res.isSuccessful) {
+                    val body = res.body?.string().orEmpty()
+                    if (body.isNotBlank()) {
+                        val json = JSONObject(body)
+                        val infoObj = json.optJSONObject("info")
+                        if (infoObj != null) {
+                            val genres = buildList {
+                                val arr = infoObj.optJSONArray("genres")
+                                if (arr != null) {
+                                    for (i in 0 until arr.length()) {
+                                        val g = arr.optString(i).trim()
+                                        if (g.isNotBlank()) add(g)
+                                    }
+                                }
+                            }
+                            val prefix = when (source) {
+                                MangaSource.WEEBCENTRAL -> "wc_"
+                                MangaSource.COMICK -> "ck_"
+                                MangaSource.MANHUA -> "mh_"
+                                MangaSource.ASURA -> "as_"
+                                MangaSource.DEMONIC_SCANS -> "ds_"
+                                MangaSource.MANGADEX -> "md_"
+                            }
+                            return@withContext MangaInfo(
+                                id = "$prefix$cid",
+                                title = infoObj.optString("title"),
+                                poster = infoObj.optString("poster").takeIf { it.isNotBlank() },
+                                description = infoObj.optString("description").replace(Regex("<[^>]*>"), " ").trim(),
+                                type = infoObj.optString("type").takeIf { it.isNotBlank() } ?: "Manga",
+                                status = infoObj.optString("status").takeIf { it.isNotBlank() },
+                                authors = listOfNotNull(infoObj.optString("author").takeIf { it.isNotBlank() }),
+                                genres = genres,
+                                source = source.id
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("WorkerManga", "Worker getInfo failed for ${source.id}: ${e.message}")
+        }
+        null
+    }
+
+    suspend fun getHome(source: MangaSource): MangaHome? = withContext(Dispatchers.IO) {
+        val sourceParam = if (source != MangaSource.WEEBCENTRAL) "&source=${source.id}" else ""
+        val url = "$WORKER_ORIGIN/?action=home$sourceParam"
+
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0 Aniverse/1.0")
+                .build()
+            client.newCall(req).execute().use { res ->
+                if (res.isSuccessful) {
+                    val body = res.body?.string().orEmpty()
+                    if (body.isNotBlank()) {
+                        val json = JSONObject(body)
+                        val trending = parseCardsArray(json.optJSONArray("trending"), source)
+                        val latest = parseCardsArray(json.optJSONArray("latest"), source)
+                        val newRelease = parseCardsArray(json.optJSONArray("newRelease") ?: json.optJSONArray("new"), source)
+                        if (trending.isNotEmpty() || latest.isNotEmpty()) {
+                            return@withContext MangaHome(
+                                trending = trending,
+                                latest = latest,
+                                newRelease = if (newRelease.isNotEmpty()) newRelease else latest.take(20)
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("WorkerManga", "Worker getHome failed for ${source.id}: ${e.message}")
+        }
+        null
+    }
+
+    fun parseCardsArray(arr: JSONArray?, source: MangaSource): List<MangaCard> {
+        if (arr == null) return emptyList()
+        val list = mutableListOf<MangaCard>()
+        val prefix = when (source) {
+            MangaSource.WEEBCENTRAL -> "wc_"
+            MangaSource.COMICK -> "ck_"
+            MangaSource.MANHUA -> "mh_"
+            MangaSource.ASURA -> "as_"
+            MangaSource.DEMONIC_SCANS -> "ds_"
+            MangaSource.MANGADEX -> "md_"
+        }
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            val id = item.optString("id").ifBlank { item.optString("slug") }
+            val title = item.optString("title")
+            if (id.isBlank() || title.isBlank()) continue
+            val poster = item.optString("poster").ifBlank { item.optString("cover") }.ifBlank { item.optString("image") }
+            val type = item.optString("type").takeIf { it.isNotBlank() } ?: when (source) {
+                MangaSource.MANHUA -> "Manhua"
+                MangaSource.ASURA -> "Manhwa"
+                else -> "Manga"
+            }
+            list.add(
+                MangaCard(
+                    id = "$prefix$id",
+                    title = title,
+                    poster = poster,
+                    type = type,
+                    chapter = item.optString("chapter").ifBlank { item.optString("latestChapter") }.takeIf { it.isNotBlank() },
+                    source = source.id
+                )
+            )
+        }
+        return list.distinctBy { it.id }
+    }
+
+    private fun parsePagesFromBody(body: String): List<String> {
+        val trimmed = body.trim()
+        val pages = mutableListOf<String>()
+        if (trimmed.startsWith("[")) {
+            try {
+                val arr = JSONArray(trimmed)
+                for (i in 0 until arr.length()) {
+                    val s = arr.optString(i)
+                    if (s.startsWith("http")) pages.add(s)
+                }
+            } catch (_: Exception) {}
+        } else if (trimmed.startsWith("{")) {
+            try {
+                val obj = JSONObject(trimmed)
+                val arr = obj.optJSONArray("pages") ?: obj.optJSONArray("images") ?: obj.optJSONArray("data") ?: obj.optJSONArray("value")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        val s = arr.optString(i)
+                        if (s.startsWith("http")) pages.add(s)
+                        else {
+                            val pObj = arr.optJSONObject(i)
+                            val url = pObj?.optString("url") ?: pObj?.optString("src") ?: ""
+                            if (url.startsWith("http")) pages.add(url)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return pages
+    }
+}
+
+// ============================================================================
 // 2. COMICK REPOSITORY (ComicK.art - Manhwa, Manga, Manhua)
 // ============================================================================
 class ComicKRepository(
@@ -428,6 +746,9 @@ class ComicKRepository(
     }
 
     override suspend fun search(query: String): List<MangaCard> {
+        val workerHits = WorkerMangaHelper.search(query, MangaSource.COMICK)
+        if (workerHits.isNotEmpty()) return workerHits
+
         val enc = URLEncoder.encode(query.trim(), "UTF-8")
         val url = "$baseUrl/api/search?q=$enc&type=comic&showAll=false&exclude_mylist=false"
         val json = fetchJson(url)
@@ -435,6 +756,9 @@ class ComicKRepository(
     }
 
     override suspend fun getInfo(mangaId: String): MangaInfo? {
+        val workerInfo = WorkerMangaHelper.getInfo(mangaId, MangaSource.COMICK)
+        if (workerInfo != null) return workerInfo
+
         val slug = mangaId.removePrefix("ck_").removePrefix("mh_")
         val pageUrl = "$baseUrl/comic/$slug"
         val html = fetchHtml(pageUrl)
@@ -492,6 +816,9 @@ class ComicKRepository(
     }
 
     override suspend fun getChapters(mangaId: String): List<MangaChapter> = coroutineScope {
+        val workerChapters = WorkerMangaHelper.getChapters(mangaId, MangaSource.COMICK)
+        if (workerChapters.isNotEmpty()) return@coroutineScope workerChapters
+
         val slug = mangaId.removePrefix("ck_").removePrefix("mh_")
         val url = "$baseUrl/api/comics/$slug/chapter-list?lang=en&page=1"
         var firstJson = fetchJson(url)
@@ -566,6 +893,9 @@ class ComicKRepository(
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
+        val workerPages = WorkerMangaHelper.getPages(chapterId, MangaSource.COMICK)
+        if (workerPages.isNotEmpty()) return workerPages
+
         val clean = chapterId.removePrefix("ck_ch_").removePrefix("ck_").removePrefix("mh_ch_").removePrefix("mh_")
         val parts = clean.split("__")
         val chapterUrl = if (parts.size >= 4) {
@@ -619,6 +949,10 @@ class ManhuaRepository(
     private val baseUrl = "https://comick.art"
 
     override suspend fun getHome(): MangaHome = coroutineScope {
+        val workerHome = WorkerMangaHelper.getHome(MangaSource.MANHUA)
+        if (workerHome != null && (workerHome.trending.isNotEmpty() || workerHome.latest.isNotEmpty())) {
+            return@coroutineScope workerHome
+        }
         val trendingDeferred = async {
             val json = comicK.fetchJson("$baseUrl/api/search?country=cn&order_by=user_follow_count&order_direction=desc&type=comic&limit=24")
             parseManhuaCards(json?.optJSONArray("data"))
@@ -640,13 +974,10 @@ class ManhuaRepository(
     }
 
     override suspend fun search(query: String): List<MangaCard> {
-        val enc = URLEncoder.encode(query.trim(), "UTF-8")
-        val url = "$baseUrl/api/search?q=$enc&country=cn&type=comic&showAll=false&exclude_mylist=false"
-        val json = comicK.fetchJson(url)
-        val cards = parseManhuaCards(json?.optJSONArray("data"))
-        if (cards.isNotEmpty()) return cards
+        val workerHits = WorkerMangaHelper.search(query, MangaSource.MANHUA)
+        if (workerHits.isNotEmpty()) return workerHits
 
-        // Fallback: search broad catalog and wrap as Manhua
+        // Fallback: search broad catalog without restrictive country=cn filter
         return comicK.search(query).map {
             it.copy(
                 id = if (it.id.startsWith("ck_")) "mh_" + it.id.removePrefix("ck_") else it.id,
@@ -657,6 +988,9 @@ class ManhuaRepository(
     }
 
     override suspend fun getInfo(mangaId: String): MangaInfo? {
+        val workerInfo = WorkerMangaHelper.getInfo(mangaId, MangaSource.MANHUA)
+        if (workerInfo != null) return workerInfo
+
         val cleanSlug = mangaId.removePrefix("mh_").removePrefix("ck_")
         val info = comicK.getInfo("ck_$cleanSlug") ?: return null
         return info.copy(
@@ -667,6 +1001,9 @@ class ManhuaRepository(
     }
 
     override suspend fun getChapters(mangaId: String): List<MangaChapter> {
+        val workerChapters = WorkerMangaHelper.getChapters(mangaId, MangaSource.MANHUA)
+        if (workerChapters.isNotEmpty()) return workerChapters
+
         val cleanSlug = mangaId.removePrefix("mh_").removePrefix("ck_")
         return comicK.getChapters("ck_$cleanSlug").map {
             it.copy(
@@ -677,6 +1014,9 @@ class ManhuaRepository(
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
+        val workerPages = WorkerMangaHelper.getPages(chapterId, MangaSource.MANHUA)
+        if (workerPages.isNotEmpty()) return workerPages
+
         val cleanId = chapterId.removePrefix("mh_ch_").removePrefix("mh_")
         return comicK.getPages("ck_$cleanId")
     }
@@ -755,6 +1095,10 @@ class AsuraScansRepository(
     }
 
     override suspend fun getHome(): MangaHome = coroutineScope {
+        val workerHome = WorkerMangaHelper.getHome(MangaSource.ASURA)
+        if (workerHome != null && (workerHome.trending.isNotEmpty() || workerHome.latest.isNotEmpty())) {
+            return@coroutineScope workerHome
+        }
         val trendingDeferred = async {
             val json = fetchJson("$apiUrl/series?limit=20")
             parseSeries(json?.optJSONArray("data"))
@@ -776,6 +1120,9 @@ class AsuraScansRepository(
     }
 
     override suspend fun search(query: String): List<MangaCard> {
+        val workerHits = WorkerMangaHelper.search(query, MangaSource.ASURA)
+        if (workerHits.isNotEmpty()) return workerHits
+
         val enc = URLEncoder.encode(query.trim(), "UTF-8")
         val url = "$apiUrl/series?search=$enc&limit=20"
         val json = fetchJson(url)
@@ -783,6 +1130,9 @@ class AsuraScansRepository(
     }
 
     override suspend fun getInfo(mangaId: String): MangaInfo? {
+        val workerInfo = WorkerMangaHelper.getInfo(mangaId, MangaSource.ASURA)
+        if (workerInfo != null) return workerInfo
+
         val slug = mangaId.removePrefix("as_")
         val url = "$apiUrl/series/$slug"
         val json = fetchJson(url) ?: return null
@@ -820,6 +1170,9 @@ class AsuraScansRepository(
     }
 
     override suspend fun getChapters(mangaId: String): List<MangaChapter> {
+        val workerChapters = WorkerMangaHelper.getChapters(mangaId, MangaSource.ASURA)
+        if (workerChapters.isNotEmpty()) return workerChapters
+
         val slug = mangaId.removePrefix("as_")
         val url = "$apiUrl/series/$slug/chapters"
         val json = fetchJson(url) ?: return emptyList()
@@ -849,6 +1202,9 @@ class AsuraScansRepository(
     }
 
     override suspend fun getPages(chapterId: String): List<String> {
+        val workerPages = WorkerMangaHelper.getPages(chapterId, MangaSource.ASURA)
+        if (workerPages.isNotEmpty()) return workerPages
+
         val clean = chapterId.removePrefix("as_ch_").removePrefix("as_")
         val parts = clean.split("__")
         val slug = parts[0]
@@ -1405,6 +1761,10 @@ class DemonicScansRepository(
     }
 
     override suspend fun getHome(): MangaHome = withContext(Dispatchers.IO) {
+        val workerHome = WorkerMangaHelper.getHome(MangaSource.DEMONIC_SCANS)
+        if (workerHome != null && (workerHome.trending.isNotEmpty() || workerHome.latest.isNotEmpty())) {
+            return@withContext workerHome
+        }
         val html = fetchHtml(baseUrl)
         if (html.isBlank()) return@withContext MangaHome()
 
@@ -1423,6 +1783,9 @@ class DemonicScansRepository(
     }
 
     override suspend fun search(query: String): List<MangaCard> = withContext(Dispatchers.IO) {
+        val workerHits = WorkerMangaHelper.search(query, MangaSource.DEMONIC_SCANS)
+        if (workerHits.isNotEmpty()) return@withContext workerHits
+
         val enc = URLEncoder.encode(query.trim(), "UTF-8")
         val html = fetchHtml("$baseUrl/search.php?manga=$enc")
         if (html.isBlank()) return@withContext emptyList()
@@ -1450,6 +1813,9 @@ class DemonicScansRepository(
     }
 
     override suspend fun getInfo(mangaId: String): MangaInfo? = withContext(Dispatchers.IO) {
+        val workerInfo = WorkerMangaHelper.getInfo(mangaId, MangaSource.DEMONIC_SCANS)
+        if (workerInfo != null) return@withContext workerInfo
+
         val slug = mangaId.removePrefix("ds_")
         val html = fetchHtml("$baseUrl/manga/$slug")
         if (html.isBlank()) return@withContext null
@@ -1488,6 +1854,9 @@ class DemonicScansRepository(
     }
 
     override suspend fun getChapters(mangaId: String): List<MangaChapter> = withContext(Dispatchers.IO) {
+        val workerChapters = WorkerMangaHelper.getChapters(mangaId, MangaSource.DEMONIC_SCANS)
+        if (workerChapters.isNotEmpty()) return@withContext workerChapters
+
         val slug = mangaId.removePrefix("ds_")
         val html = fetchHtml("$baseUrl/manga/$slug")
         if (html.isBlank()) return@withContext emptyList()
@@ -1525,6 +1894,9 @@ class DemonicScansRepository(
     }
 
     override suspend fun getPages(chapterId: String): List<String> = withContext(Dispatchers.IO) {
+        val workerPages = WorkerMangaHelper.getPages(chapterId, MangaSource.DEMONIC_SCANS)
+        if (workerPages.isNotEmpty()) return@withContext workerPages
+
         val clean = chapterId.removePrefix("ds_ch_").removePrefix("ds_")
         val parts = clean.split("__")
         val numericMangaId = parts.getOrNull(0) ?: ""

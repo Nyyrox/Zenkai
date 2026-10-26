@@ -101,6 +101,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.nyyrox.aniverse.data.download.DownloadStatus
 import com.nyyrox.aniverse.data.manga.AvailableSourceInfo
+import com.nyyrox.aniverse.data.manga.MatchedEdition
 import com.nyyrox.aniverse.data.manga.MangaChapter
 import com.nyyrox.aniverse.data.manga.MangaCharacter
 import com.nyyrox.aniverse.data.manga.MangaHistoryItem
@@ -142,6 +143,9 @@ fun MangaDetailScreen(
 
     var activeSource by remember { mutableStateOf<MangaSource?>(null) }
     var switchingSource by remember { mutableStateOf(false) }
+    var serversChecking by remember { mutableStateOf(false) }
+    var serversCheckedCount by remember { mutableIntStateOf(0) }
+    var availableSourcesList by remember { mutableStateOf<List<AvailableSourceInfo>>(cachedManga?.info?.availableSources ?: emptyList()) }
 
     var isBookmarked by remember { mutableStateOf(false) }
     var sortAscending by remember { mutableStateOf(false) } // latest first by default
@@ -158,6 +162,7 @@ fun MangaDetailScreen(
             chapters = cached.chapters
             currentMangaId = cached.resolvedId
             activeSource = MangaSource.fromId(cached.info.source)
+            availableSourcesList = cached.info.availableSources
             loading = false
             error = null
         } else {
@@ -165,15 +170,16 @@ fun MangaDetailScreen(
             error = null
         }
 
+        val fallbackTitle = vm.pendingMangaTitleHint?.also { vm.pendingMangaTitleHint = null }
+            ?: vm.findKnownManga(mangaId)?.title
+            ?: vm.findKnownManga(currentMangaId)?.title
+            ?: vm.findKnownManga(cleanCurrent)?.title
+            ?: vm.getMangaHistoryItem(mangaId)?.title
+            ?: vm.getMangaHistoryItem(currentMangaId)?.title
+            ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == currentMangaId }?.title
+
         try {
             isBookmarked = vm.isMangaBookmarked(mangaId) || vm.isMangaBookmarked(currentMangaId) || vm.isMangaBookmarked(cleanCurrent)
-            val fallbackTitle = vm.pendingMangaTitleHint?.also { vm.pendingMangaTitleHint = null }
-                ?: vm.findKnownManga(mangaId)?.title
-                ?: vm.findKnownManga(currentMangaId)?.title
-                ?: vm.findKnownManga(cleanCurrent)?.title
-                ?: vm.getMangaHistoryItem(mangaId)?.title
-                ?: vm.getMangaHistoryItem(currentMangaId)?.title
-                ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == currentMangaId }?.title
 
             val (resolvedId, fetchedInfo, fetchedChapters) = MangaRepository.resolveMangaDetails(mangaId, fallbackTitle)
             val effectiveId = resolvedId.ifBlank { cleanCurrent }
@@ -185,6 +191,7 @@ fun MangaDetailScreen(
                 info = fetchedInfo
                 chapters = fetchedChapters
                 activeSource = MangaSource.fromId(fetchedInfo.source)
+                availableSourcesList = fetchedInfo.availableSources
                 val cacheEntry = MainViewModel.CachedMangaDetail(currentMangaId, fetchedInfo, fetchedChapters)
                 vm.mangaDetailCache[mangaId] = cacheEntry
                 vm.mangaDetailCache[cleanCurrent] = cacheEntry
@@ -198,6 +205,53 @@ fun MangaDetailScreen(
             }
         } finally {
             loading = false
+        }
+
+        // 3. Launch progressive cross-server check (streaming status on screen like zenkai web)
+        val allSourcesList = listOf(
+            MangaSource.WEEBCENTRAL,
+            MangaSource.DEMONIC_SCANS,
+            MangaSource.COMICK,
+            MangaSource.MANHUA,
+            MangaSource.ASURA,
+            MangaSource.MANGADEX
+        )
+        val targetTitle = info?.title ?: fallbackTitle ?: ""
+        if (targetTitle.isNotBlank()) {
+            serversChecking = true
+            serversCheckedCount = 0
+            launch {
+                try {
+                    MangaRepository.checkSourcesProgressive(
+                        title = targetTitle,
+                        altTitles = listOfNotNull(info?.altTitle),
+                        onSourceFound = { found ->
+                            availableSourcesList = (availableSourcesList.filter { it.source != found.source } + found)
+                                .sortedBy { allSourcesList.indexOf(it.source) }
+                            info = info?.copy(availableSources = availableSourcesList)
+                            if (chapters.isEmpty() && found.matchedId.isNotBlank()) {
+                                scope.launch {
+                                    try {
+                                        val chs = MangaRepository.getChaptersForSource(found.source, found.matchedId)
+                                        if (chs.isNotEmpty()) {
+                                            chapters = chs
+                                            currentMangaId = found.matchedId
+                                            activeSource = found.source
+                                            info = info?.copy(source = found.source.id)
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        },
+                        onProgress = { checked, _ ->
+                            serversCheckedCount = checked
+                        }
+                    )
+                } catch (_: Exception) {}
+                finally {
+                    serversChecking = false
+                }
+            }
         }
     }
 
@@ -221,6 +275,33 @@ fun MangaDetailScreen(
     var missingServer by remember { mutableStateOf<MangaSource?>(null) }
     var switchingSourceId by remember { mutableStateOf<MangaSource?>(null) }
 
+    fun switchToEdition(edition: MatchedEdition, target: MangaSource) {
+        if (currentMangaId == edition.id && chapters.isNotEmpty()) return
+        scope.launch {
+            switchingSource = true
+            switchingSourceId = target
+            missingServer = null
+            try {
+                val newChapters = withContext(Dispatchers.IO) {
+                    MangaRepository.getChaptersForSource(target, edition.id)
+                }
+                if (newChapters.isNotEmpty()) {
+                    chapters = newChapters
+                    currentMangaId = edition.id
+                    activeSource = target
+                    info = info?.copy(source = target.id)
+                } else {
+                    missingServer = target
+                }
+            } catch (_: Exception) {
+                missingServer = target
+            } finally {
+                switchingSource = false
+                switchingSourceId = null
+            }
+        }
+    }
+
     fun switchToServer(target: MangaSource) {
         if (activeSource == target && chapters.isNotEmpty()) return
         scope.launch {
@@ -228,7 +309,7 @@ fun MangaDetailScreen(
             switchingSourceId = target
             missingServer = null
             try {
-                val avail = info?.availableSources?.find { it.source == target }
+                val avail = availableSourcesList.find { it.source == target } ?: info?.availableSources?.find { it.source == target }
                 if (avail != null) {
                     val newChapters = withContext(Dispatchers.IO) {
                         MangaRepository.getChaptersForSource(target, avail.matchedId)
@@ -835,7 +916,7 @@ fun MangaDetailScreen(
 
                     // 4. AVAILABLE SOURCES SECTION (Server Switcher matching zenkai web)
                     item("available_sources") {
-                        val avail = info?.availableSources ?: emptyList()
+                        val avail = availableSourcesList.ifEmpty { info?.availableSources ?: emptyList() }
                         val allSources = listOf(
                             MangaSource.WEEBCENTRAL,
                             MangaSource.DEMONIC_SCANS,
@@ -851,16 +932,45 @@ fun MangaDetailScreen(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = "Server",
-                                    color = p.text,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Server",
+                                        color = p.text,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (serversChecking) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = p.accentA,
+                                                strokeWidth = 2.dp,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = "Checking $serversCheckedCount of ${allSources.size} servers...",
+                                                color = p.textMuted,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    } else if (avail.isNotEmpty()) {
+                                        Text(
+                                            text = "Found on ${avail.size} of ${allSources.size} servers. Pick one to open it.",
+                                            color = p.textMuted,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                }
+
                                 if (switchingSource) {
-                                    Spacer(Modifier.width(10.dp))
                                     CircularProgressIndicator(
                                         color = p.accentA,
                                         strokeWidth = 2.dp,
@@ -884,7 +994,8 @@ fun MangaDetailScreen(
                                             .clip(RoundedCornerShape(999.dp))
                                             .then(
                                                 if (isSelected) Modifier.background(p.accentBrush)
-                                                else Modifier.background(p.chipBg)
+                                                else if (matchedInfo != null) Modifier.background(p.chipBg)
+                                                else Modifier.background(p.chipBg.copy(alpha = 0.5f))
                                             )
                                             .clickable(enabled = !switchingSource) {
                                                 switchToServer(targetSource)
@@ -902,7 +1013,7 @@ fun MangaDetailScreen(
                                         }
                                         Text(
                                             text = targetSource.displayName,
-                                            color = if (isSelected) p.onAccent else p.text,
+                                            color = if (isSelected) p.onAccent else if (matchedInfo != null) p.text else p.textMuted,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
@@ -912,6 +1023,57 @@ fun MangaDetailScreen(
                                                 color = if (isSelected) p.onAccent.copy(alpha = 0.8f) else p.textMuted,
                                                 fontSize = 10.5.sp
                                             )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Show available editions if selected source has more than 1 show (e.g. ComicK / Manhua with regular + color)
+                            val activeMatched = avail.find { it.source == activeSource }
+                            val editions = activeMatched?.editions ?: emptyList()
+                            if (editions.size > 1) {
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    text = "Shows / Editions (${activeSource?.displayName})",
+                                    color = p.textMuted,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(editions) { ed ->
+                                        val isCurrentEdition = currentMangaId == ed.id ||
+                                            MangaRepository.cleanWeebId(currentMangaId) == MangaRepository.cleanWeebId(ed.id)
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
+                                                .then(
+                                                    if (isCurrentEdition) Modifier.background(p.accentBrush)
+                                                    else Modifier.background(p.chipBg)
+                                                )
+                                                .clickable(enabled = !switchingSource) {
+                                                    switchToEdition(ed, activeSource ?: MangaSource.WEEBCENTRAL)
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = ed.title,
+                                                color = if (isCurrentEdition) p.onAccent else p.text,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = if (isCurrentEdition) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                            if (ed.chapterCount != null) {
+                                                Text(
+                                                    text = "(${ed.chapterCount} ch.)",
+                                                    color = if (isCurrentEdition) p.onAccent.copy(alpha = 0.8f) else p.textMuted,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
                                         }
                                     }
                                 }

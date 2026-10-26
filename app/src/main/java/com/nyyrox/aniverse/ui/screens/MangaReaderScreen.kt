@@ -527,6 +527,12 @@ fun MangaReaderScreen(
         }
 
         if (fetchedPages.isEmpty()) {
+            // Auto-retry once with short delay
+            kotlinx.coroutines.delay(1000)
+            fetchedPages = MangaRepository.getPages(cleanChId)
+        }
+
+        if (fetchedPages.isEmpty()) {
             error = "Could not load chapter pages. Tap to retry."
             loading = false
         } else {
@@ -2143,16 +2149,25 @@ private fun MangaPageItem(
     modifier: Modifier = Modifier
 ) {
     var attempt by remember(pageUrl) { mutableIntStateOf(0) }
+    var userRetryNonce by remember(pageUrl) { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
 
-    val sanitizedUrl = remember(pageUrl, attempt) {
+    val sanitizedUrl = remember(pageUrl, attempt, userRetryNonce) {
         val trimmed = pageUrl.trim().replace(" ", "%20")
+        val lower = trimmed.lowercase()
         when {
-            attempt == 0 -> trimmed
-            attempt == 1 -> MangaRepository.proxyImageUrl(trimmed)
+            attempt == 0 && userRetryNonce == 0 -> {
+                if (lower.contains("demonic") || lower.contains("readermc") || lower.contains("mangareadon") || lower.contains("comick")) {
+                    MangaRepository.proxyImageUrl(trimmed)
+                } else {
+                    trimmed
+                }
+            }
+            attempt == 1 && userRetryNonce == 0 -> MangaRepository.proxyImageUrl(trimmed)
             else -> {
-                val sep = if (trimmed.contains("?")) "&" else "?"
-                "$trimmed${sep}retry=$attempt"
+                val proxied = MangaRepository.proxyImageUrl(trimmed)
+                val sep = if (proxied.contains("?")) "&" else "?"
+                "$proxied${sep}retry=${attempt}_${userRetryNonce}"
             }
         }
     }
@@ -2187,9 +2202,9 @@ private fun MangaPageItem(
                 }
             },
             onError = {
-                if (attempt < 2) {
+                if (attempt < 3) {
                     scope.launch {
-                        kotlinx.coroutines.delay(400L * (attempt + 1))
+                        kotlinx.coroutines.delay(500L * (attempt + 1))
                         attempt++
                     }
                 }
@@ -2197,7 +2212,10 @@ private fun MangaPageItem(
             error = {
                 Box(
                     modifier = (if (isWebtoon) Modifier.fillMaxWidth().height(240.dp) else Modifier.fillMaxSize())
-                        .clickable { attempt = 0 },
+                        .clickable {
+                            userRetryNonce++
+                            attempt = 1
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -2226,7 +2244,10 @@ private fun MangaPageItem(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .background(OttPrimary)
-                                .clickable { attempt = 0 }
+                                .clickable {
+                                    userRetryNonce++
+                                    attempt = 1
+                                }
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
                         ) {
                             Icon(

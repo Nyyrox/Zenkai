@@ -49,12 +49,21 @@ data class MangaCharacter(
     val image: String? = null
 )
 
+data class MatchedEdition(
+    val id: String,
+    val title: String,
+    val chapterCount: Int? = null,
+    val latestChapter: String? = null,
+    val poster: String? = null
+)
+
 data class AvailableSourceInfo(
     val source: MangaSource,
     val matchedId: String,
     val matchedTitle: String,
     val chapterCount: Int? = null,
-    val latestChapter: String? = null
+    val latestChapter: String? = null,
+    val editions: List<MatchedEdition> = emptyList()
 )
 
 data class MangaInfo(
