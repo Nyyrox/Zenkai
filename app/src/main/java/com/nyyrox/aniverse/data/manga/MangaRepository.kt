@@ -363,6 +363,18 @@ object MangaRepository {
                                 if (seenIds.add(item.id)) {
                                     val score = MangaTitleMatcher.bestSimilarity(item.title, names)
                                     if (score >= MangaTitleMatcher.MATCH_AT) {
+                                        val itemRating = if (!item.rating.isNullOrBlank()) {
+                                            val cln = item.rating.trim().removeSuffix("%").trim()
+                                            val num = cln.toDoubleOrNull()
+                                            if (num != null && num > 0) {
+                                                val s = if (num > 10) num / 10.0 else num
+                                                String.format(java.util.Locale.US, "%.1f", s)
+                                            } else cln
+                                        } else if (item.score != null && item.score > 0) {
+                                            val s = if (item.score > 10) item.score / 10.0 else item.score
+                                            String.format(java.util.Locale.US, "%.1f", s)
+                                        } else null
+
                                         val show = ServerShowItem(
                                             id = item.id,
                                             title = item.title,
@@ -371,7 +383,8 @@ object MangaRepository {
                                             score = score,
                                             chapterCount = item.chapter?.replace(Regex("[^0-9]"), "")?.toIntOrNull(),
                                             latestChapter = item.chapter,
-                                            caption = listOfNotNull(source.displayName, item.chapter).joinToString(" · ")
+                                            caption = listOfNotNull(source.displayName, item.chapter).joinToString(" · "),
+                                            rating = itemRating
                                         )
                                         serverMatches.add(show to score)
                                     }
@@ -450,7 +463,9 @@ object MangaRepository {
                 }
             }
         }
-        val aniScore: String? = aniData?.optInt("averageScore")?.takeIf { it > 0 }?.let { "$it%" }
+        val aniAvg = aniData?.optInt("averageScore")?.takeIf { it > 0 }
+        val aniScore: String? = aniAvg?.let { String.format(java.util.Locale.US, "%.1f", it / 10.0) }
+        val aniScoreDouble: Double? = aniAvg?.let { it / 10.0 }
         val aniStatus: String? = aniData?.optString("status")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         val aniFormat: String? = aniData?.optString("format")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         val aniChapters: Int? = aniData?.optInt("chapters")?.takeIf { it > 0 }
@@ -535,7 +550,9 @@ object MangaRepository {
                     }
                 }.ifEmpty { aniGenres }
 
-                val curAniScore = effectiveAni?.optInt("averageScore")?.takeIf { it > 0 }?.let { "$it%" } ?: aniScore
+                val curAniAvg = effectiveAni?.optInt("averageScore")?.takeIf { it > 0 }
+                val curAniScore = curAniAvg?.let { String.format(java.util.Locale.US, "%.1f", it / 10.0) } ?: aniScore
+                val curAniScoreDouble = curAniAvg?.let { it / 10.0 } ?: aniScoreDouble
                 val curAniStatus = effectiveAni?.optString("status")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: aniStatus
                 val curAniFormat = effectiveAni?.optString("format")?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: aniFormat
                 val curAniChapters = effectiveAni?.optInt("chapters")?.takeIf { it > 0 } ?: aniChapters
@@ -578,6 +595,7 @@ object MangaRepository {
                     description = if (info.description.isBlank()) (curAniDesc ?: "") else info.description,
                     genres = if (info.genres.isEmpty()) curAniGenres else info.genres,
                     rating = info.rating ?: curAniScore,
+                    score = info.score ?: curAniScoreDouble,
                     status = info.status ?: curAniStatus,
                     type = info.type ?: curAniFormat ?: "Manga",
                     anilistId = aniId ?: effectiveAni?.optInt("id")?.takeIf { it > 0 },
@@ -650,6 +668,7 @@ object MangaRepository {
                     genres = primaryInfo?.genres?.takeIf { it.isNotEmpty() } ?: aniGenres,
                     status = primaryInfo?.status ?: aniStatus,
                     rating = primaryInfo?.rating ?: aniScore,
+                    score = primaryInfo?.score ?: aniScoreDouble,
                     type = primaryInfo?.type ?: aniFormat ?: "Manga",
                     source = usedSource.id,
                     anilistId = aniId ?: aniData?.optInt("id")?.takeIf { it > 0 },
@@ -679,6 +698,7 @@ object MangaRepository {
                 genres = aniGenres,
                 status = aniStatus,
                 rating = aniScore,
+                score = aniScoreDouble,
                 type = aniFormat ?: "Manga",
                 source = "anilist",
                 anilistId = fallbackAniId,

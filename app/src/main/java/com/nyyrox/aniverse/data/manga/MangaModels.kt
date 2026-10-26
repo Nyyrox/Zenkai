@@ -65,7 +65,8 @@ data class ServerShowItem(
     val score: Float = 1.0f,
     val chapterCount: Int? = null,
     val latestChapter: String? = null,
-    val caption: String? = null
+    val caption: String? = null,
+    val rating: String? = null
 )
 
 data class AvailableSourceInfo(
@@ -86,6 +87,7 @@ data class MangaInfo(
     val type: String? = "Manga",
     val status: String? = null,
     val rating: String? = null,
+    val score: Double? = null,
     val genres: List<String> = emptyList(),
     val source: String = "anilist",
     val banner: String? = null,

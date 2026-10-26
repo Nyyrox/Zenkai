@@ -13,6 +13,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -182,7 +183,7 @@ fun MangaDetailScreen(
 
     var activeSource by remember { mutableStateOf<MangaSource?>(cachedManga?.info?.let { MangaSource.fromId(it.source) }) }
     var switchingSource by remember { mutableStateOf(false) }
-    var serversChecking by remember { mutableStateOf(false) }
+    var serversChecking by remember { mutableStateOf(!isExplicitServerShow) }
     var serversCheckedCount by remember { mutableIntStateOf(0) }
     var availableSourcesList by remember { mutableStateOf<List<AvailableSourceInfo>>(cachedManga?.info?.availableSources ?: emptyList()) }
 
@@ -235,53 +236,16 @@ fun MangaDetailScreen(
             ?: vm.getMangaHistoryItem(currentMangaId)?.title
             ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == currentMangaId }?.title
 
-        try {
-            isBookmarked = vm.isMangaBookmarked(mangaId) || vm.isMangaBookmarked(currentMangaId) || vm.isMangaBookmarked(cleanCurrent)
+        val targetSearchTitle = fallbackTitle ?: initialTitle ?: ""
 
-            val (resolvedId, fetchedInfo, fetchedChapters) = MangaRepository.resolveMangaDetails(mangaId, fallbackTitle)
-            val effectiveId = resolvedId.ifBlank { cleanCurrent }
-            if (effectiveId.isNotBlank()) {
-                currentMangaId = effectiveId
-            }
-
-            if (fetchedInfo != null) {
-                info = fetchedInfo
-                chapters = fetchedChapters
-                activeSource = MangaSource.fromId(fetchedInfo.source)
-                availableSourcesList = fetchedInfo.availableSources
-                if (isExplicitServerShow && selectedShow == null) {
-                    selectedShow = ServerShowItem(
-                        id = effectiveId,
-                        title = fetchedInfo.title,
-                        poster = fetchedInfo.poster ?: initialPoster,
-                        source = activeSource ?: MangaSource.WEEBCENTRAL,
-                        chapterCount = fetchedChapters.size
-                    )
-                }
-                val cacheEntry = MainViewModel.CachedMangaDetail(currentMangaId, fetchedInfo, fetchedChapters)
-                vm.mangaDetailCache[mangaId] = cacheEntry
-                vm.mangaDetailCache[cleanCurrent] = cacheEntry
-                vm.mangaDetailCache[currentMangaId] = cacheEntry
-            } else if (info == null) {
-                error = "Unable to load manga details."
-            }
-        } catch (e: Exception) {
-            if (info == null) {
-                error = e.message ?: "Failed to load manga details"
-            }
-        } finally {
-            loading = false
-        }
-
-        // 3. Launch progressive cross-server check (streaming exact matching shows like zenkai web)
-        val targetTitle = info?.title ?: fallbackTitle ?: initialTitle ?: ""
-        if (targetTitle.isNotBlank()) {
+        // Stream server shows concurrently from frame 0
+        if (targetSearchTitle.isNotBlank() && !isExplicitServerShow) {
             serversChecking = true
             serversCheckedCount = 0
             launch {
                 try {
                     MangaRepository.findServerShowsProgressive(
-                        title = targetTitle,
+                        title = targetSearchTitle,
                         altTitles = listOfNotNull(info?.altTitle),
                         onShowFound = { show ->
                             val updated = (foundServerShows.filter { it.id != show.id } + show)
@@ -317,6 +281,45 @@ fun MangaDetailScreen(
                     serversChecking = false
                 }
             }
+        }
+
+        try {
+            isBookmarked = vm.isMangaBookmarked(mangaId) || vm.isMangaBookmarked(currentMangaId) || vm.isMangaBookmarked(cleanCurrent)
+
+            val (resolvedId, fetchedInfo, fetchedChapters) = MangaRepository.resolveMangaDetails(mangaId, fallbackTitle)
+            val effectiveId = resolvedId.ifBlank { cleanCurrent }
+            if (effectiveId.isNotBlank()) {
+                currentMangaId = effectiveId
+            }
+
+            if (fetchedInfo != null) {
+                info = fetchedInfo
+                chapters = fetchedChapters
+                activeSource = MangaSource.fromId(fetchedInfo.source)
+                availableSourcesList = fetchedInfo.availableSources
+                if (isExplicitServerShow && selectedShow == null) {
+                    selectedShow = ServerShowItem(
+                        id = effectiveId,
+                        title = fetchedInfo.title,
+                        poster = fetchedInfo.poster ?: initialPoster,
+                        source = activeSource ?: MangaSource.WEEBCENTRAL,
+                        chapterCount = fetchedChapters.size,
+                        rating = fetchedInfo.rating
+                    )
+                }
+                val cacheEntry = MainViewModel.CachedMangaDetail(currentMangaId, fetchedInfo, fetchedChapters)
+                vm.mangaDetailCache[mangaId] = cacheEntry
+                vm.mangaDetailCache[cleanCurrent] = cacheEntry
+                vm.mangaDetailCache[currentMangaId] = cacheEntry
+            } else if (info == null) {
+                error = "Unable to load manga details."
+            }
+        } catch (e: Exception) {
+            if (info == null) {
+                error = e.message ?: "Failed to load manga details"
+            }
+        } finally {
+            loading = false
         }
     }
 
@@ -468,7 +471,7 @@ fun MangaDetailScreen(
         background = { HomeBackdrop(p) }
     ) {
         Box(Modifier.fillMaxSize()) {
-            if (loading && info == null && selectedShow != null) {
+            if (loading && info == null) {
                 MangaDetailLoadingSkeleton(
                     cachedPoster = initialPoster ?: info?.poster,
                     title = initialTitle ?: info?.title,
@@ -629,19 +632,41 @@ fun MangaDetailScreen(
                                                 )
                                                 Text("·", color = p.textMuted, fontSize = 12.sp)
                                             }
-                                            if (info?.rating != null) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                            val curInfo = info
+                                            val displayRating = remember(curInfo?.rating, curInfo?.score) {
+                                                val sc = curInfo?.score
+                                                val r = curInfo?.rating
+                                                if (sc != null && sc > 0) {
+                                                    val s = if (sc > 10) sc / 10.0 else sc
+                                                    String.format(java.util.Locale.US, "%.1f", s)
+                                                } else if (!r.isNullOrBlank()) {
+                                                    val clean = r.trim().removeSuffix("%").trim()
+                                                    val num = clean.toDoubleOrNull()
+                                                    if (num != null && num > 0) {
+                                                        val s = if (num > 10) num / 10.0 else num
+                                                        String.format(java.util.Locale.US, "%.1f", s)
+                                                    } else clean
+                                                } else null
+                                            }
+                                            if (displayRating != null) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(Color(0x24FFB800))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
                                                     Icon(
                                                         Icons.Default.Star,
                                                         contentDescription = null,
-                                                        tint = p.rating,
-                                                        modifier = Modifier.size(13.dp)
+                                                        tint = Color(0xFFFFB800),
+                                                        modifier = Modifier.size(11.dp)
                                                     )
-                                                    Spacer(Modifier.width(3.dp))
                                                     Text(
-                                                        text = info?.rating ?: "",
-                                                        color = p.rating,
-                                                        fontSize = 12.sp,
+                                                        text = displayRating,
+                                                        color = Color(0xFFFFB800),
+                                                        fontSize = 11.5.sp,
                                                         fontWeight = FontWeight.Bold
                                                     )
                                                 }
@@ -770,32 +795,6 @@ fun MangaDetailScreen(
                                         }
                                     }
 
-                                    // All Servers CTA Pill
-                                    Row(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(p.chipBg)
-                                            .clickable {
-                                                selectedShow = null
-                                            }
-                                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Default.SwapVert,
-                                            contentDescription = "All Servers",
-                                            tint = p.accentText,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = "All Servers",
-                                            color = p.text,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-
                                     // Bookmark Toggle
                                     Row(
                                         modifier = Modifier
@@ -922,6 +921,117 @@ fun MangaDetailScreen(
                                             )
                                         }
                                     }
+                                }
+
+                                // SERVER Section (matching zenkai web Image 1)
+                                Spacer(Modifier.height(14.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "SERVER",
+                                        color = p.textMuted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                    if (switchingSource) {
+                                        CircularProgressIndicator(
+                                            color = p.accentA,
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(6.dp))
+
+                                val allSources = MangaRepository.PREFERRED_SOURCE_ORDER
+                                val avail = availableSourcesList.ifEmpty { info?.availableSources ?: emptyList() }
+
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(allSources) { targetSource ->
+                                        val isSelected = activeSource == targetSource
+                                        val isCurrentSwitching = switchingSourceId == targetSource
+
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
+                                                .background(
+                                                    if (isSelected) Color.White
+                                                    else Color(0x18FFFFFF)
+                                                )
+                                                .clickable(enabled = !switchingSource) {
+                                                    switchToServer(targetSource)
+                                                }
+                                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (isCurrentSwitching) {
+                                                CircularProgressIndicator(
+                                                    color = if (isSelected) Color.Black else p.accentA,
+                                                    strokeWidth = 1.8.dp,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = targetSource.displayName,
+                                                color = if (isSelected) Color.Black else Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Multiple editions row (e.g. ComicK regular + color)
+                                val activeMatched = avail.find { it.source == activeSource }
+                                val editions = activeMatched?.editions ?: emptyList()
+                                if (editions.size > 1) {
+                                    Spacer(Modifier.height(8.dp))
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(editions) { ed ->
+                                            val isEditionActive = currentMangaId == ed.id ||
+                                                MangaRepository.cleanWeebId(currentMangaId) == MangaRepository.cleanWeebId(ed.id)
+                                            Row(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .then(
+                                                        if (isEditionActive) Modifier.background(p.accentBrush)
+                                                        else Modifier.background(p.chipBg)
+                                                    )
+                                                    .clickable(enabled = !switchingSource) {
+                                                        activeSource?.let { src -> switchToEdition(ed, src) }
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = ed.title,
+                                                    color = if (isEditionActive) p.onAccent else p.text,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = if (isEditionActive) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (missingServer != null) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        text = "Couldn't find \"${info?.title ?: knownTitle}\" on ${missingServer?.displayName}.",
+                                        color = p.textMuted,
+                                        fontSize = 11.5.sp
+                                    )
                                 }
                             }
                         }
@@ -1055,263 +1165,99 @@ fun MangaDetailScreen(
                         }
                     }
 
-                    // 4. AVAILABLE SOURCES SECTION (Server Switcher matching zenkai web)
-                    item("available_sources") {
-                        val avail = availableSourcesList.ifEmpty { info?.availableSources ?: emptyList() }
-                        val allSources = listOf(
-                            MangaSource.WEEBCENTRAL,
-                            MangaSource.DEMONIC_SCANS,
-                            MangaSource.COMICK,
-                            MangaSource.MANHUA,
-                            MangaSource.ASURA,
-                            MangaSource.MANGADEX
-                        )
+                    // 5. CHAPTERS HEADER: Eyebrow + Title + Search + Sort Toggle (matching zenkai web Image 1)
+                    item("chapters_header") {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp)
+                                .padding(horizontal = 20.dp, vertical = 6.dp)
                         ) {
+                            Text(
+                                text = "READ ONLINE",
+                                color = p.textMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Text(
+                                    text = "Chapters",
+                                    color = p.text,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(
-                                        text = "Server",
-                                        color = p.text,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    if (serversChecking) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            CircularProgressIndicator(
-                                                color = p.accentA,
-                                                strokeWidth = 2.dp,
-                                                modifier = Modifier.size(13.dp)
-                                            )
-                                            Text(
-                                                text = "Checking $serversCheckedCount of ${allSources.size} servers...",
-                                                color = p.textMuted,
-                                                fontSize = 12.sp
+                                    // Search filter in chapters
+                                    Box(
+                                        modifier = Modifier
+                                            .width(135.dp)
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(p.chipBg)
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Search, null, tint = p.textMuted, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            BasicTextField(
+                                                value = chapterSearch,
+                                                onValueChange = {
+                                                    chapterSearch = it
+                                                    selectedChunkIndex = 0
+                                                },
+                                                singleLine = true,
+                                                textStyle = TextStyle(color = p.text, fontSize = 12.sp),
+                                                cursorBrush = SolidColor(p.accentA),
+                                                decorationBox = { inner ->
+                                                    if (chapterSearch.isEmpty()) {
+                                                        Text("Search chapter…", color = p.textMuted, fontSize = 12.sp)
+                                                    }
+                                                    inner()
+                                                }
                                             )
                                         }
-                                    } else if (avail.isNotEmpty()) {
-                                        Text(
-                                            text = "Found on ${avail.size} of ${allSources.size} servers. Pick one to open it.",
-                                            color = p.textMuted,
-                                            fontSize = 11.5.sp
-                                        )
                                     }
-                                }
 
-                                if (switchingSource) {
-                                    CircularProgressIndicator(
-                                        color = p.accentA,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(8.dp))
-
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                items(allSources) { targetSource ->
-                                    val isSelected = activeSource == targetSource
-                                    val isCurrentSwitching = switchingSourceId == targetSource
-                                    val matchedInfo = avail.find { it.source == targetSource }
-
+                                    // Asc / Desc sort button
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
-                                            .then(
-                                                if (isSelected) Modifier.background(p.accentBrush)
-                                                else if (matchedInfo != null) Modifier.background(p.chipBg)
-                                                else Modifier.background(p.chipBg.copy(alpha = 0.5f))
-                                            )
-                                            .clickable(enabled = !switchingSource) {
-                                                switchToServer(targetSource)
-                                            }
-                                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        if (isCurrentSwitching) {
-                                            CircularProgressIndicator(
-                                                color = if (isSelected) p.onAccent else p.accentA,
-                                                strokeWidth = 1.8.dp,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = targetSource.displayName,
-                                            color = if (isSelected) p.onAccent else if (matchedInfo != null) p.text else p.textMuted,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        )
-                                        if (matchedInfo?.chapterCount != null) {
-                                            Text(
-                                                text = "(${matchedInfo.chapterCount})",
-                                                color = if (isSelected) p.onAccent.copy(alpha = 0.8f) else p.textMuted,
-                                                fontSize = 10.5.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Show available editions if selected source has more than 1 show (e.g. ComicK / Manhua with regular + color)
-                            val activeMatched = avail.find { it.source == activeSource }
-                            val editions = activeMatched?.editions ?: emptyList()
-                            if (editions.size > 1) {
-                                Spacer(Modifier.height(10.dp))
-                                Text(
-                                    text = "Shows / Editions (${activeSource?.displayName})",
-                                    color = p.textMuted,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    items(editions) { ed ->
-                                        val isCurrentEdition = currentMangaId == ed.id ||
-                                            MangaRepository.cleanWeebId(currentMangaId) == MangaRepository.cleanWeebId(ed.id)
-                                        Row(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(999.dp))
-                                                .then(
-                                                    if (isCurrentEdition) Modifier.background(p.accentBrush)
-                                                    else Modifier.background(p.chipBg)
-                                                )
-                                                .clickable(enabled = !switchingSource) {
-                                                    switchToEdition(ed, activeSource ?: MangaSource.WEEBCENTRAL)
-                                                }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = ed.title,
-                                                color = if (isCurrentEdition) p.onAccent else p.text,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = if (isCurrentEdition) FontWeight.Bold else FontWeight.Medium
-                                            )
-                                            if (ed.chapterCount != null) {
-                                                Text(
-                                                    text = "(${ed.chapterCount} ch.)",
-                                                    color = if (isCurrentEdition) p.onAccent.copy(alpha = 0.8f) else p.textMuted,
-                                                    fontSize = 10.sp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (missingServer != null) {
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = "Couldn't find \"${info?.title ?: knownTitle}\" on ${missingServer?.displayName}.",
-                                    color = p.textMuted,
-                                    fontSize = 11.5.sp
-                                )
-                            }
-                        }
-                    }
-
-                    // 5. CHAPTERS HEADER: Search + Sort Toggle
-                    item("chapters_header") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Chapters (${filteredChapters.size})",
-                                color = p.text,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Search filter in chapters
-                                Box(
-                                    modifier = Modifier
-                                        .width(130.dp)
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(p.chipBg)
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Search, null, tint = p.textMuted, modifier = Modifier.size(14.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        BasicTextField(
-                                            value = chapterSearch,
-                                            onValueChange = {
-                                                chapterSearch = it
+                                            .background(p.chipBg)
+                                            .clickable {
+                                                sortAscending = !sortAscending
                                                 selectedChunkIndex = 0
-                                            },
-                                            singleLine = true,
-                                            textStyle = TextStyle(color = p.text, fontSize = 12.sp),
-                                            cursorBrush = SolidColor(p.accentA),
-                                            decorationBox = { inner ->
-                                                if (chapterSearch.isEmpty()) {
-                                                    Text("Search...", color = p.textMuted, fontSize = 12.sp)
-                                                }
-                                                inner()
                                             }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.SwapVert,
+                                            contentDescription = null,
+                                            tint = p.text,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = if (sortAscending) "Oldest" else "Newest",
+                                            color = p.text,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Medium
                                         )
                                     }
-                                }
-
-                                // Asc / Desc sort button
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(p.chipBg)
-                                        .clickable {
-                                            sortAscending = !sortAscending
-                                            selectedChunkIndex = 0
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.SwapVert,
-                                        contentDescription = null,
-                                        tint = p.text,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        text = if (sortAscending) "Oldest" else "Newest",
-                                        color = p.text,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
                                 }
                             }
                         }
                     }
 
-                    // Chapter chunk tabs (range selector for large chapter lists)
+                    // Chapter chunk tabs (range pills with actual chapter numbers & solid white active pill)
                     if (chunkCount > 1) {
                         item("chapter_chunk_picker") {
                             Row(
@@ -1323,8 +1269,12 @@ fun MangaDetailScreen(
                             ) {
                                 // Dropdown Range Selector
                                 Box {
-                                    val curStart = selectedChunkIndex * CHAPTER_CHUNK_SIZE + 1
-                                    val curEnd = ((selectedChunkIndex + 1) * CHAPTER_CHUNK_SIZE).coerceAtMost(filteredChapters.size)
+                                    val curChunkStart = selectedChunkIndex * CHAPTER_CHUNK_SIZE
+                                    val curChunkEnd = ((selectedChunkIndex + 1) * CHAPTER_CHUNK_SIZE).coerceAtMost(filteredChapters.size)
+                                    val curFirstCh = filteredChapters.getOrNull(curChunkStart)?.number?.let { n -> if (n.endsWith(".0")) n.dropLast(2) else n }
+                                    val curLastCh = filteredChapters.getOrNull(curChunkEnd - 1)?.number?.let { n -> if (n.endsWith(".0")) n.dropLast(2) else n }
+                                    val currentLabel = if (curFirstCh != null && curLastCh != null) "$curFirstCh–$curLastCh" else "${curChunkStart + 1}–$curChunkEnd"
+
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
@@ -1334,7 +1284,7 @@ fun MangaDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Range: Ch. $curStart – $curEnd",
+                                            text = "Range: $currentLabel",
                                             color = p.text,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold
@@ -1354,12 +1304,15 @@ fun MangaDetailScreen(
                                         modifier = Modifier.background(p.bg)
                                     ) {
                                         for (idx in 0 until chunkCount) {
-                                            val s = idx * CHAPTER_CHUNK_SIZE + 1
+                                            val s = idx * CHAPTER_CHUNK_SIZE
                                             val e = ((idx + 1) * CHAPTER_CHUNK_SIZE).coerceAtMost(filteredChapters.size)
+                                            val fCh = filteredChapters.getOrNull(s)?.number?.let { n -> if (n.endsWith(".0")) n.dropLast(2) else n }
+                                            val lCh = filteredChapters.getOrNull(e - 1)?.number?.let { n -> if (n.endsWith(".0")) n.dropLast(2) else n }
+                                            val itemLabel = if (fCh != null && lCh != null) "$fCh–$lCh" else "${s + 1}–$e"
                                             DropdownMenuItem(
                                                 text = {
                                                     Text(
-                                                        text = "Ch. $s – $e",
+                                                        text = itemLabel,
                                                         color = if (idx == selectedChunkIndex) p.accentText else p.text,
                                                         fontWeight = if (idx == selectedChunkIndex) FontWeight.Bold else FontWeight.Normal,
                                                         fontSize = 12.5.sp
@@ -1420,23 +1373,27 @@ fun MangaDetailScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 items(chunkCount) { idx ->
-                                    val startNum = idx * CHAPTER_CHUNK_SIZE + 1
-                                    val endNum = ((idx + 1) * CHAPTER_CHUNK_SIZE).coerceAtMost(filteredChapters.size)
+                                    val chunkStart = idx * CHAPTER_CHUNK_SIZE
+                                    val chunkEnd = ((idx + 1) * CHAPTER_CHUNK_SIZE).coerceAtMost(filteredChapters.size)
+                                    val firstCh = filteredChapters.getOrNull(chunkStart)?.number?.let { n -> if (n.endsWith(".0")) n.dropLast(2) else n }
+                                    val lastCh = filteredChapters.getOrNull(chunkEnd - 1)?.number?.let { n -> if (n.endsWith(".0")) n.dropLast(2) else n }
+                                    val pillLabel = if (firstCh != null && lastCh != null) "$firstCh–$lastCh" else "${chunkStart + 1}–$chunkEnd"
                                     val isSelected = selectedChunkIndex == idx
+
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
-                                            .then(
-                                                if (isSelected) Modifier.background(p.accentBrush)
-                                                else Modifier.background(p.chipBg)
+                                            .background(
+                                                if (isSelected) Color.White
+                                                else Color(0x18FFFFFF)
                                             )
                                             .clickable { selectedChunkIndex = idx }
-                                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                                            .padding(horizontal = 14.dp, vertical = 7.dp)
                                     ) {
                                         Text(
-                                            text = "$startNum – $endNum",
-                                            color = if (isSelected) p.onAccent else p.textSub,
-                                            fontSize = 11.5.sp,
+                                            text = pillLabel,
+                                            color = if (isSelected) Color.Black else Color.White,
+                                            fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
                                     }
@@ -1445,7 +1402,7 @@ fun MangaDetailScreen(
                         }
                     }
 
-                    // 6. CHAPTERS LIST
+                    // 6. CHAPTERS LIST (2-Column Grid matching zenkai web Image 1)
                     if (filteredChapters.isEmpty()) {
                         item("empty_chapters") {
                             Box(
@@ -1462,76 +1419,92 @@ fun MangaDetailScreen(
                             }
                         }
                     } else {
-                        itemsIndexed(currentChunkChapters, key = { _, ch -> ch.chapterId }) { _, chapter ->
-                            val isRead = historyItem != null && historyItem.chapterId == chapter.chapterId
-                            val task = downloadTasks.find { it.chapterId == chapter.chapterId }
-                            val isDownloaded = task?.status == DownloadStatus.COMPLETED
-
+                        items(currentChunkChapters.chunked(2), key = { pair -> pair.first().chapterId }) { pair ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onReadChapter(currentMangaId, chapter.chapterId) }
-                                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "Chapter ${chapter.number}",
-                                            color = if (isRead) p.textMuted else p.text,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isRead) FontWeight.Normal else FontWeight.SemiBold
-                                        )
-                                        if (isRead) {
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(
-                                                text = "• Read",
-                                                color = p.textMuted,
-                                                fontSize = 11.5.sp
-                                            )
-                                        }
-                                    }
+                                for (chapter in pair) {
+                                    val isRead = historyItem != null && historyItem.chapterId == chapter.chapterId
+                                    val task = downloadTasks.find { it.chapterId == chapter.chapterId }
+                                    val isDownloaded = task?.status == DownloadStatus.COMPLETED
 
-                                    if (!chapter.title.isNullOrBlank() && chapter.title != chapter.number) {
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = chapter.title,
-                                            color = p.textSub,
-                                            fontSize = 12.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFF14161E))
+                                            .border(BorderStroke(1.dp, Color(0x18FFFFFF)), RoundedCornerShape(10.dp))
+                                            .clickable { onReadChapter(currentMangaId, chapter.chapterId) }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                val cleanNum = if (chapter.number.endsWith(".0")) chapter.number.dropLast(2) else chapter.number
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "Ch. $cleanNum",
+                                                        color = if (isRead) p.textMuted else Color.White,
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    if (isRead) {
+                                                        Spacer(Modifier.width(5.dp))
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(5.dp)
+                                                                .clip(CircleShape)
+                                                                .background(p.accentA)
+                                                        )
+                                                    }
+                                                }
+                                                val subText = if (!chapter.title.isNullOrBlank() && chapter.title != chapter.number) {
+                                                    chapter.title
+                                                } else {
+                                                    "Chapter $cleanNum"
+                                                }
+                                                Text(
+                                                    text = subText,
+                                                    color = p.textMuted,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
 
-                                    if (!chapter.releaseDate.isNullOrBlank()) {
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = chapter.releaseDate,
-                                            color = p.textMuted,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                }
-
-                                // Download Icon Action Button (No border box)
-                                Icon(
-                                    imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.FileDownload,
-                                    contentDescription = "Download",
-                                    tint = if (isDownloaded) p.rating else p.textMuted,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clickable {
-                                            if (!isDownloaded && task == null) {
-                                                vm.downloadMangaChapter(
-                                                    mangaId = currentMangaId,
-                                                    mangaTitle = info?.title ?: "Manga",
-                                                    mangaPoster = info?.poster,
-                                                    chapter = chapter
+                                            // Compact download button
+                                            IconButton(
+                                                onClick = {
+                                                    if (!isDownloaded && task == null) {
+                                                        vm.downloadMangaChapter(
+                                                            mangaId = currentMangaId,
+                                                            mangaTitle = info?.title ?: "Manga",
+                                                            mangaPoster = info?.poster,
+                                                            chapter = chapter
+                                                        )
+                                                    }
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.FileDownload,
+                                                    contentDescription = "Download",
+                                                    tint = if (isDownloaded) p.rating else p.textMuted.copy(alpha = 0.5f),
+                                                    modifier = Modifier.size(15.dp)
                                                 )
                                             }
                                         }
-                                )
+                                    }
+                                }
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
@@ -1855,7 +1828,7 @@ private fun MangaServerFinderView(
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
-                            text = "Checking $serversCheckedCount of $totalServers servers…",
+                            text = if (serversCheckedCount == 0) "Searching across $totalServers servers…" else "Checked $serversCheckedCount of $totalServers servers…",
                             color = p.textMuted,
                             fontSize = 12.sp
                         )
@@ -1927,6 +1900,35 @@ private fun MangaServerFinderView(
                                         )
                                     )
                             )
+                            // Top Left Rating Badge (★ 8.7) - Matching Image 3
+                            if (!show.rating.isNullOrBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(6.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xD9000000))
+                                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Text(
+                                            text = "★",
+                                            color = Color(0xFFFFB800),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black
+                                        )
+                                        Text(
+                                            text = show.rating,
+                                            color = Color.White,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                             // Top Right Badge
                             Box(
                                 modifier = Modifier
@@ -1972,7 +1974,44 @@ private fun MangaServerFinderView(
                     }
                 }
             }
-        } else if (!serversChecking) {
+        } else if (serversChecking) {
+            // Skeleton while servers are still checking
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 32.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(4) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .shimmer(p)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .height(14.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .shimmer(p)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.45f)
+                                .height(11.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .shimmer(p)
+                        )
+                    }
+                }
+            }
+        } else {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
