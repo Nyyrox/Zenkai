@@ -57,6 +57,17 @@ data class MatchedEdition(
     val poster: String? = null
 )
 
+data class ServerShowItem(
+    val id: String,
+    val title: String,
+    val poster: String?,
+    val source: MangaSource,
+    val score: Float = 1.0f,
+    val chapterCount: Int? = null,
+    val latestChapter: String? = null,
+    val caption: String? = null
+)
+
 data class AvailableSourceInfo(
     val source: MangaSource,
     val matchedId: String,

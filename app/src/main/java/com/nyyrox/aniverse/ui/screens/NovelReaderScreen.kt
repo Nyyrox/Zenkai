@@ -1,4 +1,5 @@
 package com.nyyrox.aniverse.ui.screens
+import kotlinx.coroutines.isActive
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayCircle
@@ -360,14 +361,21 @@ fun NovelReaderScreen(
 
     LaunchedEffect(isAutoScrolling, autoScrollSpeed, settings.isContinuousScroll) {
         if (isAutoScrolling && settings.isContinuousScroll) {
-            try {
-                listState.scroll(androidx.compose.foundation.MutatePriority.PreventUserInput) {
-                    while (isAutoScrolling) {
-                        scrollBy(autoScrollSpeed * 2.2f)
-                        kotlinx.coroutines.delay(16L)
+            while (isAutoScrolling && isActive) {
+                try {
+                    listState.scroll(androidx.compose.foundation.MutatePriority.Default) {
+                        while (isAutoScrolling && this@LaunchedEffect.isActive) {
+                            scrollBy(autoScrollSpeed * 2.2f)
+                            kotlinx.coroutines.delay(16L)
+                        }
                     }
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                    if (!isAutoScrolling || !isActive) break
+                    kotlinx.coroutines.delay(100L)
+                } catch (_: Exception) {
+                    kotlinx.coroutines.delay(100L)
                 }
-            } catch (_: Exception) {}
+            }
         }
     }
 

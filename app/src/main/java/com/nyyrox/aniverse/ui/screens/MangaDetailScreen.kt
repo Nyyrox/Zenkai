@@ -38,7 +38,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.nyyrox.aniverse.data.manga.ServerShowItem
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -99,6 +103,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.nyyrox.aniverse.data.download.DownloadStatus
 import com.nyyrox.aniverse.data.manga.AvailableSourceInfo
 import com.nyyrox.aniverse.data.manga.MatchedEdition
@@ -129,19 +134,53 @@ fun MangaDetailScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    BackHandler(enabled = true) {
-        onBack()
-    }
-
     val cleanManga = MangaRepository.cleanWeebId(mangaId)
     val cachedManga = vm.mangaDetailCache[mangaId] ?: vm.mangaDetailCache[cleanManga]
+
+    val initialTitle = remember(mangaId) {
+        vm.pendingMangaTitleHint
+            ?: vm.findKnownManga(mangaId)?.title
+            ?: vm.findKnownManga(cleanManga)?.title
+            ?: vm.getMangaHistoryItem(cleanManga)?.title
+            ?: vm.getMangaHistoryItem(mangaId)?.title
+            ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == cleanManga }?.title
+    }
+    val initialPoster = remember(mangaId) {
+        vm.pendingMangaPosterHint
+            ?: vm.findKnownManga(mangaId)?.poster
+            ?: vm.findKnownManga(cleanManga)?.poster
+            ?: vm.getMangaHistoryItem(cleanManga)?.poster
+            ?: vm.getMangaHistoryItem(mangaId)?.poster
+            ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == cleanManga }?.poster
+    }
+
+    val isExplicitServerShow = remember(mangaId, cleanManga) {
+        cleanManga.startsWith("wc_") || cleanManga.startsWith("ck_") ||
+        cleanManga.startsWith("mh_") || cleanManga.startsWith("as_") ||
+        cleanManga.startsWith("ds_") || cleanManga.startsWith("md_")
+    }
+
+    var selectedShow by remember {
+        mutableStateOf<ServerShowItem?>(
+            if (isExplicitServerShow) {
+                ServerShowItem(
+                    id = cleanManga,
+                    title = initialTitle ?: "Manga",
+                    poster = initialPoster,
+                    source = MangaRepository.getSourceForId(cleanManga)
+                )
+            } else null
+        )
+    }
+
+    var foundServerShows by remember { mutableStateOf<List<ServerShowItem>>(emptyList()) }
     var currentMangaId by remember { mutableStateOf(cachedManga?.resolvedId ?: cleanManga) }
     var info by remember { mutableStateOf<MangaInfo?>(cachedManga?.info) }
     var chapters by remember { mutableStateOf<List<MangaChapter>>(cachedManga?.chapters ?: emptyList()) }
     var loading by remember { mutableStateOf(cachedManga == null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    var activeSource by remember { mutableStateOf<MangaSource?>(null) }
+    var activeSource by remember { mutableStateOf<MangaSource?>(cachedManga?.info?.let { MangaSource.fromId(it.source) }) }
     var switchingSource by remember { mutableStateOf(false) }
     var serversChecking by remember { mutableStateOf(false) }
     var serversCheckedCount by remember { mutableIntStateOf(0) }
@@ -153,6 +192,14 @@ fun MangaDetailScreen(
     var isSynopsisExpanded by remember { mutableStateOf(false) }
     val downloadTasks by vm.downloadManager.tasks.collectAsState()
 
+    BackHandler(enabled = true) {
+        if (selectedShow != null && foundServerShows.isNotEmpty()) {
+            selectedShow = null
+        } else {
+            onBack()
+        }
+    }
+
     // Load Manga Details from AniList + Available Sources
     LaunchedEffect(mangaId) {
         val cleanCurrent = MangaRepository.cleanWeebId(mangaId)
@@ -163,6 +210,15 @@ fun MangaDetailScreen(
             currentMangaId = cached.resolvedId
             activeSource = MangaSource.fromId(cached.info.source)
             availableSourcesList = cached.info.availableSources
+            if (isExplicitServerShow && selectedShow == null) {
+                selectedShow = ServerShowItem(
+                    id = cached.resolvedId,
+                    title = cached.info.title,
+                    poster = cached.info.poster ?: initialPoster,
+                    source = activeSource ?: MangaSource.WEEBCENTRAL,
+                    chapterCount = cached.chapters.size
+                )
+            }
             loading = false
             error = null
         } else {
@@ -171,6 +227,7 @@ fun MangaDetailScreen(
         }
 
         val fallbackTitle = vm.pendingMangaTitleHint?.also { vm.pendingMangaTitleHint = null }
+            ?: initialTitle
             ?: vm.findKnownManga(mangaId)?.title
             ?: vm.findKnownManga(currentMangaId)?.title
             ?: vm.findKnownManga(cleanCurrent)?.title
@@ -192,6 +249,15 @@ fun MangaDetailScreen(
                 chapters = fetchedChapters
                 activeSource = MangaSource.fromId(fetchedInfo.source)
                 availableSourcesList = fetchedInfo.availableSources
+                if (isExplicitServerShow && selectedShow == null) {
+                    selectedShow = ServerShowItem(
+                        id = effectiveId,
+                        title = fetchedInfo.title,
+                        poster = fetchedInfo.poster ?: initialPoster,
+                        source = activeSource ?: MangaSource.WEEBCENTRAL,
+                        chapterCount = fetchedChapters.size
+                    )
+                }
                 val cacheEntry = MainViewModel.CachedMangaDetail(currentMangaId, fetchedInfo, fetchedChapters)
                 vm.mangaDetailCache[mangaId] = cacheEntry
                 vm.mangaDetailCache[cleanCurrent] = cacheEntry
@@ -207,40 +273,39 @@ fun MangaDetailScreen(
             loading = false
         }
 
-        // 3. Launch progressive cross-server check (streaming status on screen like zenkai web)
-        val allSourcesList = listOf(
-            MangaSource.WEEBCENTRAL,
-            MangaSource.DEMONIC_SCANS,
-            MangaSource.COMICK,
-            MangaSource.MANHUA,
-            MangaSource.ASURA,
-            MangaSource.MANGADEX
-        )
-        val targetTitle = info?.title ?: fallbackTitle ?: ""
+        // 3. Launch progressive cross-server check (streaming exact matching shows like zenkai web)
+        val targetTitle = info?.title ?: fallbackTitle ?: initialTitle ?: ""
         if (targetTitle.isNotBlank()) {
             serversChecking = true
             serversCheckedCount = 0
             launch {
                 try {
-                    MangaRepository.checkSourcesProgressive(
+                    MangaRepository.findServerShowsProgressive(
                         title = targetTitle,
                         altTitles = listOfNotNull(info?.altTitle),
-                        onSourceFound = { found ->
-                            availableSourcesList = (availableSourcesList.filter { it.source != found.source } + found)
-                                .sortedBy { allSourcesList.indexOf(it.source) }
-                            info = info?.copy(availableSources = availableSourcesList)
-                            if (chapters.isEmpty() && found.matchedId.isNotBlank()) {
-                                scope.launch {
-                                    try {
-                                        val chs = MangaRepository.getChaptersForSource(found.source, found.matchedId)
-                                        if (chs.isNotEmpty()) {
-                                            chapters = chs
-                                            currentMangaId = found.matchedId
-                                            activeSource = found.source
-                                            info = info?.copy(source = found.source.id)
-                                        }
-                                    } catch (_: Exception) {}
+                        onShowFound = { show ->
+                            val updated = (foundServerShows.filter { it.id != show.id } + show)
+                            val order = MangaRepository.PREFERRED_SOURCE_ORDER
+                            foundServerShows = updated.sortedWith(
+                                compareByDescending<ServerShowItem> { it.score }
+                                    .thenBy { item ->
+                                        val idx = order.indexOf(item.source)
+                                        if (idx < 0) 999 else idx
+                                    }
+                            )
+                            val existingAvail = availableSourcesList.find { it.source == show.source }
+                            if (existingAvail == null) {
+                                availableSourcesList = (availableSourcesList + AvailableSourceInfo(
+                                    source = show.source,
+                                    matchedId = show.id,
+                                    matchedTitle = show.title,
+                                    chapterCount = show.chapterCount,
+                                    latestChapter = show.latestChapter
+                                )).sortedBy { s ->
+                                    val idx = order.indexOf(s.source)
+                                    if (idx < 0) 999 else idx
                                 }
+                                info = info?.copy(availableSources = availableSourcesList)
                             }
                         },
                         onProgress = { checked, _ ->
@@ -255,22 +320,8 @@ fun MangaDetailScreen(
         }
     }
 
-    val knownTitle = remember(mangaId, cleanManga) {
-        vm.pendingMangaTitleHint
-            ?: vm.findKnownManga(mangaId)?.title
-            ?: vm.findKnownManga(cleanManga)?.title
-            ?: vm.getMangaHistoryItem(cleanManga)?.title
-            ?: vm.getMangaHistoryItem(mangaId)?.title
-            ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == cleanManga }?.title
-    }
-    val cachedPoster = remember(mangaId, cleanManga) {
-        vm.pendingMangaPosterHint
-            ?: vm.findKnownManga(mangaId)?.poster
-            ?: vm.findKnownManga(cleanManga)?.poster
-            ?: vm.getMangaHistoryItem(cleanManga)?.poster
-            ?: vm.getMangaHistoryItem(mangaId)?.poster
-            ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == cleanManga }?.poster
-    }
+    val knownTitle = initialTitle
+    val cachedPoster = initialPoster
 
     var missingServer by remember { mutableStateOf<MangaSource?>(null) }
     var switchingSourceId by remember { mutableStateOf<MangaSource?>(null) }
@@ -417,11 +468,39 @@ fun MangaDetailScreen(
         background = { HomeBackdrop(p) }
     ) {
         Box(Modifier.fillMaxSize()) {
-            if (loading && info == null) {
+            if (loading && info == null && selectedShow != null) {
                 MangaDetailLoadingSkeleton(
-                    cachedPoster = cachedPoster,
-                    title = knownTitle,
+                    cachedPoster = initialPoster ?: info?.poster,
+                    title = initialTitle ?: info?.title,
                     onBack = onBack
+                )
+            } else if (selectedShow == null) {
+                MangaServerFinderView(
+                    title = initialTitle ?: info?.title ?: "Manga",
+                    poster = initialPoster ?: info?.poster,
+                    serversChecking = serversChecking,
+                    serversCheckedCount = serversCheckedCount,
+                    totalServers = 6,
+                    foundShows = foundServerShows,
+                    onSelectShow = { show ->
+                        selectedShow = show
+                        currentMangaId = show.id
+                        activeSource = show.source
+                        scope.launch {
+                            loading = true
+                            try {
+                                val chs = MangaRepository.getChaptersForSource(show.source, show.id)
+                                if (chs.isNotEmpty()) {
+                                    chapters = chs
+                                }
+                            } catch (_: Exception) {
+                            } finally {
+                                loading = false
+                            }
+                        }
+                    },
+                    onBack = onBack,
+                    p = p
                 )
             } else if (error != null && info == null) {
                 Box(Modifier.fillMaxSize().padding(horizontal = 32.dp), contentAlignment = Alignment.Center) {
@@ -471,6 +550,9 @@ fun MangaDetailScreen(
                                     .windowInsetsPadding(WindowInsets.statusBars)
                                     .padding(top = 54.dp, start = 20.dp, end = 20.dp, bottom = 16.dp)
                             ) {
+                                val displayPoster = selectedShow?.poster ?: info?.poster ?: initialPoster
+                                val displayTitle = selectedShow?.title ?: info?.title ?: initialTitle ?: "Manga"
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.Bottom
@@ -485,8 +567,11 @@ fun MangaDetailScreen(
                                             .shimmer(p)
                                     ) {
                                         AsyncImage(
-                                            model = info?.poster,
-                                            contentDescription = info?.title,
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(displayPoster)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = displayTitle,
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
@@ -499,7 +584,7 @@ fun MangaDetailScreen(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text(
-                                            text = info?.title ?: "Manga",
+                                            text = displayTitle,
                                             color = p.text,
                                             fontSize = 20.sp,
                                             lineHeight = 24.sp,
@@ -519,68 +604,75 @@ fun MangaDetailScreen(
                                             )
                                         }
 
-                                        Spacer(Modifier.height(10.dp))
+                                        Spacer(Modifier.height(8.dp))
 
-                                        // Rating, Status, Format
+                                        // Subtitle Stats Row (Source Chapters · AniList count · Rating)
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            if (info?.rating != null) {
-                                                Icon(
-                                                    Icons.Default.Star,
-                                                    contentDescription = null,
-                                                    tint = p.rating,
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                                Spacer(Modifier.width(3.dp))
+                                            if (chapters.isNotEmpty()) {
                                                 Text(
-                                                    info?.rating ?: "",
-                                                    color = p.rating,
-                                                    fontSize = 13.sp,
+                                                    text = "${chapters.size} chapters",
+                                                    color = p.accentText,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
-                                                Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
+                                                Text("·", color = p.textMuted, fontSize = 12.sp)
                                             }
-
-                                            Text(
-                                                (info?.type ?: "MANGA").uppercase(),
-                                                color = p.textSub,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-
-                                            if (!info?.status.isNullOrBlank()) {
-                                                Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
-                                                Text(
-                                                    info?.status ?: "",
-                                                    color = p.textMuted,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                        }
-
-                                        // Total Chapters info (AniList + Source)
-                                        Spacer(Modifier.height(4.dp))
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
                                             if (info?.totalChapters != null && info?.totalChapters != 0) {
                                                 Text(
-                                                    "AniList: ${info?.totalChapters} ch.",
+                                                    text = "AniList: ${info?.totalChapters} ch.",
                                                     color = p.textSub,
                                                     fontSize = 11.5.sp,
                                                     fontWeight = FontWeight.Medium
                                                 )
-                                                if (chapters.isNotEmpty()) {
-                                                    Text("  ·  ", color = p.textMuted, fontSize = 11.sp)
+                                                Text("·", color = p.textMuted, fontSize = 12.sp)
+                                            }
+                                            if (info?.rating != null) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = p.rating,
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                    Spacer(Modifier.width(3.dp))
+                                                    Text(
+                                                        text = info?.rating ?: "",
+                                                        color = p.rating,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
                                                 }
                                             }
-                                            if (chapters.isNotEmpty()) {
+                                        }
+
+                                        // Next Airing Countdown with pulsing live dot
+                                        val nextEp = info?.relatedAnimeNextAiringEpisode
+                                        val nextTime = info?.relatedAnimeNextAiringTime
+                                        if (nextEp != null && nextTime != null) {
+                                            Spacer(Modifier.height(6.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(Color(0x22FF3B30))
+                                                    .clickable { info?.relatedAnimeId?.let { onAnimeClick?.invoke(it) } }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(7.dp)
+                                                        .graphicsLayer { alpha = redBlinkAlpha }
+                                                        .background(Color(0xFFFF3B30), CircleShape)
+                                                )
                                                 Text(
-                                                    "${chapters.size} ch. on ${activeSource?.displayName ?: info?.source ?: "ComicK"}",
-                                                    color = p.accentText,
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.SemiBold
+                                                    text = "Anime Ep. $nextEp airing in ${formatAiringCountdown(nextTime)}",
+                                                    color = Color(0xFFFF5252),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
                                                 )
                                             }
                                         }
@@ -614,10 +706,10 @@ fun MangaDetailScreen(
                                     Spacer(Modifier.height(18.dp))
                                 }
 
-                                // Action Buttons: Start Reading + Bookmark + Share
+                                // Action Buttons: Start Reading + Latest + All Servers + Bookmark
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     val resumeChapter = historyItem?.chapterId ?: chapters.firstOrNull()?.chapterId
@@ -644,14 +736,63 @@ fun MangaDetailScreen(
                                             Icons.Default.AutoStories,
                                             contentDescription = null,
                                             tint = p.onAccent,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(17.dp)
                                         )
-                                        Spacer(Modifier.width(8.dp))
+                                        Spacer(Modifier.width(6.dp))
                                         Text(
                                             text = readLabel,
                                             color = p.onAccent,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                    }
+
+                                    // Latest Chapter CTA Pill (if available and not currently on it)
+                                    val latestChapter = chapters.lastOrNull()
+                                    if (latestChapter != null && historyItem == null && chapters.size > 1) {
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(CircleShape)
+                                                .background(p.chipBg)
+                                                .clickable {
+                                                    onReadChapter(currentMangaId, latestChapter.chapterId)
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Latest · Ch. ${latestChapter.number}",
+                                                color = p.text,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+
+                                    // All Servers CTA Pill
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(p.chipBg)
+                                            .clickable {
+                                                selectedShow = null
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.SwapVert,
+                                            contentDescription = "All Servers",
+                                            tint = p.accentText,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = "All Servers",
+                                            color = p.text,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
 
@@ -669,7 +810,7 @@ fun MangaDetailScreen(
                                                 )
                                                 isBookmarked = added
                                             }
-                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
@@ -1610,6 +1751,245 @@ private fun formatAiringCountdown(airingAtSeconds: Long): String {
 }
 
 @Composable
+private fun MangaServerFinderView(
+    title: String,
+    poster: String?,
+    serversChecking: Boolean,
+    serversCheckedCount: Int,
+    totalServers: Int,
+    foundShows: List<ServerShowItem>,
+    onSelectShow: (ServerShowItem) -> Unit,
+    onBack: () -> Unit,
+    p: HomePalette
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = 20.dp)
+    ) {
+        // Top Back Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(p.chipBg)
+                    .clickable { onBack() }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = p.text,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text("Back", color = p.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        // Header Section (Poster + Title + Status)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            if (!poster.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .width(76.dp)
+                        .aspectRatio(2f / 3f)
+                        .shadow(12.dp, RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(p.skeleton)
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(poster)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "READ THE MANGA",
+                    color = p.accentText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = title,
+                    color = p.text,
+                    fontSize = 22.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (serversChecking) {
+                        CircularProgressIndicator(
+                            color = p.accentA,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "Checking $serversCheckedCount of $totalServers servers…",
+                            color = p.textMuted,
+                            fontSize = 12.sp
+                        )
+                    } else if (foundShows.isNotEmpty()) {
+                        val distinctServers = foundShows.map { it.source }.distinct().size
+                        Text(
+                            text = "Found on $distinctServers of $totalServers servers. Pick one to open it.",
+                            color = p.textSub,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        Text(
+                            text = "No server has it under this name.",
+                            color = p.textMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // 2-Column Grid of Exact Shows Found
+        if (foundShows.isNotEmpty()) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 32.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(foundShows, key = { "${it.source.id}_${it.id}" }) { show ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectShow(show) }
+                    ) {
+                        // Poster Card (NO borders, clean glass shadow)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .shadow(8.dp, RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(p.flatFill)
+                        ) {
+                            val cardImg = show.poster ?: poster
+                            if (!cardImg.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(cardImg)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = show.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            // Gradient shadow at bottom of poster
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            0.6f to Color.Transparent,
+                                            1f to Color(0x99000000)
+                                        )
+                                    )
+                            )
+                            // Top Right Badge
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xCC000000))
+                                    .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                            ) {
+                                Text(
+                                    text = "MANGA",
+                                    color = Color.White,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(6.dp))
+
+                        // Title
+                        Text(
+                            text = show.title,
+                            color = p.text,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(Modifier.height(2.dp))
+
+                        // Server Label / Caption
+                        Text(
+                            text = show.caption ?: show.source.displayName,
+                            color = p.accentText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        } else if (!serversChecking) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No shows found across all servers.",
+                    color = p.textMuted,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MangaDetailLoadingSkeleton(
     cachedPoster: String?,
     title: String?,
@@ -1634,7 +2014,10 @@ private fun MangaDetailLoadingSkeleton(
     ) {
         if (!cachedPoster.isNullOrBlank()) {
             AsyncImage(
-                model = cachedPoster,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(cachedPoster)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -1686,7 +2069,10 @@ private fun MangaDetailLoadingSkeleton(
             ) {
                 if (!cachedPoster.isNullOrBlank()) {
                     AsyncImage(
-                        model = cachedPoster,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(cachedPoster)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

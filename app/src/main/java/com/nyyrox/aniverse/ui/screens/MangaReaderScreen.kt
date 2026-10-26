@@ -278,21 +278,28 @@ fun MangaReaderScreen(
 
     LaunchedEffect(isAutoScrolling, autoScrollSpeed, readMode) {
         if (isAutoScrolling && readMode == MangaReaderMode.VERTICAL_WEBTOON) {
-            try {
-                verticalListState.scroll(androidx.compose.foundation.MutatePriority.PreventUserInput) {
-                    while (isAutoScrolling) {
-                        scrollBy(autoScrollSpeed * 2.5f)
-                        kotlinx.coroutines.delay(16L)
+            while (isAutoScrolling && isActive) {
+                try {
+                    verticalListState.scroll(androidx.compose.foundation.MutatePriority.Default) {
+                        while (isAutoScrolling && this@LaunchedEffect.isActive) {
+                            scrollBy(autoScrollSpeed * 2.5f)
+                            kotlinx.coroutines.delay(16L)
+                        }
                     }
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                    if (!isAutoScrolling || !isActive) break
+                    kotlinx.coroutines.delay(100L)
+                } catch (_: Exception) {
+                    kotlinx.coroutines.delay(100L)
                 }
-            } catch (_: Exception) {}
+            }
         }
     }
     LaunchedEffect(isAutoScrolling, autoFlipSeconds, readMode) {
         if (isAutoScrolling && readMode != MangaReaderMode.VERTICAL_WEBTOON) {
-            while (isAutoScrolling) {
+            while (isAutoScrolling && isActive) {
                 kotlinx.coroutines.delay(autoFlipSeconds * 1000L)
-                if (!isAutoScrolling) break
+                if (!isAutoScrolling || !isActive) break
                 val cur = pagerState.currentPage
                 val total = pagerState.pageCount
                 val next = cur + 1

@@ -23,6 +23,15 @@ object MangaRepository {
     val demonicScans = DemonicScansRepository()
     val weebCentral = WeebCentralRepository()
 
+    val PREFERRED_SOURCE_ORDER = listOf(
+        MangaSource.WEEBCENTRAL,
+        MangaSource.DEMONIC_SCANS,
+        MangaSource.COMICK,
+        MangaSource.MANHUA,
+        MangaSource.ASURA,
+        MangaSource.MANGADEX
+    )
+
     private val repositories = mapOf<MangaSource, IMangaSourceRepository>(
         MangaSource.WEEBCENTRAL to weebCentral,
         MangaSource.DEMONIC_SCANS to demonicScans,
@@ -322,6 +331,74 @@ object MangaRepository {
         }.awaitAll()
 
         foundList.toList()
+    }
+
+    suspend fun findServerShowsProgressive(
+        title: String,
+        altTitles: List<String> = emptyList(),
+        onShowFound: (ServerShowItem) -> Unit,
+        onProgress: (checked: Int, total: Int) -> Unit
+    ): List<ServerShowItem> = withContext(Dispatchers.IO) {
+        val names = (listOf(title) + altTitles)
+            .map { it.trim() }
+            .filter { it.isNotBlank() && it.length >= 2 }
+            .distinct()
+
+        val variants = MangaTitleMatcher.searchVariants(names)
+        val orderedSources = repositories.keys.toList()
+        val total = orderedSources.size
+        val checkedCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val foundShows = java.util.Collections.synchronizedList(mutableListOf<ServerShowItem>())
+
+        orderedSources.map { source ->
+            async {
+                val repo = repositories[source]
+                if (repo != null) {
+                    val seenIds = mutableSetOf<String>()
+                    val serverMatches = mutableListOf<Pair<ServerShowItem, Float>>()
+                    for (v in variants) {
+                        try {
+                            val results = repo.search(v)
+                            for (item in results) {
+                                if (seenIds.add(item.id)) {
+                                    val score = MangaTitleMatcher.bestSimilarity(item.title, names)
+                                    if (score >= MangaTitleMatcher.MATCH_AT) {
+                                        val show = ServerShowItem(
+                                            id = item.id,
+                                            title = item.title,
+                                            poster = item.poster,
+                                            source = source,
+                                            score = score,
+                                            chapterCount = item.chapter?.replace(Regex("[^0-9]"), "")?.toIntOrNull(),
+                                            latestChapter = item.chapter,
+                                            caption = listOfNotNull(source.displayName, item.chapter).joinToString(" · ")
+                                        )
+                                        serverMatches.add(show to score)
+                                    }
+                                }
+                            }
+                            if (serverMatches.any { it.second >= 0.85f }) break
+                        } catch (_: Exception) {}
+                    }
+                    val topForServer = serverMatches
+                        .sortedByDescending { it.second }
+                        .take(3)
+                        .map { it.first }
+
+                    for (show in topForServer) {
+                        foundShows.add(show)
+                        onShowFound(show)
+                    }
+                }
+                val cur = checkedCount.incrementAndGet()
+                onProgress(cur, total)
+            }
+        }.awaitAll()
+
+        foundShows.sortedWith(
+            compareByDescending<ServerShowItem> { it.score }
+                .thenBy { orderedSources.indexOf(it.source).let { idx -> if (idx < 0) 999 else idx } }
+        )
     }
 
     suspend fun getChaptersForSource(source: MangaSource, mangaId: String): List<MangaChapter> = withContext(Dispatchers.IO) {
@@ -640,4 +717,57 @@ object MangaRepository {
         val repo = getRepoForSource(src)
         return repo.getPages(chapterId)
     }
+}
+
+object MangaTitleMatcher {
+    fun compact(s: String): String {
+        return s.lowercase()
+            .replace(Regex("""\(.*?\)|\{.*?\}|\[.*?\]"""), " ")
+            .replace("&", " and ")
+            .replace(Regex("""[^a-z0-9]+"""), " ")
+            .trim()
+    }
+
+    fun similarity(a: String, b: String): Float {
+        val x = compact(a)
+        val y = compact(b)
+        if (x.isBlank() || y.isBlank()) return 0f
+        if (x == y || x.replace(" ", "") == y.replace(" ", "")) return 1f
+        val (short, long) = if (x.length <= y.length) x to y else y to x
+        if (short.length >= 4 && " $long ".contains(" $short ")) {
+            return (0.6f + 0.4f * (short.length.toFloat() / long.length.toFloat())).coerceIn(0f, 1f)
+        }
+        val ta = x.split(" ").filter { it.isNotBlank() }.toSet()
+        val tb = y.split(" ").filter { it.isNotBlank() }.toSet()
+        if (ta.isEmpty() || tb.isEmpty()) return 0f
+        var shared = 0
+        for (t in ta) {
+            if (tb.contains(t)) shared++
+        }
+        val total = ta.size + tb.size - shared
+        return if (total > 0) shared.toFloat() / total.toFloat() else 0f
+    }
+
+    fun bestSimilarity(candidate: String, names: List<String>): Float {
+        if (names.isEmpty()) return 0f
+        return names.maxOfOrNull { similarity(candidate, it) } ?: 0f
+    }
+
+    fun searchVariants(names: List<String>): List<String> {
+        val out = mutableListOf<String>()
+        val add = { s: String? ->
+            val t = (s ?: "").trim()
+            if (t.length >= 2 && out.none { it.equals(t, ignoreCase = true) }) {
+                out.add(t)
+            }
+        }
+        for (n in names) add(n)
+        for (n in names) {
+            val part = n.split(Regex("""\s*[:：\-–—]\s+""")).firstOrNull()
+            add(part)
+        }
+        return out.take(6)
+    }
+
+    const val MATCH_AT = 0.70f
 }
