@@ -74,6 +74,8 @@ data class MangaInfo(
     val characters: List<MangaCharacter> = emptyList(),
     val relatedAnimeId: Int? = null,
     val relatedAnimeTitle: String? = null,
+    val relatedAnimeNextAiringEpisode: Int? = null,
+    val relatedAnimeNextAiringTime: Long? = null,
     val availableSources: List<AvailableSourceInfo> = emptyList(),
     val relations: List<MediaRelation> = emptyList()
 )

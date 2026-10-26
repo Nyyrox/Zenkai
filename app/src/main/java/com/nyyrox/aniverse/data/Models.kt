@@ -12,7 +12,9 @@ data class MediaRelation(
     val format: String? = null,
     val episodes: Int? = null,
     val status: String? = null,
-    val score: Int? = null
+    val score: Int? = null,
+    val nextAiringEpisode: Int? = null,
+    val nextAiringTime: Long? = null
 ) {
     val displayRelationType: String
         get() = relationType.replace('_', ' ').lowercase(Locale.US).split(" ").joinToString(" ") { word ->

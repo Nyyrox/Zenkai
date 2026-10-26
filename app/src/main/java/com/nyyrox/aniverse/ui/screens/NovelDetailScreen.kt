@@ -3,12 +3,19 @@ package com.nyyrox.aniverse.ui.screens
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +27,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,9 +45,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
@@ -50,6 +61,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -66,6 +79,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.BlendMode
@@ -130,6 +145,8 @@ fun NovelDetailScreen(
     val effectiveCover = novel?.cover?.takeIf { it.isNotBlank() && !it.contains("/series/") }
         ?: knownNovel?.cover
         ?: novel?.cover
+    val cachedPoster = effectiveCover
+    val knownTitle = novel?.title ?: knownNovel?.title ?: novelSlug
     val isBookmarked = vm.novelBookmarks.contains(novelSlug)
     val lastReadChapter = vm.novelHistory[novelSlug] ?: vm.novelHistoryList.find { it.slug == novelSlug }?.lastChapterSlug
     val downloadTasks by vm.downloadManager.tasks.collectAsState()
@@ -174,9 +191,11 @@ fun NovelDetailScreen(
                 )
         ) {
             if (vm.novelDetailLoading && novel == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = p.accentA, modifier = Modifier.size(36.dp), strokeWidth = 2.5.dp)
-                }
+                NovelDetailLoadingSkeleton(
+                    cachedPoster = cachedPoster,
+                    title = knownTitle,
+                    onBack = handleBack
+                )
                 return@Box
             }
 
@@ -213,6 +232,21 @@ fun NovelDetailScreen(
                         }
                     }
                     if (isReversedOrder) list.reversed() else list
+                }
+
+                val NOVEL_CHUNK_SIZE = 50
+                var selectedChunkIndex by remember(displayChapters.size, isReversedOrder) { mutableIntStateOf(0) }
+                val chunkCount = (displayChapters.size + NOVEL_CHUNK_SIZE - 1) / NOVEL_CHUNK_SIZE
+                var showChunkDropdown by remember { mutableStateOf(false) }
+
+                val currentChunkChapters = remember(displayChapters, selectedChunkIndex) {
+                    if (displayChapters.size <= NOVEL_CHUNK_SIZE) {
+                        displayChapters
+                    } else {
+                        val start = (selectedChunkIndex * NOVEL_CHUNK_SIZE).coerceIn(0, displayChapters.size)
+                        val end = (start + NOVEL_CHUNK_SIZE).coerceAtMost(displayChapters.size)
+                        displayChapters.subList(start, end)
+                    }
                 }
 
                 val backdropUrl = novel.banner ?: effectiveCover
@@ -713,6 +747,140 @@ fun NovelDetailScreen(
                             }
                         }
 
+                        // Novel Chapter Chunk Range Picker & Stepper
+                        if (chunkCount > 1) {
+                            item("novel_chapter_chunk_picker") {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 18.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Dropdown Range Selector
+                                    Box {
+                                        val curStart = selectedChunkIndex * NOVEL_CHUNK_SIZE + 1
+                                        val curEnd = ((selectedChunkIndex + 1) * NOVEL_CHUNK_SIZE).coerceAtMost(displayChapters.size)
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
+                                                .background(p.chipBg)
+                                                .clickable { showChunkDropdown = true }
+                                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Range: Ch. $curStart – $curEnd",
+                                                color = p.text,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Icon(
+                                                Icons.Default.ArrowDropDown,
+                                                contentDescription = null,
+                                                tint = p.textSub,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = showChunkDropdown,
+                                            onDismissRequest = { showChunkDropdown = false },
+                                            modifier = Modifier.background(p.bg)
+                                        ) {
+                                            for (idx in 0 until chunkCount) {
+                                                val s = idx * NOVEL_CHUNK_SIZE + 1
+                                                val e = ((idx + 1) * NOVEL_CHUNK_SIZE).coerceAtMost(displayChapters.size)
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = "Ch. $s – $e",
+                                                            color = if (idx == selectedChunkIndex) p.accentText else p.text,
+                                                            fontWeight = if (idx == selectedChunkIndex) FontWeight.Bold else FontWeight.Normal,
+                                                            fontSize = 12.5.sp
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        selectedChunkIndex = idx
+                                                        showChunkDropdown = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Chunk Prev / Next Steppers
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        IconButton(
+                                            onClick = { if (selectedChunkIndex > 0) selectedChunkIndex-- },
+                                            enabled = selectedChunkIndex > 0,
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ChevronLeft,
+                                                contentDescription = "Previous Range",
+                                                tint = if (selectedChunkIndex > 0) p.text else p.textMuted.copy(alpha = 0.35f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = "${selectedChunkIndex + 1} / $chunkCount",
+                                            color = p.textMuted,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        IconButton(
+                                            onClick = { if (selectedChunkIndex < chunkCount - 1) selectedChunkIndex++ },
+                                            enabled = selectedChunkIndex < chunkCount - 1,
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ChevronRight,
+                                                contentDescription = "Next Range",
+                                                tint = if (selectedChunkIndex < chunkCount - 1) p.text else p.textMuted.copy(alpha = 0.35f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            item("novel_chapter_chunk_tabs") {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(chunkCount) { idx ->
+                                        val startNum = idx * NOVEL_CHUNK_SIZE + 1
+                                        val endNum = ((idx + 1) * NOVEL_CHUNK_SIZE).coerceAtMost(displayChapters.size)
+                                        val isSelected = selectedChunkIndex == idx
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
+                                                .then(
+                                                    if (isSelected) Modifier.background(p.accentBrush)
+                                                    else Modifier.background(p.chipBg)
+                                                )
+                                                .clickable { selectedChunkIndex = idx }
+                                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = "$startNum – $endNum",
+                                                color = if (isSelected) p.onAccent else p.textSub,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         if (displayChapters.isEmpty()) {
                             item(key = "novel_no_chapters") {
                                 Box(
@@ -729,7 +897,7 @@ fun NovelDetailScreen(
                                 }
                             }
                         } else {
-                            items(displayChapters, key = { it.slug }) { ch ->
+                            items(currentChunkChapters, key = { it.slug }) { ch ->
                                 val isCurrent = lastReadChapter == ch.slug
                                 val isDownloaded = remember(downloadTasks, ch.slug) {
                                     vm.downloadManager.isNovelChapterDownloaded(novelSlug, ch.slug)
@@ -1148,4 +1316,212 @@ private fun NovelDetailBackdropArt(url: String, p: HomePalette, modifier: Modifi
                 )
         )
     }
+}
+
+@Composable
+private fun NovelDetailLoadingSkeleton(
+    cachedPoster: String?,
+    title: String?,
+    meta: List<String> = emptyList(),
+    onBack: () -> Unit
+) {
+    val p = rememberHomePalette()
+
+    val fx = rememberInfiniteTransition(label = "novelDetailLoaderFx")
+    val sweep by fx.animateFloat(0f, 1f, infiniteRepeatable(tween(2000, easing = LinearEasing)), label = "sweep")
+    val glow by fx.animateFloat(0.25f, 0.6f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "glow")
+    val drift by fx.animateFloat(-1f, 1f, infiniteRepeatable(tween(6000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "drift")
+
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
+    val cardShape = RoundedCornerShape(28.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(p.pageBrush)
+    ) {
+        if (!cachedPoster.isNullOrBlank()) {
+            AsyncImage(
+                model = cachedPoster,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(40.dp)
+                    .graphicsLayer {
+                        scaleX = 1.4f
+                        scaleY = 1.4f
+                        translationX = drift * 40f
+                        alpha = 0.5f
+                    }
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(p.bg.copy(alpha = 0.25f), p.bg.copy(alpha = 0.80f), p.bg)))
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Poster card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.62f)
+                    .aspectRatio(2f / 3f)
+                    .graphicsLayer {
+                        val s = 0.9f + 0.1f * enter.value
+                        scaleX = s
+                        scaleY = s
+                        alpha = enter.value
+                    }
+                    .drawBehind {
+                        val pad = 18.dp.toPx()
+                        drawRoundRect(
+                            color = p.text.copy(alpha = glow * 0.10f),
+                            topLeft = Offset(-pad, -pad),
+                            size = androidx.compose.ui.geometry.Size(size.width + pad * 2, size.height + pad * 2),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx() + pad)
+                        )
+                    }
+                    .clip(cardShape)
+                    .background(p.skeleton)
+            ) {
+                if (!cachedPoster.isNullOrBlank()) {
+                    AsyncImage(
+                        model = cachedPoster,
+                        contentDescription = title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0xAA000000)))
+                )
+                // Light sweep
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .drawBehind {
+                            val w = size.width
+                            val x = -w + sweep * w * 3f
+                            drawRect(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color.Transparent, Color(0x30FFFFFF), Color.Transparent),
+                                    start = Offset(x, 0f),
+                                    end = Offset(x + w * 0.7f, size.height * 0.6f)
+                                )
+                            )
+                        }
+                )
+                // Rim light
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .border(
+                            1.dp,
+                            Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x08FFFFFF), Color(0x40FFFFFF))),
+                            cardShape
+                        )
+                )
+            }
+
+            // Title, meta and page skeleton
+            Column(
+                modifier = Modifier.graphicsLayer {
+                    alpha = enter.value
+                    translationY = (1f - enter.value) * 12.dp.toPx()
+                },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.height(24.dp))
+                if (!title.isNullOrBlank()) {
+                    Text(
+                        text = title,
+                        fontSize = 22.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.3).sp,
+                        color = p.text,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    NovelSkeletonBar(Modifier.fillMaxWidth(0.5f).height(22.dp), sweep)
+                }
+                if (meta.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = meta.joinToString("  •  "),
+                        fontSize = 12.5.sp,
+                        color = p.textSub,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NovelSkeletonBar(Modifier.width(64.dp).height(22.dp), sweep)
+                    NovelSkeletonBar(Modifier.width(48.dp).height(22.dp), sweep)
+                    NovelSkeletonBar(Modifier.width(72.dp).height(22.dp), sweep)
+                }
+                Spacer(Modifier.height(14.dp))
+                NovelSkeletonBar(Modifier.fillMaxWidth().height(44.dp), sweep)
+                Spacer(Modifier.height(14.dp))
+                NovelSkeletonBar(Modifier.fillMaxWidth(0.9f).height(10.dp), sweep)
+                Spacer(Modifier.height(8.dp))
+                NovelSkeletonBar(Modifier.fillMaxWidth(0.65f).height(10.dp), sweep)
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = p.text,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NovelSkeletonBar(modifier: Modifier, sweep: Float) {
+    val p = rememberHomePalette()
+    Box(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(p.text.copy(alpha = 0.08f))
+            .drawBehind {
+                val w = size.width
+                val x = -w + sweep * w * 2.5f
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color.Transparent, p.text.copy(alpha = 0.14f), Color.Transparent),
+                        Offset(x, 0f),
+                        Offset(x + w * 0.6f, 0f)
+                    )
+                )
+            }
+    )
 }

@@ -160,9 +160,9 @@ fun MangaReaderScreen(
     fun getMangaHeadersForUrl(url: String): NetworkHeaders {
         val src = MangaRepository.getSourceForId(activeMangaId)
         val referer = when {
-            url.contains("demoniclibs") || url.contains("demonicscans") || src == com.nyyrox.aniverse.data.manga.MangaSource.DEMONIC_SCANS -> "https://demonicscans.org/"
+            url.contains("demoniclibs") || url.contains("demonicscans") || url.contains("mangareadon") || url.contains("readermc") || src == com.nyyrox.aniverse.data.manga.MangaSource.DEMONIC_SCANS -> "https://demonicscans.org/"
             url.contains("asura") || src == com.nyyrox.aniverse.data.manga.MangaSource.ASURA -> "https://asuracomic.net/"
-            url.contains("comick") || url.contains("meo") || src == com.nyyrox.aniverse.data.manga.MangaSource.COMICK || src == com.nyyrox.aniverse.data.manga.MangaSource.MANHUA -> "https://comick.art/"
+            url.contains("comick") || url.contains("meo") || url.contains("planeptune") || url.contains("lastation") || src == com.nyyrox.aniverse.data.manga.MangaSource.COMICK || src == com.nyyrox.aniverse.data.manga.MangaSource.MANHUA -> "https://comick.art/"
             url.contains("mangadex") || src == com.nyyrox.aniverse.data.manga.MangaSource.MANGADEX -> "https://mangadex.org/"
             url.contains("compsci88") || url.contains("lowee") || url.contains("weebcentral") || src == com.nyyrox.aniverse.data.manga.MangaSource.WEEBCENTRAL -> "https://weebcentral.com/"
             else -> "https://demonicscans.org/"
@@ -278,20 +278,28 @@ fun MangaReaderScreen(
 
     LaunchedEffect(isAutoScrolling, autoScrollSpeed, readMode) {
         if (isAutoScrolling && readMode == MangaReaderMode.VERTICAL_WEBTOON) {
-            while (isAutoScrolling) {
-                verticalListState.scrollBy(autoScrollSpeed * 2.2f)
-                kotlinx.coroutines.delay(16L)
-            }
+            try {
+                verticalListState.scroll(androidx.compose.foundation.MutatePriority.PreventUserInput) {
+                    while (isAutoScrolling) {
+                        scrollBy(autoScrollSpeed * 2.5f)
+                        kotlinx.coroutines.delay(16L)
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
-    LaunchedEffect(isAutoScrolling, autoFlipSeconds, readMode, pagerState.currentPage, pages.size) {
+    LaunchedEffect(isAutoScrolling, autoFlipSeconds, readMode) {
         if (isAutoScrolling && readMode != MangaReaderMode.VERTICAL_WEBTOON) {
             while (isAutoScrolling) {
                 kotlinx.coroutines.delay(autoFlipSeconds * 1000L)
                 if (!isAutoScrolling) break
-                val next = pagerState.currentPage + 1
-                if (next < pages.size) {
-                    pagerState.animateScrollToPage(next)
+                val cur = pagerState.currentPage
+                val total = pagerState.pageCount
+                val next = cur + 1
+                if (next < total) {
+                    try {
+                        pagerState.animateScrollToPage(next)
+                    } catch (_: Exception) {}
                 } else {
                     isAutoScrolling = false
                     break
@@ -828,48 +836,17 @@ fun MangaReaderScreen(
                                 items = pages,
                                 key = { index, url -> "$activeChapterId-$index-$url" }
                             ) { index, pageUrl ->
-                                val pageRequest = remember(pageUrl) {
-                                    pageUrl?.let { url ->
-                                        val builder = ImageRequest.Builder(context)
-                                        if (url.startsWith("http://") || url.startsWith("https://")) {
-                                            builder.data(url)
-                                            builder.httpHeaders(getMangaHeadersForUrl(url))
-                                        } else {
-                                            val cleanPath = url.removePrefix("file://")
-                                            builder.data(java.io.File(cleanPath))
-                                        }
-                                        builder.crossfade(true).build()
-                                    }
-                                }
-                                Box(
+                                MangaPageItem(
+                                    pageUrl = pageUrl,
+                                    pageIndex = index,
+                                    context = context,
+                                    headers = getMangaHeadersForUrl(pageUrl),
+                                    isWebtoon = true,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(readerBgColor)
-                                        .padding(vertical = pageGapDp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    SubcomposeAsyncImage(
-                                        model = pageRequest,
-                                        contentDescription = "Page ${index + 1}",
-                                        contentScale = ContentScale.FillWidth,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .wrapContentHeight(),
-                                        loading = {
-                                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                                CircularProgressIndicator(color = OttPrimary, modifier = Modifier.size(32.dp))
-                                            }
-                                        },
-                                        error = {
-                                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    Icon(Icons.Default.Image, contentDescription = "Error", tint = Color.Gray, modifier = Modifier.size(48.dp))
-                                                    Text("Failed to load page", color = Color.Gray, fontSize = 12.sp)
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
+                                        .padding(vertical = pageGapDp)
+                                )
                             }
 
                             // Next chapter trigger at the bottom of the column
@@ -921,20 +898,7 @@ fun MangaReaderScreen(
                             reverseLayout = readMode.isRtl,
                             key = { pageIndex -> "$activeChapterId-$pageIndex-${pages.getOrNull(pageIndex).orEmpty()}" }
                         ) { pageIndex ->
-                            val pageUrl = pages.getOrNull(pageIndex)
-                            val pageRequest = remember(pageUrl) {
-                                pageUrl?.let { url ->
-                                    val builder = ImageRequest.Builder(context)
-                                    if (url.startsWith("http://") || url.startsWith("https://")) {
-                                        builder.data(url)
-                                        builder.httpHeaders(getMangaHeadersForUrl(url))
-                                    } else {
-                                        val cleanPath = url.removePrefix("file://")
-                                        builder.data(java.io.File(cleanPath))
-                                    }
-                                    builder.crossfade(true).build()
-                                }
-                            }
+                            val pageUrl = pages.getOrNull(pageIndex).orEmpty()
                             val pageOffset = (pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction
                             val absOffset = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
                             Box(
@@ -946,24 +910,13 @@ fun MangaReaderScreen(
                                 },
                                 contentAlignment = Alignment.Center
                             ) {
-                                SubcomposeAsyncImage(
-                                    model = pageRequest,
-                                    contentDescription = "Page ${pageIndex + 1}",
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.fillMaxSize(),
-                                    loading = {
-                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            CircularProgressIndicator(color = OttPrimary, modifier = Modifier.size(32.dp))
-                                        }
-                                    },
-                                    error = {
-                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Icon(Icons.Default.Image, contentDescription = "Error", tint = Color.Gray, modifier = Modifier.size(48.dp))
-                                                Text("Failed to load page", color = Color.Gray, fontSize = 12.sp)
-                                            }
-                                        }
-                                    }
+                                MangaPageItem(
+                                    pageUrl = pageUrl,
+                                    pageIndex = pageIndex,
+                                    context = context,
+                                    headers = getMangaHeadersForUrl(pageUrl),
+                                    isWebtoon = false,
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
@@ -1556,58 +1509,26 @@ fun MangaReaderScreen(
                                 }
                             }
 
-                            // Mode Switcher + Auto-Scroll Toggle
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            // Auto-Scroll Pill Toggle
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(if (isAutoScrolling) OttPrimary else Color(0x28FFFFFF))
+                                    .clickable { isAutoScrolling = !isAutoScrolling }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
                             ) {
-                                // Auto-Scroll Pill Toggle
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(if (isAutoScrolling) OttPrimary else Color(0x28FFFFFF))
-                                        .clickable { isAutoScrolling = !isAutoScrolling }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Icon(
-                                            imageVector = if (isAutoScrolling) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
-                                            contentDescription = "Auto Scroll",
-                                            tint = if (isAutoScrolling) Color.Black else Color.White,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Text(
-                                            text = if (isAutoScrolling) "Auto On" else "Auto Scroll",
-                                            color = if (isAutoScrolling) Color.Black else Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                // Mode Switcher Pill (Tap to toggle Webtoon / RTL / LTR)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x20FFFFFF))
-                                        .clickable {
-                                            readMode = when (readMode) {
-                                                MangaReaderMode.VERTICAL_WEBTOON -> MangaReaderMode.HORIZONTAL_RTL
-                                                MangaReaderMode.HORIZONTAL_RTL, MangaReaderMode.HORIZONTAL_PAGED -> MangaReaderMode.HORIZONTAL_LTR
-                                                MangaReaderMode.HORIZONTAL_LTR -> MangaReaderMode.VERTICAL_WEBTOON
-                                            }
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                                ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Icon(
+                                        imageVector = if (isAutoScrolling) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
+                                        contentDescription = "Auto Scroll",
+                                        tint = if (isAutoScrolling) Color.Black else Color.White,
+                                        modifier = Modifier.size(15.dp)
+                                    )
                                     Text(
-                                        text = when (readMode) {
-                                            MangaReaderMode.VERTICAL_WEBTOON -> "Webtoon"
-                                            MangaReaderMode.HORIZONTAL_RTL, MangaReaderMode.HORIZONTAL_PAGED -> "RTL"
-                                            MangaReaderMode.HORIZONTAL_LTR -> "LTR"
-                                        },
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        text = if (isAutoScrolling) "Auto On" else "Auto Scroll",
+                                        color = if (isAutoScrolling) Color.Black else Color.White,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -1941,6 +1862,10 @@ fun MangaReaderScreen(
             onPageGapChange = { pageGapIndex = it },
             readMode = readMode,
             onSelectReadMode = { readMode = it },
+            autoScrollSpeed = autoScrollSpeed,
+            onAutoScrollSpeedChange = { autoScrollSpeed = it },
+            autoFlipSeconds = autoFlipSeconds,
+            onAutoFlipSecondsChange = { autoFlipSeconds = it },
             onDismiss = { showSettingsSheet = false }
         )
     }
@@ -1956,6 +1881,10 @@ private fun MangaReaderSettingsSheet(
     onPageGapChange: (Int) -> Unit,
     readMode: MangaReaderMode,
     onSelectReadMode: (MangaReaderMode) -> Unit,
+    autoScrollSpeed: Float,
+    onAutoScrollSpeedChange: (Float) -> Unit,
+    autoFlipSeconds: Int,
+    onAutoFlipSecondsChange: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -2094,6 +2023,61 @@ private fun MangaReaderSettingsSheet(
                 }
             }
 
+            // Auto-Scroll Settings
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (readMode == MangaReaderMode.VERTICAL_WEBTOON) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Auto Scroll Speed", fontSize = 12.sp, color = Color(0xFF8A8FA8))
+                        Text(
+                            "%.1fx".format(java.util.Locale.US, autoScrollSpeed),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OttPrimary
+                        )
+                    }
+                    Slider(
+                        value = autoScrollSpeed,
+                        onValueChange = onAutoScrollSpeedChange,
+                        valueRange = 0.5f..6.0f,
+                        steps = 10,
+                        colors = SliderDefaults.colors(
+                            thumbColor = OttPrimary,
+                            activeTrackColor = OttPrimary,
+                            inactiveTrackColor = Color(0x26FFFFFF)
+                        )
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Page Flip Interval", fontSize = 12.sp, color = Color(0xFF8A8FA8))
+                        Text(
+                            "${autoFlipSeconds}s",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OttPrimary
+                        )
+                    }
+                    Slider(
+                        value = autoFlipSeconds.toFloat(),
+                        onValueChange = { onAutoFlipSecondsChange(it.toInt()) },
+                        valueRange = 2f..20f,
+                        steps = 8,
+                        colors = SliderDefaults.colors(
+                            thumbColor = OttPrimary,
+                            activeTrackColor = OttPrimary,
+                            inactiveTrackColor = Color(0x26FFFFFF)
+                        )
+                    )
+                }
+            }
+
             // 2. Background Selector
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Background", fontSize = 12.sp, color = Color(0xFF8A8FA8))
@@ -2146,6 +2130,122 @@ private fun MangaReaderSettingsSheet(
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun MangaPageItem(
+    pageUrl: String,
+    pageIndex: Int,
+    context: android.content.Context,
+    headers: NetworkHeaders,
+    isWebtoon: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var attempt by remember(pageUrl) { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    val sanitizedUrl = remember(pageUrl, attempt) {
+        val trimmed = pageUrl.trim().replace(" ", "%20")
+        when {
+            attempt == 0 -> trimmed
+            attempt == 1 -> MangaRepository.proxyImageUrl(trimmed)
+            else -> {
+                val sep = if (trimmed.contains("?")) "&" else "?"
+                "$trimmed${sep}retry=$attempt"
+            }
+        }
+    }
+
+    val pageRequest = remember(sanitizedUrl) {
+        val builder = ImageRequest.Builder(context)
+        if (sanitizedUrl.startsWith("http://") || sanitizedUrl.startsWith("https://")) {
+            builder.data(sanitizedUrl)
+            builder.httpHeaders(headers)
+        } else {
+            val cleanPath = sanitizedUrl.removePrefix("file://")
+            builder.data(java.io.File(cleanPath))
+        }
+        builder.crossfade(true).build()
+    }
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        SubcomposeAsyncImage(
+            model = pageRequest,
+            contentDescription = "Page ${pageIndex + 1}",
+            contentScale = if (isWebtoon) ContentScale.FillWidth else ContentScale.Fit,
+            modifier = if (isWebtoon) Modifier.fillMaxWidth().wrapContentHeight() else Modifier.fillMaxSize(),
+            loading = {
+                Box(
+                    modifier = if (isWebtoon) Modifier.fillMaxWidth().height(260.dp) else Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = OttPrimary, strokeWidth = 2.5.dp, modifier = Modifier.size(32.dp))
+                }
+            },
+            onError = {
+                if (attempt < 2) {
+                    scope.launch {
+                        kotlinx.coroutines.delay(400L * (attempt + 1))
+                        attempt++
+                    }
+                }
+            },
+            error = {
+                Box(
+                    modifier = (if (isWebtoon) Modifier.fillMaxWidth().height(240.dp) else Modifier.fillMaxSize())
+                        .clickable { attempt = 0 },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0x22FFFFFF))
+                            .padding(horizontal = 24.dp, vertical = 18.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Retry",
+                            tint = OttPrimary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Text(
+                            text = "Page ${pageIndex + 1} failed to load",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(OttPrimary)
+                                .clickable { attempt = 0 }
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Tap to Retry",
+                                color = Color.Black,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        )
     }
 }
 

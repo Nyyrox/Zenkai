@@ -53,6 +53,9 @@ object MangaRepository {
             val relCover = node.optJSONObject("coverImage")?.optString("large").orEmpty()
             val relFormat = node.optString("format")
             val relStatus = node.optString("status")
+            val nextAiringObj = node.optJSONObject("nextAiringEpisode")
+            val nextAiringEp = nextAiringObj?.optInt("episode")?.takeIf { it > 0 }
+            val nextAiringAt = nextAiringObj?.optLong("airingAt")?.takeIf { it > 0 }
             if (relId > 0 && relTitle.isNotBlank()) {
                 add(
                     MediaRelation(
@@ -63,7 +66,9 @@ object MangaRepository {
                         romajiTitle = romaji,
                         cover = relCover,
                         format = relFormat,
-                        status = relStatus
+                        status = relStatus,
+                        nextAiringEpisode = nextAiringEp,
+                        nextAiringTime = nextAiringAt
                     )
                 )
             }
@@ -161,6 +166,7 @@ object MangaRepository {
             url.contains("comick") || url.contains("meo") -> MangaSource.COMICK
             url.contains("asura") -> MangaSource.ASURA
             url.contains("mangadex") -> MangaSource.MANGADEX
+            url.contains("demoniclibs") || url.contains("demonicscans") || url.contains("mangareadon") || url.contains("readermc") -> MangaSource.DEMONIC_SCANS
             else -> MangaSource.WEEBCENTRAL
         }
         val referer = effSource.baseUrl + "/"
@@ -423,6 +429,8 @@ object MangaRepository {
                     characters = aniCharacters,
                     relatedAnimeId = curRelAnimeId,
                     relatedAnimeTitle = curRelAnimeTitle,
+                    relatedAnimeNextAiringEpisode = curRelAnime?.nextAiringEpisode ?: relAnime?.nextAiringEpisode,
+                    relatedAnimeNextAiringTime = curRelAnime?.nextAiringTime ?: relAnime?.nextAiringTime,
                     availableSources = availSources,
                     relations = curAniRelations
                 )
@@ -465,6 +473,8 @@ object MangaRepository {
                 characters = aniCharacters,
                 relatedAnimeId = relAnimeId,
                 relatedAnimeTitle = relAnimeTitle,
+                relatedAnimeNextAiringEpisode = relAnime?.nextAiringEpisode,
+                relatedAnimeNextAiringTime = relAnime?.nextAiringTime,
                 availableSources = availSources,
                 relations = aniRelations
             )
@@ -491,6 +501,8 @@ object MangaRepository {
                 characters = aniCharacters,
                 relatedAnimeId = relAnimeId,
                 relatedAnimeTitle = relAnimeTitle,
+                relatedAnimeNextAiringEpisode = relAnime?.nextAiringEpisode,
+                relatedAnimeNextAiringTime = relAnime?.nextAiringTime,
                 availableSources = emptyList(),
                 relations = aniRelations
             )

@@ -979,6 +979,8 @@ class AniListRepository {
                           coverImage { large }
                           format
                           status
+                          episodes
+                          nextAiringEpisode { episode airingAt timeUntilAiring }
                         }
                       }
                     }

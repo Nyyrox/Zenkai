@@ -360,21 +360,29 @@ fun NovelReaderScreen(
 
     LaunchedEffect(isAutoScrolling, autoScrollSpeed, settings.isContinuousScroll) {
         if (isAutoScrolling && settings.isContinuousScroll) {
-            while (isAutoScrolling) {
-                listState.scrollBy(autoScrollSpeed * 2.0f)
-                kotlinx.coroutines.delay(16L)
-            }
+            try {
+                listState.scroll(androidx.compose.foundation.MutatePriority.PreventUserInput) {
+                    while (isAutoScrolling) {
+                        scrollBy(autoScrollSpeed * 2.2f)
+                        kotlinx.coroutines.delay(16L)
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 
-    LaunchedEffect(isAutoScrolling, autoFlipSeconds, settings.isContinuousScroll, pagerState.currentPage, paragraphCount) {
+    LaunchedEffect(isAutoScrolling, autoFlipSeconds, settings.isContinuousScroll) {
         if (isAutoScrolling && !settings.isContinuousScroll) {
             while (isAutoScrolling) {
                 kotlinx.coroutines.delay(autoFlipSeconds * 1000L)
                 if (!isAutoScrolling) break
-                val next = pagerState.currentPage + 1
-                if (next < paragraphCount) {
-                    pagerState.animateScrollToPage(next)
+                val cur = pagerState.currentPage
+                val total = pagerState.pageCount
+                val next = cur + 1
+                if (next < total) {
+                    try {
+                        pagerState.animateScrollToPage(next)
+                    } catch (_: Exception) {}
                 } else {
                     isAutoScrolling = false
                     break
@@ -984,24 +992,6 @@ fun NovelReaderScreen(
                             }
                         }
 
-                        // Mode indicator (Continuous / Paged)
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(Color(0x20FFFFFF))
-                                .clickable {
-                                    vm.updateNovelReaderSettings(settings.copy(isContinuousScroll = !settings.isContinuousScroll))
-                                }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = if (settings.isContinuousScroll) "Scroll" else "Paged",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                        }
-
                         // Progress Badge
                         Box(
                             modifier = Modifier
@@ -1069,6 +1059,99 @@ fun NovelReaderScreen(
                             fontWeight = FontWeight.Black,
                             color = Color.White
                         )
+
+                        // 0. Reading Mode Selector (Continuous Scroll vs Paged)
+                        Column {
+                            Text("Reading Mode", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OttTextSecondary)
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val isScroll = settings.isContinuousScroll
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isScroll) settings.theme.accentColor.copy(alpha = 0.22f) else Color(0x14FFFFFF))
+                                        .clickable {
+                                            if (!isScroll) vm.updateNovelReaderSettings(settings.copy(isContinuousScroll = true))
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Continuous Scroll",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isScroll) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isScroll) Color.White else OttTextSecondary
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (!isScroll) settings.theme.accentColor.copy(alpha = 0.22f) else Color(0x14FFFFFF))
+                                        .clickable {
+                                            if (isScroll) vm.updateNovelReaderSettings(settings.copy(isContinuousScroll = false))
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Paged (Flip)",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (!isScroll) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (!isScroll) Color.White else OttTextSecondary
+                                    )
+                                }
+                            }
+                        }
+
+                        // Auto-Scroll Speed / Timer
+                        Column {
+                            if (settings.isContinuousScroll) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Auto Scroll Speed", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OttTextSecondary)
+                                    Text("%.1fx".format(java.util.Locale.US, autoScrollSpeed), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = settings.theme.accentColor)
+                                }
+                                Slider(
+                                    value = autoScrollSpeed,
+                                    onValueChange = { autoScrollSpeed = it },
+                                    valueRange = 0.5f..6.0f,
+                                    steps = 10,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = settings.theme.accentColor,
+                                        activeTrackColor = settings.theme.accentColor,
+                                        inactiveTrackColor = Color(0x26FFFFFF)
+                                    )
+                                )
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Page Flip Interval", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OttTextSecondary)
+                                    Text("${autoFlipSeconds}s", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = settings.theme.accentColor)
+                                }
+                                Slider(
+                                    value = autoFlipSeconds.toFloat(),
+                                    onValueChange = { autoFlipSeconds = it.toInt() },
+                                    valueRange = 2f..20f,
+                                    steps = 8,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = settings.theme.accentColor,
+                                        activeTrackColor = settings.theme.accentColor,
+                                        inactiveTrackColor = Color(0x26FFFFFF)
+                                    )
+                                )
+                            }
+                        }
 
                         // 1. Page Texture & Style (Plain, Lined, Cracked, Deckled)
                         Column {

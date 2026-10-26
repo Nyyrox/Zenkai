@@ -814,14 +814,17 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         push("manga_reader:$cm:$cc")
                                     },
                                     onAnimeClick = { animeId ->
+                                        sharedPosterCoordinator.reset()
                                         vm.closeMangaDetail()
                                         vm.openAnimeDetail(animeId)
                                     },
                                     onNovelClick = { novelSlug ->
+                                        sharedPosterCoordinator.reset()
                                         vm.closeMangaDetail()
                                         vm.openNovelDetail(novelSlug)
                                     },
                                     onMangaClick = { newMangaId ->
+                                        sharedPosterCoordinator.reset()
                                         vm.openMangaDetail(newMangaId)
                                     }
                                 )
@@ -850,14 +853,17 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         push("novel_reader:$nSlug:$chSlug")
                                     },
                                     onAnimeClick = { animeId ->
+                                        sharedPosterCoordinator.reset()
                                         vm.closeNovelDetail()
                                         vm.openAnimeDetail(animeId)
                                     },
                                     onMangaClick = { mangaId ->
+                                        sharedPosterCoordinator.reset()
                                         vm.closeNovelDetail()
                                         vm.openMangaDetail(mangaId)
                                     },
                                     onNovelClick = { newSlug ->
+                                        sharedPosterCoordinator.reset()
                                         vm.openNovelDetail(newSlug)
                                     }
                                 )

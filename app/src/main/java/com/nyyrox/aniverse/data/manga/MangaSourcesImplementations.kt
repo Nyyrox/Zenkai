@@ -1484,7 +1484,7 @@ class DemonicScansRepository(
         if (html.isBlank()) return@withContext emptyList()
 
         val chapters = mutableListOf<MangaChapter>()
-        val chRegex = Regex("""(?s)<a[^>]*href="(/chaptered\.php\?manga=(\d+)&(?:amp;)?chapter=([^"&]+))"[^>]*>(.*?)</a>""", RegexOption.IGNORE_CASE)
+        val chRegex = Regex("""(?s)<a[^>]*href=["'](?:https?://[^/]+)?/?(chaptered\.php\?manga=(\d+)&(?:amp;)?chapter=([^"&]+))["'][^>]*>(.*?)</a>""", RegexOption.IGNORE_CASE)
 
         chRegex.findAll(html).forEach { match ->
             val numericMangaId = match.groupValues[2]
@@ -1497,7 +1497,7 @@ class DemonicScansRepository(
             val releaseDate = dateMatch?.groupValues?.get(1)
 
             val chNum = rawNum.trim()
-            if (chNum.isNotBlank() && chNum != "0") {
+            if (chNum.isNotBlank()) {
                 chapters.add(
                     MangaChapter(
                         number = chNum,
@@ -1526,12 +1526,24 @@ class DemonicScansRepository(
         if (html.isBlank()) return@withContext emptyList()
 
         val pages = mutableListOf<String>()
-        val imgRegex = Regex("""<img[^>]+src=["'](https?://[^"']+)["']""", RegexOption.IGNORE_CASE)
+        val imgRegex = Regex("""<img[^>]+(?:src|data-src)=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
         imgRegex.findAll(html).forEach { m ->
-            val src = m.groupValues[1]
-            if ((src.contains("demoniclibs.com") || src.contains("cdn") || src.contains("storage")) &&
-                !src.contains("logo") && !src.contains("free_ads") && !src.contains("icon")) {
-                pages.add(src)
+            var src = m.groupValues[1].trim()
+            if (src.startsWith("//")) src = "https:$src"
+            else if (src.startsWith("/")) src = "$baseUrl$src"
+
+            val lower = src.lowercase()
+            val isAdOrLogo = lower.contains("logo") || lower.contains("free_ads") || lower.contains("icon") ||
+                lower.contains("banner") || lower.contains("avatar") || lower.contains("discord") ||
+                lower.contains("donate") || lower.contains("patreon")
+            val isImageExt = lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") ||
+                lower.endsWith(".webp") || lower.contains("/storage/") || lower.contains("/manga/") ||
+                lower.contains("/chapter/") || lower.contains("demonic") || lower.contains("readermc") ||
+                lower.contains("mangareadon")
+
+            if (src.startsWith("http") && !isAdOrLogo && isImageExt) {
+                val sanitized = src.replace(" ", "%20")
+                pages.add(sanitized)
             }
         }
         pages.distinct()
