@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,6 +99,7 @@ private val DrawerGlassShape: () -> Shape = { PrismalRoundedRectangle(28.dp) }
 /**
  * Unified Expandable Top Bar & Navigation Drawer.
  * When closed, it is the sleek 44dp top bar pill with hamburger icon, ZENKAI logo and profile bubble.
+ * When scrolling down, the profile bubble stays pinned at the top-right corner.
  * When menu is clicked, that exact bar smoothly expands downwards into the liquid-glass navigation menu,
  * and the hamburger lines morph into an 'X'.
  */
@@ -220,126 +223,174 @@ fun ExpandableOttTopBar(
                     .border(0.8.dp, p.glassBorder, cardShape)
             }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .width(pillWidth)
-            ) {
-                Layout(
+            if (!isAnimatingMenu) {
+                // Collapsed Top Bar: exact behavior that pins the profile bubble at TopEnd when scrolling
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .then(cardModifier)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
-                    content = {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            // Header Row: Hamburger Lines -> 'X', ZENKAI logo, Profile bubble
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(barHeight)
-                                    .padding(horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                        .align(Alignment.TopEnd)
+                        .width(pillWidth)
+                        .height(barHeight)
+                        .then(if (p.glassOn) glass.clip(CircleShape) else Modifier.ottGlass(p, CircleShape))
+                ) {
+                    // Laid out at full width and anchored to the right, so the shape only reveals / hides it.
+                    // Lets the row be wider than the pill and pins its right edge to the pill's right edge,
+                    // so the profile bubble stays put while the pill shrinks onto it when scrolling down.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .wrapContentWidth(Alignment.End, unbounded = true)
+                            .width(fullWidth)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.graphicsLayer {
+                                alpha = ((fraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MenuLinesButton(
+                                color = p.text,
+                                openProgress = { 0f },
+                                onClick = onMenuClick,
+                                enabled = expanded
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
+                        }
+
+                        Spacer(Modifier.weight(1f))
+
+                        OttProfileBubble(
+                            p = p,
+                            avatarUrl = userAvatarUrl,
+                            decorationId = avatarDecorationId,
+                            frameId = avatarFrameId,
+                            onClick = onProfileClick
+                        )
+                    }
+                }
+            } else {
+                // Expanding Navigation Drawer Panel
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .width(pillWidth)
+                ) {
+                    Layout(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(cardModifier)
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+                        content = {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // Header Row: Hamburger Lines -> 'X', ZENKAI logo, Profile bubble
                                 Row(
-                                    modifier = Modifier.graphicsLayer {
-                                        alpha = ((effectiveFraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
-                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(barHeight)
+                                        .padding(horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    MenuLinesButton(
-                                        color = p.text,
-                                        openProgress = { menuProgress.value },
-                                        onClick = {
-                                            if (isMenuOpen) onDismissMenu() else onMenuClick()
+                                    Row(
+                                        modifier = Modifier.graphicsLayer {
+                                            alpha = ((effectiveFraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
                                         },
-                                        enabled = expanded || isMenuOpen
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        MenuLinesButton(
+                                            color = p.text,
+                                            openProgress = { menuProgress.value },
+                                            onClick = onDismissMenu,
+                                            enabled = true
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
+                                    }
+
+                                    Spacer(Modifier.weight(1f))
+
+                                    OttProfileBubble(
+                                        p = p,
+                                        avatarUrl = userAvatarUrl,
+                                        decorationId = avatarDecorationId,
+                                        frameId = avatarFrameId,
+                                        onClick = {
+                                            onDismissMenu()
+                                            onProfileClick()
+                                        }
                                     )
-                                    Spacer(Modifier.width(8.dp))
-                                    AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
                                 }
 
-                                Spacer(Modifier.weight(1f))
-
-                                OttProfileBubble(
-                                    p = p,
-                                    avatarUrl = userAvatarUrl,
-                                    decorationId = avatarDecorationId,
-                                    frameId = avatarFrameId,
-                                    onClick = {
-                                        if (isMenuOpen) onDismissMenu()
-                                        onProfileClick()
-                                    }
-                                )
-                            }
-
-                            // Drawer Content: only measured and revealed when menu expands
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f, fill = false)
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(horizontal = 14.dp)
-                            ) {
-                                Spacer(Modifier.height(10.dp))
-                                SectionLabel("EXPLORE", Modifier.stagger(menuProgress, 0), p)
-
+                                // Drawer Content: only measured and revealed when menu expands
                                 Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .stagger(menuProgress, 1)
-                                        .clip(RoundedCornerShape(22.dp))
-                                        .background(p.text.copy(alpha = 0.06f))
-                                        .padding(vertical = 4.dp)
+                                        .weight(1f, fill = false)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = 14.dp)
                                 ) {
-                                    DrawerEntries.forEachIndexed { i, entry ->
-                                        DrawerRow(
+                                    Spacer(Modifier.height(10.dp))
+                                    SectionLabel("EXPLORE", Modifier.stagger(menuProgress, 0), p)
+
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .stagger(menuProgress, 1)
+                                            .clip(RoundedCornerShape(22.dp))
+                                            .background(p.text.copy(alpha = 0.06f))
+                                            .padding(vertical = 4.dp)
+                                    ) {
+                                        DrawerEntries.forEachIndexed { i, entry ->
+                                            DrawerRow(
+                                                p = p,
+                                                entry = entry,
+                                                showDivider = i != DrawerEntries.lastIndex,
+                                                modifier = Modifier.stagger(menuProgress, 1 + i),
+                                                onClick = {
+                                                    onDismissMenu()
+                                                    onNavigate(entry.target)
+                                                }
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(Modifier.height(14.dp))
+                                    SectionLabel("COMMUNITY", Modifier.stagger(menuProgress, DrawerEntries.size + 1), p)
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .stagger(menuProgress, DrawerEntries.size + 2),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        CommunityButton(
                                             p = p,
-                                            entry = entry,
-                                            showDivider = i != DrawerEntries.lastIndex,
-                                            modifier = Modifier.stagger(menuProgress, 1 + i),
-                                            onClick = {
-                                                onDismissMenu()
-                                                onNavigate(entry.target)
-                                            }
+                                            icon = Icons.AutoMirrored.Filled.Send,
+                                            label = "Telegram",
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { openUrl(context, TELEGRAM_URL) }
+                                        )
+                                        CommunityButton(
+                                            p = p,
+                                            icon = Icons.Default.Forum,
+                                            label = "Discord",
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { openUrl(context, DISCORD_INVITE_URL) }
                                         )
                                     }
+                                    Spacer(Modifier.height(18.dp))
                                 }
-
-                                Spacer(Modifier.height(14.dp))
-                                SectionLabel("COMMUNITY", Modifier.stagger(menuProgress, DrawerEntries.size + 1), p)
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .stagger(menuProgress, DrawerEntries.size + 2),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    CommunityButton(
-                                        p = p,
-                                        icon = Icons.AutoMirrored.Filled.Send,
-                                        label = "Telegram",
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { openUrl(context, TELEGRAM_URL) }
-                                    )
-                                    CommunityButton(
-                                        p = p,
-                                        icon = Icons.Default.Forum,
-                                        label = "Discord",
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { openUrl(context, DISCORD_INVITE_URL) }
-                                    )
-                                }
-                                Spacer(Modifier.height(18.dp))
                             }
                         }
+                    ) { measurables, constraints ->
+                        val placeable = measurables.first().measure(
+                            constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
+                        )
+                        val collapsed = barHeightPx.coerceAtMost(placeable.height)
+                        val t = menuProgress.value.coerceIn(0f, 1f)
+                        val h = (collapsed + (placeable.height - collapsed) * t).roundToInt()
+                        layout(placeable.width, h) { placeable.place(0, 0) }
                     }
-                ) { measurables, constraints ->
-                    val placeable = measurables.first().measure(
-                        constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
-                    )
-                    val collapsed = barHeightPx.coerceAtMost(placeable.height)
-                    val t = menuProgress.value.coerceIn(0f, 1f)
-                    val h = (collapsed + (placeable.height - collapsed) * t).roundToInt()
-                    layout(placeable.width, h) { placeable.place(0, 0) }
                 }
             }
         }
