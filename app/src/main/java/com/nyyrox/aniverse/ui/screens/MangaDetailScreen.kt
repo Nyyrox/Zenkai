@@ -654,18 +654,18 @@ fun MangaDetailScreen(
                                                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(6.dp))
-                                                        .background(Color(0x24FFB800))
+                                                        .background(p.rating.copy(alpha = if (p.dark) 0.18f else 0.12f))
                                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Star,
                                                         contentDescription = null,
-                                                        tint = Color(0xFFFFB800),
+                                                        tint = p.rating,
                                                         modifier = Modifier.size(11.dp)
                                                     )
                                                     Text(
                                                         text = displayRating,
-                                                        color = Color(0xFFFFB800),
+                                                        color = p.rating,
                                                         fontSize = 11.5.sp,
                                                         fontWeight = FontWeight.Bold
                                                     )
@@ -958,13 +958,21 @@ fun MangaDetailScreen(
                                         val isSelected = activeSource == targetSource
                                         val isCurrentSwitching = switchingSourceId == targetSource
 
+                                        val serverPillBg = if (isSelected) {
+                                            if (p.dark) Color.White else Color(0xFF0D0A0B)
+                                        } else {
+                                            p.chipBg
+                                        }
+                                        val serverPillText = if (isSelected) {
+                                            if (p.dark) Color.Black else Color.White
+                                        } else {
+                                            p.text
+                                        }
+
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(999.dp))
-                                                .background(
-                                                    if (isSelected) Color.White
-                                                    else Color(0x18FFFFFF)
-                                                )
+                                                .background(serverPillBg)
                                                 .clickable(enabled = !switchingSource) {
                                                     switchToServer(targetSource)
                                                 }
@@ -974,14 +982,14 @@ fun MangaDetailScreen(
                                         ) {
                                             if (isCurrentSwitching) {
                                                 CircularProgressIndicator(
-                                                    color = if (isSelected) Color.Black else p.accentA,
+                                                    color = if (isSelected) serverPillText else p.accentA,
                                                     strokeWidth = 1.8.dp,
                                                     modifier = Modifier.size(11.dp)
                                                 )
                                             }
                                             Text(
                                                 text = targetSource.displayName,
-                                                color = if (isSelected) Color.Black else Color.White,
+                                                color = serverPillText,
                                                 fontSize = 12.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                             )
@@ -1380,19 +1388,27 @@ fun MangaDetailScreen(
                                     val pillLabel = if (firstCh != null && lastCh != null) "$firstCh–$lastCh" else "${chunkStart + 1}–$chunkEnd"
                                     val isSelected = selectedChunkIndex == idx
 
+                                    val chunkPillBg = if (isSelected) {
+                                        if (p.dark) Color.White else Color(0xFF0D0A0B)
+                                    } else {
+                                        p.chipBg
+                                    }
+                                    val chunkPillText = if (isSelected) {
+                                        if (p.dark) Color.Black else Color.White
+                                    } else {
+                                        p.text
+                                    }
+
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
-                                            .background(
-                                                if (isSelected) Color.White
-                                                else Color(0x18FFFFFF)
-                                            )
+                                            .background(chunkPillBg)
                                             .clickable { selectedChunkIndex = idx }
                                             .padding(horizontal = 14.dp, vertical = 7.dp)
                                     ) {
                                         Text(
                                             text = pillLabel,
-                                            color = if (isSelected) Color.Black else Color.White,
+                                            color = chunkPillText,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
@@ -1431,12 +1447,15 @@ fun MangaDetailScreen(
                                     val task = downloadTasks.find { it.chapterId == chapter.chapterId }
                                     val isDownloaded = task?.status == DownloadStatus.COMPLETED
 
+                                    val cardBg = if (p.dark) Color(0xFF14161E) else p.flatFill
+                                    val cardBorder = if (p.dark) Color(0x18FFFFFF) else p.glassBorder
+
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(Color(0xFF14161E))
-                                            .border(BorderStroke(1.dp, Color(0x18FFFFFF)), RoundedCornerShape(10.dp))
+                                            .background(cardBg)
+                                            .border(BorderStroke(1.dp, cardBorder), RoundedCornerShape(10.dp))
                                             .clickable { onReadChapter(currentMangaId, chapter.chapterId) }
                                             .padding(horizontal = 12.dp, vertical = 10.dp)
                                     ) {
@@ -1450,7 +1469,7 @@ fun MangaDetailScreen(
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text(
                                                         text = "Ch. $cleanNum",
-                                                        color = if (isRead) p.textMuted else Color.White,
+                                                        color = if (isRead) p.textMuted else p.text,
                                                         fontSize = 13.5.sp,
                                                         fontWeight = FontWeight.Bold
                                                     )
@@ -1916,7 +1935,7 @@ private fun MangaServerFinderView(
                                     ) {
                                         Text(
                                             text = "★",
-                                            color = Color(0xFFFFB800),
+                                            color = Color(0xFFFF4757),
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Black
                                         )
