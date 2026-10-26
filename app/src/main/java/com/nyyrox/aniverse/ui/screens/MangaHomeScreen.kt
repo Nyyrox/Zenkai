@@ -114,7 +114,7 @@ private const val TWO_PI = (2.0 * Math.PI).toFloat()
 @Composable
 fun MangaHomeScreen(
     vm: MainViewModel,
-    onMangaClick: (String) -> Unit,
+    onMangaClick: (String, String?, String?) -> Unit,
     onReadClick: (mangaId: String, chapterId: String) -> Unit,
     onDownloadsClick: (() -> Unit)? = null
 ) {
@@ -261,7 +261,7 @@ private fun MangaHero(
     shows: List<MangaCard>,
     p: HomePalette,
     listScrolling: Boolean,
-    onMangaClick: (String) -> Unit,
+    onMangaClick: (String, String?, String?) -> Unit,
     onBookmark: (MangaCard) -> Unit
 ) {
     val reduced = LocalThemeSettings.current.isReducedMotionEnabled
@@ -361,7 +361,7 @@ private fun MangaHero(
                                 .clip(HeroCardShape)
                                 .shimmer(p)
                                 .clickable {
-                                    if (i == center) onMangaClick(manga.id) else animateTo(i.toFloat())
+                                    if (i == center) onMangaClick(manga.id, manga.title, manga.poster) else animateTo(i.toFloat())
                                 }
                         ) {
                             AsyncImage(
@@ -435,7 +435,7 @@ private fun MangaHero(
                             Modifier
                                 .clip(CircleShape)
                                 .background(p.accentBrush)
-                                .clickable { onMangaClick(manga.id) }
+                                .clickable { onMangaClick(manga.id, manga.title, manga.poster) }
                                 .padding(horizontal = 22.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -513,7 +513,7 @@ private fun HeroPosterBackdrop(poster: String?, p: HomePalette, modifier: Modifi
 private fun MangaContinueRow(
     history: List<MangaHistoryItem>,
     p: HomePalette,
-    onMangaClick: (String) -> Unit,
+    onMangaClick: (String, String?, String?) -> Unit,
     onReadClick: (mangaId: String, chapterId: String) -> Unit
 ) {
     val items = remember(history) { history.distinctBy { it.mangaId }.take(8) }
@@ -602,7 +602,7 @@ private fun MangaContinueRow(
 private fun Top10MangaRow(
     list: List<MangaCard>,
     p: HomePalette,
-    onMangaClick: (String) -> Unit
+    onMangaClick: (String, String?, String?) -> Unit
 ) {
     val top = remember(list) { list.take(10) }
     val st = rememberLazyListState()
@@ -628,7 +628,7 @@ private fun Top10MangaRow(
                     }
                     .width(if (idx >= 9) 196.dp else 164.dp)
                     .height(184.dp)
-                    .clickable { onMangaClick(manga.id) }
+                    .clickable { onMangaClick(manga.id, manga.title, manga.poster) }
             ) {
                 // Giant Outline / Number
                 Text(
@@ -669,7 +669,7 @@ private fun Top10MangaRow(
 private fun MangaRail(
     list: List<MangaCard>,
     p: HomePalette,
-    onMangaClick: (String) -> Unit
+    onMangaClick: (String, String?, String?) -> Unit
 ) {
     val st = rememberLazyListState()
     LazyRow(
@@ -683,7 +683,7 @@ private fun MangaRail(
                 image = manga.poster,
                 meta = manga.rating?.let { "★ $it" } ?: (manga.format ?: manga.type),
                 p = p,
-                onClick = { onMangaClick(manga.id) }
+                onClick = { onMangaClick(manga.id, manga.title, manga.poster) }
             )
         }
     }
@@ -695,7 +695,7 @@ private fun MangaRail(
 private fun MangaBookmarkRail(
     bookmarks: List<MangaBookmarkItem>,
     p: HomePalette,
-    onMangaClick: (String) -> Unit
+    onMangaClick: (String, String?, String?) -> Unit
 ) {
     val items = remember(bookmarks) { bookmarks.distinctBy { it.mangaId } }
     LazyRow(
@@ -708,7 +708,7 @@ private fun MangaBookmarkRail(
                 image = bm.poster,
                 meta = bm.type ?: "Manga",
                 p = p,
-                onClick = { onMangaClick(bm.mangaId) }
+                onClick = { onMangaClick(bm.mangaId, bm.title, bm.poster) }
             )
         }
     }

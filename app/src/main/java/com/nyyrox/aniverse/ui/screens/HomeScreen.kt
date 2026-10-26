@@ -475,7 +475,7 @@ private fun Top10Row(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> U
 }
 
 @Composable
-private fun MangaRow(list: List<com.nyyrox.aniverse.data.manga.MangaCard>, p: HomePalette, onMangaClick: (String) -> Unit) {
+private fun MangaRow(list: List<com.nyyrox.aniverse.data.manga.MangaCard>, p: HomePalette, onMangaClick: (String, String?, String?) -> Unit) {
     val st = rememberLazyListState()
     LazyRow(
         state = st,
@@ -489,14 +489,14 @@ private fun MangaRow(list: List<com.nyyrox.aniverse.data.manga.MangaCard>, p: Ho
                 image = manga.poster,
                 meta = manga.chapter?.takeIf { it.isNotBlank() } ?: (manga.type ?: "Manga"),
                 p = p,
-                onClick = { onMangaClick(manga.id) }
+                onClick = { onMangaClick(manga.id, manga.title, manga.poster) }
             )
         }
     }
 }
 
 @Composable
-private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: HomePalette, onNovelClick: (String) -> Unit) {
+private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: HomePalette, onNovelClick: (String, String?, String?) -> Unit) {
     val st = rememberLazyListState()
     LazyRow(
         state = st,
@@ -510,7 +510,7 @@ private fun NovelRow(list: List<com.nyyrox.aniverse.data.novel.NovelItem>, p: Ho
                 image = novel.cover,
                 meta = novel.rating?.takeIf { it.isNotBlank() } ?: (novel.stats?.takeIf { it.isNotBlank() } ?: novel.source),
                 p = p,
-                onClick = { onNovelClick(novel.slug) }
+                onClick = { onNovelClick(novel.slug, novel.title, novel.cover) }
             )
         }
     }
@@ -1084,9 +1084,9 @@ fun HomeScreen(
     vm: MainViewModel,
     onAnimeClick: (Int) -> Unit,
     onPlayClick: (animeId: Int, episode: Int) -> Unit,
-    onMangaClick: (String) -> Unit = { vm.openMangaDetail(it) },
+    onMangaClick: (String, String?, String?) -> Unit = { id, title, poster -> vm.openMangaDetail(id, title, poster) },
     onMangaReadClick: (mangaId: String, chapterId: String) -> Unit = { _, _ -> },
-    onNovelClick: (String) -> Unit = {},
+    onNovelClick: (String, String?, String?) -> Unit = { slug, title, poster -> vm.openNovelDetail(slug, title, poster) },
     onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit = { _, _ -> },
     onDownloadsClick: () -> Unit = {}
 ) {
@@ -1153,9 +1153,9 @@ private fun HomeFeed(
     lazyListState: LazyListState,
     onAnimeClick: (Int) -> Unit,
     onPlayClick: (animeId: Int, episode: Int) -> Unit,
-    onMangaClick: (String) -> Unit,
+    onMangaClick: (String, String?, String?) -> Unit,
     onMangaReadClick: (mangaId: String, chapterId: String) -> Unit,
-    onNovelClick: (String) -> Unit,
+    onNovelClick: (String, String?, String?) -> Unit,
     onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit
 ) {
     val exploreList = vm.homeExplore.ifEmpty { vm.popular }
@@ -1431,9 +1431,9 @@ fun OfflineHomeScreenContent(
     vm: MainViewModel,
     onAnimeClick: (Int) -> Unit,
     onPlayClick: (animeId: Int, episode: Int) -> Unit,
-    onMangaClick: (String) -> Unit,
+    onMangaClick: (String, String?, String?) -> Unit,
     onMangaReadClick: (mangaId: String, chapterId: String) -> Unit,
-    onNovelClick: (String) -> Unit,
+    onNovelClick: (String, String?, String?) -> Unit,
     onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit,
     onDownloadsClick: () -> Unit
 ) {
@@ -1559,7 +1559,7 @@ fun OfflineHomeScreenContent(
                                 OfflineTile(
                                     title = manga.title, coverUrl = manga.poster,
                                     countBadge = "${manga.chaptersCount} CH", sizeBytes = manga.totalSizeBytes, p = p,
-                                    onClick = { onMangaClick(manga.mangaId) }
+                                    onClick = { onMangaClick(manga.mangaId, manga.title, manga.poster) }
                                 )
                             }
                         }
@@ -1579,7 +1579,7 @@ fun OfflineHomeScreenContent(
                                 OfflineTile(
                                     title = novel.title, coverUrl = novel.cover,
                                     countBadge = "${novel.chaptersCount} CH", sizeBytes = novel.totalSizeBytes, p = p,
-                                    onClick = { onNovelClick(novel.novelSlug) }
+                                    onClick = { onNovelClick(novel.novelSlug, novel.title, novel.cover) }
                                 )
                             }
                         }

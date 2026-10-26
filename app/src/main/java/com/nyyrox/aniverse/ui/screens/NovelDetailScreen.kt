@@ -115,8 +115,8 @@ fun NovelDetailScreen(
     onBack: () -> Unit,
     onReadChapter: (novelSlug: String, chapterSlug: String) -> Unit,
     onAnimeClick: ((Int) -> Unit)? = null,
-    onMangaClick: ((String) -> Unit)? = null,
-    onNovelClick: ((String) -> Unit)? = null,
+    onMangaClick: ((String, String?, String?) -> Unit)? = null,
+    onNovelClick: ((String, String?, String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -475,7 +475,7 @@ fun NovelDetailScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(p.chipBg)
                                             .clickable {
-                                                onMangaClick(relManga.id.toString())
+                                                onMangaClick(relManga.id.toString(), relManga.title, relManga.cover)
                                             }
                                             .padding(horizontal = 16.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -549,8 +549,8 @@ fun NovelDetailScreen(
                                             onClick = {
                                                 when {
                                                     rel.type.equals("ANIME", ignoreCase = true) -> onAnimeClick?.invoke(rel.id)
-                                                    rel.type.equals("MANGA", ignoreCase = true) -> onMangaClick?.invoke(rel.id.toString())
-                                                    else -> onNovelClick?.invoke(rel.title)
+                                                    rel.type.equals("MANGA", ignoreCase = true) -> onMangaClick?.invoke(rel.id.toString(), rel.title, rel.cover)
+                                                    else -> onNovelClick?.invoke(rel.title, rel.title, rel.cover)
                                                 }
                                             }
                                         )

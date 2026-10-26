@@ -1088,29 +1088,38 @@ class WeebCentralRepository(
                 .build()
             client.newCall(req).execute().use { res ->
                 if (res.isSuccessful) {
-                    val body = res.body?.string().orEmpty()
+                    val body = res.body?.string().orEmpty().trim()
                     if (body.isNotBlank()) {
-                        val arr = JSONArray(body)
-                        val chapters = mutableListOf<MangaChapter>()
-                        for (i in 0 until arr.length()) {
-                            val obj = arr.getJSONObject(i)
-                            val rawChapId = obj.optString("chapterId")
-                            val cleanChId = cleanChapId(rawChapId)
-                            val numStr = obj.optString("number", "${i + 1}")
-                            val titleStr = obj.optString("title").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-                            chapters.add(
-                                MangaChapter(
-                                    number = numStr,
-                                    title = titleStr,
-                                    chapterId = "wc_$cleanChId",
-                                    releaseDate = obj.optString("releaseDate").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) },
-                                    url = "$WEEBCENTRAL_BASE/chapters/$cleanChId",
-                                    source = source.id
-                                )
-                            )
+                        val arr = when {
+                            body.startsWith("[") -> JSONArray(body)
+                            body.startsWith("{") -> {
+                                val obj = JSONObject(body)
+                                obj.optJSONArray("chapters") ?: obj.optJSONArray("results") ?: obj.optJSONArray("data")
+                            }
+                            else -> null
                         }
-                        if (chapters.isNotEmpty()) {
-                            return@withContext chapters.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
+                        if (arr != null) {
+                            val chapters = mutableListOf<MangaChapter>()
+                            for (i in 0 until arr.length()) {
+                                val obj = arr.getJSONObject(i)
+                                val rawChapId = obj.optString("chapterId").ifBlank { obj.optString("id") }
+                                val cleanChId = cleanChapId(rawChapId)
+                                val numStr = obj.optString("number").ifBlank { obj.optString("chapter", "${i + 1}") }
+                                val titleStr = obj.optString("title").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                                chapters.add(
+                                    MangaChapter(
+                                        number = numStr,
+                                        title = titleStr,
+                                        chapterId = "wc_$cleanChId",
+                                        releaseDate = obj.optString("releaseDate").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) },
+                                        url = "$WEEBCENTRAL_BASE/chapters/$cleanChId",
+                                        source = source.id
+                                    )
+                                )
+                            }
+                            if (chapters.isNotEmpty()) {
+                                return@withContext chapters.sortedWith(compareBy({ it.number.toFloatOrNull() ?: Float.MAX_VALUE }, { it.number }))
+                            }
                         }
                     }
                 }

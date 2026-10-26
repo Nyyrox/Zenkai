@@ -480,13 +480,13 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         vm = vm,
                                         onAnimeClick = { vm.openAnimeDetail(it) },
                                         onPlayClick = { id, ep -> push("player:$id:$ep:") },
-                                        onMangaClick = { vm.openMangaDetail(it) },
+                                        onMangaClick = { id, title, poster -> vm.openMangaDetail(id, title, poster) },
                                         onMangaReadClick = { mId, chId ->
                                             val cm = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(mId)
                                             val cc = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chId)
                                             push("manga_reader:$cm:$cc")
                                         },
-                                        onNovelClick = { vm.openNovelDetail(it) },
+                                        onNovelClick = { slug, title, poster -> vm.openNovelDetail(slug, title, poster) },
                                         onNovelReadClick = { nSlug, chSlug -> push("novel_reader:$nSlug:$chSlug") },
                                         onDownloadsClick = { push("downloads") }
                                     )
@@ -495,7 +495,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                 screen == "manga" -> {
                                     MangaHomeScreen(
                                         vm = vm,
-                                        onMangaClick = { vm.openMangaDetail(it) },
+                                        onMangaClick = { id, title, poster -> vm.openMangaDetail(id, title, poster) },
                                         onReadClick = { mId, chId ->
                                             val cm = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(mId)
                                             val cc = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chId)
@@ -508,7 +508,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                 screen == "novel" -> {
                                     NovelHomeScreen(
                                         vm = vm,
-                                        onNovelClick = { vm.openNovelDetail(it) },
+                                        onNovelClick = { slug, title, poster -> vm.openNovelDetail(slug, title, poster) },
                                         onReadClick = { nSlug, chSlug -> push("novel_reader:$nSlug:$chSlug") },
                                         onDownloadsClick = { push("downloads") }
                                     )
@@ -533,8 +533,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         initialTab = initialTab,
                                         onBack = { pop() },
                                         onAnimeClick = { vm.openAnimeDetail(it) },
-                                        onMangaClick = { vm.openMangaDetail(it) },
-                                        onNovelClick = { vm.openNovelDetail(it) }
+                                        onMangaClick = { id, title, poster -> vm.openMangaDetail(id, title, poster) },
+                                        onNovelClick = { slug, title, poster -> vm.openNovelDetail(slug, title, poster) }
                                     )
                                 }
 
@@ -818,14 +818,15 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         vm.closeMangaDetail()
                                         vm.openAnimeDetail(animeId)
                                     },
-                                    onNovelClick = { novelSlug ->
+                                    onNovelClick = { novelSlug, title, poster ->
                                         sharedPosterCoordinator.reset()
                                         vm.closeMangaDetail()
-                                        vm.openNovelDetail(novelSlug)
+                                        vm.openNovelDetail(novelSlug, title, poster)
                                     },
-                                    onMangaClick = { newMangaId ->
+                                    onMangaClick = { newMangaId, title, poster ->
                                         sharedPosterCoordinator.reset()
-                                        vm.openMangaDetail(newMangaId)
+                                        vm.closeMangaDetail()
+                                        vm.openMangaDetail(newMangaId, title, poster)
                                     }
                                 )
                             }
@@ -857,14 +858,15 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         vm.closeNovelDetail()
                                         vm.openAnimeDetail(animeId)
                                     },
-                                    onMangaClick = { mangaId ->
+                                    onMangaClick = { mangaId, title, poster ->
                                         sharedPosterCoordinator.reset()
                                         vm.closeNovelDetail()
-                                        vm.openMangaDetail(mangaId)
+                                        vm.openMangaDetail(mangaId, title, poster)
                                     },
-                                    onNovelClick = { newSlug ->
+                                    onNovelClick = { newSlug, title, poster ->
                                         sharedPosterCoordinator.reset()
-                                        vm.openNovelDetail(newSlug)
+                                        vm.closeNovelDetail()
+                                        vm.openNovelDetail(newSlug, title, poster)
                                     }
                                 )
                             }

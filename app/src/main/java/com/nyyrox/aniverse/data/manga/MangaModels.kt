@@ -8,19 +8,20 @@ enum class MangaSource(
     val baseUrl: String,
     val badge: String? = null
 ) {
+    WEEBCENTRAL("weebcentral", "WeebCentral", "https://weebcentral.com", "Classic"),
+    DEMONIC_SCANS("demonicscans", "Demonic Scans", "https://demonicscans.org", "Action / Manhwa"),
     COMICK("comick", "ComicK", "https://comick.art", "Manhwa & Manga"),
     MANHUA("manhua", "Manhua", "https://comick.art", "Cultivation & Action"),
     ASURA("asura", "Asura Scans", "https://asuracomic.net", "Action / Regression"),
-    DEMONIC_SCANS("demonicscans", "Demonic Scans", "https://demonicscans.org", "Action / Manhwa"),
-    WEEBCENTRAL("weebcentral", "WeebCentral", "https://weebcentral.com", "Classic"),
     MANGADEX("mangadex", "MangaDex", "https://mangadex.org", "Multilingual");
 
     companion object {
         fun fromId(id: String?): MangaSource {
-            if (id.isNullOrBlank()) return COMICK
+            if (id.isNullOrBlank()) return WEEBCENTRAL
+            if (id.equals("wc", ignoreCase = true) || id.equals("weeb", ignoreCase = true) || id.equals("webtoon", ignoreCase = true)) return WEEBCENTRAL
+            if (id.equals("ds", ignoreCase = true) || id.equals("demonic", ignoreCase = true) || id.equals("demonicscans", ignoreCase = true)) return DEMONIC_SCANS
             if (id.equals("mh", ignoreCase = true)) return MANHUA
-            if (id.equals("ds", ignoreCase = true) || id.equals("demonic", ignoreCase = true)) return DEMONIC_SCANS
-            return entries.find { it.id.equals(id, ignoreCase = true) } ?: COMICK
+            return entries.find { it.id.equals(id, ignoreCase = true) } ?: WEEBCENTRAL
         }
     }
 }

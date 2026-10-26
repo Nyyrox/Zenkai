@@ -181,5 +181,5 @@ object UserPreferences {
     }
 
     fun getActiveMangaSource(context: Context): Flow<String> =
-        context.userPrefsDataStore.data.map { prefs -> prefs[ACTIVE_MANGA_SOURCE] ?: "comick" }
+        context.userPrefsDataStore.data.map { prefs -> prefs[ACTIVE_MANGA_SOURCE] ?: "weebcentral" }
 }

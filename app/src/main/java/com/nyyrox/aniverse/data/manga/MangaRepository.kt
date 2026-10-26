@@ -24,15 +24,15 @@ object MangaRepository {
     val weebCentral = WeebCentralRepository()
 
     private val repositories = mapOf<MangaSource, IMangaSourceRepository>(
-        MangaSource.MANGADEX to mangaDex,
+        MangaSource.WEEBCENTRAL to weebCentral,
+        MangaSource.DEMONIC_SCANS to demonicScans,
         MangaSource.COMICK to comicK,
         MangaSource.MANHUA to manhua,
         MangaSource.ASURA to asura,
-        MangaSource.DEMONIC_SCANS to demonicScans,
-        MangaSource.WEEBCENTRAL to weebCentral
+        MangaSource.MANGADEX to mangaDex
     )
 
-    private val _activeSource = MutableStateFlow(MangaSource.COMICK)
+    private val _activeSource = MutableStateFlow(MangaSource.WEEBCENTRAL)
     val activeSource: StateFlow<MangaSource> = _activeSource.asStateFlow()
 
     private val aniListRepo by lazy { com.nyyrox.aniverse.data.AniListRepository() }
@@ -80,7 +80,7 @@ object MangaRepository {
     }
 
     fun getRepoForSource(source: MangaSource): IMangaSourceRepository =
-        repositories[source] ?: comicK
+        repositories[source] ?: weebCentral
 
     val currentRepo: IMangaSourceRepository get() = getRepoForSource(_activeSource.value)
 

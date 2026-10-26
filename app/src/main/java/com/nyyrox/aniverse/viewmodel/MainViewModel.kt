@@ -191,30 +191,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var activeDetailNovelSlug by mutableStateOf<String?>(null)
 
     var pendingMangaTitleHint: String? = null
+    var pendingMangaPosterHint: String? = null
+    var pendingNovelTitleHint: String? = null
+    var pendingNovelPosterHint: String? = null
+
     fun openAnimeDetail(id: Int) {
         com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
         activeDetailAnimeId = id
         openDetail(id)
     }
     fun closeAnimeDetail() { activeDetailAnimeId = null }
-    fun openMangaDetail(id: String, titleHint: String? = null) {
+    fun openMangaDetail(id: String, titleHint: String? = null, posterHint: String? = null) {
         com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
         pendingMangaTitleHint = titleHint
+        pendingMangaPosterHint = posterHint
         activeDetailMangaId = id
     }
     fun closeMangaDetail() {
         pendingMangaTitleHint = null
+        pendingMangaPosterHint = null
         activeDetailMangaId = null
     }
-    fun openNovelDetail(slug: String) {
+    fun openNovelDetail(slug: String, titleHint: String? = null, posterHint: String? = null) {
         com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
+        pendingNovelTitleHint = titleHint
+        pendingNovelPosterHint = posterHint
         activeDetailNovelSlug = slug
         loadNovelDetail(slug)
     }
-    fun closeNovelDetail() { activeDetailNovelSlug = null }
+    fun closeNovelDetail() {
+        pendingNovelTitleHint = null
+        pendingNovelPosterHint = null
+        activeDetailNovelSlug = null
+    }
 
     // Manga Data
-    var activeMangaSource by mutableStateOf(com.nyyrox.aniverse.data.manga.MangaSource.COMICK); private set
+    var activeMangaSource by mutableStateOf(com.nyyrox.aniverse.data.manga.MangaSource.WEEBCENTRAL); private set
     var mangaHome by mutableStateOf(MangaHome()); private set
     var mangaHomeLoading by mutableStateOf(false); private set
     var mangaHomeError by mutableStateOf<String?>(null); private set
@@ -848,7 +860,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             mangaHistory.map { MangaCard(it.mangaId, it.title, it.poster, type = it.type) },
             downloadManager.downloadedManga.value.map { MangaCard(it.mangaId, it.title, it.poster) }
         ).flatten()
-        return allManga.firstOrNull { it.id == mangaId || (it.id.isNotBlank() && mangaId.contains(it.id)) }
+        val clean = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(mangaId)
+        val matchedManga = allManga.firstOrNull { it.id == mangaId || it.id == clean || (it.id.isNotBlank() && (mangaId.contains(it.id) || clean.contains(it.id))) }
+            ?: pendingMangaTitleHint?.let { hint -> allManga.firstOrNull { it.title.equals(hint, ignoreCase = true) } }
+        if (matchedManga != null) return matchedManga
+
+        val titleTarget = pendingMangaTitleHint ?: ""
+        if (titleTarget.isNotBlank()) {
+            val allAnime = listOf(trending, popular, topRated, newReleases, upcomingAnime, homeExplore).flatten()
+            val matchedAnime = allAnime.firstOrNull { it.title.equals(titleTarget, ignoreCase = true) || it.title.contains(titleTarget, ignoreCase = true) }
+            if (matchedAnime != null) {
+                return MangaCard(id = mangaId, title = matchedAnime.title, poster = matchedAnime.cover)
+            }
+        }
+        return null
     }
 
     fun findKnownNovel(slug: String): com.nyyrox.aniverse.data.novel.NovelItem? {
@@ -861,7 +886,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             novelHistoryList.map { com.nyyrox.aniverse.data.novel.NovelItem(it.slug, it.title, it.cover) },
             downloadManager.downloadedNovels.value.map { com.nyyrox.aniverse.data.novel.NovelItem(it.novelSlug, it.title, it.cover) }
         ).flatten()
-        return allNovels.firstOrNull { it.slug == slug || (it.slug.isNotBlank() && slug.contains(it.slug)) }
+        val hit = allNovels.firstOrNull { it.slug == slug || (it.slug.isNotBlank() && slug.contains(it.slug)) }
+            ?: pendingNovelTitleHint?.let { hint -> allNovels.firstOrNull { it.title.equals(hint, ignoreCase = true) } }
+        if (hit != null) return hit
+
+        val titleTarget = pendingNovelTitleHint ?: ""
+        if (titleTarget.isNotBlank()) {
+            val allAnime = listOf(trending, popular, topRated, newReleases, upcomingAnime, homeExplore).flatten()
+            val matchedAnime = allAnime.firstOrNull { it.title.equals(titleTarget, ignoreCase = true) || it.title.contains(titleTarget, ignoreCase = true) }
+            if (matchedAnime != null) {
+                return com.nyyrox.aniverse.data.novel.NovelItem(slug = slug, title = matchedAnime.title, cover = matchedAnime.cover)
+            }
+        }
+        return null
     }
 
     fun loadAnimeForPlayer(id: Int) = viewModelScope.launch {

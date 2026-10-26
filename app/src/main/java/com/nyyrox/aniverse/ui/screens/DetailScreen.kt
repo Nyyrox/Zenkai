@@ -2570,8 +2570,8 @@ private fun RelationRow(rel: MediaRelation, p: HomePalette, vm: MainViewModel) {
             .padding(horizontal = 18.dp)
             .fillMaxWidth()
             .pressable(0.97f) {
-                if (isNovel) vm.openNovelDetail(rel.title)
-                else if (isManga) vm.openMangaDetail(rel.id.toString(), rel.title)
+                if (isNovel) vm.openNovelDetail(rel.title, rel.title, rel.cover)
+                else if (isManga) vm.openMangaDetail(rel.id.toString(), rel.title, rel.cover)
                 else vm.openDetail(rel.id)
             },
         verticalAlignment = Alignment.CenterVertically,

@@ -120,8 +120,8 @@ fun MangaDetailScreen(
     onBack: () -> Unit,
     onReadChapter: (mangaId: String, chapterId: String) -> Unit,
     onAnimeClick: ((Int) -> Unit)? = null,
-    onNovelClick: ((String) -> Unit)? = null,
-    onMangaClick: ((String) -> Unit)? = null
+    onNovelClick: ((String, String?, String?) -> Unit)? = null,
+    onMangaClick: ((String, String?, String?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val p = rememberHomePalette()
@@ -210,7 +210,8 @@ fun MangaDetailScreen(
             ?: vm.mangaBookmarks.find { it.mangaId == mangaId || it.mangaId == cleanManga }?.title
     }
     val cachedPoster = remember(mangaId, cleanManga) {
-        vm.findKnownManga(mangaId)?.poster
+        vm.pendingMangaPosterHint
+            ?: vm.findKnownManga(mangaId)?.poster
             ?: vm.findKnownManga(cleanManga)?.poster
             ?: vm.getMangaHistoryItem(cleanManga)?.poster
             ?: vm.getMangaHistoryItem(mangaId)?.poster
@@ -821,8 +822,8 @@ fun MangaDetailScreen(
                                             onClick = {
                                                 when {
                                                     rel.type.equals("ANIME", ignoreCase = true) -> onAnimeClick?.invoke(rel.id)
-                                                    rel.type.equals("NOVEL", ignoreCase = true) || rel.format.equals("NOVEL", ignoreCase = true) || rel.format.equals("LIGHT_NOVEL", ignoreCase = true) -> onNovelClick?.invoke(rel.title)
-                                                    else -> onMangaClick?.invoke(rel.id.toString())
+                                                    rel.type.equals("NOVEL", ignoreCase = true) || rel.format.equals("NOVEL", ignoreCase = true) || rel.format.equals("LIGHT_NOVEL", ignoreCase = true) -> onNovelClick?.invoke(rel.title, rel.title, rel.cover)
+                                                    else -> onMangaClick?.invoke(rel.id.toString(), rel.title, rel.cover)
                                                 }
                                             }
                                         )
@@ -836,11 +837,11 @@ fun MangaDetailScreen(
                     item("available_sources") {
                         val avail = info?.availableSources ?: emptyList()
                         val allSources = listOf(
+                            MangaSource.WEEBCENTRAL,
+                            MangaSource.DEMONIC_SCANS,
                             MangaSource.COMICK,
                             MangaSource.MANHUA,
                             MangaSource.ASURA,
-                            MangaSource.DEMONIC_SCANS,
-                            MangaSource.WEEBCENTRAL,
                             MangaSource.MANGADEX
                         )
                         Column(

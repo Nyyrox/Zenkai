@@ -79,8 +79,8 @@ fun SearchScreen(
     initialTab: String = "anime",
     onBack: () -> Unit,
     onAnimeClick: (Int) -> Unit,
-    onMangaClick: ((String) -> Unit)? = null,
-    onNovelClick: ((String) -> Unit)? = null
+    onMangaClick: ((String, String?, String?) -> Unit)? = null,
+    onNovelClick: ((String, String?, String?) -> Unit)? = null
 ) {
     val p = rememberHomePalette()
     var selectedTab by remember(initialTab) {
@@ -495,7 +495,7 @@ fun SearchScreen(
                                             SearchResultMangaItem(
                                                 manga = manga,
                                                 p = p,
-                                                onClick = { onMangaClick?.invoke(manga.id) }
+                                                onClick = { onMangaClick?.invoke(manga.id, manga.title, manga.poster) }
                                             )
                                         }
                                     }
@@ -510,7 +510,7 @@ fun SearchScreen(
                                             SearchResultNovelItem(
                                                 novel = novel,
                                                 p = p,
-                                                onClick = { onNovelClick?.invoke(novel.slug) }
+                                                onClick = { onNovelClick?.invoke(novel.slug, novel.title, novel.cover) }
                                             )
                                         }
                                     }

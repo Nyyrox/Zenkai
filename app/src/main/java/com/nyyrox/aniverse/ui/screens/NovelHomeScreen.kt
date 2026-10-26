@@ -137,7 +137,7 @@ fun rememberNovelImageRequest(url: String?): Any? {
 @Composable
 fun NovelHomeScreen(
     vm: MainViewModel,
-    onNovelClick: (String) -> Unit,
+    onNovelClick: (String, String?, String?) -> Unit,
     onReadClick: ((novelSlug: String, chapterSlug: String) -> Unit)? = null,
     onDownloadsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -216,7 +216,8 @@ fun NovelHomeScreen(
                                 p = p,
                                 onNovelClick = onNovelClick,
                                 onReadClick = { nSlug, chSlug ->
-                                    onReadClick?.invoke(nSlug, chSlug) ?: onNovelClick(nSlug)
+                                    val item = vm.novelHistoryList.find { it.slug == nSlug }
+                                    onReadClick?.invoke(nSlug, chSlug) ?: onNovelClick(nSlug, item?.title, item?.cover)
                                 },
                                 onRemove = { vm.removeNovelHistory(it) }
                             )
@@ -369,7 +370,7 @@ private fun NovelHero(
     shows: List<NovelItem>,
     p: HomePalette,
     listScrolling: Boolean,
-    onNovelClick: (String) -> Unit,
+    onNovelClick: (String, String?, String?) -> Unit,
     onBookmark: (NovelItem) -> Unit
 ) {
     val reduced = LocalThemeSettings.current.isReducedMotionEnabled
@@ -469,7 +470,7 @@ private fun NovelHero(
                                 .clip(HeroCardShape)
                                 .shimmer(p)
                                 .clickable {
-                                    if (i == center) onNovelClick(novel.slug) else animateTo(i.toFloat())
+                                    if (i == center) onNovelClick(novel.slug, novel.title, novel.cover) else animateTo(i.toFloat())
                                 }
                         ) {
                             AsyncImage(
@@ -547,7 +548,7 @@ private fun NovelHero(
                             Modifier
                                 .clip(CircleShape)
                                 .background(p.accentBrush)
-                                .clickable { onNovelClick(novel.slug) }
+                                .clickable { onNovelClick(novel.slug, novel.title, novel.cover) }
                                 .padding(horizontal = 22.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -583,7 +584,7 @@ private fun NovelHero(
 private fun NovelContinueRow(
     history: List<NovelHistoryItem>,
     p: HomePalette,
-    onNovelClick: (String) -> Unit,
+    onNovelClick: (String, String?, String?) -> Unit,
     onReadClick: (novelSlug: String, chapterSlug: String) -> Unit,
     onRemove: (String) -> Unit
 ) {
@@ -682,7 +683,7 @@ private fun NovelRankingSection(
     subtitle: String,
     novels: List<NovelItem>,
     p: HomePalette,
-    onNovelClick: (String) -> Unit
+    onNovelClick: (String, String?, String?) -> Unit
 ) {
     Column(
         Modifier
@@ -700,7 +701,7 @@ private fun NovelRankingSection(
                     rank = idx + 1,
                     novel = novel,
                     p = p,
-                    onClick = { onNovelClick(novel.slug) }
+                    onClick = { onNovelClick(novel.slug, novel.title, novel.cover) }
                 )
             }
         }
@@ -749,7 +750,7 @@ private fun NovelRailSection(
     subtitle: String,
     novels: List<NovelItem>,
     p: HomePalette,
-    onNovelClick: (String) -> Unit
+    onNovelClick: (String, String?, String?) -> Unit
 ) {
     Column(
         Modifier
@@ -769,7 +770,7 @@ private fun NovelRailSection(
                     rating = novel.rating,
                     subtitle = novel.stats ?: novel.source.uppercase(),
                     p = p,
-                    onClick = { onNovelClick(novel.slug) }
+                    onClick = { onNovelClick(novel.slug, novel.title, novel.cover) }
                 )
             }
         }
