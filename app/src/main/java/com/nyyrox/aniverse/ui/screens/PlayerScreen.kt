@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.util.lerp
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -883,22 +884,33 @@ fun PlayerScreen(
     val progress = dragProgress.value
     val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
 
+    val playerBg = if (isDark) Color(0xFF000000) else Color.White
+    val playerSurface = if (isDark) Color(0xFF101012) else Color(0xFFF4F4F5)
+    val playerSurfaceElevated = if (isDark) Color(0xFF18181B) else Color(0xFFE4E4E7)
+    val playerBorder = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
+    val playerHairline = if (isDark) Color(0x18FFFFFF) else Color(0x12000000)
+    val playerTextPrimary = if (isDark) Color.White else Color(0xFF09090B)
+    val playerTextSecondary = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
+    val playerTextMuted = if (isDark) Color(0xFF71717A) else Color(0xFF71717A)
+    val playerActiveBg = if (isDark) Color.White else Color.Black
+    val playerActiveContent = if (isDark) Color.Black else Color.White
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isFullscreen) Color.Black else c.bg.copy(alpha = bgAlpha))
+            .background(if (isFullscreen) Color.Black else playerBg.copy(alpha = bgAlpha))
             .then(if (!isFullscreen) Modifier.navigationBarsPadding() else Modifier)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Black strip behind the status bar (replaces statusBarsPadding so the page background stays themed)
+            // Strip behind the status bar
             if (!isFullscreen) {
                 Spacer(
                     Modifier
                         .fillMaxWidth()
                         .windowInsetsTopHeight(WindowInsets.statusBars)
-                        .background(Color.Black.copy(alpha = bgAlpha))
+                        .background(if (isDark) Color.Black.copy(alpha = bgAlpha) else Color.White.copy(alpha = bgAlpha))
                 )
             }
             // Video Player Container (Morphs into floating mini-player box at bottom-right)
@@ -962,7 +974,7 @@ fun PlayerScreen(
                             Icon(
                                 Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = Color(0xFFE50914),
+                                tint = Color.White,
                                 modifier = Modifier.size(32.dp)
                             )
                             Text(
@@ -974,7 +986,7 @@ fun PlayerScreen(
                             )
                             Text(
                                 text = "This episode or title is not available on this server. Try another server.",
-                                color = Color.White.copy(alpha = 0.65f),
+                                color = Color(0xFFA1A1AA),
                                 fontSize = 11.sp,
                                 textAlign = TextAlign.Center
                             )
@@ -992,7 +1004,7 @@ fun PlayerScreen(
                                             animeSaltStreamUrl = null
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text("Retry", fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -1005,6 +1017,8 @@ fun PlayerScreen(
                                             currentProvider = otherProvider
                                             vm.setPreferredServer(otherProvider.id)
                                         },
+                                        border = BorderStroke(1.dp, Color(0x40FFFFFF)),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text("Switch to ${otherProvider.name}", color = Color.White, fontSize = 11.sp)
@@ -1149,12 +1163,13 @@ fun PlayerScreen(
             }
         }
 
-        // Below Video Section (Hidden in Fullscreen) — flat, theme-aware, no cards
+        // Below Video Section (Hidden in Fullscreen) — pure black & white, no gradients, no ambient blur
         if (!isFullscreen) {
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .background(playerBg)
                     .graphicsLayer {
                         if (progress > 0f) {
                             alpha = (1f - progress * 2.5f).coerceIn(0f, 1f)
@@ -1164,12 +1179,6 @@ fun PlayerScreen(
                         }
                     }
             ) {
-                PlayerAmbientArt(
-                    layer = backdrop,
-                    model = tmdbEpisodes[currentEpisode]?.stillUrl?.takeIf { it.isNotBlank() }
-                        ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
-                    modifier = Modifier.fillMaxSize()
-                )
 
                 val currentEpInfo = tmdbEpisodes[currentEpisode]
                 val currentEpTask = if (isCurrentEpDownloading) activeAnimeTasks["${anime.id}:$currentEpisode"] else null
@@ -1226,61 +1235,68 @@ fun PlayerScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 18.dp)
-                                .padding(top = 16.dp, bottom = 6.dp)
+                                .padding(top = 16.dp, bottom = 4.dp)
                         ) {
                             Text(
-                                text = if (isMovie) "MOVIE" else "NOW PLAYING  ·  EP $currentEpisode / $maxEpisode",
+                                text = if (isMovie) "MOVIE" else "NOW PLAYING  ·  EPISODE $currentEpisode OF $maxEpisode",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                color = c.textMuted
+                                letterSpacing = 1.3.sp,
+                                color = playerTextMuted
                             )
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(5.dp))
                             Text(
                                 text = anime.displayTitle,
-                                fontSize = 24.sp,
-                                lineHeight = 29.sp,
+                                fontSize = 22.sp,
+                                lineHeight = 28.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = c.textPrimary,
+                                color = playerTextPrimary,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             if (!isMovie) {
-                                Spacer(Modifier.height(4.dp))
+                                Spacer(Modifier.height(3.dp))
                                 Text(
                                     text = customEpName ?: "Episode $currentEpisode",
-                                    fontSize = 15.sp,
+                                    fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = c.textSecondary,
+                                    color = playerTextSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Spacer(Modifier.height(10.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = metaLine,
-                                    fontSize = 12.5.sp,
-                                    color = c.textMuted,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                if (isCurrentFiller || isCurrentMixed) FillerTag(isMixed = isCurrentMixed)
+                                anime.score?.let { score ->
+                                    MonochromeBadge(text = "★ $score%", isDark = isDark)
+                                }
+                                anime.format?.takeIf { it.isNotBlank() }?.let { fmt ->
+                                    MonochromeBadge(text = fmt, isDark = isDark)
+                                }
+                                anime.duration?.let { dur ->
+                                    MonochromeBadge(text = "${dur}m", isDark = isDark)
+                                }
+                                MonochromeBadge(text = audioTag, isDark = isDark)
+                                if (isCurrentFiller) {
+                                    MonochromeBadge(text = "FILLER", isDark = isDark, outlined = true)
+                                } else if (isCurrentMixed) {
+                                    MonochromeBadge(text = "MIXED", isDark = isDark, outlined = true)
+                                }
                             }
 
-                            // Action row: every control is a glass button (flat pill when glass is off)
+                            // Action buttons row (monochrome tactile circular buttons)
                             Spacer(Modifier.height(18.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                PlayerAction(
+                                PlayerMonochromeAction(
                                     label = "Previous",
-                                    backdrop = backdrop,
+                                    isDark = isDark,
                                     modifier = Modifier.weight(1f),
                                     enabled = hasPrev,
                                     onClick = {
@@ -1290,9 +1306,9 @@ fun PlayerScreen(
                                 ) { tint ->
                                     Icon(Icons.Default.SkipPrevious, contentDescription = "Previous episode", tint = tint, modifier = Modifier.size(22.dp))
                                 }
-                                PlayerAction(
+                                PlayerMonochromeAction(
                                     label = "Next",
-                                    backdrop = backdrop,
+                                    isDark = isDark,
                                     modifier = Modifier.weight(1f),
                                     enabled = hasNext,
                                     onClick = {
@@ -1302,9 +1318,9 @@ fun PlayerScreen(
                                 ) { tint ->
                                     Icon(Icons.Default.SkipNext, contentDescription = "Next episode", tint = tint, modifier = Modifier.size(22.dp))
                                 }
-                                PlayerAction(
+                                PlayerMonochromeAction(
                                     label = dlLabel,
-                                    backdrop = backdrop,
+                                    isDark = isDark,
                                     modifier = Modifier.weight(1f),
                                     active = isCurrentEpDownloaded && playOfflineMode,
                                     onClick = {
@@ -1328,7 +1344,7 @@ fun PlayerScreen(
                                             modifier = Modifier.size(22.dp),
                                             strokeWidth = 2.dp,
                                             color = tint,
-                                            trackColor = c.glass.border
+                                            trackColor = playerBorder
                                         )
                                     } else if (isCurrentEpDownloaded) {
                                         Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = tint, modifier = Modifier.size(22.dp))
@@ -1336,9 +1352,9 @@ fun PlayerScreen(
                                         Icon(Icons.Default.Download, contentDescription = "Download episode", tint = tint, modifier = Modifier.size(22.dp))
                                     }
                                 }
-                                PlayerAction(
+                                PlayerMonochromeAction(
                                     label = "Servers",
-                                    backdrop = backdrop,
+                                    isDark = isDark,
                                     modifier = Modifier.weight(1f),
                                     active = activeTab == "SERVERS",
                                     onClick = {
@@ -1348,9 +1364,9 @@ fun PlayerScreen(
                                 ) { tint ->
                                     Icon(Icons.Default.Dns, contentDescription = "Servers", tint = tint, modifier = Modifier.size(22.dp))
                                 }
-                                PlayerAction(
+                                PlayerMonochromeAction(
                                     label = "Fullscreen",
-                                    backdrop = backdrop,
+                                    isDark = isDark,
                                     modifier = Modifier.weight(1f),
                                     onClick = { toggleFullscreen() }
                                 ) { tint ->
@@ -1358,52 +1374,57 @@ fun PlayerScreen(
                                 }
                             }
 
-                            // Embed mode only: hand the stream to the native, ad-free player
+                            // Embed mode Zenkai Player switch
                             if (isEmbedModeActive || playInZenkaiPlayer) {
                                 Spacer(Modifier.height(18.dp))
-                                Hairline()
-                                Row(
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(playerSurfaceElevated)
+                                        .border(1.dp, playerBorder, RoundedCornerShape(12.dp))
                                         .clickable { toggleZenkaiPlayer() }
-                                        .padding(vertical = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                        .padding(horizontal = 14.dp, vertical = 12.dp)
                                 ) {
-                                    if (isSniffingStream) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(22.dp),
-                                            strokeWidth = 2.dp,
-                                            color = c.accent
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = if (playInZenkaiPlayer) Icons.Default.OpenInBrowser else Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            tint = c.accent,
-                                            modifier = Modifier.size(22.dp)
-                                        )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        if (isSniffingStream) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.dp,
+                                                color = playerTextPrimary
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = if (playInZenkaiPlayer) Icons.Default.OpenInBrowser else Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                tint = playerTextPrimary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                text = when {
+                                                    isSniffingStream -> "Extracting stream…"
+                                                    playInZenkaiPlayer -> "Back to embed player"
+                                                    else -> "Play in Zenkai Player"
+                                                },
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = playerTextPrimary
+                                            )
+                                            Text(
+                                                text = if (playInZenkaiPlayer) "Return to the web player" else "Native player · ad-free",
+                                                fontSize = 11.5.sp,
+                                                color = playerTextMuted
+                                            )
+                                        }
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = playerTextMuted, modifier = Modifier.size(18.dp))
                                     }
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            text = when {
-                                                isSniffingStream -> "Extracting stream…"
-                                                playInZenkaiPlayer -> "Back to embed player"
-                                                else -> "Play in Zenkai Player"
-                                            },
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = c.textPrimary
-                                        )
-                                        Text(
-                                            text = if (playInZenkaiPlayer) "Return to the web player" else "Native player · ad-free",
-                                            fontSize = 12.sp,
-                                            color = c.textMuted
-                                        )
-                                    }
-                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(20.dp))
                                 }
-                                Hairline()
                             }
                         }
                     }
@@ -1413,19 +1434,19 @@ fun PlayerScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(c.bg)
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .background(playerBg)
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
-                            PlayerSegmented(
+                            MonochromeSegmentedControl(
                                 labels = tabLabels,
                                 selectedIndex = tabKeys.indexOf(activeTab).coerceAtLeast(0),
                                 onSelected = { idx ->
                                     com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                     detailTab = tabKeys[idx]
                                 },
-                                backdrop = backdrop,
+                                isDark = isDark,
                                 modifier = Modifier.fillMaxWidth(),
-                                height = 44.dp
+                                height = 42.dp
                             )
                         }
                     }
@@ -1441,7 +1462,7 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 18.dp)
-                                    .padding(top = 6.dp, bottom = 8.dp)
+                                    .padding(top = 4.dp, bottom = 8.dp)
                             ) {
                                 if (pageCount > 1) {
                                     val rangeLabels = remember(pageCount, pageSize, maxEpisode) {
@@ -1450,45 +1471,34 @@ fun PlayerScreen(
                                             "$s–${minOf(s + pageSize - 1, maxEpisode)}"
                                         }
                                     }
-                                    if (backdrop != null) {
-                                        PrismalHorizontalSelector(
-                                            labels = rangeLabels,
-                                            selectedIndex = selectedPage,
-                                            onSelected = { selectedPage = it },
-                                            backdrop = backdrop,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(24.dp))
-                                                .background(if (isDark) Color(0x59000000) else Color(0x66FFFFFF))
-                                                .border(1.dp, c.glass.border, RoundedCornerShape(24.dp)),
-                                            textStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-                                            textColor = c.textPrimary
-                                        )
-                                    } else {
-                                        LazyRow(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            items(pageCount) { page ->
-                                                val selected = selectedPage == page
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(CircleShape)
-                                                        .background(if (selected) c.accent else c.skeleton)
-                                                        .clickable { selectedPage = page }
-                                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                                ) {
-                                                    Text(
-                                                        text = rangeLabels[page],
-                                                        fontSize = 12.5.sp,
-                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                                        color = if (selected) c.onAccent else c.textSecondary
-                                                    )
-                                                }
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(pageCount) { page ->
+                                            val selected = selectedPage == page
+                                            val activeBg = if (isDark) Color.White else Color.Black
+                                            val activeFg = if (isDark) Color.Black else Color.White
+                                            val inactiveBg = playerSurfaceElevated
+                                            val inactiveFg = playerTextSecondary
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(if (selected) activeBg else inactiveBg)
+                                                    .border(1.dp, if (selected) activeBg else playerBorder, CircleShape)
+                                                    .clickable { selectedPage = page }
+                                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = rangeLabels[page],
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (selected) activeFg else inactiveFg
+                                                )
                                             }
                                         }
                                     }
-                                    Spacer(Modifier.height(16.dp))
+                                    Spacer(Modifier.height(14.dp))
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -1499,38 +1509,51 @@ fun PlayerScreen(
                                             text = "Episodes",
                                             fontSize = 18.sp,
                                             fontWeight = FontWeight.ExtraBold,
-                                            color = c.textPrimary
+                                            color = playerTextPrimary
                                         )
                                         Text(
                                             text = "$curStart–$curEnd of $maxEpisode",
                                             fontSize = 12.sp,
-                                            color = c.textMuted
+                                            color = playerTextMuted
                                         )
                                     }
-                                    PlayerGlassButton(
-                                        backdrop = backdrop,
-                                        onClick = { showDownloadRangeSheet = curStart..curEnd }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(playerSurfaceElevated)
+                                            .border(1.dp, playerBorder, CircleShape)
+                                            .clickable { showDownloadRangeSheet = curStart..curEnd }
+                                            .padding(horizontal = 12.dp, vertical = 7.dp)
                                     ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, tint = c.textPrimary, modifier = Modifier.size(16.dp))
-                                        Text(
-                                            text = "Download all",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = c.textPrimary,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Download, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(15.dp))
+                                            Text(
+                                                text = "Download all",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = playerTextPrimary,
+                                                maxLines = 1,
+                                                softWrap = false
+                                            )
+                                        }
                                     }
                                     Spacer(Modifier.width(8.dp))
-                                    PlayerGlassButton(
-                                        backdrop = backdrop,
-                                        onClick = { isEpisodeGridView = !isEpisodeGridView },
-                                        circle = true
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(playerSurfaceElevated)
+                                            .border(1.dp, playerBorder, CircleShape)
+                                            .clickable { isEpisodeGridView = !isEpisodeGridView },
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
                                             contentDescription = "Toggle episode view",
-                                            tint = c.textPrimary,
+                                            tint = playerTextPrimary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1553,19 +1576,18 @@ fun PlayerScreen(
                                                 val isCurrent = epNum == currentEpisode
                                                 val isEpFiller = fillerInfo.isFiller(epNum)
                                                 val isEpMixed = fillerInfo.isMixed(epNum)
+                                                val activeBg = if (isDark) Color.White else Color.Black
+                                                val activeFg = if (isDark) Color.Black else Color.White
+                                                val inactiveBg = playerSurfaceElevated
+                                                val inactiveFg = playerTextPrimary
+                                                val borderColor = if (isCurrent) activeBg else playerBorder
                                                 Box(
                                                     modifier = Modifier
                                                         .weight(1f)
                                                         .height(48.dp)
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(
-                                                            when {
-                                                                isCurrent -> c.accent
-                                                                isEpFiller -> Color(0x24F59E0B)
-                                                                isEpMixed -> Color(0x246366F1)
-                                                                else -> c.skeleton
-                                                            }
-                                                        )
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(if (isCurrent) activeBg else inactiveBg)
+                                                        .border(if (isCurrent) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
                                                         .clickable {
                                                             com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                             currentEpisode = epNum
@@ -1576,16 +1598,16 @@ fun PlayerScreen(
                                                         text = "$epNum",
                                                         fontSize = 14.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = if (isCurrent) c.onAccent else c.textPrimary
+                                                        color = if (isCurrent) activeFg else inactiveFg
                                                     )
                                                     if (isEpFiller || isEpMixed) {
                                                         Box(
                                                             modifier = Modifier
                                                                 .align(Alignment.TopEnd)
                                                                 .padding(5.dp)
-                                                                .size(6.dp)
+                                                                .size(5.dp)
                                                                 .clip(CircleShape)
-                                                                .background(if (isEpMixed) Color(0xFF818CF8) else Color(0xFFF59E0B))
+                                                                .background(if (isCurrent) activeFg else playerTextMuted)
                                                         )
                                                     }
                                                 }
@@ -1686,13 +1708,20 @@ fun PlayerScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
+                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(22.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text("Playing downloaded video", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary)
-                                            Text("Offline · $localName · local storage", fontSize = 12.sp, color = c.textMuted)
+                                            Text("Playing downloaded video", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = playerTextPrimary)
+                                            Text("Offline · $localName · local storage", fontSize = 12.sp, color = playerTextMuted)
                                         }
-                                        PlayerGlassButton(backdrop = backdrop, onClick = { playOfflineMode = false }) {
-                                            Text("Go online", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textPrimary, maxLines = 1, softWrap = false)
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(CircleShape)
+                                                .background(playerSurfaceElevated)
+                                                .border(1.dp, playerBorder, CircleShape)
+                                                .clickable { playOfflineMode = false }
+                                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                                        ) {
+                                            Text("Go online", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = playerTextPrimary, maxLines = 1, softWrap = false)
                                         }
                                     }
                                 } else {
@@ -1704,13 +1733,20 @@ fun PlayerScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
-                                            Icon(Icons.Default.DownloadDone, contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
+                                            Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(22.dp))
                                             Column(Modifier.weight(1f)) {
-                                                Text("Downloaded on this device", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.textPrimary)
-                                                Text(localName, fontSize = 12.sp, color = c.textMuted)
+                                                Text("Downloaded on this device", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = playerTextPrimary)
+                                                Text(localName, fontSize = 12.sp, color = playerTextMuted)
                                             }
-                                            PlayerGlassButton(backdrop = backdrop, onClick = { playOfflineMode = true }) {
-                                                Text("Play offline", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textPrimary, maxLines = 1, softWrap = false)
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(playerSurfaceElevated)
+                                                    .border(1.dp, playerBorder, CircleShape)
+                                                    .clickable { playOfflineMode = true }
+                                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                                            ) {
+                                                Text("Play offline", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = playerTextPrimary, maxLines = 1, softWrap = false)
                                             }
                                         }
                                         Spacer(Modifier.height(22.dp))
@@ -1721,28 +1757,28 @@ fun PlayerScreen(
                                     Text(
                                         text = if (isDirect) "Native player · fastest, no ads" else "Web embeds · more servers, may show ads",
                                         fontSize = 12.5.sp,
-                                        color = c.textMuted
+                                        color = playerTextMuted
                                     )
                                     Spacer(Modifier.height(10.dp))
-                                    PlayerSegmented(
+                                    MonochromeSegmentedControl(
                                         labels = listOf("Direct", "Embed"),
                                         selectedIndex = if (isDirect) 0 else 1,
                                         onSelected = { selectSourceMode(if (it == 0) "DIRECT" else "EMBED") },
-                                        backdrop = backdrop,
+                                        isDark = isDark,
                                         modifier = Modifier.fillMaxWidth(),
-                                        height = 44.dp
+                                        height = 42.dp
                                     )
 
                                     Spacer(Modifier.height(22.dp))
                                     SectionLabel("AUDIO")
                                     Spacer(Modifier.height(10.dp))
-                                    PlayerSegmented(
+                                    MonochromeSegmentedControl(
                                         labels = audioLabels,
                                         selectedIndex = audioKeys.indexOf(selectedCategory).coerceAtLeast(0),
                                         onSelected = { selectCategory(audioKeys[it]) },
-                                        backdrop = backdrop,
+                                        isDark = isDark,
                                         modifier = Modifier.fillMaxWidth(),
-                                        height = 44.dp
+                                        height = 42.dp
                                     )
 
                                     Spacer(Modifier.height(22.dp))
@@ -1999,35 +2035,11 @@ fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modi
 }
 
 /**
- * Themed backdrop: solid dark or light with NO gradient, plus a very faint blurred still of the episode.
- * The faint still is what the glass buttons refract; on a perfectly flat color they would look like plain
- * flat circles. Raise/lower AMBIENT_ART_ALPHA_* to taste (0 = fully flat, glass loses its bending).
+ * PlayerAmbientArt kept as a no-op to eliminate gradients, blurred artwork blobs, and color bleeding.
  */
-private const val AMBIENT_ART_ALPHA_DARK = 0.22f
-private const val AMBIENT_ART_ALPHA_LIGHT = 0.16f
-
 @Composable
 fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
-    if (layer == null) return
-    val c = LocalAppColors.current
-    val isDark = LocalIsDark.current
-    Box(modifier.prismalGlassLayer(layer).background(c.bg)) {
-        Crossfade(targetState = model, animationSpec = tween(900), label = "ambientFade") { art ->
-            AsyncImage(
-                model = art,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(60.dp)
-                    .graphicsLayer {
-                        scaleX = 1.3f
-                        scaleY = 1.3f
-                    }
-                    .alpha(if (isDark) AMBIENT_ART_ALPHA_DARK else AMBIENT_ART_ALPHA_LIGHT)
-            )
-        }
-    }
+    // Intentionally no-op: pure black & white design with no artwork blur or gradients
 }
 
 /** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. [active] = solid accent. */
@@ -2041,49 +2053,95 @@ fun PlayerGlassButton(
     active: Boolean = false,
     content: @Composable RowScope.() -> Unit
 ) {
-    val c = LocalAppColors.current
     val isDark = LocalIsDark.current
     val sized = if (circle) modifier.width(height) else modifier
     val pad = if (circle) PaddingValues(0.dp) else PaddingValues(horizontal = 14.dp)
-    if (backdrop != null) {
-        PrismalGlassButton(
-            onClick = onClick,
-            backdrop = backdrop,
-            modifier = sized,
-            height = height,
-            surfaceColor = when {
-                active -> c.accent.copy(alpha = 0.92f)
-                isDark -> Color.Black.copy(alpha = 0.3f)
-                else -> Color.White.copy(alpha = 0.45f)
-            },
-            contentPadding = pad,
-            content = content
-        )
-    } else {
-        val source = remember { MutableInteractionSource() }
-        val pressed by source.collectIsPressedAsState()
-        val scale by animateFloatAsState(
-            targetValue = if (pressed) 0.94f else 1f,
-            animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
-            label = "btnPress"
-        )
-        Row(
-            modifier = sized
-                .height(height)
-                .graphicsLayer { scaleX = scale; scaleY = scale }
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+        label = "btnPress"
+    )
+    val activeBg = if (isDark) Color.White else Color.Black
+    val inactiveBg = if (isDark) Color(0xFF18181B) else Color(0xFFF4F4F5)
+    val borderCol = if (active) activeBg else (if (isDark) Color(0x26FFFFFF) else Color(0x18000000))
+    Row(
+        modifier = sized
+            .height(height)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(if (active) activeBg else inactiveBg)
+            .border(1.dp, borderCol, CircleShape)
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(pad),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        content = content
+    )
+}
+
+/** Round tactile action button with a caption underneath. High contrast monochrome style. */
+@Composable
+private fun PlayerMonochromeAction(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    active: Boolean = false,
+    isDark: Boolean = true,
+    icon: @Composable (Color) -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.92f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 600f),
+        label = "btnScale"
+    )
+
+    val activeBg = if (isDark) Color.White else Color.Black
+    val activeFg = if (isDark) Color.Black else Color.White
+    val inactiveBg = if (isDark) Color(0xFF141416) else Color(0xFFF4F4F5)
+    val inactiveFg = if (isDark) Color.White else Color.Black
+    val borderColor = if (active) activeBg else (if (isDark) Color(0x26FFFFFF) else Color(0x1C000000))
+
+    Column(
+        modifier = modifier.alpha(if (enabled) 1f else 0.3f),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .clip(CircleShape)
-                .background(if (active) c.accent else c.surfaceElevated)
-                .border(1.dp, if (active) c.accent else c.glass.border, CircleShape)
-                .clickable(interactionSource = source, indication = null, onClick = onClick)
-                .padding(pad),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-            content = content
+                .background(if (active) activeBg else inactiveBg)
+                .border(1.dp, borderColor, CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    enabled = enabled,
+                    onClick = onClick
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            icon(if (active) activeFg else inactiveFg)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            color = if (active) (if (isDark) Color.White else Color.Black) else (if (isDark) Color(0xFFA1A1AA) else Color(0xFF71717A)),
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
 
-/** Round glass icon button with a caption underneath. [icon] receives the tint to use (flips when [active]). */
 @Composable
 private fun PlayerAction(
     label: String,
@@ -2094,33 +2152,95 @@ private fun PlayerAction(
     onClick: () -> Unit,
     icon: @Composable (Color) -> Unit
 ) {
-    val c = LocalAppColors.current
-    Column(
-        modifier = modifier.alpha(if (enabled) 1f else 0.38f),
-        horizontalAlignment = Alignment.CenterHorizontally
+    val isDark = LocalIsDark.current
+    PlayerMonochromeAction(
+        label = label,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        active = active,
+        isDark = isDark,
+        icon = icon
+    )
+}
+
+/** Crisp monochrome metadata badge. */
+@Composable
+private fun MonochromeBadge(
+    text: String,
+    isDark: Boolean,
+    outlined: Boolean = false
+) {
+    val bg = if (outlined) Color.Transparent else (if (isDark) Color(0xFF18181B) else Color(0xFFF4F4F5))
+    val fg = if (isDark) Color(0xFFE4E4E7) else Color(0xFF27272A)
+    val border = if (isDark) Color(0x28FFFFFF) else Color(0x20000000)
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(0.8.dp, border, RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 3.dp)
     ) {
-        PlayerGlassButton(
-            backdrop = backdrop,
-            onClick = { if (enabled) onClick() },
-            height = 50.dp,
-            circle = true,
-            active = active
-        ) {
-            icon(if (active) c.onAccent else c.textPrimary)
-        }
-        Spacer(Modifier.height(7.dp))
         Text(
-            text = label,
+            text = text,
             fontSize = 11.sp,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (active) c.textPrimary else c.textSecondary,
-            maxLines = 1,
-            softWrap = false
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
+            color = fg,
+            maxLines = 1
         )
     }
 }
 
-/** Segmented control: liquid-glass droplet when glass is on, clean flat pill when it is off. Equal-width tabs both ways. */
+/** Pure black & white segmented control. */
+@Composable
+private fun MonochromeSegmentedControl(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier,
+    height: Dp = 42.dp
+) {
+    val containerBg = if (isDark) Color(0xFF121214) else Color(0xFFF4F4F5)
+    val containerBorder = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
+    val activeBg = if (isDark) Color.White else Color.Black
+    val activeFg = if (isDark) Color.Black else Color.White
+    val inactiveFg = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
+
+    Row(
+        modifier = modifier
+            .height(height)
+            .clip(RoundedCornerShape(22.dp))
+            .background(containerBg)
+            .border(1.dp, containerBorder, RoundedCornerShape(22.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        labels.forEachIndexed { i, label ->
+            val selected = i == selectedIndex
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(if (selected) activeBg else Color.Transparent)
+                    .clickable { onSelected(i) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) activeFg else inactiveFg,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun PlayerSegmented(
     labels: List<String>,
@@ -2130,77 +2250,41 @@ private fun PlayerSegmented(
     modifier: Modifier = Modifier,
     height: Dp = 44.dp
 ) {
-    val c = LocalAppColors.current
     val isDark = LocalIsDark.current
-    if (backdrop != null) {
-        PrismalSegmentedControl(
-            labels = labels,
-            selectedIndex = selectedIndex,
-            onSelected = onSelected,
-            backdrop = backdrop,
-            modifier = modifier
-                .clip(CircleShape)
-                .background(if (isDark) Color(0x59000000) else Color(0x66FFFFFF))
-                .border(1.dp, c.glass.border, CircleShape),
-            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-            textColor = c.textPrimary,
-            height = height
-        )
-    } else {
-        Row(
-            modifier = modifier
-                .height(height)
-                .clip(CircleShape)
-                .background(c.surfaceElevated)
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            labels.forEachIndexed { i, label ->
-                val selected = i == selectedIndex
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(CircleShape)
-                        .background(if (selected) c.accent else Color.Transparent)
-                        .clickable { onSelected(i) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (selected) c.onAccent else c.textSecondary,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
+    MonochromeSegmentedControl(
+        labels = labels,
+        selectedIndex = selectedIndex,
+        onSelected = onSelected,
+        isDark = isDark,
+        modifier = modifier,
+        height = height
+    )
 }
 
 @Composable
 private fun Hairline(modifier: Modifier = Modifier) {
+    val isDark = LocalIsDark.current
     Box(
         modifier
             .fillMaxWidth()
             .height(0.5.dp)
-            .background(LocalAppColors.current.glass.border)
+            .background(if (isDark) Color(0x1AFFFFFF) else Color(0x14000000))
     )
 }
 
 @Composable
 private fun SectionLabel(text: String) {
+    val isDark = LocalIsDark.current
     Text(
         text = text,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 1.2.sp,
-        color = LocalAppColors.current.textMuted
+        letterSpacing = 1.3.sp,
+        color = if (isDark) Color(0xFF71717A) else Color(0xFF71717A)
     )
 }
 
-/** Single-line chip. Never wraps its text, so "Direct" can't break into "Dire / ct" again. */
+/** Single-line chip. */
 @Composable
 fun TagChip(
     text: String,
@@ -2210,7 +2294,7 @@ fun TagChip(
     modifier: Modifier = Modifier,
     dot: Boolean = false
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(6.dp)
     Row(
         modifier = modifier
             .clip(shape)
@@ -2233,16 +2317,16 @@ fun TagChip(
     }
 }
 
-/** The one and only filler/mixed tag. Readable on both themes. */
+/** Monochrome filler/mixed tag. No gradients or colors. */
 @Composable
 fun FillerTag(isMixed: Boolean, modifier: Modifier = Modifier) {
     val isDark = LocalIsDark.current
+    val fg = if (isDark) Color.White else Color.Black
+    val border = if (isDark) Color(0x35FFFFFF) else Color(0x25000000)
     if (isMixed) {
-        if (isDark) TagChip("MIXED", Color(0xFFC7D2FE), Color(0x266366F1), Color(0x66818CF8), modifier, dot = true)
-        else TagChip("MIXED", Color(0xFF4338CA), Color(0x1A6366F1), Color(0x55818CF8), modifier, dot = true)
+        TagChip("MIXED", fg, Color.Transparent, border, modifier, dot = true)
     } else {
-        if (isDark) TagChip("FILLER", Color(0xFFFDE68A), Color(0x26F59E0B), Color(0x66FBBF24), modifier, dot = true)
-        else TagChip("FILLER", Color(0xFFB45309), Color(0x1FF59E0B), Color(0x66D97706), modifier, dot = true)
+        TagChip("FILLER", fg, Color.Transparent, border, modifier, dot = true)
     }
 }
 
@@ -2273,9 +2357,8 @@ private fun Equalizer(color: Color, modifier: Modifier = Modifier) {
 }
 
 /**
- * Flat episode row (no card): thumbnail, title, overview, tags and a trailing download state,
- * separated by a hairline. The playing episode gets a soft accent wash + equalizer.
- * [glass] is kept only so older call sites still compile.
+ * Flat episode row: 16:9 thumbnail, title, overview, tags and a trailing download state,
+ * separated by a hairline. Zero gradients, pure black and white.
  */
 @Composable
 fun PlayerEpisodeRow(
@@ -2295,26 +2378,33 @@ fun PlayerEpisodeRow(
     glass: Boolean = true,
     overview: String? = null
 ) {
-    val c = LocalAppColors.current
     val isDark = LocalIsDark.current
-    val okColor = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
+    val textPrimary = if (isDark) Color.White else Color(0xFF09090B)
+    val textSecondary = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
+    val textMuted = if (isDark) Color(0xFF71717A) else Color(0xFF71717A)
+    val borderCol = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
 
     Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(if (isSelected) c.accent.copy(alpha = 0.07f) else Color.Transparent)
+                .background(if (isSelected) (if (isDark) Color(0x18FFFFFF) else Color(0x0A000000)) else Color.Transparent)
                 .clickable(onClick = onClick)
-                .padding(start = 18.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+                .padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 Modifier
-                    .width(128.dp)
+                    .width(124.dp)
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(c.skeleton)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isDark) Color(0xFF18181B) else Color(0xFFE4E4E7))
+                    .border(
+                        width = if (isSelected) 1.5.dp else 1.dp,
+                        color = if (isSelected) (if (isDark) Color.White else Color.Black) else borderCol,
+                        shape = RoundedCornerShape(8.dp)
+                    )
             ) {
                 AsyncImage(
                     model = still,
@@ -2323,39 +2413,38 @@ fun PlayerEpisodeRow(
                     modifier = Modifier.fillMaxSize()
                 )
                 Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = if (isSelected) 0.7f else 0.5f))
-                            )
-                        )
-                )
-                Text(
-                    text = "$episode",
-                    modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 8.dp, vertical = 6.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(5.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.82f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "$episode",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
                 if (isSelected) {
                     Box(
                         Modifier
                             .align(Alignment.Center)
-                            .size(34.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.55f)),
+                            .background(Color.Black.copy(alpha = 0.7f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Equalizer(Color.White, Modifier.width(16.dp))
+                        Equalizer(Color.White, Modifier.width(14.dp))
                     }
                 }
                 if (isDownloading && downloadProgress != null) {
                     LinearProgressIndicator(
                         progress = { downloadProgress.coerceIn(0f, 1f) },
-                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(2.5.dp),
                         color = Color.White,
-                        trackColor = Color(0x33FFFFFF)
+                        trackColor = Color(0x44FFFFFF)
                     )
                 }
             }
@@ -2366,7 +2455,7 @@ fun PlayerEpisodeRow(
                     fontSize = 14.5.sp,
                     lineHeight = 19.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                    color = c.textPrimary,
+                    color = textPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2378,17 +2467,38 @@ fun PlayerEpisodeRow(
                         text = "Ep $episode · $durationLabel",
                         modifier = Modifier.padding(vertical = 2.dp),
                         fontSize = 11.5.sp,
-                        color = c.textMuted
+                        color = textMuted
                     )
-                    if (isSelected) TagChip("NOW PLAYING", c.onAccent, c.accent, c.accent)
-                    if (isFiller || isMixed) FillerTag(isMixed)
+                    if (isSelected) {
+                        TagChip(
+                            text = "NOW PLAYING",
+                            fg = if (isDark) Color.Black else Color.White,
+                            bg = if (isDark) Color.White else Color.Black,
+                            border = if (isDark) Color.White else Color.Black
+                        )
+                    }
+                    if (isFiller) {
+                        TagChip(
+                            text = "FILLER",
+                            fg = textPrimary,
+                            bg = Color.Transparent,
+                            border = borderCol
+                        )
+                    } else if (isMixed) {
+                        TagChip(
+                            text = "MIXED",
+                            fg = textPrimary,
+                            bg = Color.Transparent,
+                            border = borderCol
+                        )
+                    }
                 }
                 if (!overview.isNullOrBlank()) {
                     Text(
                         text = overview,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
-                        color = c.textMuted,
+                        color = textMuted,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -2397,7 +2507,7 @@ fun PlayerEpisodeRow(
 
             Box(
                 Modifier
-                    .size(44.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .clickable(onClick = onDownload),
                 contentAlignment = Alignment.Center
@@ -2406,20 +2516,20 @@ fun PlayerEpisodeRow(
                     isDownloaded -> Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = "Downloaded",
-                        tint = okColor,
+                        tint = textPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                     isDownloading -> CircularProgressIndicator(
                         progress = { (downloadProgress ?: 0f).coerceIn(0.05f, 1f) },
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = c.accent,
-                        trackColor = c.glass.border
+                        color = textPrimary,
+                        trackColor = borderCol
                     )
                     else -> Icon(
                         Icons.Default.Download,
                         contentDescription = "Download episode $episode",
-                        tint = c.textMuted,
+                        tint = textMuted,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -2429,7 +2539,7 @@ fun PlayerEpisodeRow(
     }
 }
 
-/** Overview tab: what's playing, the show's facts, genres and synopsis. Flat sections, no containers. */
+/** Overview tab: what's playing, the show's facts, genres and synopsis. Pure monochrome styling. */
 @Composable
 private fun PlayerOverview(
     anime: Anime,
@@ -2439,7 +2549,13 @@ private fun PlayerOverview(
     isMovie: Boolean,
     maxEpisode: Int
 ) {
-    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
+    val textPrimary = if (isDark) Color.White else Color(0xFF09090B)
+    val textSecondary = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
+    val textMuted = if (isDark) Color(0xFF71717A) else Color(0xFF71717A)
+    val borderCol = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
+    val surfaceElevated = if (isDark) Color(0xFF18181B) else Color(0xFFE4E4E7)
+
     val about = remember(anime.description) {
         anime.description?.replace(Regex("<[^>]*>"), "")?.trim()?.takeIf { it.isNotBlank() }
     }
@@ -2472,7 +2588,7 @@ private fun PlayerOverview(
                     text = episodeName,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = c.textPrimary
+                    color = textPrimary
                 )
                 Spacer(Modifier.height(6.dp))
             }
@@ -2480,7 +2596,7 @@ private fun PlayerOverview(
                 text = episodeOverview,
                 fontSize = 14.sp,
                 lineHeight = 21.sp,
-                color = c.textSecondary,
+                color = textSecondary,
                 maxLines = if (epExpanded) Int.MAX_VALUE else 4,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2489,7 +2605,7 @@ private fun PlayerOverview(
                     text = if (epExpanded) "Show less" else "Read more",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = c.textPrimary,
+                    color = textPrimary,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .clickable { epExpanded = !epExpanded }
@@ -2515,8 +2631,9 @@ private fun PlayerOverview(
                 modifier = Modifier
                     .width(104.dp)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(c.skeleton)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(surfaceElevated)
+                    .border(1.dp, borderCol, RoundedCornerShape(10.dp))
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -2527,7 +2644,7 @@ private fun PlayerOverview(
                     fontSize = 16.sp,
                     lineHeight = 21.sp,
                     fontWeight = FontWeight.Bold,
-                    color = c.textPrimary,
+                    color = textPrimary,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2535,7 +2652,7 @@ private fun PlayerOverview(
                     Text(
                         text = romaji,
                         fontSize = 12.5.sp,
-                        color = c.textMuted,
+                        color = textMuted,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -2546,14 +2663,14 @@ private fun PlayerOverview(
                             text = label,
                             modifier = Modifier.width(66.dp),
                             fontSize = 12.5.sp,
-                            color = c.textMuted
+                            color = textMuted
                         )
                         Text(
                             text = value,
                             modifier = Modifier.weight(1f),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = c.textPrimary,
+                            color = textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -2562,7 +2679,7 @@ private fun PlayerOverview(
             }
         }
 
-        // Genres (outlined, not filled)
+        // Genres (outlined, monochrome)
         if (genres.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             FlowRow(
@@ -2574,12 +2691,12 @@ private fun PlayerOverview(
                         text = genre,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.Medium,
-                        color = c.textSecondary,
+                        color = textSecondary,
                         maxLines = 1,
                         softWrap = false,
                         modifier = Modifier
                             .clip(CircleShape)
-                            .border(1.dp, c.glass.border, CircleShape)
+                            .border(1.dp, borderCol, CircleShape)
                             .padding(horizontal = 13.dp, vertical = 6.dp)
                     )
                 }
@@ -2597,7 +2714,7 @@ private fun PlayerOverview(
                 text = about,
                 fontSize = 14.sp,
                 lineHeight = 22.sp,
-                color = c.textSecondary,
+                color = textSecondary,
                 maxLines = if (aboutExpanded) Int.MAX_VALUE else 6,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2606,7 +2723,7 @@ private fun PlayerOverview(
                     text = if (aboutExpanded) "Show less" else "Read more",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = c.textPrimary,
+                    color = textPrimary,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .clickable { aboutExpanded = !aboutExpanded }
@@ -2621,7 +2738,10 @@ private fun PlayerOverview(
 /** One row of the server list: radio dot, name, badge. Flat, separated by hairlines. */
 @Composable
 private fun ServerRow(name: String, badge: String, selected: Boolean, onClick: () -> Unit) {
-    val c = LocalAppColors.current
+    val isDark = LocalIsDark.current
+    val textPrimary = if (isDark) Color.White else Color(0xFF09090B)
+    val textSecondary = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
+    val borderCol = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
     Column {
         Row(
             modifier = Modifier
@@ -2635,11 +2755,20 @@ private fun ServerRow(name: String, badge: String, selected: Boolean, onClick: (
                 modifier = Modifier
                     .size(20.dp)
                     .clip(CircleShape)
-                    .border(1.5.dp, if (selected) c.accent else c.glass.border, CircleShape),
+                    .border(
+                        1.5.dp,
+                        if (selected) (if (isDark) Color.White else Color.Black) else borderCol,
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 if (selected) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(c.accent))
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (isDark) Color.White else Color.Black)
+                    )
                 }
             }
             Text(
@@ -2647,11 +2776,11 @@ private fun ServerRow(name: String, badge: String, selected: Boolean, onClick: (
                 modifier = Modifier.weight(1f),
                 fontSize = 15.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) c.textPrimary else c.textSecondary,
+                color = if (selected) textPrimary else textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            TagChip(badge, c.textSecondary, Color.Transparent, c.glass.border)
+            TagChip(badge, textSecondary, Color.Transparent, borderCol)
         }
         Hairline()
     }

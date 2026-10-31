@@ -2779,12 +2779,7 @@ fun CinePlayerView(
                                     .background(Color(0xF20D101C))
                                     .border(
                                         1.dp,
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0x90FF453A),
-                                                Color(0x30FF453A)
-                                            )
-                                        ),
+                                        Color(0x35FFFFFF),
                                         RoundedCornerShape(16.dp)
                                     )
                                     .padding(horizontal = 20.dp, vertical = 18.dp)
@@ -2794,18 +2789,18 @@ fun CinePlayerView(
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.widthIn(max = 360.dp)
                                 ) {
-                                    // Error icon with crimson ambient halo
+                                    // Error icon
                                     Box(
                                         modifier = Modifier
                                             .size(42.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0x25FF453A)),
+                                            .background(Color(0x20FFFFFF)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             Icons.Default.Warning,
                                             contentDescription = null,
-                                            tint = Color(0xFFFF453A),
+                                            tint = Color.White,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
