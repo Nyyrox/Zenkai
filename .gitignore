@@ -15,3 +15,7 @@ local.properties
 build-output/
 .kotlin/
 zenkai-web/
+*.jks
+*.keystore
+*.apk
+keystore.properties
