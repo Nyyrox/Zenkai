@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 
 import androidx.compose.foundation.layout.Column
 
@@ -256,7 +257,7 @@ fun WatchlistScreen(
 
                     }
 
-    Box(
+    BoxWithConstraints(
 
         modifier = Modifier
 
@@ -265,6 +266,14 @@ fun WatchlistScreen(
             .background(colors.bg)
 
     ) {
+
+        val gridColumns = when {
+            maxWidth >= 1200.dp -> 6
+            maxWidth >= 900.dp -> 5
+            maxWidth >= 600.dp -> 4
+            maxWidth >= 440.dp -> 3
+            else -> 2
+        }
 
         LazyColumn(
 
@@ -829,7 +838,7 @@ fun WatchlistScreen(
 
                             ) {
 
-                                filteredAnimeList.chunked(2).forEach { rowItems ->
+                                filteredAnimeList.chunked(gridColumns).forEach { rowItems ->
 
                                     Row(
 
@@ -877,10 +886,9 @@ fun WatchlistScreen(
 
                                         }
 
-                                        if (rowItems.size == 1) {
-
+                                        val emptySlots = gridColumns - rowItems.size
+                                        repeat(emptySlots) {
                                             Spacer(Modifier.weight(1f))
-
                                         }
 
                                     }
@@ -923,7 +931,7 @@ fun WatchlistScreen(
 
                             ) {
 
-                                vm.mangaBookmarks.chunked(2).forEach { rowItems ->
+                                vm.mangaBookmarks.chunked(gridColumns).forEach { rowItems ->
 
                                     Row(
 
@@ -957,10 +965,9 @@ fun WatchlistScreen(
 
                                         }
 
-                                        if (rowItems.size == 1) {
-
+                                        val emptySlots = gridColumns - rowItems.size
+                                        repeat(emptySlots) {
                                             Spacer(Modifier.weight(1f))
-
                                         }
 
                                     }
@@ -1003,7 +1010,7 @@ fun WatchlistScreen(
 
                             ) {
 
-                                vm.novelHistoryList.chunked(2).forEach { rowItems ->
+                                vm.novelHistoryList.chunked(gridColumns).forEach { rowItems ->
 
                                     Row(
 
@@ -1039,10 +1046,9 @@ fun WatchlistScreen(
 
                                         }
 
-                                        if (rowItems.size == 1) {
-
+                                        val emptySlots = gridColumns - rowItems.size
+                                        repeat(emptySlots) {
                                             Spacer(Modifier.weight(1f))
-
                                         }
 
                                     }

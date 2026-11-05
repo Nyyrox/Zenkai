@@ -611,7 +611,7 @@ fun BrowseScreen(
                     isGridView -> {
                         // Clean 2D Poster Grid: borderless, card-free, beautiful typography
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(115.dp),
+                            columns = GridCells.Adaptive(minSize = 140.dp),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -775,10 +775,12 @@ internal fun Browse2DPosterTile(
         // Title
         Text(
             text = anime.displayTitle,
-            fontSize = 13.sp,
+            fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = p.text,
-            maxLines = 1,
+            maxLines = 2,
+            minLines = 2,
+            lineHeight = 16.sp,
             overflow = TextOverflow.Ellipsis
         )
 
