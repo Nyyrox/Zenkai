@@ -19,7 +19,7 @@ object DiscordConfig {
     const val MAIN_CHANNEL_ID: String = "1504915687338934375"
 
     @Volatile
-    var REDIRECT_URI: String = "https://voxeodunvjrhtbjvbbxt.supabase.co/auth/v1/callback"
+    var REDIRECT_URI: String = "https://wcvazatblggnbnrguopj.supabase.co/auth/v1/callback"
 
     const val OAUTH_AUTHORIZE_URL: String = "https://discord.com/oauth2/authorize"
     const val OAUTH_TOKEN_URL: String = "https://discord.com/api/v10/oauth2/token"
@@ -29,7 +29,7 @@ object DiscordConfig {
     fun getAuthorizeUrl(clientId: String = CLIENT_ID, redirectUri: String = REDIRECT_URI): String {
         // Use Supabase as OAuth middleman (configured in Supabase Dashboard with Discord Provider)
         val encodedRedirect = java.net.URLEncoder.encode("aniverse://login-callback", "UTF-8")
-        return "https://voxeodunvjrhtbjvbbxt.supabase.co/auth/v1/authorize?provider=discord&redirect_to=$encodedRedirect&scopes=identify%20email"
+        return "https://wcvazatblggnbnrguopj.supabase.co/auth/v1/authorize?provider=discord&redirect_to=$encodedRedirect&scopes=identify%20email"
     }
 
     fun getDirectDiscordAuthorizeUrl(clientId: String = CLIENT_ID, redirectUri: String = REDIRECT_URI): String {

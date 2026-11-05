@@ -87,7 +87,7 @@ private data class DrawerEntry(
 private val DrawerEntries = listOf(
     DrawerEntry(Icons.Default.Explore, "Browse Catalog", "Genres, seasons & year", "browse"),
     DrawerEntry(Icons.Default.Schedule, "Airing Schedule", "Weekly release calendar", "airing"),
-    DrawerEntry(Icons.Default.Bookmark, "Watchlist & Library", "Saved anime, manga & novels", "watchlist"),
+    DrawerEntry(Icons.Default.Bookmark, "My Library", "Saved anime, manga & novels", "library"),
     DrawerEntry(Icons.Default.DownloadDone, "Offline Downloads", "Read and watch offline", "downloads"),
     DrawerEntry(Icons.Default.Forum, "Discord Community", "Join the server, Rich Presence", "discord_hub"),
     DrawerEntry(Icons.Default.Groups, "Watch Together", "Sync watch rooms with friends", "watchtogether"),

@@ -216,7 +216,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                 "browse" -> if (vm.browse.isEmpty()) vm.loadBrowse()
                 "airing" -> if (vm.airing.isEmpty()) vm.loadAiring()
                 "profile" -> vm.refreshStorageData()
-                "watchlist" -> vm.refreshStorageData()
+                "watchlist", "library" -> vm.refreshStorageData()
             }
         }
     }
@@ -690,7 +690,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
-                                screen.startsWith("watchlist") -> {
+                                screen.startsWith("watchlist") || screen.startsWith("library") -> {
                                     val initialTab = when {
                                         screen.contains(":manga_history") -> 3
                                         screen.contains(":manga") -> 2
@@ -988,7 +988,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             onSearchClick = {
                                 push(if (currentRoute == "manga") "search:manga" else if (currentRoute == "novel") "search:novel" else "search")
                             },
-                            onWatchlistClick = { push("watchlist") },
+                            onWatchlistClick = { push("library") },
                             onProfileClick = {
                                 isDrawerOpen = false
                                 switchTab("profile")

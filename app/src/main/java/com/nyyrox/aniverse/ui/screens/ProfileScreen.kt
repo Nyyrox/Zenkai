@@ -1,108 +1,79 @@
 package com.nyyrox.aniverse.ui.screens
 
-import android.app.Activity
-import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import androidx.compose.foundation.BorderStroke
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Image
-import com.nyyrox.aniverse.ui.components.DownloadSettingsSheet
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Info
-import com.nyyrox.aniverse.data.WatchlistStatus
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MotionPhotosOff
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.SyncAlt
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudSync
-import com.nyyrox.aniverse.data.LevelAndStreakSystem
-import com.nyyrox.aniverse.ui.components.decorations.BANNER_EFFECT_PRESETS
-import com.nyyrox.aniverse.ui.components.decorations.BannerOverlayRenderer
-import com.nyyrox.aniverse.ui.components.decorations.ProfileBannerRenderer
-import com.nyyrox.aniverse.ui.components.TimeSpentSectionCard
-import com.nyyrox.aniverse.util.DisplayRefreshRateManager
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -110,56 +81,87 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.nyyrox.aniverse.data.WatchHistoryItem
-import com.nyyrox.aniverse.data.WatchlistItem
 import com.nyyrox.aniverse.data.supabase.AuthState
-import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
-import com.nyyrox.aniverse.ui.theme.OttAccentGold
-import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttCardShape
-import com.nyyrox.aniverse.ui.theme.OttPillShape
-import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.OttSecondary
-import com.nyyrox.aniverse.ui.theme.OttSurface
-import com.nyyrox.aniverse.ui.theme.OttSurfaceBorder
-import com.nyyrox.aniverse.ui.components.decorations.AvatarDecorationRenderer
-import com.nyyrox.aniverse.ui.components.decorations.TextEffectRenderer
-import com.nyyrox.aniverse.ui.components.decorations.RoleBadgeRow
-import com.nyyrox.aniverse.ui.components.decorations.LevelRankTagBadge
-import com.nyyrox.aniverse.ui.components.decorations.AnimatedLevelThemeBadge
-import com.nyyrox.aniverse.ui.components.AniListSyncModalSheet
-import com.nyyrox.aniverse.ui.components.MalSyncModalSheet
-import com.nyyrox.aniverse.ui.components.decorations.AnimatedStreakBadge
-import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.graphics.graphicsLayer
-import com.nyyrox.aniverse.ui.theme.AniButton
-import com.nyyrox.aniverse.ui.theme.AniIconButton
-import com.nyyrox.aniverse.ui.theme.AniSwitch
-import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
+import com.nyyrox.aniverse.data.UserProfile
+import com.nyyrox.aniverse.ui.components.DownloadSettingsSheet
 import com.nyyrox.aniverse.ui.theme.LocalAppColors
 import com.nyyrox.aniverse.ui.theme.ThemeMode
-import com.nyyrox.aniverse.ui.theme.ThemeRuntime
-import androidx.compose.foundation.isSystemInDarkTheme
-import com.nyyrox.aniverse.ui.theme.aniGlass
-import com.styropyr0.prismal.PrismalGlass
-import com.nyyrox.aniverse.ui.components.BioFontSelectorPills
-import com.nyyrox.aniverse.ui.components.FavoriteAnimeShowcaseCard
-import com.nyyrox.aniverse.ui.components.AniListAnimePickerSheet
-import com.nyyrox.aniverse.ui.components.getBioTextStyle
-import com.nyyrox.aniverse.ui.components.parseFavoriteAnimeString
-import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.foundation.lazy.LazyRow
-import com.nyyrox.aniverse.data.manga.MangaBookmarkItem
-import com.nyyrox.aniverse.ui.components.AvatarCropDialog
-import com.nyyrox.aniverse.ui.theme.OttTextMuted
-import com.nyyrox.aniverse.ui.theme.OttTextPrimary
-import com.nyyrox.aniverse.ui.theme.OttTextSecondary
-import com.nyyrox.aniverse.util.AppHaptics
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
+import org.json.JSONArray
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+data class FrameItem(val id: String, val name: String, val file: String) {
+    val url: String get() = "https://cdn.jsdelivr.net/gh/Nyyrox/SillyTavern-AvatarDecorations-CSS@c63faa39f5c863da5bfaa9a642720b50283de090/dc-decorations/${file}.png"
+}
+
+val PRESET_FRAMES = listOf(
+    FrameItem("1-angry", "Angry", "1_Angry"),
+    FrameItem("1-cat-ears", "Cat Ears", "1_cat-ears"),
+    FrameItem("1-dismay", "Dismay", "1_dismay"),
+    FrameItem("1-heartbloom", "Heartbloom", "1_heartbloom"),
+    FrameItem("1-in-love", "In Love", "1_In-Love"),
+    FrameItem("1-in-tears", "In Tears", "1_in-tears"),
+    FrameItem("1-ki-energy", "Ki Energy", "1_ki-energy"),
+    FrameItem("1-radiating-energy", "Radiating Energy", "1_Radiating-Energy"),
+    FrameItem("1-rage", "Rage", "1_rage"),
+    FrameItem("1-shocked", "Shocked", "1_Shocked"),
+    FrameItem("1-soul-leaving-body", "Soul Leaving Body", "1_Soul-Leaving-Body"),
+    FrameItem("1-starry-eyed", "Starry Eyed", "1_Starry-Eyed"),
+    FrameItem("1-sweat-drops", "Sweat Drops", "1_Sweat-Drops"),
+    FrameItem("2-cybernetic", "Cybernetic", "2_Cybernetic"),
+    FrameItem("2-digital-sunrise", "Digital Sunrise", "2_Digital Sunrise"),
+    FrameItem("2-glitch", "Glitch", "2_Glitch"),
+    FrameItem("2-implant", "Implant", "2_Implant"),
+    FrameItem("3-disxcore-headset", "DISXCORE Headset", "3_DISXCORE Headset"),
+    FrameItem("3-futuristic-ui", "Futuristic UI", "3_Futuristic UI"),
+    FrameItem("3-smoke", "Smoke", "3_Smoke"),
+    FrameItem("4-defensive-shield", "Defensive Shield", "4_Defensive Shield"),
+    FrameItem("4-flaming-sword", "Flaming Sword", "4_Flaming Sword"),
+    FrameItem("4-glowing-runes", "Glowing Runes", "4_GLowing Runes"),
+    FrameItem("4-magical-potion", "Magical Potion", "4_Magical Potion"),
+    FrameItem("4-skull-medallion", "Skull Medallion", "4_Skull Medallion"),
+    FrameItem("4-treasure-and-key", "Treasure & Key", "4_Treasure and Key"),
+    FrameItem("4-wizard-s-staff", "Wizard's Staff", "4_Wizard's Staff"),
+    FrameItem("5-dragon-s-smile", "Dragon's Smile", "5_Dragon's Smile"),
+    FrameItem("5-fan-fluorish", "Fan Fluorish", "5_Fan Fluorish"),
+    FrameItem("5-firecrackers", "Firecrackers", "5_Firecrackers"),
+    FrameItem("5-koi-pond", "Koi Pond", "5_Koi Pond"),
+    FrameItem("5-lucky-envelopes", "Lucky Envelopes", "5_Lucky Envelopes"),
+    FrameItem("5-lunar-lanterns", "Lunar Lanterns", "5_Lunar Lanterns"),
+    FrameItem("6-air", "Air", "6_Air"),
+    FrameItem("6-balance", "Balance", "6_Balance"),
+    FrameItem("6-earth", "Earth", "6_Earth"),
+    FrameItem("6-fire", "Fire", "6_Fire"),
+    FrameItem("6-lightning", "Lightning", "6_Lightning"),
+    FrameItem("6-water", "Water", "6_Water"),
+    FrameItem("7-chromawave", "Chromawave", "7_Chromawave"),
+    FrameItem("7-cozy-cat", "Cozy Cat", "7_Cozy-Cat"),
+    FrameItem("7-cozy-headphones", "Cozy Headphones", "7_Cozy-Headphones"),
+    FrameItem("7-oasis", "Oasis", "7_Oasis"),
+    FrameItem("7-rainy-mood", "Rainy Mood", "7_Rainy-Mood"),
+    FrameItem("8-blade-storm", "Blade Storm", "8_blade-storm"),
+    FrameItem("8-omens-cowl", "Omens Cowl", "8_omens-cowl"),
+    FrameItem("8-reynas-leer", "Reynas Leer", "8_reynas-leer"),
+    FrameItem("9-butterflies", "Butterflies", "9_butterflies"),
+    FrameItem("9-honeyblossom", "Honeyblossom", "9_honeyblossom"),
+    FrameItem("10-astronaut-helmet", "Astronaut Helmet", "10_Astronaut-Helmet"),
+    FrameItem("10-black-hole", "Black Hole", "10_Black-Hole"),
+    FrameItem("10-constellations", "Constellations", "10_Constellations"),
+    FrameItem("10-solar-orbit", "Solar Orbit", "10_Solar-Orbit"),
+    FrameItem("10-stardust", "Stardust", "10_Stardust"),
+    FrameItem("10-ufo", "UFO", "10_UFO")
+)
+
+fun getResolvedFrameUrl(id: String?): String? {
+    if (id.isNullOrBlank() || id == "none") return null
+    if (id.startsWith("http://") || id.startsWith("https://")) return id
+    return PRESET_FRAMES.firstOrNull { it.id == id }?.url
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     vm: MainViewModel,
@@ -176,1226 +178,976 @@ fun ProfileScreen(
     onOpenDecorations: (() -> Unit)? = null,
     onOpenNotifications: (() -> Unit)? = null,
     onOpenRankings: (() -> Unit)? = null,
-    onOpenUserProfile: ((String) -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onOpenUserProfile: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    // read straight from the ViewModel so toggles and theme mode update instantly
-    val themeSettings = vm.themeSettings
+    val coroutineScope = rememberCoroutineScope()
+    val colors = LocalAppColors.current
 
-    val activity = remember(context) {
-        var ctx = context
-        while (ctx is ContextWrapper) {
-            if (ctx is Activity) return@remember ctx
-            ctx = ctx.baseContext
-        }
-        null
-    }
+    val userProfile = vm.userProfile
+    val authState = vm.authState
+    val isLoggedIn = authState is AuthState.LoggedIn
 
-    var showDmcaModal by remember { mutableStateOf(false) }
-    var showEditProfileModal by remember { mutableStateOf(false) }
-    var showAvatarOptionsSheet by remember { mutableStateOf(false) }
-    var showBannerOptionsSheet by remember { mutableStateOf(false) }
-    var showBannerEffectsSheet by remember { mutableStateOf(false) }
-    var showNinjaTagsSheet by remember { mutableStateOf(false) }
-    var showRefreshRateSheet by remember { mutableStateOf(false) }
-    var showAniListSheet by remember { mutableStateOf(false) }
-    var showMalSheet by remember { mutableStateOf(false) }
-    var showDiscordSheet by remember { mutableStateOf(false) }
-    var showChangelogs by remember { mutableStateOf(false) }
-    var showDownloadSettingsSheet by remember { mutableStateOf(false) }
-    var selectedAvatarCropUri by remember { mutableStateOf<Uri?>(null) }
-    var uploadNoticeMessage by remember { mutableStateOf<String?>(null) }
-    val savedMangaList = remember(vm.mangaBookmarks) { vm.mangaBookmarks.distinctBy { it.mangaId } }
+    val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
+    var currentAudio by remember { mutableStateOf(prefs.getString("pref_audio", "sub") ?: "sub") }
+    var currentQuality by remember { mutableStateOf(prefs.getString("pref_quality", "") ?: "") }
+    var autoPlayNext by remember { mutableStateOf(prefs.getBoolean("auto_play_next", true)) }
+    var autoSkipIntro by remember { mutableStateOf(prefs.getBoolean("auto_skip_intro_outro", true)) }
+    var skipFiller by remember { mutableStateOf(prefs.getBoolean("pref_skip_filler", false)) }
 
-    val avatarPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            selectedAvatarCropUri = uri
-        }
-    }
+    var showEditSheet by remember { mutableStateOf(false) }
+    var initialEditTab by remember { mutableIntStateOf(0) }
+    var showDownloadSheet by remember { mutableStateOf(false) }
 
-    val bannerPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            vm.uploadBanner(context, uri) { success, err ->
-                if (!success && err != null) {
-                    uploadNoticeMessage = err
-                }
+    // Load presets from assets safely
+    val presetAvatars = remember {
+        try {
+            val json = context.assets.open("avatars.json").bufferedReader().use { it.readText() }
+            val array = JSONArray(json)
+            val list = mutableListOf<String>()
+            for (i in 0 until array.length()) {
+                list.add(array.getJSONObject(i).getString("url"))
             }
-        }
-    }
-
-    // Apply display refresh rate and respect Battery Saver mode
-    LaunchedEffect(themeSettings.isPowerSavingEnabled, themeSettings.preferredRefreshRate) {
-        activity?.let { act ->
-            DisplayRefreshRateManager.applyRefreshRate(
-                act,
-                themeSettings.preferredRefreshRate,
-                themeSettings.isPowerSavingEnabled
+            list
+        } catch (_: Exception) {
+            listOf(
+                "https://anime-lok-assets.pages.dev/avatars/640.jpg",
+                "https://anime-lok-assets.pages.dev/avatars/641.jpg",
+                "https://anime-lok-assets.pages.dev/avatars/642.jpg",
+                "https://anime-lok-assets.pages.dev/avatars/643.jpg",
+                "https://anime-lok-assets.pages.dev/avatars/644.jpg",
+                "https://anime-lok-assets.pages.dev/avatars/645.jpg"
             )
         }
     }
 
-    val supportedRates = remember(context) { DisplayRefreshRateManager.getSupportedRefreshRates(context) }
-    val effectiveHz = DisplayRefreshRateManager.calculateEffectiveRefreshRate(
-        context,
-        themeSettings.preferredRefreshRate,
-        themeSettings.isPowerSavingEnabled
-    )
-    val isBatterySaverActive = themeSettings.isPowerSavingEnabled || DisplayRefreshRateManager.isSystemPowerSaveMode(context)
-
-    val c = LocalAppColors.current
-    val listState = rememberLazyListState()
-    val isLoggedIn = vm.authState !is AuthState.LoggedOut
-    val scrollPx: () -> Float = {
-        if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100000f
-    }
-
-    Box(modifier.fillMaxSize()) {
-        GlassBackdropHost(background = { ProfileBanner(vm, scrollPx) }) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 110.dp)
-            ) {
-                // ── Header ────────────────────────────────────────────────
-                item {
-                    Box(Modifier.fillMaxWidth().height(242.dp)) {
-                        Box(
-                            Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(start = 20.dp)
-                                .size(84.dp)
-                                .clickable { showAvatarOptionsSheet = true }
-                        ) {
-                            AvatarDecorationRenderer(
-                                decorationId = vm.userProfile.avatarDecorationId,
-                                frameId = vm.userProfile.avatarFrameId,
-                                size = 84.dp
-                            ) {
-                                val hasDecoration = !vm.userProfile.avatarDecorationId.isNullOrBlank()
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape)
-                                        .background(c.surfaceElevated)
-                                        .border(if (hasDecoration) 1.dp else 3.dp, if (hasDecoration) c.glass.border else c.bg, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (vm.userProfile.avatarUrl.isNotBlank()) {
-                                        AsyncImage(
-                                            model = vm.userProfile.avatarUrl,
-                                            contentDescription = "Avatar",
-                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Text(
-                                            text = vm.userProfile.displayName.ifBlank { "G" }.take(1).uppercase(),
-                                            fontSize = 30.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = c.textPrimary
-                                        )
-                                    }
-                                }
-                            }
-                            Box(
-                                Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(c.accent)
-                                    .border(2.dp, c.bg, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.CameraAlt, "Edit avatar", tint = c.onAccent, modifier = Modifier.size(12.dp))
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    val email = vm.userProfile.email
-                    val handle = when {
-                        vm.userProfile.username.isNotBlank() -> "@${vm.userProfile.username}"
-                        !email.isNullOrBlank() -> email
-                        else -> "Guest"
-                    }
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    TextEffectRenderer(
-                                        effectId = vm.userProfile.textEffectId,
-                                        text = vm.userProfile.displayName.ifBlank { "Guest" },
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    RoleBadgeRow(roles = vm.userProfile.roles, isAdmin = vm.userProfile.isAdmin)
-                                }
-                                Text(handle, fontSize = 13.sp, color = c.textSecondary)
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            if (isLoggedIn) {
-                                AniButton(onClick = { showEditProfileModal = true }) {
-                                    Text("Edit profile", color = c.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            } else {
-                                AniButton(onClick = { onLogin?.invoke() }, primary = true) {
-                                    Text("Sign in", color = c.onAccent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-
-                        val bio = vm.userProfile.bio
-                        if (bio.isNotBlank()) {
-                            Spacer(Modifier.height(12.dp))
-                            Text(text = bio, style = getBioTextStyle(vm.userProfile.bioFont), color = c.textPrimary)
-                        }
-                    }
-                }
-
-                // ── Appearance ────────────────────────────────────────────
-                item {
-                    Section("Appearance") {
-                        ThemeModeSelector(
-                            current = themeSettings.mode,
-                            onChange = { vm.setThemeMode(it) }
-                        )
-                        RowDivider()
-                        SettingRow(Icons.Default.Palette, "Profile decorations", onClick = { onOpenDecorations?.invoke() })
-                        RowDivider()
-                        SettingRow(
-                            Icons.Default.Speed, "Refresh rate",
-                            subtitle = if (isBatterySaverActive) "Locked to 60 Hz by Battery Saver" else null,
-                            value = "$effectiveHz Hz",
-                            onClick = { showRefreshRateSheet = true }
-                        )
-                        RowDivider()
-                        SettingRow(
-                            Icons.Default.BatteryChargingFull, "Battery saver",
-                            subtitle = "Caps to 60 Hz, lighter rendering",
-                            trailing = { AppSwitch(themeSettings.isPowerSavingEnabled) { vm.setPowerSaving(it) } }
-                        )
-                        RowDivider()
-                        SettingRow(
-                            Icons.Default.MotionPhotosOff, "Reduced motion",
-                            trailing = { AppSwitch(themeSettings.isReducedMotionEnabled) { vm.setReducedMotion(it) } }
-                        )
-                        RowDivider()
-                        SettingRow(
-                            Icons.Default.AutoAwesome, "Liquid glass",
-                            subtitle = "Turn off for lower GPU use",
-                            trailing = {
-                                AppSwitch(themeSettings.isGlassmorphismEnabled) { vm.setGlassmorphism(it) }
-                            }
-                        )
-                    }
-                }
-
-                // ── Library ───────────────────────────────────────────────
-                item {
-                    Section("Library") {
-                        SettingRow(Icons.Default.Bookmark, "Watchlist", value = "${vm.watchlist.size}", onClick = { onSeeAllWatchlist?.invoke() })
-                        RowDivider()
-                        SettingRow(Icons.Default.History, "Watch history", value = "${vm.history.size}", onClick = { onSeeAllWatchlist?.invoke() })
-                        RowDivider()
-                        SettingRow(Icons.Default.AutoStories, "Saved manga", value = "${vm.mangaBookmarks.size}",
-                            onClick = { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() })
-                        RowDivider()
-                        SettingRow(Icons.Default.MenuBook, "Manga history", value = "${vm.mangaHistory.size}",
-                            onClick = { onOpenSavedManga?.invoke() ?: onSeeAllWatchlist?.invoke() })
-                        RowDivider()
-                        SettingRow(Icons.Default.AutoStories, "Novel history", value = "${vm.novelHistoryList.size}",
-                            onClick = { onOpenNovelHistory?.invoke() ?: onSeeAllWatchlist?.invoke() })
-                        RowDivider()
-                        SettingRow(Icons.Default.Download, "Downloads & storage", onClick = { showDownloadSettingsSheet = true })
-                    }
-                }
-
-                if (savedMangaList.isNotEmpty()) {
-                    item {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(savedMangaList, key = { it.mangaId }) { bm ->
-                                ProfileMangaCard(item = bm, onClick = {
-                                    vm.searchManga(bm.title)
-                                    onMangaClick?.invoke(bm.mangaId)
-                                })
-                            }
-                        }
-                    }
-                }
-
-                // ── Connections ───────────────────────────────────────────
-                item {
-                    val discordAcc by com.nyyrox.aniverse.data.discord.DiscordAccountManager.accountState.collectAsState()
-                    val ani = vm.aniListAccount
-                    val mal = vm.malAccount
-                    Section("Connections") {
-                        SettingRow(Icons.Default.Sync, "AniList", value = ani?.let { "@${it.username}" } ?: "Connect",
-                            onClick = { showAniListSheet = true })
-                        RowDivider()
-                        SettingRow(Icons.Default.SyncAlt, "MyAnimeList", value = mal?.let { "@${it.username}" } ?: "Connect",
-                            onClick = { showMalSheet = true })
-                        RowDivider()
-                        SettingRow(Icons.Default.PlayArrow, "Discord presence", value = discordAcc?.let { "@${it.username}" } ?: "Connect",
-                            onClick = { showDiscordSheet = true })
-                        RowDivider()
-                        SettingRow(
-                            Icons.Default.CloudSync, "Auto-sync",
-                            subtitle = "Update AniList & MAL while you watch",
-                            trailing = {
-                                AppSwitch(vm.trackerSettings.isAutoSyncEnabled) {
-                                    vm.updateTrackerSettings(vm.trackerSettings.copy(isAutoSyncEnabled = it))
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // ── Privacy ───────────────────────────────────────────────
-                if (isLoggedIn) {
-                    item {
-                        Section("Privacy") {
-                            SettingRow(Icons.Default.Lock, "Private watchlist",
-                                trailing = { AppSwitch(vm.userProfile.isWatchlistPrivate) { vm.updatePrivacySettings(isWatchlistPrivate = it) } })
-                            RowDivider()
-                            SettingRow(Icons.Default.Lock, "Private watch history",
-                                trailing = { AppSwitch(vm.userProfile.isWatchHistoryPrivate) { vm.updatePrivacySettings(isWatchHistoryPrivate = it) } })
-                            RowDivider()
-                            SettingRow(Icons.Default.Lock, "Private manga & novels",
-                                trailing = {
-                                    AppSwitch(vm.userProfile.isMangaPrivate || vm.userProfile.isNovelPrivate) {
-                                        vm.updatePrivacySettings(isMangaPrivate = it, isNovelPrivate = it)
-                                    }
-                                })
-                        }
-                    }
-                }
-
-                // ── About & community ─────────────────────────────────────
-                item {
-                    Section("About") {
-                        SettingRow(Icons.Default.Info, "What's new", value = "v${com.nyyrox.aniverse.BuildConfig.VERSION_NAME}",
-                            onClick = { showChangelogs = true })
-                        RowDivider()
-                        SettingRow(Icons.Default.Security, "Legal & DMCA", onClick = { showDmcaModal = true })
-                        RowDivider()
-                        SettingRow(Icons.AutoMirrored.Filled.OpenInNew, "Discord",
-                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))) })
-                        RowDivider()
-                        SettingRow(Icons.AutoMirrored.Filled.OpenInNew, "Telegram",
-                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))) })
-                        RowDivider()
-                        SettingRow(Icons.Default.Code, "GitHub",
-                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Nyyrox/Zenkai"))) })
-                    }
-                }
-
-                if (isLoggedIn) {
-                    item {
-                        Section("Account") {
-                            SettingRow(Icons.AutoMirrored.Filled.Logout, "Sign out", danger = true, onClick = { vm.signOut() })
-                        }
-                    }
-                }
-
-                item {
-                    Text(
-                        "ZENKAI · v${com.nyyrox.aniverse.BuildConfig.VERSION_NAME}",
-                        fontSize = 11.sp, color = c.textMuted,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
+    val presetBanners = remember {
+        try {
+            val json = context.assets.open("banners.json").bufferedReader().use { it.readText() }
+            val array = JSONArray(json)
+            val list = mutableListOf<String>()
+            for (i in 0 until array.length()) {
+                list.add(array.getJSONObject(i).getString("url"))
             }
-
-            // Pinned glass actions over the banner
-            Row(
-                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 8.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (onOpenNotifications != null) {
-                    Box {
-                        AniIconButton(Icons.Default.Notifications, "Notifications", onOpenNotifications)
-                        if (vm.unreadNotificationsCount > 0) {
-                            Box(Modifier.align(Alignment.TopEnd).padding(7.dp).size(7.dp).clip(CircleShape).background(c.accent))
-                        }
-                    }
-                }
-                AniIconButton(Icons.Default.Edit, "Edit banner", { showBannerOptionsSheet = true })
-            }
-        }
-    }
-
-    // ── Dialog: DMCA Legal Modal ──────────────────────────────────────────
-    if (showDmcaModal) {
-        ModalBottomSheet(
-            onDismissRequest = { showDmcaModal = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Security,
-                        contentDescription = null,
-                        tint = Color(0xFFFBBF24),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = "DMCA & Legal Disclaimer",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
-
-                Text(
-                    text = "ZENKAI is an open-source software application designed for educational and informational purposes. ZENKAI does NOT host, upload, or store any media files, video streams, or manga images on any server owned or controlled by the developers.\n\nAll content presented in the application is parsed and scraped in real-time from publicly accessible third-party internet sources. All trademarks, copyrights, and intellectual property belong to their respective rightful owners.\n\nIf you are a copyright owner or an agent thereof and believe that any indexed content infringes upon your copyright, please contact the third-party provider directly or contact the developer via GitHub for prompt filtering and assistance within 48 hours.",
-                    fontSize = 12.sp,
-                    color = Color(0xFFCAD5E2),
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Button(
-                    onClick = { showDmcaModal = false },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
-                    ),
-                    shape = OttPillShape
-                ) {
-                    Text(
-                        text = "I Understand",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-        }
-    }
-
-    // ── Dialog: Edit Profile Modal ───────────────────────────────────────
-    if (showEditProfileModal) {
-        var editDisplayName by remember { mutableStateOf(vm.userProfile.displayName) }
-        var editUsername by remember { mutableStateOf(vm.userProfile.username) }
-        var editBio by remember { mutableStateOf(vm.userProfile.bio) }
-        var editBioFont by remember { mutableStateOf(vm.userProfile.bioFont) }
-        var editFavoriteAnime by remember { mutableStateOf(vm.userProfile.favoriteAnime) }
-        var editRoles by remember { mutableStateOf(vm.userProfile.roles.toSet()) }
-        var showAniListPicker by remember { mutableStateOf(false) }
-
-        ModalBottomSheet(
-            onDismissRequest = { showEditProfileModal = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        tint = OttPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = "Edit Profile",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
-
-                OutlinedTextField(
-                    value = editDisplayName,
-                    onValueChange = { editDisplayName = it },
-                    label = { Text("Display Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color(0x30FFFFFF),
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = OttTextMuted
-                    )
-                )
-
-                OutlinedTextField(
-                    value = editUsername,
-                    onValueChange = { editUsername = it },
-                    label = { Text("Username") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color(0x30FFFFFF),
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = OttTextMuted
-                    )
-                )
-
-                OutlinedTextField(
-                    value = editBio,
-                    onValueChange = { editBio = it },
-                    label = { Text("Bio") },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color(0x30FFFFFF),
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = OttTextMuted
-                    )
-                )
-
-                // Bio Typography Selector
-                BioFontSelectorPills(
-                    selectedFont = editBioFont,
-                    onFontSelected = { editBioFont = it }
-                )
-
-                // Favorite Anime Selector from AniList
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "FAVORITE ANIME (FROM ANILIST)",
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Black,
-                        color = OttTextMuted,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    if (editFavoriteAnime.isNotBlank()) {
-                        val parsed = parseFavoriteAnimeString(editFavoriteAnime)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF131722))
-                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (parsed.coverImage.isNotBlank()) {
-                                AsyncImage(
-                                    model = parsed.coverImage,
-                                    contentDescription = parsed.title,
-                                    modifier = Modifier
-                                        .size(width = 40.dp, height = 56.dp)
-                                        .clip(RoundedCornerShape(6.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = parsed.title,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (parsed.score.isNotBlank()) {
-                                    Text("⭐ ${parsed.score}% Score", color = Color(0xFFFBBF24), fontSize = 11.sp)
-                                }
-                            }
-                            IconButton(onClick = { showAniListPicker = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Change", tint = OttPrimary, modifier = Modifier.size(18.dp))
-                            }
-                            IconButton(onClick = { editFavoriteAnime = "" }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color(0xFFFF6B6B), modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    } else {
-                        Button(
-                            onClick = { showAniListPicker = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0x18FFFFFF),
-                                contentColor = Color.White
-                            ),
-                            border = BorderStroke(1.dp, Color(0x30FFFFFF))
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Search & Pick Favorite Anime", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Button(
-                    onClick = {
-                        vm.updateCloudProfile(
-                            displayName = editDisplayName,
-                            username = editUsername.ifBlank { null },
-                            bio = editBio,
-                            bioFont = editBioFont,
-                            favoriteAnime = editFavoriteAnime,
-                            roles = null
-                        )
-                        showEditProfileModal = false
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
-                    ),
-                    shape = OttPillShape
-                ) {
-                    Text(
-                        text = "Save Changes",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-        }
-
-        if (showAniListPicker) {
-            AniListAnimePickerSheet(
-                onDismiss = { showAniListPicker = false },
-                onAnimeSelected = { anime ->
-                    val encoded = "${anime.id}|${anime.title}|${anime.cover}|${anime.score ?: 0}|${anime.displayFormat}"
-                    editFavoriteAnime = encoded
-                    vm.updateCloudProfile(favoriteAnime = encoded)
-                },
-                onSearch = { q -> vm.searchAniListAnime(q) }
+            list
+        } catch (_: Exception) {
+            listOf(
+                "https://artworks.thetvdb.com/banners/v4/series/81797/backgrounds/6564ee8183d39.jpg",
+                "https://artworks.thetvdb.com/banners/v4/series/81797/backgrounds/659a96a80f691.jpg",
+                "https://artworks.thetvdb.com/banners/fanart/original/79824-16.jpg",
+                "https://artworks.thetvdb.com/banners/v4/series/348545/backgrounds/62489b1bdc673.jpg"
             )
         }
     }
 
-    // ── Dialog: Avatar Options Modal ───────────────────────────────────────
-    if (showAvatarOptionsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAvatarOptionsSheet = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Profile Avatar",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                // 1. Upload from Gallery
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x16FFFFFF))
-                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
-                        .clickable {
-                            showAvatarOptionsSheet = false
-                            avatarPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.White)
-                    Column {
-                        Text("Upload from Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Choose any photo from your gallery", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    }
+    val formatLastSync: (Long?) -> String = { timestamp ->
+        if (timestamp == null || timestamp == 0L) {
+            "Never synced"
+        } else {
+            val diff = System.currentTimeMillis() - timestamp
+            when {
+                diff < 60_000 -> "Just now"
+                diff < 3600_000 -> "${diff / 60_000}m ago"
+                diff < 24 * 3600_000 -> {
+                    val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+                    "Today at ${sdf.format(Date(timestamp))}"
                 }
-
-                // 2. Customize Avatar Decorations (Zenkai Locker)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFA0A4B2).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFFA0A4B2).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                        .clickable {
-                            showAvatarOptionsSheet = false
-                            onOpenDecorations?.invoke()
-                        }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White)
-                    Column {
-                        Text("Avatar & Text Effects", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Equip animated avatars & kinetic text effects", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    }
+                else -> {
+                    val sdf = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+                    sdf.format(Date(timestamp))
                 }
-
-                // 3. Remove Avatar (if set)
-                if (vm.userProfile.avatarUrl.isNotBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x16FF3B30))
-                            .border(1.dp, Color(0x40FF453A), RoundedCornerShape(14.dp))
-                            .clickable {
-                                showAvatarOptionsSheet = false
-                                vm.updateCloudProfile(avatarUrl = "")
-                            }
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF6B6B))
-                        Text("Remove Avatar", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
             }
         }
     }
 
-    // ── Dialog: Banner Options Modal ───────────────────────────────────────
-    if (showBannerOptionsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBannerOptionsSheet = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Profile Banner",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                // 1. Upload from Gallery
+            // Header bar
+            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x16FFFFFF))
-                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
-                        .clickable {
-                            showBannerOptionsSheet = false
-                            bannerPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        .padding(top = 12.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onBack != null) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(colors.surface)
+                                .border(1.dp, colors.glass.border, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.White)
-                    Column {
-                        Text("Upload from Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Choose a wallpaper from your gallery", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                        Spacer(Modifier.width(12.dp))
                     }
-                }
-
-                // 2. Customize Banner Themes (Zenkai Locker)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFA0A4B2).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFFA0A4B2).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                        .clickable {
-                            showBannerOptionsSheet = false
-                            onOpenDecorations?.invoke()
-                        }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White)
-                    Column {
-                        Text("Zenkai Banner Themes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Choose from 16 dark, energy & anime themes", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    }
-                }
-
-                // 3. Banner Animated Overlays (Sakura, Butterflies, Starlight...)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF8B5CF6).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                        .clickable {
-                            showBannerOptionsSheet = false
-                            showBannerEffectsSheet = true
-                        }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFA78BFA))
-                    Column {
-                        Text("Animated Overlays (Sakura, Butterflies...)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Add gentle drifting sakura, butterflies, or starlight", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    }
-                }
-
-                // 4. Remove Banner (if set)
-                if (vm.userProfile.bannerUrl.isNotBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x16FF3B30))
-                            .border(1.dp, Color(0x40FF453A), RoundedCornerShape(14.dp))
-                            .clickable {
-                                showBannerOptionsSheet = false
-                                vm.updateCloudProfile(bannerUrl = "")
-                            }
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF6B6B))
-                        Text("Remove Banner", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-        }
-    }
-
-    // ── Dialog: Banner Effects Sheet (Sakura, Butterflies, Starlight...) ─────
-    if (showBannerEffectsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBannerEffectsSheet = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFA78BFA), modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "Banner Animated Overlays",
-                        fontSize = 18.sp,
+                        text = "Profile & Settings",
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = colors.textPrimary
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Delicate ambient particle animations that gently drift over your banner",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 12.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                BANNER_EFFECT_PRESETS.forEach { preset ->
-                    val isEquipped = (vm.userProfile.bannerEffectId == preset.id) ||
-                            (preset.id == "none" && (vm.userProfile.bannerEffectId.isBlank() || vm.userProfile.bannerEffectId == "none"))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isEquipped) Color(0xFF8B5CF6).copy(alpha = 0.2f) else Color(0x14FFFFFF))
-                            .border(
-                                1.dp,
-                                if (isEquipped) Color(0xFF8B5CF6) else Color(0x22FFFFFF),
-                                RoundedCornerShape(14.dp)
-                            )
-                            .clickable {
-                                vm.equipBannerEffect(preset.id)
-                                showBannerEffectsSheet = false
-                            }
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x228B5CF6)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = when (preset.id) {
-                                        "embers" -> Icons.Default.LocalFireDepartment
-                                        "starlight" -> Icons.Default.AutoAwesome
-                                        "none" -> Icons.Default.Close
-                                        else -> Icons.Default.Palette
-                                    },
-                                    contentDescription = preset.name,
-                                    tint = Color(0xFFA78BFA),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = preset.name,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.5.sp
-                                )
-                                Text(
-                                    text = preset.description,
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
-                        if (isEquipped) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF8B5CF6))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
-        }
-    }
 
-    // ── Dialog: Ninja Ranks & Tags Unlock Sheet ─────────────────────────────
-    if (showNinjaTagsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showNinjaTagsSheet = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Ninja Ranks & Title Tags",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Level up & build daily streaks to unlock prestigious titles",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 12.sp
-                        )
-                    }
+            // 1. ProfileHero
+            item {
+                val bannerUrl = userProfile.bannerUrl.takeIf { it.isNotBlank() }
+                val avatarUrl = userProfile.avatarUrl.takeIf { it.isNotBlank() } ?: "https://anime-lok-assets.pages.dev/avatars/641.jpg"
+                val frameUrl = getResolvedFrameUrl(userProfile.avatarDecorationId ?: userProfile.avatarFrameId)
 
-                    AnimatedLevelThemeBadge(level = vm.userProfile.level)
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                val currentEquipped = vm.userProfile.customTag?.takeIf {
-                    it.isNotBlank() && !it.equals("null", ignoreCase = true) && !it.equals("none", ignoreCase = true)
-                }
-                val userLvl = vm.userProfile.level
-                val userStrk = vm.userProfile.streakCount
-
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(380.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        val isNoTagEquipped = currentEquipped == null
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isNoTagEquipped) Color(0xFFA0A4B2).copy(alpha = 0.2f) else Color(0x0AFFFFFF))
-                                .border(
-                                    1.dp,
-                                    if (isNoTagEquipped) Color(0xFFA0A4B2) else Color(0x15FFFFFF),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .clickable {
-                                    vm.equipCustomTag(null)
-                                    showNinjaTagsSheet = false
-                                }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(
-                                    text = "No Tag",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                                Text(
-                                    text = "Clear equipped badge from your profile",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 11.sp
-                                )
-                            }
-                            if (isNoTagEquipped) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0xFFA0A4B2))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    items(LevelAndStreakSystem.ALL_TAGS) { tag ->
-                        val isUnlocked = userLvl >= tag.minLevel && userStrk >= tag.minStreak
-                        val isEquipped = currentEquipped?.equals(tag.title, ignoreCase = true) == true
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    when {
-                                        isEquipped -> Color(tag.colorHex).copy(alpha = 0.25f)
-                                        isUnlocked -> Color(0x14FFFFFF)
-                                        else -> Color(0x0AFFFFFF)
-                                    }
-                                )
-                                .border(
-                                    1.dp,
-                                    when {
-                                        isEquipped -> Color(tag.colorHex)
-                                        isUnlocked -> Color(0x30FFFFFF)
-                                        else -> Color(0x15FFFFFF)
-                                    },
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .clickable(enabled = isUnlocked) {
-                                    if (isEquipped) {
-                                        vm.equipCustomTag(null)
-                                    } else {
-                                        vm.equipCustomTag(tag.title)
-                                    }
-                                    showNinjaTagsSheet = false
-                                }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Box(
-                                    modifier = if (isUnlocked) Modifier else Modifier.alpha(0.45f)
-                                ) {
-                                    LevelRankTagBadge(
-                                        tag = tag.title,
-                                        level = tag.minLevel
-                                    )
-                                }
-
-                                Spacer(Modifier.width(10.dp))
-
-                                Column {
-                                    Text(
-                                        text = tag.category,
-                                        color = Color(0xFF64748B),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = tag.description,
-                                        color = if (isUnlocked) Color(0xFFCBD5E1) else Color(0xFF64748B),
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-
-                            when {
-                                isEquipped -> {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color(tag.colorHex))
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text("Equipped", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                isUnlocked -> {
-                                    Button(
-                                        onClick = {
-                                            vm.equipCustomTag(tag.title)
-                                            showNinjaTagsSheet = false
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x28FFFFFF)),
-                                        shape = RoundedCornerShape(6.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                        modifier = Modifier.height(28.dp)
-                                    ) {
-                                        Text("Equip", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
-                                else -> {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Lock,
-                                            contentDescription = null,
-                                            tint = Color(0xFF64748B),
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = if (tag.minStreak > 0) "${tag.minStreak}d streak" else "Lv. ${tag.minLevel}",
-                                            color = Color(0xFF64748B),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-        }
-    }
-
-    if (showDownloadSettingsSheet) {
-        DownloadSettingsSheet(
-            onDismiss = { showDownloadSettingsSheet = false }
-        )
-    }
-
-    // ── Dialog: Refresh Rate Selector Modal ──────────────────────────────
-    if (showRefreshRateSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showRefreshRateSheet = false },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF0D0F14)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "Display Refresh Rate",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = if (isBatterySaverActive)
-                        "Battery saver is currently active. App runs at 60Hz to save battery."
-                    else
-                        "Select target screen refresh rate for smooth animations and scrolling.",
-                    fontSize = 12.sp,
-                    color = Color(0xFF94A3B8)
-                )
-
-                var currentPhysicalHz by remember {
-                    mutableStateOf(DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context))
-                }
-                LaunchedEffect(showRefreshRateSheet, themeSettings.preferredRefreshRate) {
-                    if (showRefreshRateSheet) {
-                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
-                        kotlinx.coroutines.delay(100)
-                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
-                        kotlinx.coroutines.delay(250)
-                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
-                        kotlinx.coroutines.delay(400)
-                        currentPhysicalHz = DisplayRefreshRateManager.getCurrentDisplayRefreshRate(context)
-                    }
-                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(24.dp))
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Banner with overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(130.dp)
+                                .background(colors.surfaceElevated)
+                        ) {
+                            if (bannerUrl != null) {
+                                AsyncImage(
+                                    model = bannerUrl,
+                                    contentDescription = "Profile Banner",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color(0xFF1E222A))
+                                )
+                            }
+                            // Dark gradient overlay
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0x60000000))
+                            )
+
+                            // Quick Edit Banner Button
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(12.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xCC000000))
+                                    .border(1.dp, Color(0x40FFFFFF), CircleShape)
+                                    .clickable {
+                                        initialEditTab = 3
+                                        showEditSheet = true
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.CameraAlt,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = "Edit Banner",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        // Info section below banner
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                // Avatar with frame
+                                Box(
+                                    modifier = Modifier
+                                        .size(76.dp)
+                                        .clickable {
+                                            initialEditTab = 1
+                                            showEditSheet = true
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AsyncImage(
+                                        model = avatarUrl,
+                                        contentDescription = "Avatar",
+                                        modifier = Modifier
+                                            .size(62.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    if (frameUrl != null) {
+                                        AsyncImage(
+                                            model = frameUrl,
+                                            contentDescription = "Avatar Frame",
+                                            modifier = Modifier.size(76.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+                                }
+
+                                // Edit Profile button
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(colors.surface)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable {
+                                            initialEditTab = 0
+                                            showEditSheet = true
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = colors.textPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Edit profile",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Text(
+                                text = userProfile.displayName.ifBlank { "Zenkai User" },
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = colors.textPrimary
+                            )
+
+                            if (userProfile.username.isNotBlank()) {
+                                Text(
+                                    text = "@${userProfile.username.removePrefix("@")}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colors.textMuted
+                                )
+                            }
+
+                            if (userProfile.bio.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = userProfile.bio,
+                                    fontSize = 13.sp,
+                                    color = colors.textSecondary,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. CloudSyncCard / AccountPanel
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                        .padding(16.dp)
+                ) {
+                    if (!isLoggedIn) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onLogin?.invoke() },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Sign in to sync",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textPrimary
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = "Optional. Back up history & resume on any device.",
+                                    fontSize = 12.sp,
+                                    color = colors.textMuted
+                                )
+                            }
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = colors.textMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    } else {
+                        val loggedInState = authState as AuthState.LoggedIn
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Cloud Sync",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = "Account: ${loggedInState.email ?: userProfile.username.ifBlank { "Connected" }}",
+                                        fontSize = 12.sp,
+                                        color = colors.textMuted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "Last synced: ${formatLastSync(vm.lastCloudSyncTime)}",
+                                        fontSize = 11.sp,
+                                        color = colors.accent
+                                    )
+                                }
+
+                                if (vm.isCloudSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = colors.accent,
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.height(14.dp))
+                            HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+                            Spacer(Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Push to Cloud
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                    .clickable(enabled = !vm.isCloudSyncing) {
+                                        vm.pushToCloud { success ->
+                                            Toast.makeText(
+                                                context,
+                                                if (success) "Synced to Cloud successfully" else "Sync failed",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                    .padding(vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.CloudUpload,
+                                        contentDescription = null,
+                                        tint = colors.textPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Push",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
+
+                                // Pull from Cloud
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable(enabled = !vm.isCloudSyncing) {
+                                            vm.pullFromCloud { success ->
+                                                Toast.makeText(
+                                                    context,
+                                                    if (success) "Restored from Cloud" else "Cloud sync failed",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                        .padding(vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.CloudDownload,
+                                        contentDescription = null,
+                                        tint = colors.textPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Pull",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
+
+                                // Sign Out
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable {
+                                            vm.signOut()
+                                            Toast.makeText(context, "Signed out", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Logout,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Sign out",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEF4444)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. AniList Card
+            item {
+                val aniList = vm.aniListAccount
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                        .padding(16.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "AniList Sync",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textPrimary
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (aniList != null) "Connected as ${aniList.username}" else "Sync watch progress with AniList",
+                                    fontSize = 12.sp,
+                                    color = colors.textMuted
+                                )
+                            }
+
+                            if (aniList != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable {
+                                            vm.syncTrackers { res ->
+                                                Toast.makeText(context, "AniList synced (${res.totalPulled} items)", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Sync,
+                                        contentDescription = null,
+                                        tint = colors.accent,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Sync",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colors.accent
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable {
+                                            val url = "https://anilist.co/api/v2/oauth/authorize?client_id=18497&response_type=token"
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                            context.startActivity(intent)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Connect",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Settings Section (Matching Web & Desktop)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = "Settings",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+
+                        // Theme Mode
+                        SettingRow(title = "Theme", hint = "Dark or light appearance") {
+                            val isDark = vm.themeSettings.mode == ThemeMode.DARK
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(colors.surfaceElevated)
+                                    .border(1.dp, colors.glass.border, CircleShape)
+                                    .padding(3.dp)
+                            ) {
+                                listOf("dark" to true, "light" to false).forEach { (label, dark) ->
+                                    val selected = isDark == dark
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(if (selected) colors.textPrimary else Color.Transparent)
+                                            .clickable {
+                                                vm.setThemeMode(if (dark) ThemeMode.DARK else ThemeMode.LIGHT)
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 5.dp)
+                                    ) {
+                                        Text(
+                                            text = label.replaceFirstChar { it.uppercase() },
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selected) colors.bg else colors.textMuted
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Default Audio (Sub / Dub)
+                        SettingRow(title = "Default audio", hint = "Sub or dub for multi-audio streams") {
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(colors.surfaceElevated)
+                                    .border(1.dp, colors.glass.border, CircleShape)
+                                    .padding(3.dp)
+                            ) {
+                                listOf("sub", "dub").forEach { opt ->
+                                    val selected = currentAudio.equals(opt, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(if (selected) colors.textPrimary else Color.Transparent)
+                                            .clickable {
+                                                currentAudio = opt
+                                                prefs.edit().putString("pref_audio", opt).apply()
+                                                Toast.makeText(context, "Default audio: ${opt.uppercase()}", Toast.LENGTH_SHORT).show()
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 5.dp)
+                                    ) {
+                                        Text(
+                                            text = opt.uppercase(),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selected) colors.bg else colors.textMuted
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Preferred Server
+                        SettingRow(title = "Preferred server", hint = "Default playback source") {
+                            val serverList = listOf("megaplay" to "MegaPlay", "acdn" to "ACDN", "direct" to "Direct", "animesalt" to "AnimeSalt")
+                            val currentServer = vm.preferredServerId?.ifBlank { "megaplay" } ?: "megaplay"
+                            var expanded by remember { mutableStateOf(false) }
+
+                            Box {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable { expanded = !expanded }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = serverList.firstOrNull { it.first == currentServer }?.second ?: currentServer,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
+                                }
+
+                                androidx.compose.material3.DropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false },
+                                    modifier = Modifier.background(colors.surface)
+                                ) {
+                                    serverList.forEach { (id, name) ->
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { Text(name, color = colors.textPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                vm.setPreferredServer(id)
+                                                expanded = false
+                                                Toast.makeText(context, "Server: $name", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Preferred Quality
+                        SettingRow(title = "Preferred quality", hint = "Video resolution preference") {
+                            val qualityList = listOf("" to "Auto", "1080" to "1080p", "720" to "720p", "480" to "480p", "360" to "360p")
+                            var expandedQ by remember { mutableStateOf(false) }
+
+                            Box {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, CircleShape)
+                                        .clickable { expandedQ = !expandedQ }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = qualityList.firstOrNull { it.first == currentQuality }?.second ?: "Auto",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
+                                }
+
+                                androidx.compose.material3.DropdownMenu(
+                                    expanded = expandedQ,
+                                    onDismissRequest = { expandedQ = false },
+                                    modifier = Modifier.background(colors.surface)
+                                ) {
+                                    qualityList.forEach { (id, name) ->
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { Text(name, color = colors.textPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                currentQuality = id
+                                                prefs.edit().putString("pref_quality", id).apply()
+                                                expandedQ = false
+                                                Toast.makeText(context, "Quality: $name", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Autoplay next episode
+                        SettingRow(title = "Autoplay next episode", hint = "Plays next episode when current ends") {
+                            Switch(
+                                checked = autoPlayNext,
+                                onCheckedChange = {
+                                    autoPlayNext = it; prefs.edit().putBoolean("auto_play_next", it).apply()
+                                    Toast.makeText(context, "Autoplay ${if (it) "on" else "off"}", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.bg,
+                                    checkedTrackColor = colors.textPrimary,
+                                    uncheckedThumbColor = colors.textMuted,
+                                    uncheckedTrackColor = colors.surfaceElevated
+                                )
+                            )
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Auto-skip intro & outro
+                        SettingRow(title = "Auto-skip intro & outro", hint = "Automatically skips opening & ending") {
+                            Switch(
+                                checked = autoSkipIntro,
+                                onCheckedChange = {
+                                    autoSkipIntro = it; prefs.edit().putBoolean("auto_skip_intro_outro", it).apply()
+                                    Toast.makeText(context, "Auto-skip ${if (it) "on" else "off"}", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.bg,
+                                    checkedTrackColor = colors.textPrimary,
+                                    uncheckedThumbColor = colors.textMuted,
+                                    uncheckedTrackColor = colors.surfaceElevated
+                                )
+                            )
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Skip filler episodes
+                        SettingRow(title = "Skip filler episodes", hint = "Jumps over non-canon and filler episodes") {
+                            Switch(
+                                checked = skipFiller,
+                                onCheckedChange = {
+                                    skipFiller = it; prefs.edit().putBoolean("pref_skip_filler", it).apply()
+                                    Toast.makeText(context, "Skip filler ${if (it) "on" else "off"}", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.bg,
+                                    checkedTrackColor = colors.textPrimary,
+                                    uncheckedThumbColor = colors.textMuted,
+                                    uncheckedTrackColor = colors.surfaceElevated
+                                )
+                            )
+                        }
+
+                        HorizontalDivider(color = colors.glass.border, thickness = 1.dp)
+
+                        // Downloads configuration
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showDownloadSheet = true },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Offline Downloads",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = "Storage location, quality and Wi-Fi rules",
+                                    fontSize = 12.sp,
+                                    color = colors.textMuted
+                                )
+                            }
+                            Icon(Icons.Default.Download, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+
+            // 5. About & Legal (Matching Web & Desktop)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = "About & legal",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Disclaimer",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Zenkai does not host, upload or store any video, novel text or manga images. Streams, chapters and pages are provided by third-party services and are fetched at the moment you watch or read. Zenkai has no control over that content and is not affiliated with those services. All titles, artwork and trademarks belong to their respective owners.",
+                                fontSize = 12.sp,
+                                color = colors.textMuted,
+                                lineHeight = 17.sp
+                            )
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "DMCA / copyright",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "If you own a work and believe something linked from Zenkai infringes your copyright, the file lives on the third-party host, so please contact that host first. You may also contact maintainers via Discord or GitHub for notice and removal.",
+                                fontSize = 12.sp,
+                                color = colors.textMuted,
+                                lineHeight = 17.sp
+                            )
+
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(colors.surfaceElevated)
+                                    .border(1.dp, colors.glass.border, CircleShape)
+                                    .clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))
+                                        context.startActivity(intent)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = colors.accent, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = "Join Discord Community",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.accent
+                                )
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Data & credits",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Anime data from AniList & MyAnimeList (via Jikan); filler information from AnimeFillerList; artwork and episode details from TMDB. Avatar frames from SillyTavern-AvatarDecorations collection.",
+                                fontSize = 12.sp,
+                                color = colors.textMuted,
+                                lineHeight = 17.sp
+                            )
+                        }
+
+                        Text(
+                            text = "Zenkai v2.1.0 • Android Native & Web Unified",
+                            fontSize = 11.sp,
+                            color = colors.textMuted
+                        )
+                    }
+                }
+            }
+
+            item {
+                Spacer(Modifier.height(32.dp))
+            }
+        }
+
+        // Profile Editor Bottom Sheet
+        if (showEditSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showEditSheet = false },
+                containerColor = colors.bg,
+                dragHandle = null
+            ) {
+                var editTab by remember { mutableIntStateOf(initialEditTab) }
+                var editName by remember { mutableStateOf(userProfile.displayName) }
+                var editBio by remember { mutableStateOf(userProfile.bio) }
+                var editUsername by remember { mutableStateOf(userProfile.username) }
+                var editAvatarUrl by remember { mutableStateOf(userProfile.avatarUrl) }
+                var editBannerUrl by remember { mutableStateOf(userProfile.bannerUrl) }
+                var editFrameId by remember { mutableStateOf(userProfile.avatarDecorationId ?: userProfile.avatarFrameId ?: "none") }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1403,402 +1155,372 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Live Hardware Display Rate",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
+                            text = "Customize Profile",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF10B981))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { showEditSheet = false },
+                                shape = CircleShape
+                            ) {
+                                Text("Cancel", color = colors.textMuted, fontSize = 12.sp)
+                            }
+                            Button(
+                                onClick = {
+                                    val updated = userProfile.copy(
+                                        displayName = editName.trim(),
+                                        bio = editBio.trim(),
+                                        username = editUsername.trim().lowercase().removePrefix("@"),
+                                        avatarUrl = editAvatarUrl.trim(),
+                                        bannerUrl = editBannerUrl.trim(),
+                                        avatarDecorationId = if (editFrameId == "none") null else editFrameId,
+                                        avatarFrameId = if (editFrameId == "none") null else editFrameId
+                                    )
+                                    vm.updateUserProfile(updated)
+                                    if (isLoggedIn) {
+                                        vm.pushToCloud()
+                                    }
+                                    showEditSheet = false
+                                    Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = CircleShape,
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary)
+                            ) {
+                                Text("Save", color = colors.bg, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+
+                    // Tab Row
+                    val tabs = listOf("Identity", "Avatar", "Frame", "Banner")
+                    TabRow(
+                        selectedTabIndex = editTab,
+                        containerColor = Color.Transparent,
+                        contentColor = colors.textPrimary,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[editTab]),
+                                color = colors.textPrimary
                             )
-                            Text(
-                                text = "${(currentPhysicalHz + 0.5f).toInt()}Hz Active",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF34D399)
+                        }
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = editTab == index,
+                                onClick = { editTab = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (editTab == index) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (editTab == index) colors.textPrimary else colors.textMuted
+                                    )
+                                }
                             )
                         }
                     }
-                }
 
-                Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                val availableRates = remember(supportedRates) {
-                    val base = mutableSetOf(60, 90, 120, 144)
-                    base.addAll(supportedRates)
-                    base.sorted()
-                }
-                availableRates.forEach { hz ->
-                    val isSelected = themeSettings.preferredRefreshRate == hz
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isSelected) Color(0x22FFFFFF) else Color(0x0CFFFFFF))
-                            .border(
-                                1.dp,
-                                if (isSelected) Color.White else Color(0x1AFFFFFF),
-                                RoundedCornerShape(14.dp)
-                            )
-                            .clickable {
-                                vm.setPreferredRefreshRate(hz)
-                                activity?.let { act ->
-                                    DisplayRefreshRateManager.applyRefreshRate(act, hz, false)
-                                }
-                                showRefreshRateSheet = false
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = "${hz}Hz",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
+                    when (editTab) {
+                        // 0: Identity
+                        0 -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = editName,
+                                    onValueChange = { editName = it },
+                                    label = { Text("Display Name") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.textPrimary,
+                                        unfocusedBorderColor = colors.glass.border
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
                                 )
-                                if ((currentPhysicalHz + 0.5f).toInt() == hz) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(Color(0x2510B981))
-                                            .border(0.8.dp, Color(0x5010B981), OttPillShape)
-                                            .padding(horizontal = 6.dp, vertical = 1.dp)
-                                    ) {
-                                        Text(
-                                            text = "CURRENT",
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF6EE7B7)
-                                        )
+
+                                OutlinedTextField(
+                                    value = editUsername,
+                                    onValueChange = { editUsername = it },
+                                    label = { Text("Username (@handle)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.textPrimary,
+                                        unfocusedBorderColor = colors.glass.border
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+
+                                OutlinedTextField(
+                                    value = editBio,
+                                    onValueChange = { editBio = it },
+                                    label = { Text("Bio") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.textPrimary,
+                                        unfocusedBorderColor = colors.glass.border
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    maxLines = 3
+                                )
+                            }
+                        }
+
+                        // 1: Avatar Presets & URL
+                        1 -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = editAvatarUrl,
+                                    onValueChange = { editAvatarUrl = it },
+                                    label = { Text("Avatar Image URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.textPrimary,
+                                        unfocusedBorderColor = colors.glass.border
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+
+                                Text(
+                                    text = "Or choose from Anime presets:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textMuted
+                                )
+
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(5),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(220.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(presetAvatars.take(40)) { url ->
+                                        val isSelected = editAvatarUrl == url
+                                        Box(
+                                            modifier = Modifier
+                                                .size(54.dp)
+                                                .clip(CircleShape)
+                                                .border(
+                                                    if (isSelected) 2.dp else 1.dp,
+                                                    if (isSelected) colors.textPrimary else colors.glass.border,
+                                                    CircleShape
+                                                )
+                                                .clickable { editAvatarUrl = url },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            AsyncImage(
+                                                model = url,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
                                     }
                                 }
                             }
-                            Text(
-                                text = when (hz) {
-                                    60 -> "Standard (lowest battery use, locked)"
-                                    90 -> "Smooth & balanced (recommended)"
-                                    120 -> "Ultra fluid (high refresh rate)"
-                                    144 -> "Extreme 144Hz (maximum frame rate)"
-                                    else -> "${hz} frames per second"
-                                },
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp
-                            )
                         }
 
-                        if (isSelected) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                        // 2: Avatar Frame
+                        2 -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = "Choose an avatar overlay frame:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textMuted
+                                )
+
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(4),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(250.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // "None" option
+                                    item {
+                                        val isNone = editFrameId == "none" || editFrameId.isBlank()
+                                        Column(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isNone) colors.surfaceElevated else Color.Transparent)
+                                                .border(1.dp, if (isNone) colors.textPrimary else colors.glass.border, RoundedCornerShape(12.dp))
+                                                .clickable { editFrameId = "none" }
+                                                .padding(6.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Box(
+                                                modifier = Modifier.size(46.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("None", fontSize = 11.sp, color = colors.textMuted)
+                                            }
+                                            Text("None", fontSize = 10.sp, color = colors.textMuted)
+                                        }
+                                    }
+
+                                    items(PRESET_FRAMES) { frame ->
+                                        val isSelected = editFrameId == frame.id
+                                        Column(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) colors.surfaceElevated else Color.Transparent)
+                                                .border(1.dp, if (isSelected) colors.textPrimary else colors.glass.border, RoundedCornerShape(12.dp))
+                                                .clickable { editFrameId = frame.id }
+                                                .padding(6.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Box(
+                                                modifier = Modifier.size(46.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                AsyncImage(
+                                                    model = editAvatarUrl.ifBlank { "https://anime-lok-assets.pages.dev/avatars/641.jpg" },
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                                AsyncImage(
+                                                    model = frame.url,
+                                                    contentDescription = frame.name,
+                                                    modifier = Modifier.size(46.dp),
+                                                    contentScale = ContentScale.Fit
+                                                )
+                                            }
+                                            Spacer(Modifier.height(3.dp))
+                                            Text(
+                                                text = frame.name,
+                                                fontSize = 9.sp,
+                                                color = if (isSelected) colors.textPrimary else colors.textMuted,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3: Banner Presets & URL
+                        3 -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = editBannerUrl,
+                                    onValueChange = { editBannerUrl = it },
+                                    label = { Text("Banner Image URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.textPrimary,
+                                        unfocusedBorderColor = colors.glass.border
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+
+                                Text(
+                                    text = "Or choose from Anime banner presets:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textMuted
+                                )
+
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(2),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(220.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(presetBanners.take(30)) { url ->
+                                        val isSelected = editBannerUrl == url
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(65.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .border(
+                                                    if (isSelected) 2.dp else 1.dp,
+                                                    if (isSelected) colors.textPrimary else colors.glass.border,
+                                                    RoundedCornerShape(10.dp)
+                                                )
+                                                .clickable { editBannerUrl = url }
+                                        ) {
+                                            AsyncImage(
+                                                model = url,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
             }
         }
-    }
 
-    // ── Dialog: AniList Account Sheet ────────────────────────────────────
-    if (showAniListSheet) {
-        AniListSyncModalSheet(
-            vm = vm,
-            account = vm.aniListAccount,
-            onDismiss = { showAniListSheet = false }
-        )
-    }
-
-    // ── Dialog: MyAnimeList (MAL) Account Sheet ──────────────────────────
-    if (showMalSheet) {
-        MalSyncModalSheet(
-            vm = vm,
-            account = vm.malAccount,
-            onDismiss = { showMalSheet = false }
-        )
-    }
-
-    // ── Dialog: Discord Rich Presence Sheet ──────────────────────────────
-    if (showDiscordSheet) {
-        com.nyyrox.aniverse.ui.components.DiscordIntegrationSheet(
-            onDismiss = { showDiscordSheet = false }
-        )
-    }
-
-    // ── Dialog: Avatar Interactive Cropper ───────────────────────────────
-    if (selectedAvatarCropUri != null) {
-        AvatarCropDialog(
-            imageUri = selectedAvatarCropUri!!,
-            onConfirm = { croppedBytes, mimeType ->
-                selectedAvatarCropUri = null
-                vm.uploadAvatarBytes(croppedBytes, mimeType) { success, err ->
-                    if (!success && err != null) {
-                        uploadNoticeMessage = err
-                    }
-                }
-            },
-            onDismiss = { selectedAvatarCropUri = null }
-        )
-    }
-
-    // ── Dialog: In-App Changelogs Overlay ────────────────────────────────
-    if (showChangelogs) {
-        ZenkaiChangelogsOverlay(onDismiss = { showChangelogs = false })
-    }
-
-    // ── Dialog: Upload Notice / Rate Limit Alert ─────────────────────────
-    if (uploadNoticeMessage != null) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { uploadNoticeMessage = null },
-            title = {
-                Text("Upload Notice", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
-            },
-            text = {
-                Text(uploadNoticeMessage ?: "", color = Color(0xFFCBD5E1), fontSize = 13.5.sp)
-            },
-            confirmButton = {
-                Button(
-                    onClick = { uploadNoticeMessage = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                ) {
-                    Text("OK", color = Color.Black)
-                }
-            },
-            containerColor = Color(0xFF141720),
-            shape = RoundedCornerShape(18.dp)
-        )
+        // Offline Download Settings Sheet
+        if (showDownloadSheet) {
+            DownloadSettingsSheet(onDismiss = { showDownloadSheet = false })
+        }
     }
 }
 
-// ── Profile UI pieces ─────────────────────────────────────────────────────────
-
 @Composable
-private fun ProfileBanner(vm: MainViewModel, scrollPx: () -> Float) {
-    val c = LocalAppColors.current
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .graphicsLayer { translationY = -scrollPx() }
+fun SettingRow(
+    title: String,
+    hint: String? = null,
+    content: @Composable () -> Unit
+) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        ProfileBannerRenderer(
-            bannerThemeId = vm.userProfile.bannerThemeId,
-            customBannerUrl = vm.userProfile.bannerUrl,
-            modifier = Modifier.fillMaxSize()
-        )
-        BannerOverlayRenderer(effectId = vm.userProfile.bannerEffectId, modifier = Modifier.fillMaxSize())
-        Box(
-            Modifier.fillMaxWidth().height(90.dp).align(Alignment.TopCenter)
-                .background(Brush.verticalGradient(listOf(Color(0x99000000), Color.Transparent)))
-        )
-        Box(
-            Modifier.fillMaxWidth().height(110.dp).align(Alignment.BottomCenter)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, c.bg)))
-        )
-    }
-}
-
-@Composable
-private fun Stat(count: Int, label: String, modifier: Modifier = Modifier) {
-    val c = LocalAppColors.current
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(count.toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = c.textPrimary)
-        Text(label, fontSize = 12.sp, color = c.textMuted)
-    }
-}
-
-@Composable
-private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-    val c = LocalAppColors.current
-    Column(Modifier.fillMaxWidth().padding(top = 24.dp)) {
-        Text(
-            title,
-            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.textMuted, letterSpacing = 0.6.sp,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp)
-        )
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.textPrimary
+            )
+            if (!hint.isNullOrBlank()) {
+                Spacer(Modifier.height(1.dp))
+                Text(
+                    text = hint,
+                    fontSize = 12.sp,
+                    color = colors.textMuted,
+                    lineHeight = 16.sp
+                )
+            }
+        }
         content()
     }
 }
-
-@Composable
-private fun RowDivider() {
-    HorizontalDivider(
-        color = LocalAppColors.current.glass.border.copy(alpha = 0.5f),
-        thickness = 0.5.dp,
-        modifier = Modifier.padding(start = 56.dp, end = 20.dp)
-    )
-}
-
-@Composable
-private fun SettingRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String? = null,
-    value: String? = null,
-    danger: Boolean = false,
-    trailing: (@Composable () -> Unit)? = null,
-    onClick: (() -> Unit)? = null
-) {
-    val c = LocalAppColors.current
-    val context = LocalContext.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable { AppHaptics.tick(context); onClick() } else Modifier)
-            .padding(horizontal = 20.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = if (danger) c.error else c.textSecondary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (danger) c.error else c.textPrimary)
-            if (!subtitle.isNullOrBlank()) {
-                Text(subtitle, fontSize = 12.sp, color = c.textMuted, lineHeight = 16.sp)
-            }
-        }
-        if (value != null) {
-            Text(value, fontSize = 13.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.width(6.dp))
-        }
-        when {
-            trailing != null -> trailing()
-            onClick != null -> Icon(Icons.Default.ChevronRight, null, tint = c.textMuted, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-@Composable
-private fun ThemeModeSelector(current: ThemeMode, onChange: (ThemeMode) -> Unit) {
-    val c = LocalAppColors.current
-    val options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark")
-    Row(
-        Modifier
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .fillMaxWidth()
-            .aniGlass(radius = 999.dp)
-            .padding(4.dp)
-    ) {
-        options.forEach { (mode, label) ->
-            val selected = mode == current
-            Box(
-                Modifier
-                    .weight(1f)
-                    .clip(CircleShape)
-                    .background(if (selected) c.accent else Color.Transparent)
-                    .clickable { onChange(mode) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    label, fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selected) c.onAccent else c.textSecondary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProfileMangaCard(
-    item: MangaBookmarkItem,
-    onClick: () -> Unit
-) {
-    val context = LocalContext.current
-    Column(
-        modifier = Modifier
-            .width(115.dp)
-            .clickable {
-                AppHaptics.tick(context)
-                onClick()
-            }
-    ) {
-        Box(
-            modifier = Modifier
-                .width(115.dp)
-                .height(160.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            AsyncImage(
-                model = item.poster,
-                contentDescription = item.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xDD000000))
-                        )
-                    )
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = item.latestChapter ?: item.type ?: "Manga",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = item.title,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = LocalAppColors.current.textPrimary,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            lineHeight = 14.sp
-        )
-    }
-}
-
-/** Custom iOS-style switch: green track when on, white thumb that slides. Not tied to the glass setting. */
-@Composable
-private fun AppSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
-    val track by androidx.compose.animation.animateColorAsState(
-        targetValue = if (checked) Color(0xFF34C759) else Color(0xFF48484F),
-        label = "switchTrack"
-    )
-    val thumbX by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (checked) 22.dp else 2.dp,
-        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f),
-        label = "switchThumb"
-    )
-    Box(
-        Modifier
-            .width(52.dp)
-            .height(32.dp)
-            .clip(CircleShape)
-            .background(track)
-            .clickable(
-                interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
-                indication = null
-            ) { onChange(!checked) }
-    ) {
-        Box(
-            Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = thumbX)
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-        )
-    }
-}
-
