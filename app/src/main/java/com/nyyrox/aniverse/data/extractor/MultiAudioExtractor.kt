@@ -72,6 +72,9 @@ object MultiAudioExtractor {
         episode: Int,
         title: String
     ): List<MultiAudioServer> = withContext(Dispatchers.IO) {
+        if (anilistId > 0 && !AnimeMappingRepository.isMapped(anilistId)) {
+            return@withContext emptyList()
+        }
         val cacheKey = "$anilistId:$episode"
         serverCache[cacheKey]?.let { return@withContext it }
 

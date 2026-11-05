@@ -1,5 +1,7 @@
 package com.nyyrox.aniverse.data.extractor
 
+import com.nyyrox.aniverse.data.mapping.AnimeMappingRepository
+
 import android.net.Uri
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.SkipInterval
@@ -36,7 +38,14 @@ data class DirectStreamResult(
     val availableServers: List<StreamServerOption> = emptyList()
 )
 
+data class EpisodeAudioAvailability(
+    val hasSub: Boolean = true,
+    val hasDub: Boolean = false,
+    val hasAcdn: Boolean = false
+)
+
 object DirectStreamResolver {
+    private val audioAvailabilityCache = ConcurrentHashMap<String, EpisodeAudioAvailability>()
     private val ANIVEXA_WORKER_BASE: String
         get() = com.nyyrox.aniverse.data.config.DynamicConfigManager.getWorkerUrl(
             "zenkai_stream_proxy",
@@ -74,6 +83,99 @@ object DirectStreamResolver {
      * Dynamically fetches only the providers that have active episodes for this anime and audio category.
      * Supports audioMode: "sub", "dub", or "multi".
      */
+    suspend fun checkEpisodeAudioAvailability(
+        anilistId: Int,
+        episode: Int = 1,
+        animeTitle: String = ""
+    ): EpisodeAudioAvailability = withContext(Dispatchers.IO) {
+        val cacheKey = "$anilistId:$episode"
+        audioAvailabilityCache[cacheKey]?.let { return@withContext it }
+
+        val isAcdnMapped = anilistId > 0 && AnimeMappingRepository.isMapped(anilistId)
+        var hasSub = true
+        var hasDub = isAcdnMapped // If in anime-mapping.json, ACDN provides multi-audio / dub
+
+        // 1. Query worker for episode providers
+        try {
+            val req = Request.Builder()
+                .url("$ANIVEXA_WORKER_BASE/episodes/$anilistId")
+                .addHeader("User-Agent", USER_AGENT)
+                .addHeader("Accept", "application/json")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val json = JSONObject(resp.body.string())
+                    val provObj = json.optJSONObject("providers")
+                    if (provObj != null) {
+                        val keys = provObj.keys()
+                        var workerDub = false
+                        var workerSub = false
+                        while (keys.hasNext()) {
+                            val provKey = keys.next()
+                            val data = provObj.optJSONObject(provKey) ?: continue
+                            val dubEps = data.optJSONArray("dub")
+                            if (dubEps != null && (0 until dubEps.length()).any { idx ->
+                                val epItem = dubEps.optJSONObject(idx)
+                                val num = epItem?.optInt("number", idx + 1) ?: (idx + 1)
+                                num == episode || dubEps.length() >= episode
+                            }) {
+                                workerDub = true
+                            }
+                            val subEps = data.optJSONArray("sub")
+                            if (subEps != null && (0 until subEps.length()).any { idx ->
+                                val epItem = subEps.optJSONObject(idx)
+                                val num = epItem?.optInt("number", idx + 1) ?: (idx + 1)
+                                num == episode || subEps.length() >= episode
+                            }) {
+                                workerSub = true
+                            }
+                        }
+                        if (workerDub) hasDub = true
+                        if (workerSub) hasSub = true
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2. Fallback check: ReAnime Flix API
+        if (!hasDub && anilistId > 0) {
+            try {
+                val flixReq = Request.Builder()
+                    .url("https://reanime.to/api/flix/$anilistId/$episode")
+                    .addHeader("User-Agent", USER_AGENT)
+                    .addHeader("Accept", "application/json")
+                    .build()
+                client.newCall(flixReq).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val root = JSONObject(resp.body.string())
+                        val servers = root.optJSONArray("servers")
+                        if (servers != null) {
+                            for (i in 0 until servers.length()) {
+                                val s = servers.optJSONObject(i) ?: continue
+                                val dt = s.optString("dataType").lowercase()
+                                if (dt.contains("dub")) hasDub = true
+                                if (dt.contains("sub") || dt.contains("raw")) hasSub = true
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        val result = EpisodeAudioAvailability(
+            hasSub = hasSub,
+            hasDub = hasDub,
+            hasAcdn = isAcdnMapped
+        )
+        audioAvailabilityCache[cacheKey] = result
+        result
+    }
+
+    /**
+     * Dynamically fetches only the providers that have active episodes for this anime and audio category.
+     * Supports audioMode: "sub", "dub", or "multi".
+     */
     suspend fun getAvailableDirectProviders(
         anilistId: Int,
         audioMode: String, // "sub" or "dub"
@@ -84,7 +186,7 @@ object DirectStreamResolver {
         availableProvidersCache[cacheKey]?.let { return@withContext it }
 
         val dynamicList = mutableListOf<Provider>()
-        var apiSucceeded = false
+        val isMapped = anilistId > 0 && AnimeMappingRepository.isMapped(anilistId)
 
         try {
             val req = Request.Builder()
@@ -95,7 +197,6 @@ object DirectStreamResolver {
 
             client.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
-                    apiSucceeded = true
                     val body = resp.body.string()
                     val json = JSONObject(body)
                     val provObj = json.optJSONObject("providers")
@@ -115,7 +216,7 @@ object DirectStreamResolver {
                             } else false
 
                             if (hasEpisode) {
-                                val prov = createProviderForDirectKey(provKey, targetAudio)
+                                val prov = createProviderForDirectKey(provKey, targetAudio, anilistId)
                                 if (prov != null) {
                                     dynamicList.add(prov)
                                 }
@@ -126,7 +227,7 @@ object DirectStreamResolver {
             }
         } catch (e: Exception) {}
 
-        val defaultList = getDefaultDirectProviders(targetAudio)
+        val defaultList = getDefaultDirectProviders(targetAudio, anilistId)
         val combined = if (dynamicList.isNotEmpty()) {
             val dynamicIds = dynamicList.map { it.id }.toSet()
             dynamicList + defaultList.filter { it.id !in dynamicIds }
@@ -134,7 +235,13 @@ object DirectStreamResolver {
             defaultList
         }
 
-        val result = combined.distinctBy { it.id }.sortedBy { prov ->
+        val filtered = if (!isMapped) {
+            combined.filter { !it.id.contains("animesalt") && !it.id.contains("acdn") }
+        } else {
+            combined
+        }
+
+        val result = filtered.distinctBy { it.id }.sortedBy { prov ->
             val id = prov.id.lowercase()
             when {
                 id.contains("flixcloud") || id.startsWith("hd-1") -> 0
@@ -155,7 +262,7 @@ object DirectStreamResolver {
         episode: Int = 1
     ): List<Provider> = getAvailableDirectProviders(anilistId, if (isDub) "dub" else "sub", episode)
 
-    fun createProviderForDirectKey(key: String, audio: String): Provider? {
+    fun createProviderForDirectKey(key: String, audio: String, anilistId: Int = 0): Provider? {
         val normalized = key.lowercase()
         return when {
             normalized == "flixcloud" || normalized == "reanime" || normalized == "hd1" || normalized == "hd-1" ->
@@ -165,20 +272,21 @@ object DirectStreamResolver {
             normalized == "vidstream" || normalized == "hd3" || normalized == "hd-3" ->
                 Provider("vidstream-direct-$audio", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true)
             normalized.contains("animesalt") || normalized.contains("acdn") || normalized.contains("salt") ->
-                if (audio == "dub") Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true)
-                else null
+                if (audio == "dub" && anilistId > 0 && AnimeMappingRepository.isMapped(anilistId)) {
+                    Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true)
+                } else null
             else -> null
         }
     }
 
-    fun getDefaultDirectProviders(audioMode: String): List<Provider> {
+    fun getDefaultDirectProviders(audioMode: String, anilistId: Int = 0): List<Provider> {
         val audio = if (audioMode.equals("dub", ignoreCase = true)) "dub" else "sub"
         val list = mutableListOf(
             Provider("flixcloud-$audio", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true),
             Provider("megaplay-direct-$audio", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true),
             Provider("vidstream-direct-$audio", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true)
         )
-        if (audio == "dub") {
+        if (audio == "dub" && anilistId > 0 && AnimeMappingRepository.isMapped(anilistId)) {
             list.add(Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true))
         }
         return list
@@ -210,6 +318,10 @@ object DirectStreamResolver {
 
         val normId = providerId.lowercase()
         val isAnimeSalt = normId.contains("animesalt") || normId.contains("acdn") || normId.contains("salt")
+        if (isAnimeSalt && (anilistId <= 0 || !AnimeMappingRepository.isMapped(anilistId))) {
+            // Unmapped in anime-mapping.json -> ACDN stream unavailable
+            return@withContext null
+        }
         val isVidstream = normId.contains("vidstream") || normId.contains("hd-3") || normId.contains("hd3")
         val isMegaPlay = normId.contains("megaplay") || (normId.contains("anikoto") && !normId.contains("vidstream")) || normId.contains("hd-2") || normId.contains("hd2")
         val isFlixCloud = normId.contains("flixcloud") || normId.contains("reanime") || normId.contains("hd-1") || normId.contains("hd1")
@@ -276,6 +388,9 @@ object DirectStreamResolver {
         animeTitle: String
     ): DirectStreamResult? {
         try {
+            if (anilistId <= 0 || !AnimeMappingRepository.isMapped(anilistId)) {
+                return null
+            }
             val candidate = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.resolveCandidate(anilistId, episode, animeTitle)
             val saltId = candidate.saltId.ifBlank {
                 com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.normalizeAnimeSaltTitle(animeTitle)

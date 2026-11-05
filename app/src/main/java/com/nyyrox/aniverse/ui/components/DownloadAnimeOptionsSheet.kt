@@ -112,14 +112,22 @@ fun DownloadAnimeOptionsSheet(
     val savedQuality = remember { storage.getLastDownloadQuality() }
     val savedServerId = remember { storage.getLastDownloadServerId() }
 
-    val initialAudioMode = if (initialProvider?.isDub == true) "DUB"
+    val isAcdnMapped = remember(anime.id) {
+        com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id)
+    }
+    val hasDubAvailable = remember(availableDirectServers, isAcdnMapped) {
+        isAcdnMapped || (availableDirectServers?.any { it.isDub } == true)
+    }
+
+    val initialAudioMode = if (initialProvider?.isDub == true && hasDubAvailable) "DUB"
         else if (initialProvider?.isMulti == true) "MULTI"
         else if (initialProvider != null) "SUB"
         else null
 
-    var selectedAudio by remember(initialProvider) {
+    var selectedAudio by remember(initialProvider, hasDubAvailable) {
         mutableStateOf(
-            initialAudioMode ?: savedAudio ?: "SUB"
+            if (!hasDubAvailable && (initialAudioMode == "DUB" || savedAudio == "DUB")) "SUB"
+            else (initialAudioMode ?: savedAudio ?: "SUB")
         )
     }
     var selectedQuality by remember {
@@ -132,24 +140,24 @@ fun DownloadAnimeOptionsSheet(
 
         val directList = if (!availableDirectServers.isNullOrEmpty()) {
             val matching = when {
-                isDubSelected -> availableDirectServers.filter { it.isDub || it.isMulti }
-                isMultiSelected -> availableDirectServers.filter { it.isMulti }
+                isDubSelected -> availableDirectServers.filter { (it.isDub || it.isMulti) && (isAcdnMapped || !it.id.contains("animesalt")) }
+                isMultiSelected -> availableDirectServers.filter { it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
                 else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
             }
             if (matching.isNotEmpty()) matching else {
-                com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio)
+                com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio, anime.id)
             }
         } else {
-            com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio)
+            com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio, anime.id)
         }
 
         // Direct servers
-        val directServers = directList.filter { it.isDirectStream && !it.isEmbedOnly }
+        val directServers = directList.filter { it.isDirectStream && !it.isEmbedOnly && (isAcdnMapped || !it.id.contains("animesalt")) }
 
         // Embed mode servers supported via StreamSniffer (ACDN, MegaPlay, Vidstream)
         val embedServers = ALL_PROVIDERS.filter { prov ->
             prov.isEmbedOnly && (
-                prov.id.contains("animesalt", ignoreCase = true) ||
+                (isAcdnMapped && prov.id.contains("animesalt", ignoreCase = true)) ||
                 prov.id.contains("megaplay", ignoreCase = true) ||
                 prov.id.contains("vidstream", ignoreCase = true)
             ) && when {
@@ -292,8 +300,13 @@ fun DownloadAnimeOptionsSheet(
             // Audio
             Column(Modifier.floatIn(1, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("AUDIO TRACK")
+                val audioOptions = if (hasDubAvailable) {
+                    listOf("SUB" to "Subbed", "DUB" to "Dubbed", "MULTI" to "Multi")
+                } else {
+                    listOf("SUB" to "Subbed", "MULTI" to "Multi")
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("SUB" to "Subbed", "DUB" to "Dubbed", "MULTI" to "Multi").forEach { (key, sub) ->
+                    audioOptions.forEach { (key, sub) ->
                         val sel = selectedAudio == key
                         GlassOption(
                             selected = sel,

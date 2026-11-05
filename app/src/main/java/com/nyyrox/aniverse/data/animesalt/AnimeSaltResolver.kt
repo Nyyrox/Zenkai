@@ -235,6 +235,11 @@ object AnimeSaltResolver {
         seriesCache[anilistId]?.let { return@withContext it }
 
         try {
+            if (anilistId > 0 && !AnimeMappingRepository.isMapped(anilistId)) {
+                // Unmapped in anime-mapping.json -> Not available on AnimeSalt / ACDN
+                return@withContext null
+            }
+
             val isMovie = format?.equals("MOVIE", ignoreCase = true) == true
             val targetSeason = extractSeason(title, romajiTitle)
 
@@ -715,6 +720,9 @@ object AnimeSaltResolver {
         isAbyss: Boolean = false,
         anilistId: Int = 0
     ): String {
+        if (anilistId > 0 && !AnimeMappingRepository.isMapped(anilistId)) {
+            return ""
+        }
         val isMovie = format?.equals("MOVIE", ignoreCase = true) == true
         val slug = resolveSlug(relationship, title, romajiTitle, format, episode, anilistId)
         val servers = extractServers(slug, isMovie)

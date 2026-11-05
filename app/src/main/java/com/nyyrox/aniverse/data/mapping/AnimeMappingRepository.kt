@@ -219,6 +219,7 @@ object AnimeMappingRepository {
      * Checks whether an AniList ID is present in the mapping cache.
      */
     fun isMapped(anilistId: Int): Boolean {
+        if (anilistId <= 0) return false
         return mappingCache.containsKey(anilistId.toString())
     }
 

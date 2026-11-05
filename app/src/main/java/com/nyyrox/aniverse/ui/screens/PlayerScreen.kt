@@ -313,8 +313,16 @@ fun PlayerScreen(
     }
     val initialProv = ALL_PROVIDERS.firstOrNull { it.id == initialProviderId }
         ?: vm.preferredServerId?.let { prefId -> ALL_PROVIDERS.firstOrNull { it.id == prefId } }
-        ?: com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders("sub").first()
-    var currentProvider by remember(animeId, initialProviderId) { mutableStateOf(initialProv) }
+        ?: com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders("sub", anime.id).first()
+    val isAcdnMapped = remember(anime.id) {
+        com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id)
+    }
+    val safeInitialProv = if (!isAcdnMapped && (initialProv.id.contains("animesalt") || initialProv.id.contains("acdn"))) {
+        com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders("sub", anime.id).first()
+    } else {
+        initialProv
+    }
+    var currentProvider by remember(animeId, initialProviderId) { mutableStateOf(safeInitialProv) }
     var selectedSourceMode by remember { mutableStateOf(if (initialProv.isDirectStream) "DIRECT" else "EMBED") }
     var selectedCategory by remember {
         mutableStateOf(
@@ -337,7 +345,41 @@ fun PlayerScreen(
 
     // Dynamically query available direct servers for this anime & episode
     var availableDirectServers by remember(anime.id, selectedCategory, currentEpisode) {
-        mutableStateOf(com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory))
+        mutableStateOf(com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory, anime.id))
+    }
+
+    // Dynamically track episode audio availability (SUB vs DUB)
+    var audioAvailability by remember(anime.id, currentEpisode) {
+        mutableStateOf(
+            com.nyyrox.aniverse.data.extractor.EpisodeAudioAvailability(
+                hasSub = true,
+                hasDub = isAcdnMapped,
+                hasAcdn = isAcdnMapped
+            )
+        )
+    }
+
+    LaunchedEffect(anime.id, currentEpisode) {
+        try {
+            val avail = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.checkEpisodeAudioAvailability(
+                anilistId = anime.id,
+                episode = currentEpisode,
+                animeTitle = anime.title
+            )
+            audioAvailability = avail
+            // If current episode does not have DUB available, auto fallback to SUB
+            if (!avail.hasDub && selectedCategory == "DUB") {
+                selectedCategory = "SUB"
+                if (currentProvider.isDub || currentProvider.id.contains("dub", ignoreCase = true)) {
+                    val subProv = availableDirectServers.firstOrNull { !it.isDub && !it.isMulti }
+                        ?: ALL_PROVIDERS.firstOrNull { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                    if (subProv != null) {
+                        currentProvider = subProv
+                        vm.setPreferredServer(subProv.id)
+                    }
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     LaunchedEffect(anime.id, selectedCategory, currentEpisode) {
@@ -347,15 +389,20 @@ fun PlayerScreen(
                 audioMode = selectedCategory,
                 episode = currentEpisode
             )
-            if (servers.isNotEmpty()) {
-                availableDirectServers = servers
+            val filtered = if (!isAcdnMapped) {
+                servers.filter { !it.id.contains("animesalt") && !it.id.contains("acdn") }
+            } else {
+                servers
+            }
+            if (filtered.isNotEmpty()) {
+                availableDirectServers = filtered
                 // If in DIRECT mode and current provider is not in the available list, smoothly select the first available
-                if (selectedSourceMode == "DIRECT" && servers.none { it.id == currentProvider.id }) {
-                    currentProvider = servers.first()
-                    vm.setPreferredServer(servers.first().id)
+                if (selectedSourceMode == "DIRECT" && filtered.none { it.id == currentProvider.id }) {
+                    currentProvider = filtered.first()
+                    vm.setPreferredServer(filtered.first().id)
                 }
             } else {
-                availableDirectServers = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
+                availableDirectServers = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory, anime.id)
             }
         } catch (_: Exception) {}
     }
@@ -365,9 +412,9 @@ fun PlayerScreen(
             availableDirectServers
         } else {
             when (selectedCategory) {
-                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnMapped || !it.id.contains("animesalt")) }
+                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
+                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
             }
         }
         if (currentList.isEmpty()) return
@@ -440,8 +487,8 @@ fun PlayerScreen(
     }
 
     // No mapping in anime-mapping.json — show "Unavailable" instead of a spinner
-    val animeSaltNoMapping = animeSaltRelChecked && animeSaltRel == null &&
-            currentProvider.id.startsWith("animesalt")
+    val animeSaltNoMapping = (!isAcdnMapped || (animeSaltRelChecked && animeSaltRel == null)) &&
+            (currentProvider.id.startsWith("animesalt") || currentProvider.id.contains("acdn"))
 
     val currentAnimeSaltSlug = remember(animeSaltRel, currentEpisode) {
         com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.resolveSlug(
@@ -804,9 +851,9 @@ fun PlayerScreen(
         } else {
             vm.setPlayEmbed(true)
             val embedList = when (selectedCategory) {
-                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnMapped || !it.id.contains("animesalt")) }
+                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
+                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
             }
             val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
             currentProvider = prov
@@ -819,16 +866,16 @@ fun PlayerScreen(
         if (selectedCategory == catKey) return
         selectedCategory = catKey
         if (selectedSourceMode == "DIRECT") {
-            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey)
+            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey, anime.id)
             availableDirectServers = nextDirect
             val newProv = nextDirect.first()
             currentProvider = newProv
             vm.setPreferredServer(newProv.id)
         } else {
             val embedServers = when (catKey) {
-                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnMapped || !it.id.contains("animesalt")) }
+                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
+                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
             }
             val newProv = embedServers.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
             currentProvider = newProv
@@ -1677,21 +1724,32 @@ fun PlayerScreen(
                     if (activeTab == "SERVERS") {
                         item(key = "servers") {
                             val isDirect = selectedSourceMode == "DIRECT"
+                            val isAcdnSupported = isAcdnMapped
+                            val hasDub = audioAvailability.hasDub
+
                             val servers = if (isDirect) {
                                 when (selectedCategory) {
-                                    "DUB" -> availableDirectServers.filter { it.isDub || it.isMulti }
-                                    "MULTI" -> availableDirectServers.filter { it.isMulti }
+                                    "DUB" -> availableDirectServers.filter { (it.isDub || it.isMulti) && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                    "MULTI" -> availableDirectServers.filter { it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
                                     else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
-                                }.ifEmpty { availableDirectServers }
+                                }.ifEmpty { availableDirectServers.filter { isAcdnSupported || !it.id.contains("animesalt") } }
                             } else {
                                 when (selectedCategory) {
-                                    "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub }
-                                    "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti }
-                                    else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti }
+                                    "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                    "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                    else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
                                 }
                             }
-                            val audioKeys = if (isDirect) listOf("SUB", "DUB") else listOf("SUB", "DUB", "MULTI")
-                            val audioLabels = if (isDirect) listOf("Sub", "Dub") else listOf("Sub", "Dub", "Multi audio")
+                            val audioKeys = if (isDirect) {
+                                if (hasDub) listOf("SUB", "DUB") else listOf("SUB")
+                            } else {
+                                if (hasDub) listOf("SUB", "DUB", "MULTI") else listOf("SUB", "MULTI")
+                            }
+                            val audioLabels = if (isDirect) {
+                                if (hasDub) listOf("Sub", "Dub") else listOf("Sub")
+                            } else {
+                                if (hasDub) listOf("Sub", "Dub", "Multi audio") else listOf("Sub", "Multi audio")
+                            }
                             val localName = downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"
 
                             Column(
