@@ -1,48 +1,32 @@
 {
   "project_info": {
-    "project_number": "291033138118",
-    "project_id": "zenkai-nyrox",
-    "storage_bucket": "zenkai-nyrox.firebasestorage.app"
+    "project_number": "762562909877",
+    "project_id": "zenkai-web",
+    "storage_bucket": "zenkai-web.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:291033138118:android:39e6e38c0e1a979987a8c7",
+        "mobilesdk_app_id": "1:762562909877:android:39e6e38c0e1a979987a8c7",
         "android_client_info": {
           "package_name": "com.nyyrox.aniverse"
         }
       },
       "oauth_client": [
         {
+          "client_id": "762562909877-bh38mq2lo5hvkropomurbkhpubub53o2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nyyrox.aniverse",
+            "certificate_hash": "c3807fd699f1b7f642d36da23c25fd8ef8297f93"
+          }
+        },
+        {
           "client_id": "291033138118-1in0dcf3tbn4qvlrpau5n3ftgcqjcf0b.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.nyyrox.aniverse",
             "certificate_hash": "95ecf845d0fc07d7351d914f77fbee5bd369757c"
-          }
-        },
-        {
-          "client_id": "291033138118-386p4ugaa5e00h9jpklm9ibcmvaurvff.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.nyyrox.aniverse",
-            "certificate_hash": "3b9cea12d3d956e168a093beeb4e668ebe1bc084"
-          }
-        },
-        {
-          "client_id": "291033138118-e94j50dgntsoc8h1c0j18d5kqk0u2ujt.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.nyyrox.aniverse",
-            "certificate_hash": "8fd9ff81ed26c24223fff89823133251cf095ef6"
-          }
-        },
-        {
-          "client_id": "291033138118-uagmcfp2rql0rt5shdddu7vlg6c9m3n7.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.nyyrox.aniverse",
-            "certificate_hash": "b41020f44c3b9708079cd8c308860b193a264ed2"
           }
         },
         {
