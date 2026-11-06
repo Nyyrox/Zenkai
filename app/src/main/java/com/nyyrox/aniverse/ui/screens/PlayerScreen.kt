@@ -81,6 +81,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ViewHeadline
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -931,16 +934,18 @@ fun PlayerScreen(
     val progress = dragProgress.value
     val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
 
-    val playerBg = if (isDark) Color(0xFF000000) else Color.White
-    val playerSurface = if (isDark) Color(0xFF101012) else Color(0xFFF4F4F5)
-    val playerSurfaceElevated = if (isDark) Color(0xFF18181B) else Color(0xFFE4E4E7)
+    val playerBg = if (isDark) Color(0xFF0A0A0A) else Color.White
+    val playerSurface = if (isDark) Color(0xFF121212) else Color(0xFFF5F5F5)
+    val playerSurfaceElevated = if (isDark) Color(0xFF1C1C1C) else Color(0xFFEFEFEF)
     val playerBorder = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
     val playerHairline = if (isDark) Color(0x18FFFFFF) else Color(0x12000000)
     val playerTextPrimary = if (isDark) Color.White else Color(0xFF09090B)
-    val playerTextSecondary = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
-    val playerTextMuted = if (isDark) Color(0xFF71717A) else Color(0xFF71717A)
+    val playerTextSecondary = if (isDark) Color(0xFFA3A3A3) else Color(0xFF525252)
+    val playerTextMuted = if (isDark) Color(0xFF737373) else Color(0xFF737373)
     val playerActiveBg = if (isDark) Color.White else Color.Black
     val playerActiveContent = if (isDark) Color.Black else Color.White
+    // Brand accent: use sparingly (active bar, progress, active dot, equalizer). Same in light and dark.
+    val playerAccent = Color(0xFFDC143C)
 
     Box(
         modifier = Modifier
@@ -1240,103 +1245,65 @@ fun PlayerScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 32.dp)
                 ) {
-                    // ───────── Header: title, meta, actions ─────────
+                    // ───────── Header: title + one quiet meta line ─────────
                     item(key = "header") {
-                        val isDubActive = currentProvider.isDub || selectedCategory == "DUB"
-                        val audioTag = when {
-                            selectedCategory == "MULTI" -> "Multi audio"
-                            isDubActive -> "English dub"
-                            else -> "Japanese sub"
-                        }
                         val metaLine = listOfNotNull(
                             anime.score?.let { "★ $it%" },
                             anime.format?.takeIf { it.isNotBlank() },
-                            anime.duration?.let { "$it min" },
-                            audioTag
+                            anime.duration?.let { "${it}m" }
                         ).joinToString("  ·  ")
                         val isCurrentFiller = fillerInfo.isFiller(currentEpisode)
                         val isCurrentMixed = fillerInfo.isMixed(currentEpisode)
-                        val hasPrev = !isMovie && currentEpisode > 1
-                        val hasNext = !isMovie && currentEpisode < maxEpisode
-                        val dlQueued = currentEpTask?.status == DownloadStatus.QUEUED
-                        val dlProgress = currentEpTask?.progress ?: 0f
-                        val dlConnecting = currentEpTask != null && !dlQueued &&
-                            (dlProgress <= 0.02f || currentEpTask.speedFormatted.contains("Connecting", ignoreCase = true))
-                        val dlLabel = when {
-                            currentEpTask != null && dlQueued -> "Queued"
-                            currentEpTask != null && dlConnecting -> "Starting"
-                            currentEpTask != null -> "${(dlProgress * 100).toInt()}%"
-                            isCurrentEpDownloaded -> if (playOfflineMode) "Offline" else "Saved"
-                            else -> "Download"
-                        }
 
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 18.dp)
-                                .padding(top = 16.dp, bottom = 4.dp)
+                                .padding(horizontal = 20.dp)
+                                .padding(top = 24.dp)
                         ) {
                             Text(
-                                text = if (isMovie) "MOVIE" else "NOW PLAYING  ·  EPISODE $currentEpisode OF $maxEpisode",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.3.sp,
-                                color = playerTextMuted
-                            )
-                            Spacer(Modifier.height(5.dp))
-                            Text(
                                 text = anime.displayTitle,
-                                fontSize = 22.sp,
-                                lineHeight = 28.sp,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 24.sp,
+                                lineHeight = 30.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = playerTextPrimary,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             if (!isMovie) {
-                                Spacer(Modifier.height(3.dp))
+                                Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = customEpName ?: "Episode $currentEpisode",
-                                    fontSize = 14.5.sp,
+                                    text = "Ep $currentEpisode  ·  ${customEpName ?: "Episode $currentEpisode"}",
+                                    fontSize = 15.sp,
+                                    lineHeight = 20.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = playerTextSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Spacer(Modifier.height(10.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                anime.score?.let { score ->
-                                    MonochromeBadge(text = "★ $score%", isDark = isDark)
-                                }
-                                anime.format?.takeIf { it.isNotBlank() }?.let { fmt ->
-                                    MonochromeBadge(text = fmt, isDark = isDark)
-                                }
-                                anime.duration?.let { dur ->
-                                    MonochromeBadge(text = "${dur}m", isDark = isDark)
-                                }
-                                MonochromeBadge(text = audioTag, isDark = isDark)
-                                if (isCurrentFiller) {
-                                    MonochromeBadge(text = "FILLER", isDark = isDark, outlined = true)
-                                } else if (isCurrentMixed) {
-                                    MonochromeBadge(text = "MIXED", isDark = isDark, outlined = true)
-                                }
+                            if (metaLine.isNotBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = metaLine,
+                                    fontSize = 13.sp,
+                                    color = playerTextMuted
+                                )
                             }
-
+                            if (isCurrentFiller || isCurrentMixed) {
+                                Spacer(Modifier.height(12.dp))
+                                FillerTag(isMixed = isCurrentMixed && !isCurrentFiller)
+                            }
 
 
                             // Embed mode Zenkai Player switch
                             if (isEmbedModeActive || playInZenkaiPlayer) {
-                                Spacer(Modifier.height(18.dp))
+                                Spacer(Modifier.height(16.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(playerSurfaceElevated)
+                                        .background(playerSurface)
                                         .border(1.dp, playerBorder, RoundedCornerShape(12.dp))
                                         .clickable { toggleZenkaiPlayer() }
                                         .padding(horizontal = 14.dp, vertical = 12.dp)
@@ -1384,7 +1351,7 @@ fun PlayerScreen(
                         }
                     }
 
-                    // ───────── 1. SERVERS (Compact, high-quality, not taking whole place) ─────────
+                    // ───────── Servers: one toggle, one row of chips ─────────
                     item(key = "servers_card") {
                         val isAcdnSupported = isAcdnMapped
                         val hasDub = audioAvailability.hasDub
@@ -1411,253 +1378,143 @@ fun PlayerScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 18.dp)
-                                .padding(top = 10.dp, bottom = 4.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isDark) Color(0xFF141418) else Color(0xFFF1F5F9))
-                                .border(1.dp, if (isDark) Color(0x22FFFFFF) else Color(0x18000000), RoundedCornerShape(14.dp))
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .padding(top = 32.dp)
                         ) {
-                            // Header Row: "SERVERS" label + active indicator + Audio & Source toggles
+                            // SUB | DUB (| MULTI): full-width, never wraps
+                            MonochromeSegmentedControl(
+                                labels = audioKeys,
+                                selectedIndex = audioKeys.indexOf(selectedCategory).coerceAtLeast(0),
+                                onSelected = { selectCategory(audioKeys[it]) },
+                                isDark = isDark,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp),
+                                height = 44.dp
+                            )
+
+                            Spacer(Modifier.height(16.dp))
+
+                            // Label + source switch (Direct HD / Embed)
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                var serverDropdownExpanded by remember { mutableStateOf(false) }
+                                Text(
+                                    text = "Servers",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = playerTextMuted
+                                )
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Dns,
-                                        contentDescription = "Server",
-                                        tint = if (isDark) Color.White else Color(0xFF0F172A),
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "SERVERS",
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 1.2.sp,
-                                        color = playerTextPrimary
-                                    )
-                                    // Top dropdown selector for active server
-                                    Box {
-                                        Row(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isDark) Color(0xFF222228) else Color(0xFFE2E8F0))
-                                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x22000000), RoundedCornerShape(8.dp))
-                                                .clickable { serverDropdownExpanded = !serverDropdownExpanded }
-                                                .padding(horizontal = 8.dp, vertical = 3.5.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(5.5.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (isDark) Color(0xFF34D399) else Color(0xFF059669))
-                                            )
-                                            Text(
-                                                text = currentProvider.name,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = playerTextPrimary
-                                            )
-                                            Icon(
-                                                Icons.Default.ArrowDropDown,
-                                                contentDescription = null,
-                                                tint = playerTextMuted,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                        }
-
-                                        DropdownMenu(
-                                            expanded = serverDropdownExpanded,
-                                            onDismissRequest = { serverDropdownExpanded = false },
-                                            modifier = Modifier.background(if (isDark) Color(0xFF18181D) else Color.White)
-                                        ) {
-                                            servers.forEach { prov ->
-                                                val isCur = prov.id == currentProvider.id
-                                                DropdownMenuItem(
-                                                    text = {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                        ) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(6.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(if (isCur) (if (isDark) Color(0xFF34D399) else Color(0xFF059669)) else Color(0xFF71717A))
-                                                            )
-                                                            Text(
-                                                                text = prov.name,
-                                                                fontSize = 13.sp,
-                                                                fontWeight = if (isCur) FontWeight.Bold else FontWeight.Medium,
-                                                                color = if (isCur) playerTextPrimary else playerTextMuted
-                                                            )
-                                                        }
-                                                    },
-                                                    onClick = {
-                                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                        currentProvider = prov
-                                                        vm.setPreferredServer(prov.id)
-                                                        serverDropdownExpanded = false
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Audio tabs & Source toggle
-                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { selectSourceMode(if (isDirect) "EMBED" else "DIRECT") }
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    // Source mode toggle (Direct HD vs Embed)
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isDark) Color(0xFF222228) else Color(0xFFE2E8F0))
-                                            .border(1.dp, if (isDirect) (if (isDark) Color(0x44FFFFFF) else Color(0x33000000)) else Color.Transparent, RoundedCornerShape(8.dp))
-                                            .clickable { selectSourceMode(if (isDirect) "EMBED" else "DIRECT") }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isDirect) "Direct HD" else "Embed",
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isDirect) playerTextPrimary else playerTextMuted
-                                        )
-                                    }
-
-                                    // Audio category tabs (SUB / DUB)
-                                    Row(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isDark) Color(0xFF222228) else Color(0xFFE2E8F0))
-                                            .padding(2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        audioKeys.forEach { key ->
-                                            val isCatSelected = selectedCategory == key
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(if (isCatSelected) (if (isDark) Color.White else Color.Black) else Color.Transparent)
-                                                    .clickable { selectCategory(key) }
-                                                    .padding(horizontal = 7.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = key,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = if (isCatSelected) FontWeight.Black else FontWeight.SemiBold,
-                                                    color = if (isCatSelected) (if (isDark) Color.Black else Color.White) else playerTextMuted
-                                                )
-                                            }
-                                        }
-                                    }
+                                    Text(
+                                        text = if (isDirect) "Direct HD" else "Embed",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = playerTextPrimary
+                                    )
+                                    Icon(
+                                        Icons.Default.SwapHoriz,
+                                        contentDescription = "Switch source",
+                                        tint = playerTextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
 
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(8.dp))
 
-                            // Horizontal Server Chips (High-quality, compact, scrollable)
                             if (servers.isEmpty()) {
                                 Text(
                                     text = "No servers available for this audio category.",
-                                    fontSize = 12.sp,
+                                    fontSize = 13.sp,
                                     color = playerTextMuted,
-                                    modifier = Modifier.padding(vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                                 )
                             } else {
                                 LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     items(servers, key = { it.id }) { prov ->
                                         val isSelected = prov.id == currentProvider.id
-                                        val activeBg = if (isDark) Color.White else Color(0xFF0F172A)
-                                        val activeFg = if (isDark) Color.Black else Color.White
-                                        val inactiveBg = if (isDark) Color(0xFF1C1C22) else Color(0xFFE2E8F0)
-                                        val activeBorder = if (isDark) Color.White else Color(0xFF0F172A)
-                                        val inactiveBorder = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
                                         val badgeText = prov.serverBadge.replace("Direct HD", "HD").replace("Direct", "HD")
 
                                         Row(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isSelected) activeBg else inactiveBg)
-                                                .border(if (isSelected) 1.5.dp else 1.dp, if (isSelected) activeBorder else inactiveBorder, RoundedCornerShape(10.dp))
+                                                .height(40.dp)
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(if (isSelected) playerActiveBg else playerSurfaceElevated)
                                                 .clickable {
                                                     com.nyyrox.aniverse.util.AppHaptics.tick(context)
                                                     currentProvider = prov
                                                     vm.setPreferredServer(prov.id)
                                                 }
-                                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                                                .padding(horizontal = 16.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (isSelected) (if (isDark) Color(0xFF10B981) else Color(0xFF059669)) else Color(0xFF71717A))
-                                            )
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(playerAccent)
+                                                )
+                                            }
                                             Text(
                                                 text = prov.name,
-                                                fontSize = 12.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) activeFg else playerTextPrimary,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                color = if (isSelected) playerActiveContent else playerTextPrimary,
                                                 maxLines = 1
                                             )
                                             if (badgeText.isNotBlank()) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(4.dp))
-                                                        .background(if (isSelected) (if (isDark) Color(0x22000000) else Color(0x33FFFFFF)) else (if (isDark) Color(0x33FFFFFF) else Color(0x18000000)))
-                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                ) {
-                                                    Text(
-                                                        text = badgeText,
-                                                        fontSize = 8.5.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = if (isSelected) activeFg else playerTextMuted
-                                                    )
-                                                }
+                                                Text(
+                                                    text = badgeText,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (isSelected) playerActiveContent.copy(alpha = 0.6f) else playerTextMuted
+                                                )
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            // Offline notice if available
                             if (isPlayingOffline) {
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(16.dp))
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        .padding(horizontal = 20.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(playerSurface)
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(14.dp))
-                                        Text("Playing offline copy", fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = playerTextPrimary)
+                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(16.dp))
+                                        Text("Playing offline copy", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = playerTextPrimary)
                                     }
                                     Text(
                                         text = "Switch to online",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = playerTextPrimary,
                                         modifier = Modifier.clickable { playOfflineMode = false }
                                     )
@@ -1673,113 +1530,152 @@ fun PlayerScreen(
                         val episodeNumbers = (curStart..curEnd).toList()
 
                         item(key = "ep-toolbar") {
-                            Column(
+                            var rangeMenuOpen by remember { mutableStateOf(false) }
+                            var moreMenuOpen by remember { mutableStateOf(false) }
+                            val rangeLabels = remember(pageCount, pageSize, maxEpisode) {
+                                List(pageCount) { p ->
+                                    val s = p * pageSize + 1
+                                    "$s–${minOf(s + pageSize - 1, maxEpisode)}"
+                                }
+                            }
+                            val menuBg = if (isDark) Color(0xFF1C1C1C) else Color.White
+
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 18.dp)
-                                    .padding(top = 10.dp, bottom = 8.dp)
+                                    .padding(horizontal = 20.dp)
+                                    .padding(top = 32.dp, bottom = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Text(
+                                    text = "Episodes",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = playerTextPrimary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "$maxEpisode",
+                                    fontSize = 14.sp,
+                                    color = playerTextMuted
+                                )
+                                Spacer(Modifier.weight(1f))
+
+                                // One range dropdown instead of a row of 1–25 / 26–50 chips
                                 if (pageCount > 1) {
-                                    val rangeLabels = remember(pageCount, pageSize, maxEpisode) {
-                                        List(pageCount) { p ->
-                                            val s = p * pageSize + 1
-                                            "$s–${minOf(s + pageSize - 1, maxEpisode)}"
+                                    Box {
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(playerSurfaceElevated)
+                                                .clickable { rangeMenuOpen = true }
+                                                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "$curStart–$curEnd",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = playerTextPrimary
+                                            )
+                                            Icon(
+                                                Icons.Default.ArrowDropDown,
+                                                contentDescription = "Choose range",
+                                                tint = playerTextMuted,
+                                                modifier = Modifier.size(20.dp)
+                                            )
                                         }
-                                    }
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        items(pageCount) { page ->
-                                            val selected = selectedPage == page
-                                            val activeBg = if (isDark) Color.White else Color.Black
-                                            val activeFg = if (isDark) Color.Black else Color.White
-                                            val inactiveBg = playerSurfaceElevated
-                                            val inactiveFg = playerTextSecondary
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(if (selected) activeBg else inactiveBg)
-                                                    .border(1.dp, if (selected) activeBg else playerBorder, CircleShape)
-                                                    .clickable { selectedPage = page }
-                                                    .padding(horizontal = 14.dp, vertical = 7.dp)
-                                            ) {
-                                                Text(
-                                                    text = rangeLabels[page],
-                                                    fontSize = 12.sp,
-                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (selected) activeFg else inactiveFg
+                                        DropdownMenu(
+                                            expanded = rangeMenuOpen,
+                                            onDismissRequest = { rangeMenuOpen = false },
+                                            modifier = Modifier.background(menuBg)
+                                        ) {
+                                            rangeLabels.forEachIndexed { page, label ->
+                                                val sel = page == selectedPage
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = label,
+                                                            fontSize = 14.sp,
+                                                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
+                                                            color = if (sel) playerTextPrimary else playerTextSecondary
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        selectedPage = page
+                                                        rangeMenuOpen = false
+                                                    }
                                                 )
                                             }
                                         }
                                     }
-                                    Spacer(Modifier.height(14.dp))
+                                    Spacer(Modifier.width(4.dp))
                                 }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
+
+                                // List / grid toggle
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .clickable { isEpisodeGridView = !isEpisodeGridView },
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Episodes",
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = playerTextPrimary
-                                        )
-                                        Text(
-                                            text = "$curStart–$curEnd of $maxEpisode",
-                                            fontSize = 12.sp,
-                                            color = playerTextMuted
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
+                                        contentDescription = "Toggle episode view",
+                                        tint = playerTextPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // ⋮ menu: Download all lives here now
+                                Box {
                                     Box(
                                         modifier = Modifier
+                                            .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(playerSurfaceElevated)
-                                            .border(1.dp, playerBorder, CircleShape)
-                                            .clickable { showDownloadRangeSheet = curStart..curEnd }
-                                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Icon(Icons.Default.Download, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(15.dp))
-                                            Text(
-                                                text = "Download all",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = playerTextPrimary,
-                                                maxLines = 1,
-                                                softWrap = false
-                                            )
-                                        }
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(playerSurfaceElevated)
-                                            .border(1.dp, playerBorder, CircleShape)
-                                            .clickable { isEpisodeGridView = !isEpisodeGridView },
+                                            .clickable { moreMenuOpen = true },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = if (isEpisodeGridView) Icons.Default.ViewHeadline else Icons.Default.GridView,
-                                            contentDescription = "Toggle episode view",
+                                            Icons.Default.MoreVert,
+                                            contentDescription = "More",
                                             tint = playerTextPrimary,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = moreMenuOpen,
+                                        onDismissRequest = { moreMenuOpen = false },
+                                        modifier = Modifier.background(menuBg)
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = "Download all",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = playerTextPrimary
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.Download, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(20.dp))
+                                            },
+                                            onClick = {
+                                                moreMenuOpen = false
+                                                showDownloadRangeSheet = curStart..curEnd
+                                            }
                                         )
                                     }
                                 }
                             }
                         }
 
+
                         if (isEpisodeGridView) {
                             item(key = "ep-grid") {
                                 Column(
-                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     episodeNumbers.chunked(5).forEach { rowEps ->
@@ -1876,7 +1772,7 @@ fun PlayerScreen(
 
                     // ───────── 3. OVERVIEW SECTION ─────────
                     item(key = "overview_section") {
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(32.dp))
                         PlayerOverview(
                             anime = anime,
                             episode = currentEpisode,
@@ -2279,11 +2175,11 @@ private fun MonochromeSegmentedControl(
     modifier: Modifier = Modifier,
     height: Dp = 42.dp
 ) {
-    val containerBg = if (isDark) Color(0xFF121214) else Color(0xFFF4F4F5)
+    val containerBg = if (isDark) Color(0xFF121212) else Color(0xFFF2F2F2)
     val containerBorder = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
     val activeBg = if (isDark) Color.White else Color.Black
     val activeFg = if (isDark) Color.Black else Color.White
-    val inactiveFg = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
+    val inactiveFg = if (isDark) Color(0xFFA3A3A3) else Color(0xFF525252)
 
     Row(
         modifier = modifier
@@ -2452,166 +2348,136 @@ fun PlayerEpisodeRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     glass: Boolean = true,
-    overview: String? = null
+    overview: String? = null // kept for API compatibility; synopsis now lives in the Overview section
 ) {
     val isDark = LocalIsDark.current
-    val textPrimary = if (isDark) Color.White else Color(0xFF09090B)
-    val textSecondary = if (isDark) Color(0xFFA1A1AA) else Color(0xFF52525B)
-    val textMuted = if (isDark) Color(0xFF71717A) else Color(0xFF71717A)
+    val textPrimary = if (isDark) Color.White else Color(0xFF0A0A0A)
+    val textMuted = Color(0xFF737373)
     val borderCol = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
+    val accent = Color(0xFFDC143C)
+    val rowBg = if (isSelected) (if (isDark) Color(0x0FFFFFFF) else Color(0x0A000000)) else Color.Transparent
 
-    Column(modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(if (isSelected) (if (isDark) Color(0x18FFFFFF) else Color(0x0A000000)) else Color.Transparent)
-                .clickable(onClick = onClick)
-                .padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier
-                    .width(152.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isDark) Color(0xFF18181B) else Color(0xFFE4E4E7))
-                    .border(
-                        width = if (isSelected) 1.5.dp else 1.dp,
-                        color = if (isSelected) (if (isDark) Color.White else Color.Black) else borderCol,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-            ) {
-                AsyncImage(
-                    model = still,
-                    contentDescription = "Episode $episode",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(5.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.82f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "$episode",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(rowBg)
+            // Crimson accent bar replaces the NOW PLAYING badge
+            .drawBehind {
                 if (isSelected) {
-                    Box(
-                        Modifier
-                            .align(Alignment.Center)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.7f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Equalizer(Color.White, Modifier.width(14.dp))
-                    }
-                }
-                if (isDownloading && downloadProgress != null) {
-                    LinearProgressIndicator(
-                        progress = { downloadProgress.coerceIn(0f, 1f) },
-                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(2.5.dp),
-                        color = Color.White,
-                        trackColor = Color(0x44FFFFFF)
-                    )
+                    drawRect(color = accent, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height))
                 }
             }
-
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = title?.takeIf { it.isNotBlank() } ?: "Episode $episode",
-                    fontSize = 14.5.sp,
-                    lineHeight = 19.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                    color = textPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Ep $episode · $durationLabel",
-                        modifier = Modifier.padding(vertical = 2.dp),
-                        fontSize = 11.5.sp,
-                        color = textMuted
-                    )
-                    if (isSelected) {
-                        TagChip(
-                            text = "NOW PLAYING",
-                            fg = if (isDark) Color.Black else Color.White,
-                            bg = if (isDark) Color.White else Color.Black,
-                            border = if (isDark) Color.White else Color.Black
-                        )
-                    }
-                    if (isFiller) {
-                        TagChip(
-                            text = "FILLER",
-                            fg = textPrimary,
-                            bg = Color.Transparent,
-                            border = borderCol
-                        )
-                    } else if (isMixed) {
-                        TagChip(
-                            text = "MIXED",
-                            fg = textPrimary,
-                            bg = Color.Transparent,
-                            border = borderCol
-                        )
-                    }
-                }
-                if (!overview.isNullOrBlank()) {
-                    Text(
-                        text = overview,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        color = textMuted,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
+            .clickable(onClick = onClick)
+            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .width(120.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isDark) Color(0xFF1C1C1C) else Color(0xFFEFEFEF))
+        ) {
+            AsyncImage(
+                model = still,
+                contentDescription = "Episode $episode",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
             Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onDownload),
-                contentAlignment = Alignment.Center
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                when {
-                    isDownloaded -> Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Downloaded",
-                        tint = textPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    isDownloading -> CircularProgressIndicator(
-                        progress = { (downloadProgress ?: 0f).coerceIn(0.05f, 1f) },
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = textPrimary,
-                        trackColor = borderCol
-                    )
-                    else -> Icon(
-                        Icons.Default.Download,
-                        contentDescription = "Download episode $episode",
-                        tint = textMuted,
-                        modifier = Modifier.size(22.dp)
-                    )
+                Text(
+                    text = "$episode",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            if (isSelected) {
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.65f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Equalizer(accent, Modifier.width(14.dp))
+                }
+            }
+            if (isDownloading && downloadProgress != null) {
+                LinearProgressIndicator(
+                    progress = { downloadProgress.coerceIn(0f, 1f) },
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                    color = accent,
+                    trackColor = Color(0x44FFFFFF)
+                )
+            }
+        }
+
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = title?.takeIf { it.isNotBlank() } ?: "Episode $episode",
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = durationLabel,
+                    fontSize = 12.sp,
+                    color = textMuted
+                )
+                if (isFiller) {
+                    TagChip(text = "FILLER", fg = textPrimary, bg = Color.Transparent, border = borderCol)
+                } else if (isMixed) {
+                    TagChip(text = "MIXED", fg = textPrimary, bg = Color.Transparent, border = borderCol)
                 }
             }
         }
-        Hairline(Modifier.padding(start = 18.dp))
+
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onDownload),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                isDownloaded -> Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Downloaded",
+                    tint = textPrimary,
+                    modifier = Modifier.size(22.dp)
+                )
+                isDownloading -> CircularProgressIndicator(
+                    progress = { (downloadProgress ?: 0f).coerceIn(0.05f, 1f) },
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = accent,
+                    trackColor = borderCol
+                )
+                else -> Icon(
+                    Icons.Default.Download,
+                    contentDescription = "Download episode $episode",
+                    tint = textMuted,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
     }
 }
 
