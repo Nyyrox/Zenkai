@@ -1234,15 +1234,7 @@ fun PlayerScreen(
                 val customEpName = currentEpInfo?.name?.takeIf {
                     it.isNotBlank() && !it.equals("Episode $currentEpisode", ignoreCase = true)
                 }
-                val tabKeys = if (isMovie) listOf("OVERVIEW", "SERVERS") else listOf("EPISODES", "OVERVIEW", "SERVERS")
-                val tabLabels = tabKeys.map { key ->
-                    when (key) {
-                        "EPISODES" -> "Episodes"
-                        "OVERVIEW" -> "Overview"
-                        else -> "Servers"
-                    }
-                }
-                val activeTab = if (isMovie && detailTab == "EPISODES") "OVERVIEW" else detailTab
+                val isDirect = selectedSourceMode == "DIRECT"
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -1400,16 +1392,16 @@ fun PlayerScreen(
                                     }
                                 }
                                 PlayerMonochromeAction(
-                                    label = "Servers",
+                                    label = if (selectedSourceMode == "DIRECT") "Direct" else "Embed",
                                     isDark = isDark,
                                     modifier = Modifier.weight(1f),
-                                    active = activeTab == "SERVERS",
+                                    active = selectedSourceMode == "DIRECT",
                                     onClick = {
                                         com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                        detailTab = "SERVERS"
+                                        selectSourceMode(if (selectedSourceMode == "DIRECT") "EMBED" else "DIRECT")
                                     }
                                 ) { tint ->
-                                    Icon(Icons.Default.Dns, contentDescription = "Servers", tint = tint, modifier = Modifier.size(22.dp))
+                                    Icon(Icons.Default.Dns, contentDescription = "Toggle Source", tint = tint, modifier = Modifier.size(22.dp))
                                 }
                                 PlayerMonochromeAction(
                                     label = "Fullscreen",
@@ -1476,30 +1468,245 @@ fun PlayerScreen(
                         }
                     }
 
-                    // ───────── Tabs (sticky) ─────────
-                    stickyHeader(key = "tabs") {
-                        Box(
+                    // ───────── 1. SERVERS (Compact, high-quality, not taking whole place) ─────────
+                    item(key = "servers_card") {
+                        val isAcdnSupported = isAcdnMapped
+                        val hasDub = audioAvailability.hasDub
+
+                        val servers = if (isDirect) {
+                            when (selectedCategory) {
+                                "DUB" -> availableDirectServers.filter { (it.isDub || it.isMulti) && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                "MULTI" -> availableDirectServers.filter { it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
+                            }.ifEmpty { availableDirectServers.filter { isAcdnSupported || !it.id.contains("animesalt") } }
+                        } else {
+                            when (selectedCategory) {
+                                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
+                                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
+                            }
+                        }
+                        val audioKeys = if (isDirect) {
+                            if (hasDub) listOf("SUB", "DUB") else listOf("SUB")
+                        } else {
+                            if (hasDub) listOf("SUB", "DUB", "MULTI") else listOf("SUB", "MULTI")
+                        }
+
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(playerBg)
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .padding(horizontal = 18.dp)
+                                .padding(top = 10.dp, bottom = 4.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (isDark) Color(0xFF141418) else Color(0xFFF1F5F9))
+                                .border(1.dp, if (isDark) Color(0x22FFFFFF) else Color(0x18000000), RoundedCornerShape(14.dp))
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
-                            MonochromeSegmentedControl(
-                                labels = tabLabels,
-                                selectedIndex = tabKeys.indexOf(activeTab).coerceAtLeast(0),
-                                onSelected = { idx ->
-                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                    detailTab = tabKeys[idx]
-                                },
-                                isDark = isDark,
+                            // Header Row: "SERVERS" label + active indicator + Audio & Source toggles
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                height = 42.dp
-                            )
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Dns,
+                                        contentDescription = "Server",
+                                        tint = if (isDark) Color.White else Color(0xFF0F172A),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "SERVERS",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.2.sp,
+                                        color = playerTextPrimary
+                                    )
+                                    // Active server badge with green dot
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(if (isDark) Color(0x1F10B981) else Color(0x1A059669))
+                                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isDark) Color(0xFF34D399) else Color(0xFF059669))
+                                            )
+                                            Text(
+                                                text = currentProvider.name,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Audio tabs & Source toggle
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    // Source mode toggle (Direct HD vs Embed)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isDark) Color(0xFF222228) else Color(0xFFE2E8F0))
+                                            .border(1.dp, if (isDirect) (if (isDark) Color(0x44FFFFFF) else Color(0x33000000)) else Color.Transparent, RoundedCornerShape(8.dp))
+                                            .clickable { selectSourceMode(if (isDirect) "EMBED" else "DIRECT") }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isDirect) "Direct HD" else "Embed",
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDirect) playerTextPrimary else playerTextMuted
+                                        )
+                                    }
+
+                                    // Audio category tabs (SUB / DUB)
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isDark) Color(0xFF222228) else Color(0xFFE2E8F0))
+                                            .padding(2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        audioKeys.forEach { key ->
+                                            val isCatSelected = selectedCategory == key
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isCatSelected) (if (isDark) Color.White else Color.Black) else Color.Transparent)
+                                                    .clickable { selectCategory(key) }
+                                                    .padding(horizontal = 7.dp, vertical = 3.dp)
+                                            ) {
+                                                Text(
+                                                    text = key,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (isCatSelected) FontWeight.Black else FontWeight.SemiBold,
+                                                    color = if (isCatSelected) (if (isDark) Color.Black else Color.White) else playerTextMuted
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            // Horizontal Server Chips (High-quality, compact, scrollable)
+                            if (servers.isEmpty()) {
+                                Text(
+                                    text = "No servers available for this audio category.",
+                                    fontSize = 12.sp,
+                                    color = playerTextMuted,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                            } else {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(servers, key = { it.id }) { prov ->
+                                        val isSelected = prov.id == currentProvider.id
+                                        val activeBg = if (isDark) Color.White else Color(0xFF0F172A)
+                                        val activeFg = if (isDark) Color.Black else Color.White
+                                        val inactiveBg = if (isDark) Color(0xFF1C1C22) else Color(0xFFE2E8F0)
+                                        val activeBorder = if (isDark) Color.White else Color(0xFF0F172A)
+                                        val inactiveBorder = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
+                                        val badgeText = prov.serverBadge.replace("Direct HD", "HD").replace("Direct", "HD")
+
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) activeBg else inactiveBg)
+                                                .border(if (isSelected) 1.5.dp else 1.dp, if (isSelected) activeBorder else inactiveBorder, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                    currentProvider = prov
+                                                    vm.setPreferredServer(prov.id)
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isSelected) (if (isDark) Color(0xFF10B981) else Color(0xFF059669)) else Color(0xFF71717A))
+                                            )
+                                            Text(
+                                                text = prov.name,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) activeFg else playerTextPrimary,
+                                                maxLines = 1
+                                            )
+                                            if (badgeText.isNotBlank()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(if (isSelected) (if (isDark) Color(0x22000000) else Color(0x33FFFFFF)) else (if (isDark) Color(0x33FFFFFF) else Color(0x18000000)))
+                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text(
+                                                        text = badgeText,
+                                                        fontSize = 8.5.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = if (isSelected) activeFg else playerTextMuted
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Offline notice if available
+                            if (isPlayingOffline) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(14.dp))
+                                        Text("Playing offline copy", fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = playerTextPrimary)
+                                    }
+                                    Text(
+                                        text = "Switch to online",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = playerTextPrimary,
+                                        modifier = Modifier.clickable { playOfflineMode = false }
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // ───────── EPISODES ─────────
-                    if (activeTab == "EPISODES") {
+                    // ───────── 2. EPISODES DOWN BELOW ─────────
+                    if (!isMovie) {
                         val curStart = selectedPage * pageSize + 1
                         val curEnd = minOf(curStart + pageSize - 1, maxEpisode)
                         val episodeNumbers = (curStart..curEnd).toList()
@@ -1509,7 +1716,7 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 18.dp)
-                                    .padding(top = 4.dp, bottom = 8.dp)
+                                    .padding(top = 10.dp, bottom = 8.dp)
                             ) {
                                 if (pageCount > 1) {
                                     val rangeLabels = remember(pageCount, pageSize, maxEpisode) {
@@ -1706,167 +1913,17 @@ fun PlayerScreen(
                         }
                     }
 
-                    // ───────── OVERVIEW ─────────
-                    if (activeTab == "OVERVIEW") {
-                        item(key = "overview") {
-                            PlayerOverview(
-                                anime = anime,
-                                episode = currentEpisode,
-                                episodeName = customEpName,
-                                episodeOverview = currentEpInfo?.overview,
-                                isMovie = isMovie,
-                                maxEpisode = maxEpisode
-                            )
-                        }
-                    }
-
-                    // ───────── SERVERS ─────────
-                    if (activeTab == "SERVERS") {
-                        item(key = "servers") {
-                            val isDirect = selectedSourceMode == "DIRECT"
-                            val isAcdnSupported = isAcdnMapped
-                            val hasDub = audioAvailability.hasDub
-
-                            val servers = if (isDirect) {
-                                when (selectedCategory) {
-                                    "DUB" -> availableDirectServers.filter { (it.isDub || it.isMulti) && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                    "MULTI" -> availableDirectServers.filter { it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                    else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
-                                }.ifEmpty { availableDirectServers.filter { isAcdnSupported || !it.id.contains("animesalt") } }
-                            } else {
-                                when (selectedCategory) {
-                                    "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                    "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                    else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                }
-                            }
-                            val audioKeys = if (isDirect) {
-                                if (hasDub) listOf("SUB", "DUB") else listOf("SUB")
-                            } else {
-                                if (hasDub) listOf("SUB", "DUB", "MULTI") else listOf("SUB", "MULTI")
-                            }
-                            val audioLabels = if (isDirect) {
-                                if (hasDub) listOf("Sub", "Dub") else listOf("Sub")
-                            } else {
-                                if (hasDub) listOf("Sub", "Dub", "Multi audio") else listOf("Sub", "Multi audio")
-                            }
-                            val localName = downloadedEpInfo?.providerName?.ifBlank { "Local" } ?: "Local"
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 18.dp)
-                                    .padding(top = 8.dp)
-                            ) {
-                                if (isPlayingOffline) {
-                                    SectionLabel("PLAYBACK")
-                                    Spacer(Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(22.dp))
-                                        Column(Modifier.weight(1f)) {
-                                            Text("Playing downloaded video", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = playerTextPrimary)
-                                            Text("Offline · $localName · local storage", fontSize = 12.sp, color = playerTextMuted)
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(CircleShape)
-                                                .background(playerSurfaceElevated)
-                                                .border(1.dp, playerBorder, CircleShape)
-                                                .clickable { playOfflineMode = false }
-                                                .padding(horizontal = 12.dp, vertical = 7.dp)
-                                        ) {
-                                            Text("Go online", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = playerTextPrimary, maxLines = 1, softWrap = false)
-                                        }
-                                    }
-                                } else {
-                                    if (isCurrentEpDownloaded && downloadedEpInfo != null) {
-                                        SectionLabel("OFFLINE COPY")
-                                        Spacer(Modifier.height(10.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(22.dp))
-                                            Column(Modifier.weight(1f)) {
-                                                Text("Downloaded on this device", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = playerTextPrimary)
-                                                Text(localName, fontSize = 12.sp, color = playerTextMuted)
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(playerSurfaceElevated)
-                                                    .border(1.dp, playerBorder, CircleShape)
-                                                    .clickable { playOfflineMode = true }
-                                                    .padding(horizontal = 12.dp, vertical = 7.dp)
-                                            ) {
-                                                Text("Play offline", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = playerTextPrimary, maxLines = 1, softWrap = false)
-                                            }
-                                        }
-                                        Spacer(Modifier.height(22.dp))
-                                    }
-
-                                    SectionLabel("SOURCE")
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        text = if (isDirect) "Native player · fastest, no ads" else "Web embeds · more servers, may show ads",
-                                        fontSize = 12.5.sp,
-                                        color = playerTextMuted
-                                    )
-                                    Spacer(Modifier.height(10.dp))
-                                    MonochromeSegmentedControl(
-                                        labels = listOf("Direct", "Embed"),
-                                        selectedIndex = if (isDirect) 0 else 1,
-                                        onSelected = { selectSourceMode(if (it == 0) "DIRECT" else "EMBED") },
-                                        isDark = isDark,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        height = 42.dp
-                                    )
-
-                                    Spacer(Modifier.height(22.dp))
-                                    SectionLabel("AUDIO")
-                                    Spacer(Modifier.height(10.dp))
-                                    MonochromeSegmentedControl(
-                                        labels = audioLabels,
-                                        selectedIndex = audioKeys.indexOf(selectedCategory).coerceAtLeast(0),
-                                        onSelected = { selectCategory(audioKeys[it]) },
-                                        isDark = isDark,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        height = 42.dp
-                                    )
-
-                                    Spacer(Modifier.height(22.dp))
-                                    SectionLabel(if (isDirect) "DIRECT SERVERS" else "EMBED SOURCES")
-                                    Spacer(Modifier.height(4.dp))
-                                    if (servers.isEmpty()) {
-                                        Text(
-                                            text = "No servers available for this audio category.",
-                                            fontSize = 13.sp,
-                                            color = c.textMuted,
-                                            modifier = Modifier.padding(vertical = 12.dp)
-                                        )
-                                    } else {
-                                        Hairline()
-                                        servers.forEach { prov ->
-                                            ServerRow(
-                                                name = prov.name,
-                                                badge = prov.serverBadge.replace("Direct HD", "HD"),
-                                                selected = prov.id == currentProvider.id,
-                                                onClick = {
-                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    // ───────── 3. OVERVIEW SECTION ─────────
+                    item(key = "overview_section") {
+                        Spacer(Modifier.height(14.dp))
+                        PlayerOverview(
+                            anime = anime,
+                            episode = currentEpisode,
+                            episodeName = customEpName,
+                            episodeOverview = currentEpInfo?.overview,
+                            isMovie = isMovie,
+                            maxEpisode = maxEpisode
+                        )
                     }
                 }
             }

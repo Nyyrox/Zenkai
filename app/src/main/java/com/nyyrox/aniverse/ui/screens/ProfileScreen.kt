@@ -71,6 +71,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
@@ -297,6 +298,13 @@ val ANILIST_TMDB_AVATARS = listOf(
     "https://s4.anilist.co/file/anilistcdn/character/large/b89361-tq8PQQ4MmF0M.png"  // Megumi Fushiguro
 )
 
+private data class ProfileFeatureEntry(
+    val title: String,
+    val subtitle: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val route: String
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -439,14 +447,13 @@ fun ProfileScreen(
                             )
                     )
 
-                    // Top Bar: Back button on left, clean pencil icon on right corner (NO "Customize" text)
+                    // Top Bar: Back button on left (top-right edit option removed)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (onBack != null) {
                             IconButton(
@@ -464,28 +471,6 @@ fun ProfileScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
-                        } else {
-                            Spacer(Modifier.size(38.dp))
-                        }
-
-                        // Clean pencil button on corner (NO text)
-                        IconButton(
-                            onClick = {
-                                initialEditTab = 0
-                                showEditSheet = true
-                            },
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color(0x99000000) else Color(0xCCFFFFFF))
-                                .border(1.dp, borderColor, CircleShape)
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Customize",
-                                tint = textPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
                         }
                     }
                 }
@@ -683,149 +668,124 @@ fun ProfileScreen(
 
                     Spacer(Modifier.height(10.dp))
 
-                    val features = listOf(
-                        Triple("Movies & TV", Icons.Default.Movie, "movies"),
-                        Triple("Airing & Schedule", Icons.Default.Schedule, "airing"),
-                        Triple("Watch Together", Icons.Default.Groups, "watchtogether"),
-                        Triple("Community & Chat", Icons.Default.Forum, "community"),
-                        Triple("Saved Library", Icons.Default.Bookmark, "library"),
-                        Triple("Downloads", Icons.Default.Download, "downloads")
+                    val featureList = listOf(
+                        ProfileFeatureEntry("Movies & TV", "Browse anime movies, series, OVAs & specials", Icons.Default.Movie, "movies"),
+                        ProfileFeatureEntry("Airing & Schedule", "Release calendar & episode countdowns", Icons.Default.Schedule, "airing"),
+                        ProfileFeatureEntry("Watch Together", "Stream videos in sync with friends", Icons.Default.Groups, "watchtogether"),
+                        ProfileFeatureEntry("Community & Chat", "Join discussions, rankings & user feed", Icons.Default.Forum, "community"),
+                        ProfileFeatureEntry("Saved Library", "Your watchlist, bookmarks & history", Icons.Default.Bookmark, "library"),
+                        ProfileFeatureEntry("Downloads", "Manage offline anime and downloaded episodes", Icons.Default.Download, "downloads"),
+                        ProfileFeatureEntry("Discord Community", "Official chat, updates & feature requests", Icons.AutoMirrored.Filled.Send, "discord"),
+                        ProfileFeatureEntry("Telegram Channel", "Announcements and instant release alerts", Icons.AutoMirrored.Filled.Send, "telegram")
                     )
 
-                    // 2-column clean card grid
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cardElevated)
+                            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
                     ) {
-                        for (col in 0..1) {
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                for (i in col until features.size step 2) {
-                                    val (title, icon, route) = features[i]
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(cardElevated)
-                                            .border(1.dp, borderColor, RoundedCornerShape(14.dp))
-                                            .clickable {
-                                                if (route == "downloads") {
-                                                    showDownloadSheet = true
-                                                } else if (route == "library") {
-                                                    onSeeAllWatchlist?.invoke() ?: onNavigate?.invoke("library")
-                                                } else if (route == "community") {
-                                                    onNavigate?.invoke("discord_hub")
-                                                } else {
-                                                    onNavigate?.invoke(route)
-                                                }
+                        featureList.forEachIndexed { index, item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        when (item.route) {
+                                            "downloads" -> onNavigate?.invoke("downloads")
+                                            "library" -> onSeeAllWatchlist?.invoke() ?: onNavigate?.invoke("library")
+                                            "community" -> onNavigate?.invoke("discord_hub")
+                                            "discord" -> {
+                                                try {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))
+                                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    )
+                                                } catch (_: Exception) {}
                                             }
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(textPrimary.copy(alpha = 0.08f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = icon,
-                                                contentDescription = null,
-                                                tint = textPrimary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                            "telegram" -> {
+                                                try {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))
+                                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    )
+                                                } catch (_: Exception) {}
+                                            }
+                                            else -> onNavigate?.invoke(item.route)
                                         }
-                                        Spacer(Modifier.width(10.dp))
-                                        Text(
-                                            text = title,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = textPrimary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
                                     }
+                                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = item.title,
+                                        tint = textPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
+                                Spacer(Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.title,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textPrimary
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = item.subtitle,
+                                        fontSize = 12.sp,
+                                        color = textMuted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = textMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            if (index < featureList.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 68.dp, end = 16.dp),
+                                    color = borderColor.copy(alpha = 0.5f),
+                                    thickness = 0.8.dp
+                                )
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(14.dp))
-
-                    // Community Links: Discord & Telegram
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .clip(CircleShape)
-                                .background(cardElevated)
-                                .border(1.dp, borderColor, CircleShape)
-                                .clickable {
-                                    try {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))
-                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        )
-                                    } catch (_: Exception) {}
-                                },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = textPrimary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Discord", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .clip(CircleShape)
-                                .background(cardElevated)
-                                .border(1.dp, borderColor, CircleShape)
-                                .clickable {
-                                    try {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))
-                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        )
-                                    } catch (_: Exception) {}
-                                },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = textPrimary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Telegram", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
-                        }
-                    }
-
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(16.dp))
                 }
             }
 
-            // Seamless Page Tabs (No cards)
+            // Seamless Page Tabs (Scrollable so tabs never wrap text)
             item(key = "profile_tabs_header") {
                 val pageTabs = listOf("Preferences", "Cloud & Sync", "AniList", "About")
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
+                    edgePadding = 20.dp,
                     containerColor = Color.Transparent,
-                    contentColor = Color.White,
-                    divider = { HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 1.dp) },
+                    contentColor = textPrimary,
+                    divider = { HorizontalDivider(color = borderColor, thickness = 1.dp) },
                     indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = Color.White
-                        )
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                        if (selectedTab < tabPositions.size) {
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                color = textPrimary
+                            )
+                        }
+                    }
                 ) {
                     pageTabs.forEachIndexed { index, title ->
                         Tab(
@@ -834,9 +794,11 @@ fun ProfileScreen(
                             text = {
                                 Text(
                                     text = title,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selectedTab == index) Color.White else Color(0xFF787882)
+                                    fontSize = 13.5.sp,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedTab == index) textPrimary else textMuted,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         )
@@ -855,45 +817,45 @@ fun ProfileScreen(
                     ) {
                         // Theme Mode
                         SettingRow(title = "Theme", hint = "Dark or light appearance") {
-                            val isDark = vm.themeSettings.mode == ThemeMode.DARK
+                            val isDarkTheme = vm.themeSettings.mode == ThemeMode.DARK
                             Row(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(Color(0xFF1E1E22))
-                                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                    .background(if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0))
+                                    .border(1.dp, borderColor, CircleShape)
                                     .padding(3.dp)
                             ) {
-                                listOf("dark" to true, "light" to false).forEach { (label, dark) ->
-                                    val selected = isDark == dark
+                                listOf("Dark" to true, "Light" to false).forEach { (label, isD) ->
+                                    val selected = isDarkTheme == isD
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(if (selected) Color.White else Color.Transparent)
+                                            .background(if (selected) textPrimary else Color.Transparent)
                                             .clickable {
-                                                vm.setThemeMode(if (dark) ThemeMode.DARK else ThemeMode.LIGHT)
+                                                vm.setThemeMode(if (isD) ThemeMode.DARK else ThemeMode.LIGHT)
                                             }
                                             .padding(horizontal = 12.dp, vertical = 5.dp)
                                     ) {
                                         Text(
-                                            text = label.replaceFirstChar { it.uppercase() },
+                                            text = label,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (selected) Color.Black else Color(0xFF888892)
+                                            color = if (selected) pageBg else textMuted
                                         )
                                     }
                                 }
                             }
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Default Audio (Sub / Dub)
                         SettingRow(title = "Default audio", hint = "Sub or dub for multi-audio streams") {
                             Row(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(Color(0xFF1E1E22))
-                                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                    .background(if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0))
+                                    .border(1.dp, borderColor, CircleShape)
                                     .padding(3.dp)
                             ) {
                                 listOf("sub", "dub").forEach { opt ->
@@ -901,7 +863,7 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(if (selected) Color.White else Color.Transparent)
+                                            .background(if (selected) textPrimary else Color.Transparent)
                                             .clickable {
                                                 currentAudio = opt
                                                 prefs.edit().putString("pref_audio", opt).apply()
@@ -913,14 +875,14 @@ fun ProfileScreen(
                                             text = opt.uppercase(),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (selected) Color.Black else Color(0xFF888892)
+                                            color = if (selected) pageBg else textMuted
                                         )
                                     }
                                 }
                             }
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Preferred Server
                         SettingRow(title = "Preferred server", hint = "Default playback source") {
@@ -932,8 +894,8 @@ fun ProfileScreen(
                                 Row(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(Color(0xFF1E1E22))
-                                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                        .background(if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0))
+                                        .border(1.dp, borderColor, CircleShape)
                                         .clickable { expanded = !expanded }
                                         .padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -942,19 +904,20 @@ fun ProfileScreen(
                                         text = serverList.firstOrNull { it.first == currentServer }?.second ?: currentServer,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
-                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF888892), modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = textMuted, modifier = Modifier.size(14.dp))
                                 }
 
                                 androidx.compose.material3.DropdownMenu(
                                     expanded = expanded,
                                     onDismissRequest = { expanded = false },
-                                    modifier = Modifier.background(Color(0xFF1E1E22))
+                                    modifier = Modifier.background(cardElevated)
                                 ) {
                                     serverList.forEach { (id, name) ->
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(name, color = Color.White, fontSize = 13.sp) },
+                                            text = { Text(name, color = textPrimary, fontSize = 13.sp) },
                                             onClick = {
                                                 vm.setPreferredServer(id)
                                                 expanded = false
@@ -966,7 +929,7 @@ fun ProfileScreen(
                             }
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Preferred Quality
                         SettingRow(title = "Preferred quality", hint = "Video resolution preference") {
@@ -977,8 +940,8 @@ fun ProfileScreen(
                                 Row(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(Color(0xFF1E1E22))
-                                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                        .background(if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0))
+                                        .border(1.dp, borderColor, CircleShape)
                                         .clickable { expandedQ = !expandedQ }
                                         .padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -987,19 +950,20 @@ fun ProfileScreen(
                                         text = qualityList.firstOrNull { it.first == currentQuality }?.second ?: "Auto",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
-                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF888892), modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = textMuted, modifier = Modifier.size(14.dp))
                                 }
 
                                 androidx.compose.material3.DropdownMenu(
                                     expanded = expandedQ,
                                     onDismissRequest = { expandedQ = false },
-                                    modifier = Modifier.background(Color(0xFF1E1E22))
+                                    modifier = Modifier.background(cardElevated)
                                 ) {
                                     qualityList.forEach { (id, name) ->
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(name, color = Color.White, fontSize = 13.sp) },
+                                            text = { Text(name, color = textPrimary, fontSize = 13.sp) },
                                             onClick = {
                                                 currentQuality = id
                                                 prefs.edit().putString("pref_quality", id).apply()
@@ -1012,87 +976,96 @@ fun ProfileScreen(
                             }
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Autoplay next episode
                         SettingRow(title = "Autoplay next episode", hint = "Plays next episode when current ends") {
                             Switch(
                                 checked = autoPlayNext,
                                 onCheckedChange = {
-                                    autoPlayNext = it; prefs.edit().putBoolean("auto_play_next", it).apply()
+                                    autoPlayNext = it
+                                    prefs.edit().putBoolean("auto_play_next", it).apply()
                                     Toast.makeText(context, "Autoplay ${if (it) "on" else "off"}", Toast.LENGTH_SHORT).show()
                                 },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color(0xFF787882),
-                                    uncheckedTrackColor = Color(0xFF1E1E22)
+                                    checkedThumbColor = pageBg,
+                                    checkedTrackColor = textPrimary,
+                                    uncheckedThumbColor = textMuted,
+                                    uncheckedTrackColor = if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0),
+                                    uncheckedBorderColor = borderColor
                                 )
                             )
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Auto-skip intro & outro
                         SettingRow(title = "Auto-skip intro & outro", hint = "Automatically skips opening & ending") {
                             Switch(
                                 checked = autoSkipIntro,
                                 onCheckedChange = {
-                                    autoSkipIntro = it; prefs.edit().putBoolean("auto_skip_intro_outro", it).apply()
+                                    autoSkipIntro = it
+                                    prefs.edit().putBoolean("auto_skip_intro_outro", it).apply()
                                     Toast.makeText(context, "Auto-skip ${if (it) "on" else "off"}", Toast.LENGTH_SHORT).show()
                                 },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color(0xFF787882),
-                                    uncheckedTrackColor = Color(0xFF1E1E22)
+                                    checkedThumbColor = pageBg,
+                                    checkedTrackColor = textPrimary,
+                                    uncheckedThumbColor = textMuted,
+                                    uncheckedTrackColor = if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0),
+                                    uncheckedBorderColor = borderColor
                                 )
                             )
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Skip filler episodes
                         SettingRow(title = "Skip filler episodes", hint = "Jumps over non-canon and filler episodes") {
                             Switch(
                                 checked = skipFiller,
                                 onCheckedChange = {
-                                    skipFiller = it; prefs.edit().putBoolean("pref_skip_filler", it).apply()
+                                    skipFiller = it
+                                    prefs.edit().putBoolean("pref_skip_filler", it).apply()
                                     Toast.makeText(context, "Skip filler ${if (it) "on" else "off"}", Toast.LENGTH_SHORT).show()
                                 },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = Color.White,
-                                    uncheckedThumbColor = Color(0xFF787882),
-                                    uncheckedTrackColor = Color(0xFF1E1E22)
+                                    checkedThumbColor = pageBg,
+                                    checkedTrackColor = textPrimary,
+                                    uncheckedThumbColor = textMuted,
+                                    uncheckedTrackColor = if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0),
+                                    uncheckedBorderColor = borderColor
                                 )
                             )
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         // Downloads configuration
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showDownloadSheet = true },
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { showDownloadSheet = true }
+                                .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                 Text(
-                                    text = "Offline Downloads",
+                                    text = "Offline Downloads Settings",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color.White
+                                    color = textPrimary
                                 )
+                                Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = "Storage location, quality and Wi-Fi rules",
                                     fontSize = 12.sp,
-                                    color = Color(0xFF888892)
+                                    color = textMuted
                                 )
                             }
-                            Icon(Icons.Default.Download, contentDescription = null, tint = Color(0xFF888892), modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = textMuted, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -1112,8 +1085,8 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0xFF141416))
-                                    .border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(14.dp))
+                                    .background(cardElevated)
+                                    .border(1.dp, borderColor, RoundedCornerShape(14.dp))
                                     .clickable { onLogin?.invoke() }
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1124,19 +1097,19 @@ fun ProfileScreen(
                                         text = "Sign in to Cloud Sync",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
                                     Spacer(Modifier.height(3.dp))
                                     Text(
                                         text = "Back up watch history, bookmarks & continue watching across any device.",
                                         fontSize = 12.sp,
-                                        color = Color(0xFF888892)
+                                        color = textMuted
                                     )
                                 }
                                 Icon(
                                     Icons.Default.ChevronRight,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = textMuted,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1152,13 +1125,13 @@ fun ProfileScreen(
                                         text = "Connected Account",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         text = loggedInState.email ?: userProfile.username.ifBlank { "Cloud Connected" },
                                         fontSize = 13.sp,
-                                        color = Color(0xFFB0B0B8),
+                                        color = textSecondary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -1172,13 +1145,13 @@ fun ProfileScreen(
                                 if (vm.isCloudSyncing) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
-                                        color = Color.White,
+                                        color = textPrimary,
                                         strokeWidth = 2.dp
                                     )
                                 }
                             }
 
-                            HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                            HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1189,8 +1162,8 @@ fun ProfileScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF1E1E22))
-                                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                        .background(cardElevated)
+                                        .border(1.dp, borderColor, CircleShape)
                                         .clickable(enabled = !vm.isCloudSyncing) {
                                             vm.pushToCloud { success ->
                                                 Toast.makeText(
@@ -1207,7 +1180,7 @@ fun ProfileScreen(
                                     Icon(
                                         Icons.Default.CloudUpload,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = textPrimary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(Modifier.width(6.dp))
@@ -1215,7 +1188,7 @@ fun ProfileScreen(
                                         text = "Push",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
                                 }
 
@@ -1224,8 +1197,8 @@ fun ProfileScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF1E1E22))
-                                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                        .background(cardElevated)
+                                        .border(1.dp, borderColor, CircleShape)
                                         .clickable(enabled = !vm.isCloudSyncing) {
                                             vm.pullFromCloud { success ->
                                                 Toast.makeText(
@@ -1242,7 +1215,7 @@ fun ProfileScreen(
                                     Icon(
                                         Icons.Default.CloudDownload,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = textPrimary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(Modifier.width(6.dp))
@@ -1250,7 +1223,7 @@ fun ProfileScreen(
                                         text = "Pull",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
                                 }
 
@@ -1259,7 +1232,7 @@ fun ProfileScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF2A1517))
+                                        .background(if (isDark) Color(0xFF2A1517) else Color(0xFFFEE2E2))
                                         .border(1.dp, Color(0x44EF4444), CircleShape)
                                         .clickable {
                                             vm.signOut()
@@ -1309,13 +1282,13 @@ fun ProfileScreen(
                                     text = "AniList Tracker",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = textPrimary
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = if (aniList != null) "Connected as ${aniList.username}" else "Sync watch progress automatically with AniList",
                                     fontSize = 12.sp,
-                                    color = Color(0xFF888892)
+                                    color = textMuted
                                 )
                             }
 
@@ -1323,8 +1296,8 @@ fun ProfileScreen(
                                 Row(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(Color(0xFF1E1E22))
-                                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                        .background(cardElevated)
+                                        .border(1.dp, borderColor, CircleShape)
                                         .clickable {
                                             vm.syncTrackers { res ->
                                                 Toast.makeText(context, "AniList synced (${res.totalPulled} items)", Toast.LENGTH_SHORT).show()
@@ -1336,7 +1309,7 @@ fun ProfileScreen(
                                     Icon(
                                         Icons.Default.Sync,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = textPrimary,
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Spacer(Modifier.width(5.dp))
@@ -1344,7 +1317,7 @@ fun ProfileScreen(
                                         text = "Sync Now",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        color = textPrimary
                                     )
                                 }
                             } else {
@@ -1356,8 +1329,8 @@ fun ProfileScreen(
                                     },
                                     shape = CircleShape,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color.Black
+                                        containerColor = textPrimary,
+                                        contentColor = pageBg
                                     )
                                 ) {
                                     Text("Connect", fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -1382,40 +1355,40 @@ fun ProfileScreen(
                                 text = "Disclaimer",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = textPrimary
                             )
                             Text(
                                 text = "Zenkai does not host, upload or store any video, novel text or manga images. Streams, chapters and pages are provided by third-party services. All titles, artwork and trademarks belong to their respective owners.",
                                 fontSize = 12.sp,
-                                color = Color(0xFF888892),
+                                color = textMuted,
                                 lineHeight = 17.sp
                             )
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 text = "Data & credits",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = textPrimary
                             )
                             Text(
                                 text = "Anime data from AniList & MyAnimeList (via Jikan); filler information from AnimeFillerList; artwork and episode details from TMDB. Avatar frames from SillyTavern-AvatarDecorations collection.",
                                 fontSize = 12.sp,
-                                color = Color(0xFF888892),
+                                color = textMuted,
                                 lineHeight = 17.sp
                             )
                         }
 
-                        HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 1.dp)
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
 
                         Row(
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xFF1E1E22))
-                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                .background(cardElevated)
+                                .border(1.dp, borderColor, CircleShape)
                                 .clickable {
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))
                                     context.startActivity(intent)
@@ -1423,18 +1396,15 @@ fun ProfileScreen(
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Join Discord Community",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Icon(Icons.Default.Info, contentDescription = null, tint = textPrimary, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Support Discord Server", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
                         }
 
                         Text(
                             text = "Zenkai v2.1.0 • Android Native & Web Unified",
                             fontSize = 11.sp,
-                            color = Color(0xFF666670)
+                            color = textMuted
                         )
                     }
                 }
@@ -2068,6 +2038,10 @@ fun SettingRow(
     hint: String? = null,
     content: @Composable () -> Unit
 ) {
+    val colors = LocalAppColors.current
+    val textPrimary = colors.textPrimary
+    val textMuted = colors.textMuted
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -2078,14 +2052,14 @@ fun SettingRow(
                 text = title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White
+                color = textPrimary
             )
             if (!hint.isNullOrBlank()) {
                 Spacer(Modifier.height(1.dp))
                 Text(
                     text = hint,
                     fontSize = 12.sp,
-                    color = Color(0xFF888892),
+                    color = textMuted,
                     lineHeight = 16.sp
                 )
             }
