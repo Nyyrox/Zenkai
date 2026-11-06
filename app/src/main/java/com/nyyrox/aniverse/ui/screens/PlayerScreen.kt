@@ -381,6 +381,11 @@ fun PlayerScreen(
                         vm.setPreferredServer(subProv.id)
                     }
                 }
+                android.widget.Toast.makeText(
+                    context,
+                    "Dub is not available for Episode $currentEpisode. Switched to Sub.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         } catch (_: Exception) {}
     }
@@ -866,6 +871,14 @@ fun PlayerScreen(
 
     fun selectCategory(catKey: String) {
         com.nyyrox.aniverse.util.AppHaptics.tick(context)
+        if (catKey == "DUB" && !audioAvailability.hasDub) {
+            android.widget.Toast.makeText(
+                context,
+                "Dub is not available for Episode $currentEpisode",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         if (selectedCategory == catKey) return
         selectedCategory = catKey
         if (selectedSourceMode == "DIRECT") {
@@ -1370,21 +1383,30 @@ fun PlayerScreen(
                             }
                         }
                         val audioKeys = if (isDirect) {
-                            if (hasDub) listOf("SUB", "DUB") else listOf("SUB")
+                            listOf("SUB", "DUB")
                         } else {
-                            if (hasDub) listOf("SUB", "DUB", "MULTI") else listOf("SUB", "MULTI")
+                            listOf("SUB", "DUB", "MULTI")
                         }
+                        val disabledKeys = if (!hasDub) setOf("DUB") else emptySet()
 
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 32.dp)
                         ) {
-                            // SUB | DUB (| MULTI): full-width, never wraps
+                            // SUB | DUB (| MULTI): full-width, translucent & disabled when DUB is unavailable
                             MonochromeSegmentedControl(
                                 labels = audioKeys,
                                 selectedIndex = audioKeys.indexOf(selectedCategory).coerceAtLeast(0),
                                 onSelected = { selectCategory(audioKeys[it]) },
+                                disabledLabels = disabledKeys,
+                                onDisabledClick = { label ->
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "$label is not available for Episode $currentEpisode",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                },
                                 isDark = isDark,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -2171,6 +2193,8 @@ private fun MonochromeSegmentedControl(
     labels: List<String>,
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    disabledLabels: Set<String> = emptySet(),
+    onDisabledClick: (String) -> Unit = {},
     isDark: Boolean,
     modifier: Modifier = Modifier,
     height: Dp = 42.dp
@@ -2192,20 +2216,36 @@ private fun MonochromeSegmentedControl(
     ) {
         labels.forEachIndexed { i, label ->
             val selected = i == selectedIndex
+            val isDisabled = disabledLabels.contains(label)
+
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(19.dp))
-                    .background(if (selected) activeBg else Color.Transparent)
-                    .clickable { onSelected(i) },
+                    .then(
+                        if (isDisabled) {
+                            Modifier
+                                .background(if (selected) activeBg.copy(alpha = 0.2f) else Color.Transparent)
+                                .alpha(0.38f)
+                                .clickable { onDisabledClick(label) }
+                        } else {
+                            Modifier
+                                .background(if (selected) activeBg else Color.Transparent)
+                                .clickable { onSelected(i) }
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label,
                     fontSize = 13.sp,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected) activeFg else inactiveFg,
+                    color = when {
+                        isDisabled -> if (isDark) Color(0xFF737373) else Color(0xFFA3A3A3)
+                        selected -> activeFg
+                        else -> inactiveFg
+                    },
                     maxLines = 1
                 )
             }
@@ -2218,6 +2258,8 @@ private fun PlayerSegmented(
     labels: List<String>,
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    disabledLabels: Set<String> = emptySet(),
+    onDisabledClick: (String) -> Unit = {},
     backdrop: PrismalGlassLayer?,
     modifier: Modifier = Modifier,
     height: Dp = 44.dp
@@ -2227,6 +2269,8 @@ private fun PlayerSegmented(
         labels = labels,
         selectedIndex = selectedIndex,
         onSelected = onSelected,
+        disabledLabels = disabledLabels,
+        onDisabledClick = onDisabledClick,
         isDark = isDark,
         modifier = modifier,
         height = height
