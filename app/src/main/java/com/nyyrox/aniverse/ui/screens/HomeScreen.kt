@@ -616,7 +616,21 @@ private fun HomeHero(
                 vm.loadTmdbArtwork(anime)
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+            val absOffset = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Fade transformation instead of swipe slide
+                        translationX = size.width * pageOffset
+                        alpha = (1f - absOffset).coerceIn(0f, 1f)
+                        val scale = 1f + (1f - absOffset) * 0.06f
+                        scaleX = scale
+                        scaleY = scale
+                    }
+            ) {
                 AsyncImage(
                     model = backdrop,
                     contentDescription = anime.displayTitle,

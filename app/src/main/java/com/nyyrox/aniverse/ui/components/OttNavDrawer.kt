@@ -67,6 +67,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Canvas
 import com.nyyrox.aniverse.ui.screens.HomePalette
 import com.nyyrox.aniverse.ui.screens.rememberHomePalette
 import com.styropyr0.prismal.LocalPrismalBackdrop
@@ -76,6 +78,83 @@ import kotlin.math.roundToInt
 
 private const val DISCORD_INVITE_URL = "https://discord.gg/kHxHzZtH7"
 private const val TELEGRAM_URL = "https://t.me/StreamverseOfc"
+
+
+@Composable
+fun SidebarButton(
+    color: Color,
+    openProgress: () -> Float,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    size: androidx.compose.ui.unit.Dp = 38.dp,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "sidebarBtnScale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .clickable(interactionSource = source, indication = null, enabled = enabled) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        val progress = openProgress()
+        Canvas(modifier = Modifier.size(20.dp)) {
+            val strokeWidth = 1.8.dp.toPx()
+            val w = this.size.width
+            val h = this.size.height
+            val r = 3.dp.toPx()
+
+            if (progress > 0.5f) {
+                val pad = 4.dp.toPx()
+                drawLine(
+                    color = color,
+                    start = Offset(pad, pad),
+                    end = Offset(w - pad, h - pad),
+                    strokeWidth = strokeWidth,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawLine(
+                    color = color,
+                    start = Offset(w - pad, pad),
+                    end = Offset(pad, h - pad),
+                    strokeWidth = strokeWidth,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            } else {
+                val padX = 2.dp.toPx()
+                val padY = 3.dp.toPx()
+                val rectW = w - padX * 2
+                val rectH = h - padY * 2
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(padX, padY),
+                    size = androidx.compose.ui.geometry.Size(rectW, rectH),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                )
+                val divX = padX + rectW * 0.35f
+                drawLine(
+                    color = color,
+                    start = Offset(divX, padY + strokeWidth * 0.5f),
+                    end = Offset(divX, padY + rectH - strokeWidth * 0.5f),
+                    strokeWidth = strokeWidth
+                )
+            }
+        }
+    }
+}
 
 private data class DrawerEntry(
     val icon: ImageVector,
@@ -249,14 +328,12 @@ fun ExpandableOttTopBar(
                             },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            MenuLinesButton(
-                                color = p.text,
-                                openProgress = { 0f },
-                                onClick = onMenuClick,
-                                enabled = expanded
+                            SidebarButton(
+                            color = p.text,
+                            openProgress = { 0f },
+                            onClick = onMenuClick,
+                            enabled = expanded
                             )
-                            Spacer(Modifier.width(8.dp))
-                            AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
                         }
 
                         Spacer(Modifier.weight(1f))
@@ -298,14 +375,12 @@ fun ExpandableOttTopBar(
                                         },
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        MenuLinesButton(
-                                            color = p.text,
-                                            openProgress = { menuProgress.value },
-                                            onClick = onDismissMenu,
-                                            enabled = true
+                                        SidebarButton(
+                                        color = p.text,
+                                        openProgress = { menuProgress.value },
+                                        onClick = onDismissMenu,
+                                        enabled = true
                                         )
-                                        Spacer(Modifier.width(8.dp))
-                                        AniverseLogo(showIcon = false, tint = if (p.dark) null else p.text)
                                     }
 
                                     Spacer(Modifier.weight(1f))

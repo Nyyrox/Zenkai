@@ -113,6 +113,15 @@ fun PublicProfileScreen(
     }
     var ownerStatusMsg by remember { mutableStateOf<String?>(null) }
 
+    val colors = LocalAppColors.current
+    val isDark = LocalIsDark.current
+    val pageBg = colors.bg
+    val cardSurface = colors.surfaceElevated
+    val cardBorder = colors.glass.border
+    val textPrimary = colors.textPrimary
+    val textSecondary = colors.textSecondary
+    val textMuted = colors.textMuted
+
     LaunchedEffect(userId) {
         isLoading = true
         vm.fetchPublicProfile(userId) { profile ->
@@ -134,7 +143,7 @@ fun PublicProfileScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(OttBg)
+            .background(pageBg)
     ) {
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -184,12 +193,13 @@ fun PublicProfileScreen(
                                 .statusBarsPadding()
                                 .padding(8.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x88000000))
+                                .background(if (isDark) Color(0x88000000) else Color(0xCCFFFFFF))
+                                .border(1.dp, cardBorder, CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
-                                tint = Color.White
+                                tint = textPrimary
                             )
                         }
 
@@ -201,7 +211,7 @@ fun PublicProfileScreen(
                                 .align(Alignment.BottomCenter)
                                 .background(
                                     Brush.verticalGradient(
-                                        listOf(Color.Transparent, OttBg)
+                                        listOf(Color.Transparent, pageBg.copy(alpha = 0.5f), pageBg)
                                     )
                                 )
                         )
@@ -271,7 +281,7 @@ fun PublicProfileScreen(
                                         style = getBioTextStyle(profile?.bioFont).copy(
                                             fontSize = 12.sp,
                                             lineHeight = 16.sp,
-                                            color = Color(0xFFF1F5F9)
+                                            color = textPrimary
                                         ),
                                         maxLines = 3,
                                         overflow = TextOverflow.Ellipsis

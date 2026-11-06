@@ -3,6 +3,14 @@ package com.nyyrox.aniverse.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.runtime.snapshotFlow
+import com.nyyrox.aniverse.ui.theme.LocalIsDark
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +70,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -214,6 +223,91 @@ val ANILIST_TMDB_BANNERS = listOf(
 )
 
 // Rich Anime Character Avatars from AniList (High-res, NO source labels, clean art)
+
+object AniListCatalog {
+    fun fetchMoreAvatars(page: Int): List<String> {
+        return try {
+            val query = "query (\$page: Int) { Page(page: \$page, perPage: 40) { characters(sort: FAVOURITES_DESC) { image { large } } } }"
+            val payload = org.json.JSONObject().apply {
+                put("query", query)
+                put("variables", org.json.JSONObject().put("page", page))
+            }.toString()
+
+            val url = java.net.URL("https://graphql.anilist.co")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Accept", "application/json")
+            conn.setRequestProperty("User-Agent", "Zenkai-Android/1.0")
+            conn.doOutput = true
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            conn.outputStream.use { os ->
+                os.write(payload.toByteArray(Charsets.UTF_8))
+            }
+            if (conn.responseCode == 200) {
+                val json = conn.inputStream.bufferedReader().use { it.readText() }
+                val data = org.json.JSONObject(json).optJSONObject("data")?.optJSONObject("Page")?.optJSONArray("characters")
+                val list = mutableListOf<String>()
+                if (data != null) {
+                    for (i in 0 until data.length()) {
+                        val img = data.optJSONObject(i)?.optJSONObject("image")?.optString("large")
+                        if (!img.isNullOrBlank() && !img.contains("default")) {
+                            list.add(img)
+                        }
+                    }
+                }
+                list
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun fetchMoreBanners(page: Int): List<String> {
+        return try {
+            val query = "query (\$page: Int) { Page(page: \$page, perPage: 40) { media(type: ANIME, sort: POPULARITY_DESC) { bannerImage } } }"
+            val payload = org.json.JSONObject().apply {
+                put("query", query)
+                put("variables", org.json.JSONObject().put("page", page))
+            }.toString()
+
+            val url = java.net.URL("https://graphql.anilist.co")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Accept", "application/json")
+            conn.setRequestProperty("User-Agent", "Zenkai-Android/1.0")
+            conn.doOutput = true
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            conn.outputStream.use { os ->
+                os.write(payload.toByteArray(Charsets.UTF_8))
+            }
+            if (conn.responseCode == 200) {
+                val json = conn.inputStream.bufferedReader().use { it.readText() }
+                val data = org.json.JSONObject(json).optJSONObject("data")?.optJSONObject("Page")?.optJSONArray("media")
+                val list = mutableListOf<String>()
+                if (data != null) {
+                    for (i in 0 until data.length()) {
+                        val banner = data.optJSONObject(i)?.optString("bannerImage")
+                        if (!banner.isNullOrBlank()) {
+                            list.add(banner)
+                        }
+                    }
+                }
+                list
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+}
+
 val ANILIST_TMDB_AVATARS = listOf(
     "https://s4.anilist.co/file/anilistcdn/character/large/b127691-9zqh1xpIubn7.png", // Gojo Satoru
     "https://s4.anilist.co/file/anilistcdn/character/large/b45627-CR68RyZmddGG.png", // Levi
@@ -316,6 +410,15 @@ fun ProfileScreen(
         }
     }
 
+    val isDark = LocalIsDark.current
+    val pageBg = colors.bg
+    val cardBg = colors.surface
+    val cardElevated = colors.surfaceElevated
+    val textPrimary = colors.textPrimary
+    val textSecondary = colors.textSecondary
+    val textMuted = colors.textMuted
+    val borderColor = colors.glass.border
+
     val bannerUrl = userProfile.bannerUrl.takeIf { it.isNotBlank() }
     val avatarUrl = userProfile.avatarUrl.takeIf { it.isNotBlank() } ?: ANILIST_TMDB_AVATARS[0]
     val frameUrl = getResolvedFrameUrl(userProfile.avatarDecorationId ?: userProfile.avatarFrameId)
@@ -323,7 +426,7 @@ fun ProfileScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(pageBg)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -335,7 +438,7 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp)
-                        .background(Color.Black)
+                        .background(pageBg)
                 ) {
                     if (bannerUrl != null) {
                         SubcomposeAsyncImage(
@@ -371,7 +474,7 @@ fun ProfileScreen(
                             )
                     )
 
-                    // Cinematic Bottom Gradient
+                    // Cinematic Bottom Gradient (Melts into page background in both light & dark themes)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -381,9 +484,9 @@ fun ProfileScreen(
                                 Brush.verticalGradient(
                                     listOf(
                                         Color.Transparent,
-                                        Color(0x66000000),
-                                        Color(0xDD000000),
-                                        Color.Black
+                                        pageBg.copy(alpha = 0.40f),
+                                        pageBg.copy(alpha = 0.85f),
+                                        pageBg
                                     )
                                 )
                             )
@@ -404,13 +507,13 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0x80000000))
-                                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                    .background(if (isDark) Color(0x80000000) else Color(0xCCFFFFFF))
+                                    .border(1.dp, borderColor, CircleShape)
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = Color.White,
+                                    tint = textPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -427,13 +530,13 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .size(38.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x99000000))
-                                .border(1.dp, Color(0x4DFFFFFF), CircleShape)
+                                .background(if (isDark) Color(0x99000000) else Color(0xCCFFFFFF))
+                                .border(1.dp, borderColor, CircleShape)
                         ) {
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = "Customize",
-                                tint = Color.White,
+                                tint = textPrimary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -472,7 +575,7 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .size(74.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, Color.Black, CircleShape),
+                                    .border(2.dp, pageBg, CircleShape),
                                 contentScale = ContentScale.Crop,
                                 loading = {
                                     ShimmerBox(
@@ -495,14 +598,14 @@ fun ProfileScreen(
                                     .offset(x = (-4).dp, y = (-4).dp)
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White)
-                                    .border(1.5.dp, Color.Black, CircleShape),
+                                    .background(colors.accent)
+                                    .border(1.5.dp, pageBg, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.CameraAlt,
                                     contentDescription = null,
-                                    tint = Color.Black,
+                                    tint = colors.onAccent,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -517,13 +620,13 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .size(38.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF1E1E22))
-                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                .background(cardElevated)
+                                .border(1.dp, borderColor, CircleShape)
                         ) {
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = "Edit Profile",
-                                tint = Color.White,
+                                tint = textPrimary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -537,7 +640,7 @@ fun ProfileScreen(
                         text = userProfile.displayName.ifBlank { "Zenkai User" },
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color.White
+                        color = textPrimary
                     )
 
                     // Username
@@ -547,7 +650,7 @@ fun ProfileScreen(
                             text = "@${userProfile.username.removePrefix("@")}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF888892)
+                            color = textMuted
                         )
                     }
 
@@ -558,8 +661,8 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF141416))
-                                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
+                                .background(cardElevated)
+                                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                                 .clickable {
                                     initialEditTab = 0
                                     showEditSheet = true
@@ -570,7 +673,7 @@ fun ProfileScreen(
                             Text(
                                 text = userProfile.bio,
                                 fontSize = 13.5.sp,
-                                color = Color(0xFFF1F5F9),
+                                color = textPrimary,
                                 lineHeight = 19.sp,
                                 modifier = Modifier.weight(1f)
                             )
@@ -578,7 +681,7 @@ fun ProfileScreen(
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = "Edit bio",
-                                tint = Color(0xFFA1A1AA),
+                                tint = textMuted,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -586,8 +689,8 @@ fun ProfileScreen(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF161618))
-                                .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+                                .background(cardElevated)
+                                .border(1.dp, borderColor, RoundedCornerShape(10.dp))
                                 .clickable {
                                     initialEditTab = 0
                                     showEditSheet = true
@@ -598,14 +701,14 @@ fun ProfileScreen(
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = null,
-                                tint = Color(0xFFA1A1AA),
+                                tint = textMuted,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "+ Add a bio...",
                                 fontSize = 12.5.sp,
-                                color = Color(0xFFCBD5E1)
+                                color = textMuted
                             )
                         }
                     }
@@ -1244,13 +1347,28 @@ fun ProfileScreen(
             }
         }
 
-        // Profile Customizer Bottom Sheet (Supports swipe-up to fullscreen)
+        // Profile Customizer Bottom Sheet (Supports swipe-up to fullscreen, isolated content scrolling)
         if (showEditSheet) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val blockSheetScroll = remember {
+                object : NestedScrollConnection {
+                    override fun onPostScroll(
+                        consumed: Offset,
+                        available: Offset,
+                        source: NestedScrollSource
+                    ): Offset = available
+
+                    override suspend fun onPostFling(
+                        consumed: Velocity,
+                        available: Velocity
+                    ): Velocity = available
+                }
+            }
+
             ModalBottomSheet(
                 onDismissRequest = { showEditSheet = false },
                 sheetState = sheetState,
-                containerColor = Color(0xFF101012),
+                containerColor = if (isDark) Color(0xFF101012) else Color(0xFFFFFFFF),
                 dragHandle = null
             ) {
                 var editTab by remember { mutableIntStateOf(initialEditTab) }
@@ -1261,12 +1379,61 @@ fun ProfileScreen(
                 var editBannerUrl by remember { mutableStateOf(userProfile.bannerUrl) }
                 var editFrameId by remember { mutableStateOf(userProfile.avatarDecorationId ?: userProfile.avatarFrameId ?: "none") }
 
+                var avatarList by remember { mutableStateOf(ANILIST_TMDB_AVATARS) }
+                var avatarPage by remember { mutableIntStateOf(1) }
+                var isLoadingMoreAvatars by remember { mutableStateOf(false) }
+                val avatarGridState = rememberLazyGridState()
+
+                var bannerList by remember { mutableStateOf(ANILIST_TMDB_BANNERS) }
+                var bannerPage by remember { mutableIntStateOf(1) }
+                var isLoadingMoreBanners by remember { mutableStateOf(false) }
+                val bannerGridState = rememberLazyGridState()
+
+                // Endless / Unlimited Avatar Pagination
+                LaunchedEffect(avatarGridState) {
+                    snapshotFlow { avatarGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                        .collect { lastIdx ->
+                            if (lastIdx != null && lastIdx >= avatarList.size - 8 && !isLoadingMoreAvatars) {
+                                isLoadingMoreAvatars = true
+                                val nextPage = avatarPage + 1
+                                val more = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    AniListCatalog.fetchMoreAvatars(nextPage)
+                                }
+                                if (more.isNotEmpty()) {
+                                    avatarList = (avatarList + more).distinct()
+                                    avatarPage = nextPage
+                                }
+                                isLoadingMoreAvatars = false
+                            }
+                        }
+                }
+
+                // Endless / Unlimited Banner Pagination
+                LaunchedEffect(bannerGridState) {
+                    snapshotFlow { bannerGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                        .collect { lastIdx ->
+                            if (lastIdx != null && lastIdx >= bannerList.size - 6 && !isLoadingMoreBanners) {
+                                isLoadingMoreBanners = true
+                                val nextPage = bannerPage + 1
+                                val more = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    AniListCatalog.fetchMoreBanners(nextPage)
+                                }
+                                if (more.isNotEmpty()) {
+                                    bannerList = (bannerList + more).distinct()
+                                    bannerPage = nextPage
+                                }
+                                isLoadingMoreBanners = false
+                            }
+                        }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .nestedScroll(blockSheetScroll)
                 ) {
                     // Sheet Top Bar: Drag indicator & Save/Cancel buttons
                     Box(
@@ -1293,7 +1460,7 @@ fun ProfileScreen(
                             text = "Customize Profile",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = textPrimary
                         )
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1301,7 +1468,7 @@ fun ProfileScreen(
                                 onClick = { showEditSheet = false },
                                 shape = CircleShape
                             ) {
-                                Text("Cancel", color = Color(0xFF888892), fontSize = 12.sp)
+                                Text("Cancel", color = textMuted, fontSize = 12.sp)
                             }
                             Button(
                                 onClick = {
@@ -1322,9 +1489,9 @@ fun ProfileScreen(
                                     Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
                                 },
                                 shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.accent)
                             ) {
-                                Text("Save", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Save", color = colors.onAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -1336,8 +1503,8 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF18181B))
-                            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(16.dp))
+                            .background(cardElevated)
+                            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             // Mini Banner Preview
@@ -1414,21 +1581,21 @@ fun ProfileScreen(
                                         text = editName.ifBlank { "Your Name" },
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = textPrimary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = "@${editUsername.ifBlank { "username" }}",
                                         fontSize = 12.sp,
-                                        color = Color(0xFF888892)
+                                        color = textMuted
                                     )
                                     if (editBio.isNotBlank()) {
                                         Spacer(Modifier.height(3.dp))
                                         Text(
                                             text = editBio,
                                             fontSize = 12.sp,
-                                            color = Color(0xFFE2E8F0),
+                                            color = textSecondary,
                                             lineHeight = 16.sp,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
@@ -1446,12 +1613,12 @@ fun ProfileScreen(
                     TabRow(
                         selectedTabIndex = editTab,
                         containerColor = Color.Transparent,
-                        contentColor = Color.White,
+                        contentColor = textPrimary,
                         divider = {},
                         indicator = { tabPositions ->
                             TabRowDefaults.SecondaryIndicator(
                                 Modifier.tabIndicatorOffset(tabPositions[editTab]),
-                                color = Color.White
+                                color = textPrimary
                             )
                         }
                     ) {
@@ -1464,7 +1631,7 @@ fun ProfileScreen(
                                         text = title,
                                         fontSize = 12.5.sp,
                                         fontWeight = if (editTab == index) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (editTab == index) Color.White else Color(0xFF888892)
+                                        color = if (editTab == index) textPrimary else textMuted
                                     )
                                 }
                             )
@@ -1477,20 +1644,20 @@ fun ProfileScreen(
                         // 0: Bio & Identity
                         0 -> {
                             val fieldColors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color(0xFFF1F5F9),
-                                focusedContainerColor = Color(0xFF141419),
-                                unfocusedContainerColor = Color(0xFF101014),
-                                focusedBorderColor = Color.White,
-                                unfocusedBorderColor = Color(0x33FFFFFF),
-                                focusedLabelColor = Color.White,
-                                unfocusedLabelColor = Color(0xFF94A3B8),
-                                cursorColor = Color.White,
-                                focusedPlaceholderColor = Color(0xFF64748B),
-                                unfocusedPlaceholderColor = Color(0xFF64748B)
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary,
+                                focusedContainerColor = if (isDark) Color(0xFF141419) else Color(0xFFF3F4F6),
+                                unfocusedContainerColor = if (isDark) Color(0xFF101014) else Color(0xFFF9FAFB),
+                                focusedBorderColor = colors.accent,
+                                unfocusedBorderColor = borderColor,
+                                focusedLabelColor = textPrimary,
+                                unfocusedLabelColor = textMuted,
+                                cursorColor = textPrimary,
+                                focusedPlaceholderColor = textMuted,
+                                unfocusedPlaceholderColor = textMuted
                             )
                             val inputStyle = androidx.compose.ui.text.TextStyle(
-                                color = Color.White,
+                                color = textPrimary,
                                 fontSize = 14.sp
                             )
 
@@ -1595,22 +1762,24 @@ fun ProfileScreen(
                             ) {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(5),
+                                    state = avatarGridState,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(340.dp),
+                                        .height(340.dp)
+                                        .nestedScroll(blockSheetScroll),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    items(ANILIST_TMDB_AVATARS) { url ->
+                                    items(avatarList) { url ->
                                         val isSelected = editAvatarUrl == url
                                         Box(
                                             modifier = Modifier
                                                 .size(56.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFF16161A))
+                                                .background(cardElevated)
                                                 .border(
                                                     if (isSelected) 2.5.dp else 1.dp,
-                                                    if (isSelected) Color.White else Color(0x22FFFFFF),
+                                                    if (isSelected) colors.accent else borderColor,
                                                     CircleShape
                                                 )
                                                 .clickable { editAvatarUrl = url },
@@ -1627,6 +1796,14 @@ fun ProfileScreen(
                                                         shape = CircleShape
                                                     )
                                                 }
+                                            )
+                                        }
+                                    }
+                                    if (isLoadingMoreAvatars) {
+                                        items(5) {
+                                            ShimmerBox(
+                                                modifier = Modifier.size(56.dp),
+                                                shape = CircleShape
                                             )
                                         }
                                     }
@@ -1725,23 +1902,25 @@ fun ProfileScreen(
                             ) {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(2),
+                                    state = bannerGridState,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(340.dp),
+                                        .height(340.dp)
+                                        .nestedScroll(blockSheetScroll),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(ANILIST_TMDB_BANNERS) { url ->
+                                    items(bannerList) { url ->
                                         val isSelected = editBannerUrl == url
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(68.dp)
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0xFF16161A))
+                                                .background(cardElevated)
                                                 .border(
                                                     if (isSelected) 2.dp else 1.dp,
-                                                    if (isSelected) Color.White else Color(0x26FFFFFF),
+                                                    if (isSelected) colors.accent else borderColor,
                                                     RoundedCornerShape(8.dp)
                                                 )
                                                 .clickable { editBannerUrl = url }
@@ -1757,6 +1936,16 @@ fun ProfileScreen(
                                                         shape = RoundedCornerShape(8.dp)
                                                     )
                                                 }
+                                            )
+                                        }
+                                    }
+                                    if (isLoadingMoreBanners) {
+                                        items(2) {
+                                            ShimmerBox(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(68.dp),
+                                                shape = RoundedCornerShape(8.dp)
                                             )
                                         }
                                     }
