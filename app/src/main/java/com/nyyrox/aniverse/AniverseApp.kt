@@ -40,6 +40,11 @@ import com.nyyrox.aniverse.data.StorageManager
 import com.nyyrox.aniverse.data.supabase.AuthState
 import com.nyyrox.aniverse.ui.components.CompulsoryUsernameDialog
 import com.nyyrox.aniverse.ui.components.OttBottomDock
+import com.nyyrox.aniverse.ui.components.OttProfileBubble
+import com.nyyrox.aniverse.ui.screens.rememberHomePalette
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.unit.dp
 import com.styropyr0.prismal.sources.prismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import com.styropyr0.prismal.LocalPrismalBackdrop
@@ -562,7 +567,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         onOpenDecorations = { push("decorations") },
                                         onOpenNotifications = { push("notifications") },
                                         onOpenRankings = { push("community_rankings") },
-                                        onOpenUserProfile = { push("public_profile:$it") }
+                                        onOpenUserProfile = { push("public_profile:$it") },
+                                        onNavigate = { target ->
+                                            if (listOf("home", "browse", "manga", "novel", "profile").contains(target)) {
+                                                switchTab(target)
+                                            } else {
+                                                push(target)
+                                            }
+                                        }
                                     )
                                 }
 
@@ -966,35 +978,19 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         )
                     }
 
-                    // Unified Expandable Top Bar & Navigation Drawer
-                    // When closed: sleek 44dp top bar. When menu is clicked: that same bar smoothly expands downward into the drawer menu.
+                    // Dedicated Circular Profile Button pinned at top-right
                     if (isRootRoute && currentRoute != "profile" && currentRoute != "browse") {
-                        OttTopBar(
-                            // Schedule has its own header: keep only the profile bubble there.
-                            expanded = chrome.topExpanded && currentRoute != "airing",
-                            userAvatarUrl = vm.userProfile.avatarUrl,
-                            avatarDecorationId = vm.userProfile.avatarDecorationId,
-                            avatarFrameId = vm.userProfile.avatarFrameId,
-                            isMenuOpen = isDrawerOpen,
-                            onMenuClick = { isDrawerOpen = true },
-                            onDismissMenu = { isDrawerOpen = false },
-                            onNavigate = { target ->
-                                isDrawerOpen = false
-                                if (listOf("home", "airing", "manga", "novel", "profile").contains(target)) {
-                                    switchTab(target)
-                                } else {
-                                    push(target)
-                                }
-                            },
-                            onSearchClick = {
-                                push(if (currentRoute == "manga") "search:manga" else if (currentRoute == "novel") "search:novel" else "search")
-                            },
-                            onWatchlistClick = { push("library") },
-                            onProfileClick = {
-                                isDrawerOpen = false
-                                switchTab("profile")
-                            },
-                            modifier = Modifier.align(Alignment.TopCenter)
+                        OttProfileBubble(
+                            p = rememberHomePalette(),
+                            avatarUrl = vm.userProfile.avatarUrl,
+                            decorationId = vm.userProfile.avatarDecorationId,
+                            frameId = vm.userProfile.avatarFrameId,
+                            onClick = { switchTab("profile") },
+                            size = 40.dp,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .statusBarsPadding()
+                                .padding(end = 16.dp, top = 8.dp)
                         )
                     }
 

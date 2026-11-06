@@ -450,7 +450,7 @@ internal fun MenuLinesButton(
     }
 }
 
-/** Round profile avatar button used inside the top bar and the menu header. */
+/** Round profile avatar button pinned at top right or inside headers. */
 @Composable
 internal fun OttProfileBubble(
     p: HomePalette,
@@ -459,7 +459,7 @@ internal fun OttProfileBubble(
     frameId: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 36.dp
+    size: Dp = 40.dp
 ) {
     val context = LocalContext.current
     val source = remember { MutableInteractionSource() }
@@ -484,22 +484,31 @@ internal fun OttProfileBubble(
             frameId = frameId,
             size = size - 4.dp
         ) {
-            if (!avatarUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = avatarUrl,
-                    contentDescription = "Profile",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = "Profile",
-                    tint = p.text,
-                    modifier = Modifier.size(20.dp)
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(p.flatFill)
+                    .border(1.dp, p.glassBorder, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "Profile",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Profile",
+                        tint = p.text,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
@@ -810,16 +819,47 @@ fun OttBottomDock(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    // Solid Dock Bar (NO liquid glass)
-                    FlatDockBar(
-                        tabs = tabs,
-                        activeIndex = activeIndex,
-                        p = p,
-                        userAvatarUrl = userAvatarUrl,
-                        avatarDecorationId = avatarDecorationId,
-                        avatarFrameId = avatarFrameId,
-                        onNavigate = onNavigate
-                    )
+                    if (glassOn) {
+                        val baseConfig = LocalConfiguration.current
+                        val themedConfig = remember(baseConfig, p.dark) {
+                            android.content.res.Configuration(baseConfig).apply {
+                                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                                    (if (p.dark) android.content.res.Configuration.UI_MODE_NIGHT_YES
+                                    else android.content.res.Configuration.UI_MODE_NIGHT_NO)
+                            }
+                        }
+                        CompositionLocalProvider(LocalConfiguration provides themedConfig) {
+                        PrismalGlassBottomTabs(
+                            selectedTabIndex = { activeIndex },
+                            onTabSelected = { idx ->
+                                if (idx in tabs.indices) onNavigate(tabs[idx].route)
+                            },
+                            backdrop = ambientBackdrop,
+                            tabsCount = tabs.size,
+                            specular = { PrismalSpecular.Default },
+                            tintDropletContent = false,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val highlightedIndex = LocalPrismalBottomTabHighlightedIndex.current
+                            for ((index, tab) in tabs.withIndex()) {
+                                val isSelected = highlightedIndex() == index
+                                PrismalGlassBottomTab(onClick = { onNavigate(tab.route) }) {
+                                    DockTabContent(tab, isSelected, p, userAvatarUrl, avatarDecorationId, avatarFrameId)
+                                }
+                            }
+                        }
+                        }
+                    } else {
+                        FlatDockBar(
+                            tabs = tabs,
+                            activeIndex = activeIndex,
+                            p = p,
+                            userAvatarUrl = userAvatarUrl,
+                            avatarDecorationId = avatarDecorationId,
+                            avatarFrameId = avatarFrameId,
+                            onNavigate = onNavigate
+                        )
+                    }
                 }
             }
 
@@ -870,15 +910,11 @@ private fun FlatDockBar(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "flat_dock_spring"
     )
-    val dockSolidBg = if (p.dark) Color(0xFF101013) else Color(0xFFFFFFFF)
-    val dockSolidBorder = if (p.dark) Color(0x33FFFFFF) else Color(0x1F000000)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(if (p.dark) 10.dp else 5.dp, RoundedCornerShape(32.dp))
-            .clip(RoundedCornerShape(32.dp))
-            .background(dockSolidBg)
-            .border(1.dp, dockSolidBorder, RoundedCornerShape(32.dp))
+            .shadow(4.dp, RoundedCornerShape(32.dp))
+            .ottGlass(p, RoundedCornerShape(32.dp))
             .padding(horizontal = 6.dp, vertical = 6.dp)
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -891,8 +927,8 @@ private fun FlatDockBar(
                     .width(itemWidth - pillPaddingH * 2)
                     .height(46.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(if (p.dark) Color(0xFF222228) else Color(0xFFF1F3F7))
-                    .border(1.dp, if (p.dark) Color(0x38FFFFFF) else Color(0x1A000000), RoundedCornerShape(24.dp))
+                    .background(p.text.copy(alpha = 0.12f))
+                    .border(1.dp, p.glassBorder, RoundedCornerShape(24.dp))
             )
 
             Row(

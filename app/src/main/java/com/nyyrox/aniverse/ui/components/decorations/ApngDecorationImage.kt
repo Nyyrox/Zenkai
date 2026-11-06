@@ -24,6 +24,20 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
+ * Helper to ensure decoration URLs are fully valid (spaces encoded, cdn mapped).
+ */
+fun sanitizeDecorationUrl(url: String): String {
+    var clean = url.trim().replace(" ", "%20")
+    if (clean.startsWith("https://raw.githubusercontent.com/Nyyrox/SillyTavern-AvatarDecorations-CSS/main/dc-decorations/")) {
+        clean = clean.replace(
+            "https://raw.githubusercontent.com/Nyyrox/SillyTavern-AvatarDecorations-CSS/main/dc-decorations/",
+            "https://cdn.jsdelivr.net/gh/Nyyrox/SillyTavern-AvatarDecorations-CSS@c63faa39f5c863da5bfaa9a642720b50283de090/dc-decorations/"
+        )
+    }
+    return clean
+}
+
+/**
  * High-performance animated APNG viewer for Discord avatar decorations.
  * APNG4Android decodes multi-frame APNG chunks (acTL, fcTL, fdAT) and renders
  * at full 60fps hardware-accelerated framerate in an Android ImageView.
@@ -32,7 +46,7 @@ import java.util.concurrent.TimeUnit
  * Animatable2Compat classpath visibility issues on certain build configurations.
  */
 object ApngMemoryCache {
-    private val cache = ConcurrentHashMap<String, ByteArray>(64)
+    private val cache = ConcurrentHashMap<String, ByteArray>(128)
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -40,33 +54,51 @@ object ApngMemoryCache {
 
     fun get(url: String): ByteArray? = cache[url]
 
-    suspend fun loadBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
-        cache[url]?.let { return@withContext it }
+    private fun fetch(url: String): ByteArray? {
         try {
             val request = Request.Builder().url(url).build()
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    val bytes = response.body.bytes()
-                    cache[url] = bytes
-                    return@withContext bytes
+                    return response.body.bytes()
                 }
             }
         } catch (_: Throwable) {}
-        null
+        return null
+    }
+
+    suspend fun loadBytes(rawUrl: String): ByteArray? = withContext(Dispatchers.IO) {
+        val safeUrl = sanitizeDecorationUrl(rawUrl)
+        cache[safeUrl]?.let { return@withContext it }
+        cache[rawUrl]?.let { return@withContext it }
+
+        var bytes = fetch(safeUrl)
+        if (bytes == null && safeUrl.contains("jsdelivr.net")) {
+            val rawFallback = safeUrl.replace(
+                "https://cdn.jsdelivr.net/gh/Nyyrox/SillyTavern-AvatarDecorations-CSS@c63faa39f5c863da5bfaa9a642720b50283de090/dc-decorations/",
+                "https://raw.githubusercontent.com/Nyyrox/SillyTavern-AvatarDecorations-CSS/main/dc-decorations/"
+            )
+            bytes = fetch(rawFallback)
+        }
+        if (bytes != null) {
+            cache[safeUrl] = bytes
+            cache[rawUrl] = bytes
+        }
+        bytes
     }
 }
 
 @Composable
 fun ApngDecorationImage(
     url: String,
-    contentDescription: String?,
+    contentDescription: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var apngDrawable by remember(url) { mutableStateOf<APNGDrawable?>(null) }
-    var loadFailed by remember(url) { mutableStateOf(false) }
+    val safeUrl = remember(url) { sanitizeDecorationUrl(url) }
+    var apngDrawable by remember(safeUrl) { mutableStateOf<APNGDrawable?>(null) }
+    var loadFailed by remember(safeUrl) { mutableStateOf(false) }
 
-    LaunchedEffect(url) {
-        val bytes = ApngMemoryCache.get(url) ?: ApngMemoryCache.loadBytes(url)
+    LaunchedEffect(safeUrl) {
+        val bytes = ApngMemoryCache.get(safeUrl) ?: ApngMemoryCache.loadBytes(safeUrl)
         if (bytes != null) {
             try {
                 val loader = object : StreamLoader() {
@@ -100,9 +132,12 @@ fun ApngDecorationImage(
             modifier = modifier,
             factory = { ctx ->
                 ImageView(ctx).apply {
+                    layoutParams = android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    )
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     setImageDrawable(currentDrawable)
-                    // start() already called in LaunchedEffect; safe to call again
                     try { currentDrawable.start() } catch (_: Throwable) {}
                 }
             },
@@ -116,7 +151,7 @@ fun ApngDecorationImage(
     } else {
         // Fallback static image while loading or if APNG fails
         AsyncImage(
-            model = url,
+            model = safeUrl,
             contentDescription = contentDescription,
             modifier = modifier,
             contentScale = ContentScale.Fit

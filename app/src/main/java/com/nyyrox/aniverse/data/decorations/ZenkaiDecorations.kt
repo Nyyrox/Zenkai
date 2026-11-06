@@ -83,6 +83,68 @@ data class DecorationItem(
     val nameplateTheme: NameplateTheme? = null
 )
 
+data class FrameItem(val id: String, val name: String, val file: String) {
+    val url: String get() = "https://cdn.jsdelivr.net/gh/Nyyrox/SillyTavern-AvatarDecorations-CSS@c63faa39f5c863da5bfaa9a642720b50283de090/dc-decorations/" + file.replace(" ", "%20") + ".png"
+}
+
+val PRESET_FRAMES = listOf(
+    FrameItem("1-angry", "Angry", "1_Angry"),
+    FrameItem("1-cat-ears", "Cat Ears", "1_cat-ears"),
+    FrameItem("1-dismay", "Dismay", "1_dismay"),
+    FrameItem("1-heartbloom", "Heartbloom", "1_heartbloom"),
+    FrameItem("1-in-love", "In Love", "1_In-Love"),
+    FrameItem("1-in-tears", "In Tears", "1_in-tears"),
+    FrameItem("1-ki-energy", "Ki Energy", "1_ki-energy"),
+    FrameItem("1-radiating-energy", "Radiating Energy", "1_Radiating-Energy"),
+    FrameItem("1-rage", "Rage", "1_rage"),
+    FrameItem("1-shocked", "Shocked", "1_Shocked"),
+    FrameItem("1-soul-leaving-body", "Soul Leaving Body", "1_Soul-Leaving-Body"),
+    FrameItem("1-starry-eyed", "Starry Eyed", "1_Starry-Eyed"),
+    FrameItem("1-sweat-drops", "Sweat Drops", "1_Sweat-Drops"),
+    FrameItem("2-cybernetic", "Cybernetic", "2_Cybernetic"),
+    FrameItem("2-digital-sunrise", "Digital Sunrise", "2_Digital Sunrise"),
+    FrameItem("2-glitch", "Glitch", "2_Glitch"),
+    FrameItem("2-implant", "Implant", "2_Implant"),
+    FrameItem("3-disxcore-headset", "DISXCORE Headset", "3_DISXCORE Headset"),
+    FrameItem("3-futuristic-ui", "Futuristic UI", "3_Futuristic UI"),
+    FrameItem("3-smoke", "Smoke", "3_Smoke"),
+    FrameItem("4-defensive-shield", "Defensive Shield", "4_Defensive Shield"),
+    FrameItem("4-flaming-sword", "Flaming Sword", "4_Flaming Sword"),
+    FrameItem("4-glowing-runes", "Glowing Runes", "4_GLowing Runes"),
+    FrameItem("4-magical-potion", "Magical Potion", "4_Magical Potion"),
+    FrameItem("4-skull-medallion", "Skull Medallion", "4_Skull Medallion"),
+    FrameItem("4-treasure-and-key", "Treasure & Key", "4_Treasure and Key"),
+    FrameItem("4-wizard-s-staff", "Wizard's Staff", "4_Wizard's Staff"),
+    FrameItem("5-dragon-s-smile", "Dragon's Smile", "5_Dragon's Smile"),
+    FrameItem("5-fan-fluorish", "Fan Fluorish", "5_Fan Fluorish"),
+    FrameItem("5-firecrackers", "Firecrackers", "5_Firecrackers"),
+    FrameItem("5-koi-pond", "Koi Pond", "5_Koi Pond"),
+    FrameItem("5-lucky-envelopes", "Lucky Envelopes", "5_Lucky Envelopes"),
+    FrameItem("5-lunar-lanterns", "Lunar Lanterns", "5_Lunar Lanterns"),
+    FrameItem("6-air", "Air", "6_Air"),
+    FrameItem("6-balance", "Balance", "6_Balance"),
+    FrameItem("6-earth", "Earth", "6_Earth"),
+    FrameItem("6-fire", "Fire", "6_Fire"),
+    FrameItem("6-lightning", "Lightning", "6_Lightning"),
+    FrameItem("6-water", "Water", "6_Water"),
+    FrameItem("7-chromawave", "Chromawave", "7_Chromawave"),
+    FrameItem("7-cozy-cat", "Cozy Cat", "7_Cozy-Cat"),
+    FrameItem("7-cozy-headphones", "Cozy Headphones", "7_Cozy-Headphones"),
+    FrameItem("7-oasis", "Oasis", "7_Oasis"),
+    FrameItem("7-rainy-mood", "Rainy Mood", "7_Rainy-Mood"),
+    FrameItem("8-blade-storm", "Blade Storm", "8_blade-storm"),
+    FrameItem("8-omens-cowl", "Omens Cowl", "8_omens-cowl"),
+    FrameItem("8-reynas-leer", "Reynas Leer", "8_reynas-leer"),
+    FrameItem("9-butterflies", "Butterflies", "9_butterflies"),
+    FrameItem("9-honeyblossom", "Honeyblossom", "9_honeyblossom"),
+    FrameItem("10-astronaut-helmet", "Astronaut Helmet", "10_Astronaut-Helmet"),
+    FrameItem("10-black-hole", "Black Hole", "10_Black-Hole"),
+    FrameItem("10-constellations", "Constellations", "10_Constellations"),
+    FrameItem("10-solar-orbit", "Solar Orbit", "10_Solar-Orbit"),
+    FrameItem("10-stardust", "Stardust", "10_Stardust"),
+    FrameItem("10-ufo", "UFO", "10_UFO")
+)
+
 object ZenkaiDecorationCatalog {
 
     // 3D Circular Frames removed as requested - backward compatibility alias

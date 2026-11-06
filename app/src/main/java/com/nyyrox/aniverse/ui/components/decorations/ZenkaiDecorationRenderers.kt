@@ -49,6 +49,9 @@ import com.nyyrox.aniverse.data.decorations.AvatarFrameTheme
 import com.nyyrox.aniverse.data.decorations.DecorationRarity
 import com.nyyrox.aniverse.data.decorations.TextEffectStyle
 import com.nyyrox.aniverse.data.decorations.ZenkaiDecorationCatalog
+import com.nyyrox.aniverse.data.decorations.DecorationItem
+import com.nyyrox.aniverse.data.decorations.FrameItem
+import com.nyyrox.aniverse.data.decorations.PRESET_FRAMES
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -193,11 +196,69 @@ fun CircularAvatarFrameRenderer(
 }
 
 const val AVATAR_DECORATIONS_BASE_URL =
-    "https://raw.githubusercontent.com/Nyyrox/SillyTavern-AvatarDecorations-CSS/main/dc-decorations/"
+    "https://cdn.jsdelivr.net/gh/Nyyrox/SillyTavern-AvatarDecorations-CSS@c63faa39f5c863da5bfaa9a642720b50283de090/dc-decorations/"
 
 fun getAvatarDecorationUrl(fileName: String): String {
-    val encoded = fileName.replace(" ", "%20")
+    val cleanName = if (fileName.endsWith(".png", ignoreCase = true)) fileName else "$fileName.png"
+    val encoded = cleanName.replace(" ", "%20")
     return "$AVATAR_DECORATIONS_BASE_URL$encoded"
+}
+
+fun resolveAvatarOverlayUrl(idOrUrl: String?): String? {
+    if (idOrUrl.isNullOrBlank() || idOrUrl == "none" || idOrUrl == "null") return null
+
+    val trimmed = idOrUrl.trim()
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        return sanitizeDecorationUrl(trimmed)
+    }
+
+    // 1. Try finding in ZenkaiDecorationCatalog directly
+    val catalogItem = ZenkaiDecorationCatalog.findById(trimmed)
+    if (catalogItem != null && !catalogItem.assetFileName.isNullOrBlank()) {
+        return getAvatarDecorationUrl(catalogItem.assetFileName)
+    }
+
+    // 2. Try matching by catalog item assetFileName
+    val matchByAsset = ZenkaiDecorationCatalog.AVATAR_OVERLAYS.firstOrNull {
+        it.assetFileName?.equals(trimmed, ignoreCase = true) == true ||
+        it.assetFileName?.equals("$trimmed.png", ignoreCase = true) == true ||
+        it.assetFileName?.removeSuffix(".png")?.equals(trimmed, ignoreCase = true) == true
+    }
+    if (matchByAsset != null && !matchByAsset.assetFileName.isNullOrBlank()) {
+        return getAvatarDecorationUrl(matchByAsset.assetFileName)
+    }
+
+    // 3. Try matching in PRESET_FRAMES
+    val preset = PRESET_FRAMES.firstOrNull {
+        it.id.equals(trimmed, ignoreCase = true) ||
+        it.file.equals(trimmed, ignoreCase = true) ||
+        it.name.equals(trimmed, ignoreCase = true)
+    }
+    if (preset != null) {
+        return sanitizeDecorationUrl(preset.url)
+    }
+
+    // 4. Try normalized fuzzy match between 'ao_xxx' and '1-xxx' or '1_xxx'
+    val norm = trimmed.replace("ao_", "").replace("-", "_").lowercase()
+    val matchPreset = PRESET_FRAMES.firstOrNull {
+        it.id.replace("-", "_").lowercase().contains(norm) ||
+        it.file.replace("-", "_").lowercase().contains(norm)
+    }
+    if (matchPreset != null) {
+        return sanitizeDecorationUrl(matchPreset.url)
+    }
+
+    val matchCatalog = ZenkaiDecorationCatalog.AVATAR_OVERLAYS.firstOrNull {
+        it.id.replace("ao_", "").replace("-", "_").lowercase().contains(norm) ||
+        it.assetFileName?.replace("-", "_")?.lowercase()?.contains(norm) == true
+    }
+    if (matchCatalog != null && !matchCatalog.assetFileName.isNullOrBlank()) {
+        return getAvatarDecorationUrl(matchCatalog.assetFileName)
+    }
+
+    // 5. Fallback: treat as direct file name on CDN
+    val fileTarget = if (trimmed.endsWith(".png", ignoreCase = true)) trimmed else "$trimmed.png"
+    return getAvatarDecorationUrl(fileTarget)
 }
 
 /**
@@ -205,8 +266,8 @@ fun getAvatarDecorationUrl(fileName: String): String {
  * 2. MASTER AVATAR DECORATION RENDERER
  * ══════════════════════════════════════════════════════════════════════════════
  * Renders the circular avatar with an animated Discord overlay loaded directly
- * from GitHub repo (https://github.com/Nyyrox/SillyTavern-AvatarDecorations-CSS).
- * Overlays are zoomed (1.55x) so they comfortably frame and fill the avatar.
+ * from CDN (https://github.com/Nyyrox/SillyTavern-AvatarDecorations-CSS).
+ * Overlays are zoomed (1.34x) so they comfortably frame and fill the avatar.
  */
 @Composable
 fun AvatarDecorationRenderer(
@@ -216,9 +277,14 @@ fun AvatarDecorationRenderer(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val overlayItem = remember(decorationId) {
-        val oid = decorationId?.takeIf { !it.startsWith("cf_") }
-        oid?.let { ZenkaiDecorationCatalog.findById(it) }
+    val activeId = remember(decorationId, frameId) {
+        val did = decorationId?.takeIf { it.isNotBlank() && it != "none" && !it.startsWith("cf_") }
+        val fid = frameId?.takeIf { it.isNotBlank() && it != "none" && !it.startsWith("cf_") }
+        did ?: fid
+    }
+
+    val resolvedOverlayUrl = remember(activeId) {
+        resolveAvatarOverlayUrl(activeId)
     }
 
     Box(
@@ -236,11 +302,10 @@ fun AvatarDecorationRenderer(
         }
 
         // Overlay Animated APNG (1.34x scale, unconstrained so ears/horns/masks fit comfortably OUTSIDE the avatar circle)
-        if (overlayItem != null && !overlayItem.assetFileName.isNullOrBlank()) {
-            val overlayUrl = getAvatarDecorationUrl(overlayItem.assetFileName)
+        if (resolvedOverlayUrl != null) {
             ApngDecorationImage(
-                url = overlayUrl,
-                contentDescription = overlayItem.name,
+                url = resolvedOverlayUrl,
+                contentDescription = "Avatar Decoration",
                 modifier = Modifier
                     .wrapContentSize(align = Alignment.Center, unbounded = true)
                     .requiredSize(size * 1.34f)
