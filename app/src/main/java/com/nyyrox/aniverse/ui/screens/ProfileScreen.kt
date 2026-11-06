@@ -642,8 +642,6 @@ fun ProfileScreen(
                     val featureList = listOf(
                         ProfileFeatureEntry("Movies & TV", "Browse anime movies, series, OVAs & specials", Icons.Default.Movie, "movies"),
                         ProfileFeatureEntry("Airing & Schedule", "Release calendar & episode countdowns", Icons.Default.Schedule, "airing"),
-                        ProfileFeatureEntry("Watch Together", "Stream videos in sync with friends", Icons.Default.Groups, "watchtogether"),
-                        ProfileFeatureEntry("Community & Chat", "Join discussions, rankings & user feed", Icons.Default.Forum, "community"),
                         ProfileFeatureEntry("Saved Library", "Your watchlist, bookmarks & history", Icons.Default.Bookmark, "library"),
                         ProfileFeatureEntry("Downloads", "Manage offline anime and downloaded episodes", Icons.Default.Download, "downloads")
                     )
@@ -657,7 +655,6 @@ fun ProfileScreen(
                                         when (item.route) {
                                             "downloads" -> onNavigate?.invoke("downloads")
                                             "library" -> onSeeAllWatchlist?.invoke() ?: onNavigate?.invoke("library")
-                                            "community" -> onNavigate?.invoke("community")
                                             else -> onNavigate?.invoke(item.route)
                                         }
                                     }

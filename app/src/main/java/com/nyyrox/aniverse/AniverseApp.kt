@@ -56,7 +56,6 @@ import com.nyyrox.aniverse.ui.screens.AiringScreen
 import com.nyyrox.aniverse.ui.screens.AvatarPickerScreen
 import com.nyyrox.aniverse.ui.screens.BannerPickerScreen
 import com.nyyrox.aniverse.ui.screens.BrowseScreen
-import com.nyyrox.aniverse.ui.screens.CommunityScreen
 import com.nyyrox.aniverse.ui.screens.SearchScreen
 import com.nyyrox.aniverse.ui.screens.DecorationClosetScreen
 import com.nyyrox.aniverse.ui.screens.DirectChatScreen
@@ -75,7 +74,6 @@ import com.nyyrox.aniverse.ui.screens.NovelReaderScreen
 import com.nyyrox.aniverse.ui.screens.PlayerScreen
 import com.nyyrox.aniverse.ui.screens.ProfileScreen
 import com.nyyrox.aniverse.ui.screens.PublicProfileScreen
-import com.nyyrox.aniverse.ui.screens.WatchTogetherScreen
 import com.nyyrox.aniverse.ui.screens.WatchlistScreen
 import com.nyyrox.aniverse.ui.screens.ZenkaiSplashScreen
 import com.nyyrox.aniverse.ui.screens.ZenkaiUpdateDialog
@@ -619,14 +617,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
-                                screen == "community" -> {
-                                    CommunityScreen(
-                                        vm = vm,
-                                        onBack = { pop() },
-                                        onAnimeClick = { vm.openAnimeDetail(it) },
-                                        onOpenUserProfile = { push("public_profile:$it") }
-                                    )
-                                }
+
 
                                 screen == "discord_hub" || screen == "discord" || screen == "community_rankings" || screen == "rankings" -> {
                                     DiscordHubScreen(
@@ -658,14 +649,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
-                                screen == "watchtogether" || screen.startsWith("watchtogether:") -> {
-                                    val roomId = screen.removePrefix("watchtogether:").takeIf { it != "watchtogether" && it.isNotBlank() }
-                                    WatchTogetherScreen(
-                                        vm = vm,
-                                        onBack = { pop() },
-                                        initialRoomId = roomId
-                                    )
-                                }
+
 
                                 screen == "login" -> {
                                     LoginScreen(
@@ -797,18 +781,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         playerOpenedFromDetail = true
                                         push("player:$id:$ep:${prov.id}")
                                     },
-                                    onWatchTogether = { anime, ep ->
-                                        vm.createWatchTogetherRoom(
-                                            name = "${anime.title} Watch Party",
-                                            anime = anime,
-                                            episode = ep
-                                        ) { room ->
-                                            if (room != null) {
-                                                vm.closeAnimeDetail()
-                                                push("watchtogether:${room.id}")
-                                            }
-                                        }
-                                    }
+
                                 )
                             }
                         }

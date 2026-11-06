@@ -179,8 +179,6 @@ private val DrawerEntries = listOf(
     DrawerEntry(Icons.Default.Schedule, "Airing Schedule", "Weekly release calendar", "airing"),
     DrawerEntry(Icons.Default.Bookmark, "My Library", "Saved anime, manga & novels", "library"),
     DrawerEntry(Icons.Default.DownloadDone, "Offline Downloads", "Read and watch offline", "downloads"),
-    DrawerEntry(Icons.Default.Forum, "Discord Community", "Join the server, Rich Presence", "discord_hub"),
-    DrawerEntry(Icons.Default.Groups, "Watch Together", "Sync watch rooms with friends", "watchtogether"),
     DrawerEntry(Icons.Default.Person, "Profile & Settings", "Themes, playback & preferences", "profile")
 )
 
@@ -623,9 +621,7 @@ fun AniverseSidebarDrawer(
                         DrawerEntry(Icons.Default.Schedule, "Schedule", "Upcoming & airing schedule", "airing"),
                         DrawerEntry(Icons.Default.Bookmark, "Library", "Saved watchlist & watch history", "library"),
                         DrawerEntry(Icons.Default.Explore, "Manga", "Read chapters & bookmarks", "manga"),
-                        DrawerEntry(Icons.Default.Explore, "Light Novels", "Read translated light novels", "novel"),
-                        DrawerEntry(Icons.Default.Groups, "Watch Together", "Watch anime with friends", "watchtogether"),
-                        DrawerEntry(Icons.Default.Forum, "Community", "Live chat & anime discussions", "community")
+                        DrawerEntry(Icons.Default.Explore, "Light Novels", "Read translated light novels", "novel")
                     )
 
                     navItems.forEach { entry ->
