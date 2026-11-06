@@ -588,70 +588,41 @@ fun ProfileScreen(
                         )
                     }
 
-                    // Direct Bio Section (Tap anywhere or tap pencil to edit bio)
-                    Spacer(Modifier.height(10.dp))
+                    // Direct Bio Section (Rendered naturally as part of profile, no cards)
                     if (userProfile.bio.isNotBlank()) {
-                        Row(
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = userProfile.bio,
+                            fontSize = 13.5.sp,
+                            color = textSecondary,
+                            lineHeight = 20.sp,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(cardElevated)
-                                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                                 .clickable {
                                     initialEditTab = 0
                                     showEditSheet = true
                                 }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = userProfile.bio,
-                                fontSize = 13.5.sp,
-                                color = textPrimary,
-                                lineHeight = 19.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Edit bio",
-                                tint = textMuted,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
+                        )
                     } else {
-                        Row(
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "+ Add a bio",
+                            fontSize = 12.5.sp,
+                            color = textMuted,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(cardElevated)
-                                .border(1.dp, borderColor, RoundedCornerShape(10.dp))
                                 .clickable {
                                     initialEditTab = 0
                                     showEditSheet = true
                                 }
-                                .padding(horizontal = 12.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = null,
-                                tint = textMuted,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "+ Add a bio...",
-                                fontSize = 12.5.sp,
-                                color = textMuted
-                            )
-                        }
+                                .padding(vertical = 4.dp)
+                        )
                     }
 
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(14.dp))
                 }
             }
 
-            // Quick Access & Features Section (Moved from top navbar / sidebar to profile)
+            // Explore & Features Section (Flat, clean, NO card styles)
             item(key = "profile_features_section") {
                 Column(
                     modifier = Modifier
@@ -666,7 +637,7 @@ fun ProfileScreen(
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(8.dp))
 
                     val featureList = listOf(
                         ProfileFeatureEntry("Movies & TV", "Browse anime movies, series, OVAs & specials", Icons.Default.Movie, "movies"),
@@ -674,18 +645,10 @@ fun ProfileScreen(
                         ProfileFeatureEntry("Watch Together", "Stream videos in sync with friends", Icons.Default.Groups, "watchtogether"),
                         ProfileFeatureEntry("Community & Chat", "Join discussions, rankings & user feed", Icons.Default.Forum, "community"),
                         ProfileFeatureEntry("Saved Library", "Your watchlist, bookmarks & history", Icons.Default.Bookmark, "library"),
-                        ProfileFeatureEntry("Downloads", "Manage offline anime and downloaded episodes", Icons.Default.Download, "downloads"),
-                        ProfileFeatureEntry("Discord Community", "Official chat, updates & feature requests", Icons.AutoMirrored.Filled.Send, "discord"),
-                        ProfileFeatureEntry("Telegram Channel", "Announcements and instant release alerts", Icons.AutoMirrored.Filled.Send, "telegram")
+                        ProfileFeatureEntry("Downloads", "Manage offline anime and downloaded episodes", Icons.Default.Download, "downloads")
                     )
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(cardElevated)
-                            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         featureList.forEachIndexed { index, item ->
                             Row(
                                 modifier = Modifier
@@ -694,41 +657,25 @@ fun ProfileScreen(
                                         when (item.route) {
                                             "downloads" -> onNavigate?.invoke("downloads")
                                             "library" -> onSeeAllWatchlist?.invoke() ?: onNavigate?.invoke("library")
-                                            "community" -> onNavigate?.invoke("discord_hub")
-                                            "discord" -> {
-                                                try {
-                                                    context.startActivity(
-                                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))
-                                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                    )
-                                                } catch (_: Exception) {}
-                                            }
-                                            "telegram" -> {
-                                                try {
-                                                    context.startActivity(
-                                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))
-                                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                    )
-                                                } catch (_: Exception) {}
-                                            }
+                                            "community" -> onNavigate?.invoke("community")
                                             else -> onNavigate?.invoke(item.route)
                                         }
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                                    .padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(38.dp)
+                                        .size(36.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isDark) Color(0xFF1E1E24) else Color(0xFFE2E8F0)),
+                                        .background(if (isDark) Color(0x18FFFFFF) else Color(0x0C000000)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = item.icon,
                                         contentDescription = item.title,
                                         tint = textPrimary,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
                                 Spacer(Modifier.width(14.dp))
@@ -757,8 +704,8 @@ fun ProfileScreen(
                             }
                             if (index < featureList.lastIndex) {
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(start = 68.dp, end = 16.dp),
-                                    color = borderColor.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(start = 50.dp),
+                                    color = borderColor.copy(alpha = 0.4f),
                                     thickness = 0.8.dp
                                 )
                             }
@@ -1407,6 +1354,129 @@ fun ProfileScreen(
                             color = textMuted
                         )
                     }
+                }
+            }
+
+            // Dedicated bottom section for Discord & Telegram links
+            item(key = "profile_community_links_bottom") {
+                Spacer(Modifier.height(14.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                ) {
+                    Text(
+                        text = "OFFICIAL COMMUNITY",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textMuted,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                try {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/kHxHzZtH7"))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                } catch (_: Exception) {}
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF5865F2).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = null,
+                                tint = Color(0xFF5865F2),
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Discord Community",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textPrimary
+                            )
+                            Text(
+                                text = "Join official chat, voice parties & support",
+                                fontSize = 12.sp,
+                                color = textMuted
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = textMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 50.dp),
+                        color = borderColor.copy(alpha = 0.4f),
+                        thickness = 0.8.dp
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                try {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/StreamverseOfc"))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                } catch (_: Exception) {}
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF229ED9).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = null,
+                                tint = Color(0xFF229ED9),
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Telegram Channel",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textPrimary
+                            )
+                            Text(
+                                text = "Official announcements & release updates",
+                                fontSize = 12.sp,
+                                color = textMuted
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = textMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
             }
         }

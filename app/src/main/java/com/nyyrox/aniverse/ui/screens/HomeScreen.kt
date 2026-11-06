@@ -580,8 +580,16 @@ private fun HomeHero(
     onAnimeClick: (Int) -> Unit,
     onPlayClick: ((Int, Int) -> Unit)? = null
 ) {
-    if (shows.isEmpty()) return
-    val count = shows.size
+    // Only display shows that have a valid TMDB logo PNG
+    val tmdbPngShows = remember(shows, vm.tmdbArtworks) {
+        val filtered = shows.filter { anime ->
+            val logo = vm.tmdbArtworks[anime.id]?.logoUrl
+            !logo.isNullOrBlank() && (logo.endsWith(".png", ignoreCase = true) || logo.contains("/t/p/"))
+        }
+        if (filtered.isNotEmpty()) filtered else shows.filter { vm.tmdbArtworks[it.id]?.logoUrl?.isNotBlank() == true }.ifEmpty { shows }
+    }
+    if (tmdbPngShows.isEmpty()) return
+    val count = tmdbPngShows.size
     // Infinite looping: large virtual page count so user and auto-scroll loop endlessly from last to first
     val virtualCount = if (count > 1) count * 1000 else count
     val initialPage = if (count > 1) (virtualCount / 2) - ((virtualCount / 2) % count) else 0
@@ -612,7 +620,7 @@ private fun HomeHero(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
-            val anime = shows[page % count]
+            val anime = tmdbPngShows[page % count]
             val artwork = vm.tmdbArtworks[anime.id]
             val backdrop = artwork?.backdropUrl?.takeIf { it.isNotBlank() }
                 ?: anime.banner?.takeIf { it.isNotBlank() }
@@ -645,9 +653,10 @@ private fun HomeHero(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        translationX = size.width * pageOffset
-                        alpha = (1f - absOffset).coerceIn(0f, 1f)
-                        val totalScale = continuousZoom.value * (1f + (1f - absOffset) * 0.02f)
+                        // Buttery smooth cinematic parallax swipe:
+                        translationX = size.width * 0.38f * pageOffset
+                        alpha = (1f - (absOffset * absOffset)).coerceIn(0f, 1f)
+                        val totalScale = continuousZoom.value * (0.95f + 0.05f * (1f - absOffset))
                         scaleX = totalScale
                         scaleY = totalScale
                     }
@@ -702,7 +711,7 @@ private fun HomeHero(
         }
 
         // Foreground details & actions aligned to bottom
-        val currentAnime = shows[pagerState.currentPage % count]
+        val currentAnime = tmdbPngShows[pagerState.currentPage % count]
         val currentArtwork = vm.tmdbArtworks[currentAnime.id]
         val logo = currentArtwork?.logoUrl?.takeIf { it.isNotBlank() }
         val title = currentArtwork?.title?.takeIf { it.isNotBlank() } ?: currentAnime.displayTitle
@@ -1241,8 +1250,19 @@ fun HomeScreen(
         }
 
         val lazyListState = vm.homeLazyListState
-        val heroShows = remember(vm.trending, vm.popular) {
-            (vm.trending + vm.popular).distinctBy { it.id }.take(10)
+        val candidates = remember(vm.trending, vm.popular) {
+            (vm.trending + vm.popular).distinctBy { it.id }.take(25)
+        }
+        LaunchedEffect(candidates) {
+            candidates.forEach { vm.loadTmdbArtwork(it) }
+        }
+        val heroShows = remember(candidates, vm.tmdbArtworks) {
+            val withPng = candidates.filter { anime ->
+                val art = vm.tmdbArtworks[anime.id]
+                val logo = art?.logoUrl
+                !logo.isNullOrBlank() && (logo.endsWith(".png", ignoreCase = true) || logo.contains("/t/p/"))
+            }
+            if (withPng.isNotEmpty()) withPng else candidates.filter { vm.tmdbArtworks[it.id]?.logoUrl?.isNotBlank() == true }.ifEmpty { candidates.take(8) }
         }
 
         if (p.glassOn) {

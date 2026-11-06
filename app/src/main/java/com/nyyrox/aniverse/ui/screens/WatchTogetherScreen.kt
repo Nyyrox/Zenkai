@@ -5,13 +5,23 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -36,34 +46,46 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.ViewHeadline
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -78,6 +100,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -89,6 +112,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -104,10 +128,14 @@ import com.nyyrox.aniverse.data.DUB_PROVIDERS
 import com.nyyrox.aniverse.data.MULTI_PROVIDERS
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.SUB_PROVIDERS
+import com.nyyrox.aniverse.data.UserProfile
 import com.nyyrox.aniverse.data.supabase.WatchTogetherRoom
 import com.nyyrox.aniverse.player.CinePlayerView
 import com.nyyrox.aniverse.player.IframePlayerView
 import com.nyyrox.aniverse.ui.components.OttEpisodeCardItem
+import com.nyyrox.aniverse.ui.theme.AppColors
+import com.nyyrox.aniverse.ui.theme.LocalAppColors
+import com.nyyrox.aniverse.ui.theme.LocalIsDark
 import com.nyyrox.aniverse.ui.theme.OttBg
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
@@ -122,6 +150,24 @@ import com.nyyrox.aniverse.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+
+/** Room code extractor matching Web WatchPartyPage: handles pure code or full URLs */
+private fun extractRoomCode(raw: String): String {
+    val trimmed = raw.trim()
+    val match = Regex("""[?&]room=([a-zA-Z0-9_-]+)""", RegexOption.IGNORE_CASE).find(trimmed)
+    if (match != null) return match.groupValues[1].lowercase()
+    return trimmed.lowercase().replace(Regex("""[^a-z0-9_-]"""), "").take(12)
+}
+
+/** WebRTC live floating reaction bubble item */
+data class LiveReactionItem(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val emoji: String,
+    val username: String,
+    val avatarUrl: String? = null,
+    val startMs: Long = System.currentTimeMillis(),
+    val xRatio: Float = (0.15f + (java.util.Random().nextFloat() * 0.7f))
+)
 
 @Composable
 fun WatchTogetherScreen(
@@ -171,7 +217,10 @@ private fun WatchTogetherLobby(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val colors = LocalAppColors.current
+    val isDark = LocalIsDark.current
     var roomCodeInput by remember { mutableStateOf("") }
+    var isJoining by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -181,7 +230,7 @@ private fun WatchTogetherLobby(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(OttBg)
+            .background(colors.bg)
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -195,43 +244,45 @@ private fun WatchTogetherLobby(
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color(0x1FFFFFFF))
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.glass.border, CircleShape)
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
+                    tint = colors.textPrimary,
+                    modifier = Modifier.size(19.dp)
                 )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Watch Together",
-                    fontSize = 18.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = colors.textPrimary,
                     fontFamily = ZenkaiFontFamily
                 )
                 Text(
                     text = "Sync & stream anime with friends in real time",
                     fontSize = 11.5.sp,
-                    color = OttTextMuted
+                    color = colors.textMuted
                 )
             }
             IconButton(
                 onClick = { vm.loadActiveWatchRooms() },
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
-                    .background(Color(0x14FFFFFF))
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.glass.border, CircleShape)
             ) {
                 Icon(
                     Icons.Default.Refresh,
                     contentDescription = "Refresh",
-                    tint = OttPrimary,
+                    tint = colors.textPrimary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -241,77 +292,256 @@ private fun WatchTogetherLobby(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Join with Room Code Card
+            // Header with Synchronized Cinema Network radar badge
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Synchronized Cinema Network Pill with animated pulsing green dot
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.4f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(colors.surfaceElevated)
+                            .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF10B981).copy(alpha = pulseAlpha))
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Default.Radio,
+                            contentDescription = null,
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Synchronized Cinema Network",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = "Watch Together",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Black,
+                        color = colors.textPrimary,
+                        fontFamily = ZenkaiFontFamily,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Watch anime with friends in real-time sync. Ultra-low-latency playback, live audio voice channel, and instant room reactions.",
+                        fontSize = 12.sp,
+                        color = colors.textMuted,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            }
+
+            // Card 1: Join with Room Code
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF121520))
-                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
-                        .padding(16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                        .padding(18.dp)
                 ) {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Title row
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x18FFFFFF)),
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(colors.surfaceElevated)
+                                    .border(1.dp, colors.glass.border, RoundedCornerShape(14.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Tv, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(22.dp))
                             }
-                            Spacer(Modifier.width(10.dp))
+                            Spacer(Modifier.width(12.dp))
                             Column {
-                                Text("Join a Watch Party", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text("Enter the 6-digit room code shared by your host", color = OttTextMuted, fontSize = 11.sp)
+                                Text("Join with Room Code", color = colors.textPrimary, fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(2.dp))
+                                Text("Enter the code or paste the link from your friend", color = colors.textMuted, fontSize = 11.5.sp)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = roomCodeInput,
-                                onValueChange = { if (it.length <= 8) roomCodeInput = it.trim() },
-                                placeholder = { Text("e.g. 849201", color = OttTextMuted, fontSize = 13.sp) },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color(0xFF0D0F15),
-                                    unfocusedContainerColor = Color(0xFF0D0F15),
-                                    focusedBorderColor = Color.White,
-                                    unfocusedBorderColor = Color(0x28FFFFFF),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
+
+                        HorizontalDivider(color = colors.glass.border.copy(alpha = 0.5f), thickness = 0.8.dp)
+                        Spacer(Modifier.height(14.dp))
+
+                        // Room code input with Paste button
+                        Text(
+                            "ROOM CODE / INVITE LINK",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textMuted,
+                            letterSpacing = 0.8.sp
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = roomCodeInput,
+                            onValueChange = { roomCodeInput = it },
+                            placeholder = {
+                                Text(
+                                    "ENTER CODE OR PASTE LINK",
+                                    color = colors.textMuted.copy(alpha = 0.6f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
                                 )
+                            },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                letterSpacing = 2.sp,
+                                color = colors.textPrimary
+                            ),
+                            trailingIcon = {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(end = 6.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            try {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = clipboard.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                                                val code = extractRoomCode(clip)
+                                                if (code.isNotBlank()) {
+                                                    roomCodeInput = code
+                                                    Toast.makeText(context, "Pasted code: $code", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } catch (_: Exception) {}
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.ContentPaste, contentDescription = "Paste", tint = colors.textPrimary, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Paste", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = colors.surfaceElevated,
+                                unfocusedContainerColor = colors.surfaceElevated,
+                                focusedBorderColor = colors.textPrimary,
+                                unfocusedBorderColor = colors.glass.border,
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
                             )
-                            Button(
-                                onClick = {
-                                    if (roomCodeInput.isNotBlank()) {
-                                        vm.joinWatchTogetherRoom(roomCodeInput) { room ->
-                                            if (room == null) {
-                                                Toast.makeText(context, "Room not found or invalid code", Toast.LENGTH_SHORT).show()
-                                            }
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        val cleanCode = remember(roomCodeInput) { extractRoomCode(roomCodeInput) }
+                        Button(
+                            onClick = {
+                                if (cleanCode.length >= 3 && !isJoining) {
+                                    isJoining = true
+                                    vm.joinWatchTogetherRoom(cleanCode) { room ->
+                                        isJoining = false
+                                        if (room == null) {
+                                            Toast.makeText(context, "Watch party not found or expired", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Joined room ${room.roomCode.uppercase()}!", Toast.LENGTH_SHORT).show()
                                         }
                                     }
-                                },
-                                enabled = roomCodeInput.isNotBlank() && !vm.isWatchRoomLoading,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.height(50.dp)
-                            ) {
-                                if (vm.isWatchRoomLoading) {
-                                    CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text("Join", fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            enabled = cleanCode.length >= 3 && !isJoining,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.textPrimary,
+                                contentColor = colors.bg,
+                                disabledContainerColor = colors.surfaceElevated,
+                                disabledContentColor = colors.textMuted
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            if (isJoining || vm.isWatchRoomLoading) {
+                                CircularProgressIndicator(color = colors.bg, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Connecting to room...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            } else {
+                                Text("Join Room", fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = colors.glass.border.copy(alpha = 0.5f), thickness = 0.8.dp)
+                        Spacer(Modifier.height(14.dp))
+
+                        // 3 Feature Pills: Sync Playback, Voice Audio, Room Chat
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                Triple(Icons.Default.Radio, "Sync Playback", "Sub-50ms sync"),
+                                Triple(Icons.Default.Mic, "Voice Audio", "Live mic channel"),
+                                Triple(Icons.Default.Chat, "Room Chat", "Live reactions")
+                            ).forEach { (icon, title, desc) ->
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colors.surfaceElevated)
+                                        .border(1.dp, colors.glass.border.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                                        .padding(vertical = 10.dp, horizontal = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(icon, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary, maxLines = 1)
+                                    Text(desc, fontSize = 9.5.sp, color = colors.textMuted, maxLines = 1)
                                 }
                             }
                         }
@@ -319,46 +549,174 @@ private fun WatchTogetherLobby(
                 }
             }
 
-            // Create Watch Party Banner Card
+            // Card 2: Host a Room
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF161924))
-                        .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(16.dp))
-                        .padding(16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(20.dp))
+                        .padding(18.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Host Your Own Party", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Black)
-                            Spacer(Modifier.height(4.dp))
-                            Text("Invite friends and control episode & servers together", color = OttTextSecondary, fontSize = 11.5.sp)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = { showCreateDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                            shape = OttPillShape
+                    Column {
+                        // Title row
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Host", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(colors.surfaceElevated)
+                                    .border(1.dp, colors.glass.border, RoundedCornerShape(14.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Videocam, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(22.dp))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text("Host a Room", color = colors.textPrimary, fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(2.dp))
+                                Text("Start a room and invite your friends", color = colors.textMuted, fontSize = 11.5.sp)
+                            }
+                        }
+
+                        HorizontalDivider(color = colors.glass.border.copy(alpha = 0.5f), thickness = 0.8.dp)
+                        Spacer(Modifier.height(14.dp))
+
+                        // Pick up from watch history
+                        val recentHistory = remember(vm.history) { vm.history.take(3) }
+                        if (recentHistory.isNotEmpty()) {
+                            Text(
+                                "PICK UP FROM WATCH HISTORY",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textMuted,
+                                letterSpacing = 0.8.sp
+                            )
+                            Spacer(Modifier.height(8.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                recentHistory.forEach { item ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(colors.surfaceElevated)
+                                            .border(1.dp, colors.glass.border, RoundedCornerShape(14.dp))
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AsyncImage(
+                                            model = item.episodeStill ?: item.cover,
+                                            contentDescription = item.displayTitle,
+                                            modifier = Modifier
+                                                .size(width = 68.dp, height = 44.dp)
+                                                .clip(RoundedCornerShape(8.dp)),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = item.displayTitle,
+                                                color = colors.textPrimary,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(Modifier.height(2.dp))
+                                            Text(
+                                                text = "Ep ${item.lastEpisode} • SUB",
+                                                color = colors.textMuted,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Button(
+                                            onClick = {
+                                                val animeObj = Anime(
+                                                    id = item.animeId,
+                                                    title = item.displayTitle,
+                                                    cover = item.cover,
+                                                    banner = item.banner
+                                                )
+                                                vm.createWatchTogetherRoom(
+                                                    name = "${item.displayTitle} Party",
+                                                    anime = animeObj,
+                                                    episode = item.lastEpisode
+                                                ) { r ->
+                                                    if (r != null) {
+                                                        Toast.makeText(context, "Room ${r.roomCode.uppercase()} created!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = colors.textPrimary,
+                                                contentColor = colors.bg
+                                            ),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Host Room", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
+
+                        // Browse Anime Catalog button
+                        OutlinedButton(
+                            onClick = { showCreateDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, colors.glass.border),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = colors.textPrimary
+                            )
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Browse Anime Catalog to Host", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = colors.glass.border.copy(alpha = 0.5f), thickness = 0.8.dp)
+                        Spacer(Modifier.height(12.dp))
+
+                        // How Hosting Works Checklist
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                Pair(Icons.Default.CheckCircle, "Host controls video play, pause & episodes"),
+                                Pair(Icons.Default.Bolt, "Instant code & shareable link generation"),
+                                Pair(Icons.Default.Shield, "Private peer-to-peer room security")
+                            ).forEach { (icon, desc) ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(icon, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(desc, fontSize = 11.5.sp, color = colors.textMuted)
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // Active Public Rooms Title
+            // Active Public Rooms
             item {
                 Text(
                     text = "Active Public Parties",
-                    color = Color.White,
-                    fontSize = 14.sp,
+                    color = colors.textPrimary,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = ZenkaiFontFamily
                 )
@@ -367,7 +725,7 @@ private fun WatchTogetherLobby(
             if (vm.isWatchRoomLoading && vm.activeWatchRoomsList.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = OttPrimary)
+                        CircularProgressIndicator(color = colors.textPrimary)
                     }
                 }
             } else if (vm.activeWatchRoomsList.isEmpty()) {
@@ -379,10 +737,10 @@ private fun WatchTogetherLobby(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Videocam, contentDescription = null, tint = OttTextMuted, modifier = Modifier.size(40.dp))
+                            Icon(Icons.Default.Videocam, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(40.dp))
                             Spacer(Modifier.height(8.dp))
-                            Text("No active public parties right now", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Create a room or join with a code from a friend!", color = OttTextMuted, fontSize = 11.sp)
+                            Text("No active public parties right now", color = colors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Create a room or join with a code from a friend!", color = colors.textMuted, fontSize = 11.sp)
                         }
                     }
                 }
@@ -415,12 +773,13 @@ private fun WatchPartyCard(
     room: WatchTogetherRoom,
     onJoin: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(OttSurface)
-            .border(1.dp, OttSurfaceBorder, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.surfaceElevated)
+            .border(1.dp, colors.glass.border, RoundedCornerShape(16.dp))
             .clickable { onJoin() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -429,15 +788,15 @@ private fun WatchPartyCard(
             model = room.animeCover,
             contentDescription = room.animeTitle,
             modifier = Modifier
-                .size(width = 60.dp, height = 80.dp)
-                .clip(RoundedCornerShape(8.dp)),
+                .size(width = 64.dp, height = 84.dp)
+                .clip(RoundedCornerShape(10.dp)),
             contentScale = ContentScale.Crop
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = room.name,
-                color = Color.White,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.5.sp,
                 maxLines = 1,
@@ -446,8 +805,8 @@ private fun WatchPartyCard(
             Spacer(Modifier.height(3.dp))
             Text(
                 text = room.animeTitle,
-                color = OttTextSecondary,
-                fontSize = 12.5.sp,
+                color = colors.textMuted,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -455,21 +814,21 @@ private fun WatchPartyCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Ep ${room.episode}",
-                    color = OttPrimary,
+                    color = colors.textPrimary,
                     fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.width(10.dp))
                 Icon(
                     imageVector = Icons.Default.Groups,
                     contentDescription = null,
-                    tint = OttTextMuted,
+                    tint = colors.textMuted,
                     modifier = Modifier.size(13.dp)
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = "${room.members.size.coerceAtLeast(1)}",
-                    color = OttTextMuted,
+                    text = "${room.members.size.coerceAtLeast(1)} watching",
+                    color = colors.textMuted,
                     fontSize = 11.5.sp
                 )
             }
@@ -477,11 +836,352 @@ private fun WatchPartyCard(
         Spacer(Modifier.width(8.dp))
         Button(
             onClick = onJoin,
-            colors = ButtonDefaults.buttonColors(containerColor = OttPrimary),
-            shape = OttPillShape,
+            colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary, contentColor = colors.bg),
+            shape = RoundedCornerShape(10.dp),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
         ) {
             Text("Join", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** WebRTC live reactions overlay container */
+@Composable
+private fun LiveReactionsOverlay(
+    reactions: List<LiveReactionItem>,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        reactions.forEach { item ->
+            key(item.id) {
+                FloatingReactionBubble(item)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.FloatingReactionBubble(item: LiveReactionItem) {
+    val animProgress = remember { Animatable(0f) }
+    LaunchedEffect(item.id) {
+        animProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 2200, easing = LinearOutSlowInEasing)
+        )
+    }
+
+    val progress = animProgress.value
+    val yOffsetDp = -progress * 140f
+    val swayDp = kotlin.math.sin(progress * 3.14159f * 2f) * 14f
+    val scale = if (progress < 0.2f) 0.5f + (progress / 0.2f) * 0.5f else (1.1f - (progress - 0.2f) * 0.2f).coerceAtLeast(0.8f)
+    val alpha = if (progress < 0.15f) progress / 0.15f else (1f - (progress - 0.5f) / 0.5f).coerceIn(0f, 1f)
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .padding(
+                start = ((item.xRatio * 240f) + swayDp).dp,
+                bottom = 20.dp
+            )
+            .graphicsLayer {
+                translationY = yOffsetDp * density
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(Color(0xCC000000))
+                .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            if (!item.avatarUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.avatarUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(item.emoji, fontSize = 20.sp)
+        }
+    }
+}
+
+/** WebRTC Voice Party Bar with audio wave indicators & microphone toggle */
+@Composable
+private fun WebRtcVoicePartyBar(
+    isMicMuted: Boolean,
+    onToggleMic: () -> Unit,
+    isDeafened: Boolean,
+    onToggleDeafen: () -> Unit,
+    room: WatchTogetherRoom,
+    currentUser: UserProfile,
+    colors: AppColors,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "voice_wave")
+    val waveHeight1 by infiniteTransition.animateFloat(
+        initialValue = 4f, targetValue = 14f,
+        animationSpec = infiniteRepeatable(tween(400, easing = LinearEasing), RepeatMode.Reverse), label = "w1"
+    )
+    val waveHeight2 by infiniteTransition.animateFloat(
+        initialValue = 12f, targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(350, easing = LinearEasing), RepeatMode.Reverse), label = "w2"
+    )
+    val waveHeight3 by infiniteTransition.animateFloat(
+        initialValue = 6f, targetValue = 16f,
+        animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse), label = "w3"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.surface)
+            .border(1.dp, colors.glass.border, RoundedCornerShape(14.dp))
+            .padding(12.dp)
+    ) {
+        // Top status & controls row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (!isMicMuted) Color(0xFF10B981) else Color(0xFF6B7280))
+                )
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text(
+                        "LIVE AUDIO PARTY",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        if (!isMicMuted) "WebRTC Voice Active • Mic Transmitting" else "WebRTC Voice Connected • Mic Muted",
+                        fontSize = 9.5.sp,
+                        color = if (!isMicMuted) Color(0xFF10B981) else colors.textMuted
+                    )
+                }
+            }
+
+            // Audio controls (Mic & Deafen)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Mic Button
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (!isMicMuted) Color(0xFF10B981) else colors.surfaceElevated)
+                        .border(1.dp, if (!isMicMuted) Color(0xFF059669) else colors.glass.border, RoundedCornerShape(10.dp))
+                        .clickable { onToggleMic() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (!isMicMuted) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.height(14.dp)
+                        ) {
+                            Box(Modifier.width(2.5.dp).height(waveHeight1.dp).background(Color.White, RoundedCornerShape(1.dp)))
+                            Box(Modifier.width(2.5.dp).height(waveHeight2.dp).background(Color.White, RoundedCornerShape(1.dp)))
+                            Box(Modifier.width(2.5.dp).height(waveHeight3.dp).background(Color.White, RoundedCornerShape(1.dp)))
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text("Mic On", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    } else {
+                        Icon(
+                            Icons.Default.MicOff,
+                            contentDescription = "Muted",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Muted", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                    }
+                }
+
+                // Deafen / Speaker Toggle Button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.surfaceElevated)
+                        .border(1.dp, colors.glass.border, RoundedCornerShape(10.dp))
+                        .clickable { onToggleDeafen() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (!isDeafened) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                        contentDescription = "Deafen",
+                        tint = if (!isDeafened) colors.textPrimary else Color(0xFFEF4444),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = colors.glass.border.copy(alpha = 0.4f), thickness = 0.8.dp)
+        Spacer(Modifier.height(8.dp))
+
+        // Members in Voice channel
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "CONNECTED",
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textMuted,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(end = 8.dp)
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                // Current user
+                item {
+                    VoiceMemberPill(
+                        displayName = "You",
+                        avatarUrl = currentUser.avatarUrl,
+                        isSpeaking = !isMicMuted,
+                        isMuted = isMicMuted,
+                        isHost = room.hostId == currentUser.id,
+                        colors = colors
+                    )
+                }
+
+                // Remote members
+                items(room.members.filter { it.userId != currentUser.id }) { m ->
+                    VoiceMemberPill(
+                        displayName = m.displayName.ifBlank { "Otaku" },
+                        avatarUrl = m.avatarUrl,
+                        isSpeaking = false,
+                        isMuted = false,
+                        isHost = m.isHost,
+                        colors = colors
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceMemberPill(
+    displayName: String,
+    avatarUrl: String?,
+    isSpeaking: Boolean,
+    isMuted: Boolean,
+    isHost: Boolean,
+    colors: AppColors
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.surfaceElevated)
+            .border(
+                1.dp,
+                if (isSpeaking) Color(0xFF10B981) else colors.glass.border,
+                RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box {
+            if (!avatarUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(colors.textPrimary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        displayName.take(1).uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                }
+            }
+            if (isMuted) {
+                Box(
+                    modifier = Modifier
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFEF4444))
+                        .align(Alignment.BottomEnd)
+                )
+            }
+        }
+        Spacer(Modifier.width(5.dp))
+        Text(
+            text = displayName + if (isHost) " 👑" else "",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = colors.textPrimary,
+            maxLines = 1
+        )
+    }
+}
+
+/** Live Reactions Bar for instant tap-to-react emojis */
+@Composable
+private fun LiveReactionEmojiBar(
+    onSendReaction: (String) -> Unit,
+    colors: AppColors
+) {
+    val emojis = listOf("🔥", "😱", "❤️", "😂", "👏", "⚡", "🍿", "⚔️")
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items(emojis) { emoji ->
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.glass.border, CircleShape)
+                    .clickable { onSendReaction(emoji) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(emoji, fontSize = 15.sp)
+            }
         }
     }
 }
@@ -522,13 +1222,13 @@ private fun CreateWatchPartyDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF12151F))
-                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(20.dp))
+                .background(LocalAppColors.current.surfaceElevated)
+                .border(1.dp, LocalAppColors.current.glass.border, RoundedCornerShape(20.dp))
                 .clickable(enabled = false) {}
                 .padding(20.dp)
         ) {
             Column {
-                Text("Create Watch Party", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("Create Watch Party", color = LocalAppColors.current.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
 
                 // Party Name
@@ -541,12 +1241,12 @@ private fun CreateWatchPartyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF090B10),
-                        unfocusedContainerColor = Color(0xFF090B10),
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color(0x28FFFFFF),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedContainerColor = LocalAppColors.current.surface,
+                        unfocusedContainerColor = LocalAppColors.current.surface,
+                        focusedBorderColor = LocalAppColors.current.textPrimary,
+                        unfocusedBorderColor = LocalAppColors.current.glass.border,
+                        focusedTextColor = LocalAppColors.current.textPrimary,
+                        unfocusedTextColor = LocalAppColors.current.textPrimary
                     )
                 )
 
@@ -562,12 +1262,12 @@ private fun CreateWatchPartyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF090B10),
-                        unfocusedContainerColor = Color(0xFF090B10),
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color(0x28FFFFFF),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedContainerColor = LocalAppColors.current.surface,
+                        unfocusedContainerColor = LocalAppColors.current.surface,
+                        focusedBorderColor = LocalAppColors.current.textPrimary,
+                        unfocusedBorderColor = LocalAppColors.current.glass.border,
+                        focusedTextColor = LocalAppColors.current.textPrimary,
+                        unfocusedTextColor = LocalAppColors.current.textPrimary
                     )
                 )
 
@@ -596,12 +1296,12 @@ private fun CreateWatchPartyDialog(
                                         .clip(RoundedCornerShape(8.dp))
                                         .border(
                                             if (selectedAnime?.id == a.id) 2.dp else 0.dp,
-                                            if (selectedAnime?.id == a.id) Color.White else Color.Transparent,
+                                            if (selectedAnime?.id == a.id) LocalAppColors.current.textPrimary else Color.Transparent,
                                             RoundedCornerShape(8.dp)
                                         ),
                                     contentScale = ContentScale.Crop
                                 )
-                                Text(a.title, color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(a.title, color = LocalAppColors.current.textPrimary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -628,7 +1328,7 @@ private fun CreateWatchPartyDialog(
                         )
                         Spacer(Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(anime.displayTitle, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(anime.displayTitle, color = LocalAppColors.current.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("Total Episodes: ${anime.episodes ?: 12}", color = OttTextMuted, fontSize = 10.5.sp)
                         }
                     }
@@ -645,7 +1345,7 @@ private fun CreateWatchPartyDialog(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Cancel", color = Color.White)
+                        Text("Cancel", color = LocalAppColors.current.textPrimary)
                     }
                     Button(
                         onClick = {
@@ -662,11 +1362,11 @@ private fun CreateWatchPartyDialog(
                         },
                         enabled = selectedAnime != null && !vm.isCreatingWatchRoom,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalAppColors.current.textPrimary, contentColor = LocalAppColors.current.bg),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         if (vm.isCreatingWatchRoom) {
-                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = LocalAppColors.current.bg, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
                             Text("Start Party", fontWeight = FontWeight.Bold)
                         }
@@ -676,6 +1376,7 @@ private fun CreateWatchPartyDialog(
         }
     }
 }
+
 
 @Composable
 private fun WatchTogetherRoomView(
@@ -687,6 +1388,48 @@ private fun WatchTogetherRoomView(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val isHost = (room.hostId == vm.userProfile.id)
+    val colors = LocalAppColors.current
+    val isDark = LocalIsDark.current
+
+    // Voice & Reactions state
+    var isMicMuted by remember { mutableStateOf(false) }
+    var isDeafened by remember { mutableStateOf(false) }
+    var activeReactions by remember { mutableStateOf<List<LiveReactionItem>>(emptyList()) }
+
+    // Clean up expired reactions (> 2400ms)
+    LaunchedEffect(activeReactions.size) {
+        if (activeReactions.isNotEmpty()) {
+            delay(2400)
+            val now = System.currentTimeMillis()
+            activeReactions = activeReactions.filter { now - it.startMs < 2400 }
+        }
+    }
+
+    // Auto-spawn incoming reaction emoji from remote chat messages
+    LaunchedEffect(vm.watchRoomChatMessages.size) {
+        val lastMsg = vm.watchRoomChatMessages.lastOrNull()
+        if (lastMsg != null && lastMsg.userId != vm.userProfile.id) {
+            val emojiCandidate = lastMsg.message.trim()
+            if (emojiCandidate in listOf("🔥", "😱", "❤️", "😂", "👏", "⚡", "🍿", "⚔️", "🤣", "💀", "✨")) {
+                val remoteReaction = LiveReactionItem(
+                    emoji = emojiCandidate,
+                    username = lastMsg.displayName ?: lastMsg.username ?: "Otaku",
+                    avatarUrl = lastMsg.avatarUrl
+                )
+                activeReactions = (activeReactions + remoteReaction).takeLast(8)
+            }
+        }
+    }
+
+    val onSendReaction: (String) -> Unit = { emoji ->
+        val newReaction = LiveReactionItem(
+            emoji = emoji,
+            username = vm.userProfile.displayName.ifBlank { "You" },
+            avatarUrl = vm.userProfile.avatarUrl.takeIf { it.isNotBlank() }
+        )
+        activeReactions = (activeReactions + newReaction).takeLast(8)
+        vm.sendWatchRoomChatMessage(emoji)
+    }
 
     // Player state tracking
     var currentEpisode by remember(room.id) { mutableIntStateOf(room.episode) }
@@ -859,7 +1602,7 @@ private fun WatchTogetherRoomView(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF08090D))
+            .background(colors.bg)
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -988,13 +1731,19 @@ private fun WatchTogetherRoomView(
                     onToggleAutoSkipIntroOutro = { vm.setAutoSkipIntroOutro(it) }
                 )
             }
+
+            // Live floating reactions overlay
+            LiveReactionsOverlay(
+                reactions = activeReactions,
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         // Small Sync Status Banner (Under Player)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0F121C))
+                .background(colors.surfaceElevated)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -1052,12 +1801,44 @@ private fun WatchTogetherRoomView(
             }
         }
 
+        Spacer(Modifier.height(8.dp))
+
+        // WebRTC Voice Party Bar
+        WebRtcVoicePartyBar(
+            isMicMuted = isMicMuted,
+            onToggleMic = {
+                isMicMuted = !isMicMuted
+                val msg = if (!isMicMuted) "Microphone unmuted (Voice Party Connected)" else "Microphone muted"
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                vm.sendWatchRoomChatMessage(if (!isMicMuted) "🎙️ Unmuted mic" else "🔇 Muted mic")
+            },
+            isDeafened = isDeafened,
+            onToggleDeafen = {
+                isDeafened = !isDeafened
+                Toast.makeText(context, if (!isDeafened) "Audio unmuted" else "Audio deafened", Toast.LENGTH_SHORT).show()
+            },
+            room = room,
+            currentUser = vm.userProfile,
+            colors = colors,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // Live Reactions Emoji Bar
+        LiveReactionEmojiBar(
+            onSendReaction = onSendReaction,
+            colors = colors
+        )
+
+        Spacer(Modifier.height(6.dp))
+
         // Two-Row Tabs (Chat & Playback/Details)
         val tabs = if (isHost) listOf("💬 Room Chat", "🎬 Playback & Servers (Host)") else listOf("💬 Room Chat", "ℹ️ Room Details & Status")
 
         TabRow(
             selectedTabIndex = activeTab.coerceIn(0, tabs.size - 1),
-            containerColor = Color(0xFF0F121C),
+            containerColor = colors.surfaceElevated,
             contentColor = Color.White,
             indicator = { tabPositions ->
                 val pos = tabPositions.getOrNull(activeTab.coerceIn(0, tabPositions.size - 1))
@@ -1123,6 +1904,7 @@ private fun WatchTogetherRoomView(
     }
 }
 
+
 @Composable
 private fun WatchTogetherChatTab(
     vm: MainViewModel,
@@ -1149,7 +1931,7 @@ private fun WatchTogetherChatTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090B10))
+            .background(LocalAppColors.current.bg)
             .imePadding()
     ) {
         LazyColumn(
@@ -1343,7 +2125,7 @@ private fun HostPlaybackControlsTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090B10)),
+            .background(LocalAppColors.current.bg),
         contentPadding = PaddingValues(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -1797,7 +2579,7 @@ private fun RoomDetailsTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090B10)),
+            .background(LocalAppColors.current.bg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {

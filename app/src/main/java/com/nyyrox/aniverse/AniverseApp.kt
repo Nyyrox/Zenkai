@@ -56,6 +56,7 @@ import com.nyyrox.aniverse.ui.screens.AiringScreen
 import com.nyyrox.aniverse.ui.screens.AvatarPickerScreen
 import com.nyyrox.aniverse.ui.screens.BannerPickerScreen
 import com.nyyrox.aniverse.ui.screens.BrowseScreen
+import com.nyyrox.aniverse.ui.screens.CommunityScreen
 import com.nyyrox.aniverse.ui.screens.SearchScreen
 import com.nyyrox.aniverse.ui.screens.DecorationClosetScreen
 import com.nyyrox.aniverse.ui.screens.DirectChatScreen
@@ -618,7 +619,15 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
-                                screen == "discord_hub" || screen == "community" || screen == "discord" || screen == "community_rankings" || screen == "rankings" -> {
+                                screen == "community" -> {
+                                    CommunityScreen(
+                                        vm = vm,
+                                        onBack = { pop() },
+                                        onAnimeClick = { vm.openAnimeDetail(it) }
+                                    )
+                                }
+
+                                screen == "discord_hub" || screen == "discord" || screen == "community_rankings" || screen == "rankings" -> {
                                     DiscordHubScreen(
                                         onBack = { pop() }
                                     )

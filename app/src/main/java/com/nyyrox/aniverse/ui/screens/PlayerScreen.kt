@@ -1327,91 +1327,7 @@ fun PlayerScreen(
                                 }
                             }
 
-                            // Action buttons row (monochrome tactile circular buttons)
-                            Spacer(Modifier.height(18.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                PlayerMonochromeAction(
-                                    label = "Previous",
-                                    isDark = isDark,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = hasPrev,
-                                    onClick = {
-                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                        if (currentEpisode > 1) currentEpisode -= 1
-                                    }
-                                ) { tint ->
-                                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous episode", tint = tint, modifier = Modifier.size(22.dp))
-                                }
-                                PlayerMonochromeAction(
-                                    label = "Next",
-                                    isDark = isDark,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = hasNext,
-                                    onClick = {
-                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                        if (currentEpisode < maxEpisode) currentEpisode += 1
-                                    }
-                                ) { tint ->
-                                    Icon(Icons.Default.SkipNext, contentDescription = "Next episode", tint = tint, modifier = Modifier.size(22.dp))
-                                }
-                                PlayerMonochromeAction(
-                                    label = dlLabel,
-                                    isDark = isDark,
-                                    modifier = Modifier.weight(1f),
-                                    active = isCurrentEpDownloaded && playOfflineMode,
-                                    onClick = {
-                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                        when {
-                                            isCurrentEpDownloading -> {
-                                                android.widget.Toast.makeText(context, "Download in progress", android.widget.Toast.LENGTH_SHORT).show()
-                                            }
-                                            isCurrentEpDownloaded -> {
-                                                playOfflineMode = !playOfflineMode
-                                            }
-                                            else -> {
-                                                showDownloadSheetEpisode = currentEpisode to currentEpInfo?.name
-                                            }
-                                        }
-                                    }
-                                ) { tint ->
-                                    if (currentEpTask != null) {
-                                        CircularProgressIndicator(
-                                            progress = { dlProgress.coerceIn(0.05f, 1f) },
-                                            modifier = Modifier.size(22.dp),
-                                            strokeWidth = 2.dp,
-                                            color = tint,
-                                            trackColor = playerBorder
-                                        )
-                                    } else if (isCurrentEpDownloaded) {
-                                        Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = tint, modifier = Modifier.size(22.dp))
-                                    } else {
-                                        Icon(Icons.Default.Download, contentDescription = "Download episode", tint = tint, modifier = Modifier.size(22.dp))
-                                    }
-                                }
-                                PlayerMonochromeAction(
-                                    label = if (selectedSourceMode == "DIRECT") "Direct" else "Embed",
-                                    isDark = isDark,
-                                    modifier = Modifier.weight(1f),
-                                    active = selectedSourceMode == "DIRECT",
-                                    onClick = {
-                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                        selectSourceMode(if (selectedSourceMode == "DIRECT") "EMBED" else "DIRECT")
-                                    }
-                                ) { tint ->
-                                    Icon(Icons.Default.Dns, contentDescription = "Toggle Source", tint = tint, modifier = Modifier.size(22.dp))
-                                }
-                                PlayerMonochromeAction(
-                                    label = "Fullscreen",
-                                    isDark = isDark,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { toggleFullscreen() }
-                                ) { tint ->
-                                    Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen", tint = tint, modifier = Modifier.size(22.dp))
-                                }
-                            }
+
 
                             // Embed mode Zenkai Player switch
                             if (isEmbedModeActive || playInZenkaiPlayer) {
@@ -1508,6 +1424,7 @@ fun PlayerScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                var serverDropdownExpanded by remember { mutableStateOf(false) }
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1525,29 +1442,73 @@ fun PlayerScreen(
                                         letterSpacing = 1.2.sp,
                                         color = playerTextPrimary
                                     )
-                                    // Active server badge with green dot
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(if (isDark) Color(0x1F10B981) else Color(0x1A059669))
-                                            .padding(horizontal = 7.dp, vertical = 2.dp)
-                                    ) {
+                                    // Top dropdown selector for active server
+                                    Box {
                                         Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isDark) Color(0xFF222228) else Color(0xFFE2E8F0))
+                                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x22000000), RoundedCornerShape(8.dp))
+                                                .clickable { serverDropdownExpanded = !serverDropdownExpanded }
+                                                .padding(horizontal = 8.dp, vertical = 3.5.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(5.dp)
+                                                    .size(5.5.dp)
                                                     .clip(CircleShape)
                                                     .background(if (isDark) Color(0xFF34D399) else Color(0xFF059669))
                                             )
                                             Text(
                                                 text = currentProvider.name,
-                                                fontSize = 10.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
+                                                color = playerTextPrimary
                                             )
+                                            Icon(
+                                                Icons.Default.ArrowDropDown,
+                                                contentDescription = null,
+                                                tint = playerTextMuted,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = serverDropdownExpanded,
+                                            onDismissRequest = { serverDropdownExpanded = false },
+                                            modifier = Modifier.background(if (isDark) Color(0xFF18181D) else Color.White)
+                                        ) {
+                                            servers.forEach { prov ->
+                                                val isCur = prov.id == currentProvider.id
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(6.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(if (isCur) (if (isDark) Color(0xFF34D399) else Color(0xFF059669)) else Color(0xFF71717A))
+                                                            )
+                                                            Text(
+                                                                text = prov.name,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = if (isCur) FontWeight.Bold else FontWeight.Medium,
+                                                                color = if (isCur) playerTextPrimary else playerTextMuted
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                                                        currentProvider = prov
+                                                        vm.setPreferredServer(prov.id)
+                                                        serverDropdownExpanded = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2511,14 +2472,14 @@ fun PlayerEpisodeRow(
         ) {
             Box(
                 Modifier
-                    .width(124.dp)
+                    .width(152.dp)
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(if (isDark) Color(0xFF18181B) else Color(0xFFE4E4E7))
                     .border(
                         width = if (isSelected) 1.5.dp else 1.dp,
                         color = if (isSelected) (if (isDark) Color.White else Color.Black) else borderCol,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(12.dp)
                     )
             ) {
                 AsyncImage(
