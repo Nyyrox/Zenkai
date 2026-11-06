@@ -582,16 +582,22 @@ private fun HomeHero(
 ) {
     if (shows.isEmpty()) return
     val count = shows.size
-    val pagerState = rememberPagerState(pageCount = { count })
+    // Infinite looping: large virtual page count so user and auto-scroll loop endlessly from last to first
+    val virtualCount = if (count > 1) count * 1000 else count
+    val initialPage = if (count > 1) (virtualCount / 2) - ((virtualCount / 2) % count) else 0
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { virtualCount }
+    )
     val scope = rememberCoroutineScope()
 
-    // Smooth auto-cycle every 7 seconds, pauses during manual scroll
+    // Smooth continuous auto-advance every 7 seconds, seamless loop
     LaunchedEffect(pagerState, listScrolling) {
         while (true) {
             delay(7000)
             if (!listScrolling && !pagerState.isScrollInProgress && count > 1) {
-                val next = (pagerState.currentPage + 1) % count
-                pagerState.animateScrollToPage(next, animationSpec = tween(700, easing = FastOutSlowInEasing))
+                val next = pagerState.currentPage + 1
+                pagerState.animateScrollToPage(next, animationSpec = tween(750, easing = FastOutSlowInEasing))
             }
         }
     }
@@ -606,7 +612,7 @@ private fun HomeHero(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
-            val anime = shows[page]
+            val anime = shows[page % count]
             val artwork = vm.tmdbArtworks[anime.id]
             val backdrop = artwork?.backdropUrl?.takeIf { it.isNotBlank() }
                 ?: anime.banner?.takeIf { it.isNotBlank() }
@@ -616,6 +622,22 @@ private fun HomeHero(
                 vm.loadTmdbArtwork(anime)
             }
 
+            // Continuous slow zoom (Ken Burns): starts immediately after change of show, zooming 1.0 -> 1.10 over 7s
+            val isCurrentPage = pagerState.currentPage == page
+            val continuousZoom = remember { Animatable(1.0f) }
+
+            LaunchedEffect(isCurrentPage) {
+                if (isCurrentPage) {
+                    continuousZoom.snapTo(1.0f)
+                    continuousZoom.animateTo(
+                        targetValue = 1.10f,
+                        animationSpec = tween(durationMillis = 7000, easing = LinearEasing)
+                    )
+                } else {
+                    continuousZoom.snapTo(1.0f)
+                }
+            }
+
             val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
             val absOffset = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
 
@@ -623,12 +645,11 @@ private fun HomeHero(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        // Fade transformation instead of swipe slide
                         translationX = size.width * pageOffset
                         alpha = (1f - absOffset).coerceIn(0f, 1f)
-                        val scale = 1f + (1f - absOffset) * 0.06f
-                        scaleX = scale
-                        scaleY = scale
+                        val totalScale = continuousZoom.value * (1f + (1f - absOffset) * 0.02f)
+                        scaleX = totalScale
+                        scaleY = totalScale
                     }
             ) {
                 AsyncImage(
@@ -852,7 +873,8 @@ private fun HomeHero(
                             .background(if (isCurrent) Color.White else Color(0x55FFFFFF))
                             .clickable {
                                 scope.launch {
-                                    pagerState.animateScrollToPage(i)
+                                    val currentBase = pagerState.currentPage - (pagerState.currentPage % count)
+                                    pagerState.animateScrollToPage(currentBase + i)
                                 }
                             }
                     )

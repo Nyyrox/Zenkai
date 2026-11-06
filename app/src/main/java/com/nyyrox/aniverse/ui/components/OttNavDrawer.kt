@@ -4,6 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.draw.shadow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -199,273 +210,98 @@ fun ExpandableOttTopBar(
     modifier: Modifier = Modifier
 ) {
     val p = rememberHomePalette()
-    val context = LocalContext.current
     val fraction by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 220f),
         label = "topBarMorph"
     )
-    val menuProgress = animateFloatAsState(
-        targetValue = if (isMenuOpen) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = 260f),
-        label = "drawerProgress"
-    )
 
-    BackHandler(enabled = isMenuOpen) { onDismissMenu() }
-
-    val barHeightPx = with(LocalDensity.current) { 44.dp.roundToPx() }
-    val backdrop = LocalPrismalBackdrop.current ?: emptyGlassSource()
     val scrim = p.gradTop
 
-    val isAnimatingMenu = isMenuOpen || menuProgress.value > 0.005f
-    val effectiveFraction = if (isAnimatingMenu) 1f else fraction
-
     Box(
-        modifier = if (isAnimatingMenu) {
-            Modifier.fillMaxSize()
-        } else {
-            modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-        }
+        modifier = modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
     ) {
-        // Scrim background when menu is opening / open
-        if (isAnimatingMenu) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = menuProgress.value.coerceIn(0f, 1f) }
-                    .background(Color.Black.copy(alpha = if (p.dark) 0.40f else 0.18f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        enabled = isMenuOpen
-                    ) { onDismissMenu() }
-            )
-        }
-
         // Top gradient scrim for status bar readability
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
+                .height(90.dp)
                 .align(Alignment.TopCenter)
                 .drawBehind {
                     drawRect(
                         brush = Brush.verticalGradient(
-                            0f to scrim.copy(alpha = 0.92f),
-                            0.55f to scrim.copy(alpha = 0.55f),
+                            0f to scrim.copy(alpha = 0.90f),
+                            0.55f to scrim.copy(alpha = 0.50f),
                             1f to scrim.copy(alpha = 0f)
                         ),
-                        alpha = maxOf(fraction, menuProgress.value).coerceIn(0f, 1f)
+                        alpha = fraction.coerceIn(0f, 1f)
                     )
                 }
         )
 
-        // The bar / panel that expands downwards in-place
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .then(if (isAnimatingMenu) Modifier.navigationBarsPadding() else Modifier)
                 .padding(
                     start = 16.dp,
                     end = 16.dp,
                     top = 6.dp,
-                    bottom = if (isAnimatingMenu) 12.dp else 16.dp
+                    bottom = 16.dp
                 )
         ) {
             val fullWidth = maxWidth
             val barHeight = 44.dp
-            val pillWidth = lerp(barHeight, fullWidth, effectiveFraction.coerceIn(0f, 1f))
+            val pillWidth = lerp(barHeight, fullWidth, fraction.coerceIn(0f, 1f))
 
-            val surface = if (p.dark) Color(0xFF1C1C1E).copy(alpha = 0.78f) else Color.White.copy(alpha = 0.70f)
-            val cardRadius = lerp(22.dp, 28.dp, menuProgress.value)
-            val cardShape = RoundedCornerShape(cardRadius)
+            // Solid black / white shade (NO liquid glass)
+            val solidBarBg = if (p.dark) Color(0xFF101013) else Color(0xFFFFFFFF)
+            val solidBarBorder = if (p.dark) Color(0x33FFFFFF) else Color(0x1F000000)
 
-            val glass = rememberOttGlass(
-                backdrop = backdrop,
-                p = p,
-                shape = if (isAnimatingMenu) DrawerGlassShape else OttCapsuleShape,
-                refractionHeight = if (isAnimatingMenu) 22.dp else 16.dp,
-                refractionAmount = if (isAnimatingMenu) 22.dp else 16.dp,
-                surfaceColor = if (isAnimatingMenu) surface else null
-            )
-
-            val cardModifier = if (p.glassOn) {
-                glass.clip(cardShape)
-            } else {
-                Modifier
-                    .clip(cardShape)
-                    .background(if (p.dark) Color(0xFF1A1A1C) else Color(0xFFF7F7F9))
-                    .border(0.8.dp, p.glassBorder, cardShape)
-            }
-
-            if (!isAnimatingMenu) {
-                // Collapsed Top Bar: exact behavior that pins the profile bubble at TopEnd when scrolling
-                Box(
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .width(pillWidth)
+                    .height(barHeight)
+                    .shadow(if (p.dark) 8.dp else 4.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(solidBarBg)
+                    .border(1.dp, solidBarBorder, CircleShape)
+            ) {
+                Row(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .width(pillWidth)
-                        .height(barHeight)
-                        .then(if (p.glassOn) glass.clip(CircleShape) else Modifier.ottGlass(p, CircleShape))
+                        .fillMaxHeight()
+                        .wrapContentWidth(Alignment.End, unbounded = true)
+                        .width(fullWidth)
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Laid out at full width and anchored to the right, so the shape only reveals / hides it.
-                    // Lets the row be wider than the pill and pins its right edge to the pill's right edge,
-                    // so the profile bubble stays put while the pill shrinks onto it when scrolling down.
                     Row(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .wrapContentWidth(Alignment.End, unbounded = true)
-                            .width(fullWidth)
-                            .padding(horizontal = 4.dp),
+                        modifier = Modifier.graphicsLayer {
+                            alpha = ((fraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
+                        },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.graphicsLayer {
-                                alpha = ((fraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
-                            },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            SidebarButton(
+                        SidebarButton(
                             color = p.text,
-                            openProgress = { 0f },
+                            openProgress = { if (isMenuOpen) 1f else 0f },
                             onClick = onMenuClick,
                             enabled = expanded
-                            )
-                        }
-
-                        Spacer(Modifier.weight(1f))
-
-                        OttProfileBubble(
-                            p = p,
-                            avatarUrl = userAvatarUrl,
-                            decorationId = avatarDecorationId,
-                            frameId = avatarFrameId,
-                            onClick = onProfileClick
                         )
                     }
-                }
-            } else {
-                // Expanding Navigation Drawer Panel
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .width(pillWidth)
-                ) {
-                    Layout(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(cardModifier)
-                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
-                        content = {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                // Header Row: Hamburger Lines -> 'X', ZENKAI logo, Profile bubble
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(barHeight)
-                                        .padding(horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        modifier = Modifier.graphicsLayer {
-                                            alpha = ((effectiveFraction - 0.45f) / 0.45f).coerceIn(0f, 1f)
-                                        },
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        SidebarButton(
-                                        color = p.text,
-                                        openProgress = { menuProgress.value },
-                                        onClick = onDismissMenu,
-                                        enabled = true
-                                        )
-                                    }
 
-                                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
 
-                                    OttProfileBubble(
-                                        p = p,
-                                        avatarUrl = userAvatarUrl,
-                                        decorationId = avatarDecorationId,
-                                        frameId = avatarFrameId,
-                                        onClick = {
-                                            onDismissMenu()
-                                            onProfileClick()
-                                        }
-                                    )
-                                }
-
-                                // Drawer Content: only measured and revealed when menu expands
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f, fill = false)
-                                        .verticalScroll(rememberScrollState())
-                                        .padding(horizontal = 14.dp)
-                                ) {
-                                    Spacer(Modifier.height(10.dp))
-                                    SectionLabel("EXPLORE", Modifier.stagger(menuProgress, 0), p)
-
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .stagger(menuProgress, 1)
-                                            .clip(RoundedCornerShape(22.dp))
-                                            .background(p.text.copy(alpha = 0.06f))
-                                            .padding(vertical = 4.dp)
-                                    ) {
-                                        DrawerEntries.forEachIndexed { i, entry ->
-                                            DrawerRow(
-                                                p = p,
-                                                entry = entry,
-                                                showDivider = i != DrawerEntries.lastIndex,
-                                                modifier = Modifier.stagger(menuProgress, 1 + i),
-                                                onClick = {
-                                                    onDismissMenu()
-                                                    onNavigate(entry.target)
-                                                }
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(Modifier.height(14.dp))
-                                    SectionLabel("COMMUNITY", Modifier.stagger(menuProgress, DrawerEntries.size + 1), p)
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .stagger(menuProgress, DrawerEntries.size + 2),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        CommunityButton(
-                                            p = p,
-                                            icon = Icons.AutoMirrored.Filled.Send,
-                                            label = "Telegram",
-                                            modifier = Modifier.weight(1f),
-                                            onClick = { openUrl(context, TELEGRAM_URL) }
-                                        )
-                                        CommunityButton(
-                                            p = p,
-                                            icon = Icons.Default.Forum,
-                                            label = "Discord",
-                                            modifier = Modifier.weight(1f),
-                                            onClick = { openUrl(context, DISCORD_INVITE_URL) }
-                                        )
-                                    }
-                                    Spacer(Modifier.height(18.dp))
-                                }
-                            }
-                        }
-                    ) { measurables, constraints ->
-                        val placeable = measurables.first().measure(
-                            constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
-                        )
-                        val collapsed = barHeightPx.coerceAtMost(placeable.height)
-                        val t = menuProgress.value.coerceIn(0f, 1f)
-                        val h = (collapsed + (placeable.height - collapsed) * t).roundToInt()
-                        layout(placeable.width, h) { placeable.place(0, 0) }
-                    }
+                    OttProfileBubble(
+                        p = p,
+                        avatarUrl = userAvatarUrl,
+                        decorationId = avatarDecorationId,
+                        frameId = avatarFrameId,
+                        onClick = onProfileClick
+                    )
                 }
             }
         }
@@ -642,5 +478,263 @@ private fun openUrl(context: Context, url: String) {
         )
     } catch (_: Exception) {
         // No browser / app can open the link.
+    }
+}
+
+
+/**
+ * Real Left Sidebar Drawer: slides smoothly from the left edge of the screen.
+ * Solid black / white shade (NO liquid glass).
+ */
+@Composable
+fun AniverseSidebarDrawer(
+    isOpen: Boolean,
+    onClose: () -> Unit,
+    userAvatarUrl: String?,
+    avatarDecorationId: String?,
+    avatarFrameId: String?,
+    displayName: String = "Zenkai User",
+    username: String = "",
+    onNavigate: (String) -> Unit,
+    onProfileClick: () -> Unit
+) {
+    val p = rememberHomePalette()
+    val context = LocalContext.current
+
+    BackHandler(enabled = isOpen) { onClose() }
+
+    AnimatedVisibility(
+        visible = isOpen,
+        enter = fadeIn(animationSpec = tween(220)),
+        exit = fadeOut(animationSpec = tween(180))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = if (p.dark) 0.65f else 0.40f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onClose() }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(295.dp)
+                    .align(Alignment.CenterStart)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {}
+                    .shadow(16.dp)
+                    .background(if (p.dark) Color(0xFF101013) else Color(0xFFFFFFFF))
+                    .border(
+                        1.dp,
+                        if (p.dark) Color(0x2EFFFFFF) else Color(0x1A000000)
+                    )
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 14.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // Header: User identity & close button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    onClose()
+                                    onProfileClick()
+                                }
+                        ) {
+                            OttProfileBubble(
+                                p = p,
+                                avatarUrl = userAvatarUrl,
+                                decorationId = avatarDecorationId,
+                                frameId = avatarFrameId,
+                                onClick = {
+                                    onClose()
+                                    onProfileClick()
+                                }
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = displayName.ifBlank { "Zenkai" },
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = p.text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (username.isNotBlank()) "@${username.removePrefix("@")}" else "View Profile",
+                                    fontSize = 12.sp,
+                                    color = p.textSub,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onClose,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(p.text.copy(alpha = 0.08f))
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close Sidebar",
+                                tint = p.text,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+                    HorizontalDivider(color = p.glassBorder, thickness = 1.dp)
+                    Spacer(Modifier.height(14.dp))
+
+                    Text(
+                        text = "EXPLORE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = p.textSub,
+                        letterSpacing = 1.sp
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    val navItems = listOf(
+                        DrawerEntry(Icons.Default.Explore, "Home", "Featured & trending anime", "home"),
+                        DrawerEntry(Icons.Default.Movie, "Movies & TV", "Full anime film catalogue", "movies"),
+                        DrawerEntry(Icons.Default.Explore, "Browse", "Filter by genres, season & year", "browse"),
+                        DrawerEntry(Icons.Default.Schedule, "Schedule", "Upcoming & airing schedule", "airing"),
+                        DrawerEntry(Icons.Default.Bookmark, "Library", "Saved watchlist & watch history", "library"),
+                        DrawerEntry(Icons.Default.Explore, "Manga", "Read chapters & bookmarks", "manga"),
+                        DrawerEntry(Icons.Default.Explore, "Light Novels", "Read translated light novels", "novel"),
+                        DrawerEntry(Icons.Default.Groups, "Watch Together", "Watch anime with friends", "watchtogether"),
+                        DrawerEntry(Icons.Default.Forum, "Community", "Live chat & anime discussions", "community")
+                    )
+
+                    navItems.forEach { entry ->
+                        SidebarNavRow(
+                            entry = entry,
+                            p = p,
+                            onClick = {
+                                onClose()
+                                onNavigate(entry.target)
+                            }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = p.glassBorder, thickness = 1.dp)
+                    Spacer(Modifier.height(14.dp))
+
+                    Text(
+                        text = "COMMUNITY & LINKS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = p.textSub,
+                        letterSpacing = 1.sp
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CommunityButton(
+                            p = p,
+                            icon = Icons.AutoMirrored.Filled.Send,
+                            label = "Discord",
+                            modifier = Modifier.weight(1f),
+                            onClick = { openUrl(context, DISCORD_INVITE_URL) }
+                        )
+                        CommunityButton(
+                            p = p,
+                            icon = Icons.AutoMirrored.Filled.Send,
+                            label = "Telegram",
+                            modifier = Modifier.weight(1f),
+                            onClick = { openUrl(context, TELEGRAM_URL) }
+                        )
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SidebarNavRow(
+    entry: DrawerEntry,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "sidebarRowScale"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (pressed) p.text.copy(alpha = 0.10f) else Color.Transparent)
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            }
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(p.text.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(entry.icon, contentDescription = null, tint = p.text, modifier = Modifier.size(19.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.title,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = p.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.subtitle,
+                fontSize = 11.sp,
+                color = p.textSub,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }

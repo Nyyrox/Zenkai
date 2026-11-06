@@ -45,6 +45,7 @@ import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import com.styropyr0.prismal.LocalPrismalBackdrop
 import com.nyyrox.aniverse.ui.components.OttNavDrawer
 import com.nyyrox.aniverse.ui.components.OttTopBar
+import com.nyyrox.aniverse.ui.components.AniverseSidebarDrawer
 import com.nyyrox.aniverse.ui.components.rememberChromeScrollState
 import com.nyyrox.aniverse.ui.screens.AiringScreen
 import com.nyyrox.aniverse.ui.screens.AvatarPickerScreen
