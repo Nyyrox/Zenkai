@@ -1,16 +1,4 @@
 package com.nyyrox.aniverse.player
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
@@ -121,8 +109,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -536,9 +522,6 @@ private fun DoubleTapSeekOverlay(
 
 private enum class PlayerSettingsTab {
     MAIN,
-    VIDEO,
-    PICTURE,
-    PLAYBACK,
     QUALITY,
     SERVER,
     ORIENTATION,
@@ -547,487 +530,6 @@ private enum class PlayerSettingsTab {
     THEME_PACKS,
     GESTURES
 }
-
-// ── Web CinePlayer Design Tokens & CSS Components ───────────────────────────
-private val ZpRed = Color(0xFFDC143C)
-private val ZpRed2 = Color(0xFFFF4D6A)
-
-private data class Anime4kModeInfo(val id: String, val label: String, val desc: String)
-
-private val ANIME4K_MODES = listOf(
-    Anime4kModeInfo("modeA", "Mode A", "Balanced restoration & 2× upscale (Best for 720p/1080p anime)"),
-    Anime4kModeInfo("modeB", "Mode B", "Soft restoration (Reduces compression ringing & artifacts)"),
-    Anime4kModeInfo("modeC", "Mode C", "Sharp outlines & high detail for crisp modern animation"),
-    Anime4kModeInfo("modeAA", "Mode AA", "Double-pass ultra restoration for maximum clean detail"),
-    Anime4kModeInfo("denoise", "Denoise", "Artifact removal & debanding + 2× CNN upscale"),
-    Anime4kModeInfo("fast", "Fast CNN", "Lightweight 2× neural net (low battery / integrated GPU)")
-)
-
-private data class FilterPresetInfo(val id: String, val label: String)
-
-private val VIDEO_FILTER_PRESETS = listOf(
-    FilterPresetInfo("off", "Default"),
-    FilterPresetInfo("vibrant", "Vibrance"),
-    FilterPresetInfo("cinema", "Cinema HDR"),
-    FilterPresetInfo("sharp", "Crisp Lines"),
-    FilterPresetInfo("warm", "Warm (Eye Care)")
-)
-
-private val VIDEO_ASPECTS = listOf("Fit", "Fill", "Stretch", "16:9", "4:3")
-
-private fun computeVideoColorMatrix(
-    preset: String,
-    brightnessPct: Int,
-    contrastPct: Int,
-    saturationPct: Int,
-    upscalerEnabled: Boolean,
-    upscalerIntensity: Int,
-    upscalerMode: String
-): ColorMatrix {
-    var b = (brightnessPct - 100) / 100f
-    var c = contrastPct / 100f
-    var s = saturationPct / 100f
-
-    when (preset) {
-        "vibrant" -> {
-            s *= 1.35f
-            c *= 1.08f
-        }
-        "cinema" -> {
-            c *= 1.22f
-            s *= 1.12f
-            b -= 0.03f
-        }
-        "sharp" -> {
-            c *= 1.28f
-            s *= 1.05f
-        }
-        "warm" -> {
-            s *= 1.05f
-        }
-    }
-
-    if (upscalerEnabled) {
-        val intensity = (upscalerIntensity / 100f).coerceIn(0f, 1f)
-        when (upscalerMode) {
-            "modeA" -> {
-                c *= (1f + 0.18f * intensity)
-                s *= (1f + 0.10f * intensity)
-            }
-            "modeB" -> {
-                c *= (1f + 0.08f * intensity)
-                b += (0.02f * intensity)
-            }
-            "modeC" -> {
-                c *= (1f + 0.25f * intensity)
-                s *= (1f + 0.05f * intensity)
-            }
-            "modeAA" -> {
-                c *= (1f + 0.30f * intensity)
-                s *= (1f + 0.15f * intensity)
-            }
-            "denoise" -> {
-                c *= (1f + 0.05f * intensity)
-                b += (0.01f * intensity)
-            }
-            "fast" -> {
-                c *= (1f + 0.12f * intensity)
-                s *= (1f + 0.08f * intensity)
-            }
-        }
-    }
-
-    val lr = 0.2126f
-    val lg = 0.7152f
-    val lb = 0.0722f
-
-    val invSat = 1f - s
-    val rR = invSat * lr + s
-    val rG = invSat * lg
-    val rB = invSat * lb
-
-    val gR = invSat * lr
-    val gG = invSat * lg + s
-    val gB = invSat * lb
-
-    val bR = invSat * lr
-    val bG = invSat * lg
-    val bB = invSat * lb + s
-
-    val contrastOffset = 0.5f * (1f - c) * 255f
-    val brightnessOffset = b * 255f
-    val totalOffset = contrastOffset + brightnessOffset
-
-    val warmR = if (preset == "warm") 1.08f else 1.0f
-    val warmG = if (preset == "warm") 1.02f else 1.0f
-    val warmB = if (preset == "warm") 0.90f else 1.0f
-
-    val values = floatArrayOf(
-        rR * c * warmR, rG * c, rB * c, 0f, totalOffset,
-        gR * c, gG * c * warmG, gB * c, 0f, totalOffset,
-        bR * c, bG * c, bB * c * warmB, 0f, totalOffset,
-        0f, 0f, 0f, 1f, 0f
-    )
-    return ColorMatrix(values)
-}
-
-/** Web Frosted Button (.zp-b in cineplayer.css) */
-@Composable
-private fun ZpBtn(
-    size: androidx.compose.ui.unit.Dp = 36.dp,
-    modifier: Modifier = Modifier,
-    isPill: Boolean = false,
-    isSelected: Boolean = false,
-    enabled: Boolean = true,
-    onClick: (Rect) -> Unit,
-    content: @Composable RowScope.() -> Unit
-) {
-    var bounds by remember { mutableStateOf(Rect.Zero) }
-    val src = remember { MutableInteractionSource() }
-    val isPressed by src.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.64f, stiffness = Spring.StiffnessMedium),
-        label = "zpBtnScale"
-    )
-    val bg = if (isSelected) ZpRed.copy(alpha = 0.40f) else Color(0x1FFFFFFF)
-    val borderCol = if (isSelected) ZpRed else Color(0x29FFFFFF)
-    val shape = if (isPill) RoundedCornerShape(99.dp) else CircleShape
-
-    Row(
-        modifier = modifier
-            .onGloballyPositioned { bounds = it.boundsInWindow() }
-            .scale(scale)
-            .alpha(if (enabled) 1f else 0.32f)
-            .then(if (isPill) Modifier.height(34.dp) else Modifier.size(size))
-            .clip(shape)
-            .background(bg)
-            .border(1.dp, borderCol, shape)
-            .clickable(
-                interactionSource = src,
-                indication = null,
-                enabled = enabled,
-                onClick = { onClick(bounds) }
-            )
-            .then(if (isPill) Modifier.padding(horizontal = 12.dp) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-        content = content
-    )
-}
-
-/** Web Hero Play/Pause Button (.zp-hero in cineplayer.css) */
-@Composable
-private fun ZpHeroBtn(
-    isPlaying: Boolean,
-    size: androidx.compose.ui.unit.Dp = 68.dp,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val src = remember { MutableInteractionSource() }
-    val isPressed by src.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.64f, stiffness = Spring.StiffnessMedium),
-        label = "heroScale"
-    )
-
-    val infiniteTransition = rememberInfiniteTransition(label = "heroPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseAlpha"
-    )
-
-    Box(
-        modifier = modifier
-            .size(size)
-            .scale(scale),
-        contentAlignment = Alignment.Center
-    ) {
-        if (!isPlaying) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .scale(pulseScale)
-                    .clip(CircleShape)
-                    .border(2.dp, ZpRed2.copy(alpha = pulseAlpha), CircleShape)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(ZpRed, ZpRed2)))
-                .clickable(
-                    interactionSource = src,
-                    indication = null,
-                    onClick = onClick
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            AnimatedContent(
-                targetState = isPlaying,
-                transitionSpec = {
-                    (fadeIn(tween(140)) + scaleIn(initialScale = 0.75f, animationSpec = tween(140)))
-                        .togetherWith(fadeOut(tween(100)) + scaleOut(targetScale = 0.75f, animationSpec = tween(100)))
-                },
-                label = "heroPlayPauseMorph"
-            ) { playing ->
-                Icon(
-                    imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (playing) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(size * 0.46f)
-                )
-            }
-        }
-    }
-}
-
-/** Web Seek Button (.zp-sd in cineplayer.css) */
-@Composable
-private fun ZpSeekBtn(
-    isForward: Boolean,
-    seconds: Int = 10,
-    size: androidx.compose.ui.unit.Dp = 42.dp,
-    onClick: () -> Unit
-) {
-    ZpBtn(size = size, onClick = { onClick() }) {
-        Icon(
-            imageVector = if (isForward) Icons.Default.Forward10 else Icons.Default.Replay10,
-            contentDescription = if (isForward) "+${seconds}s" else "-${seconds}s",
-            tint = Color.White,
-            modifier = Modifier.size(size * 0.62f)
-        )
-    }
-}
-
-/** Web Toggle Switch (.zp-tg in cineplayer.css) */
-@Composable
-private fun ZpToggle(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val thumbOffset by animateFloatAsState(
-        targetValue = if (checked) 20f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "toggleThumb"
-    )
-    val trackBg by animateColorAsState(
-        targetValue = if (checked) ZpRed else Color(0x33FFFFFF),
-        animationSpec = tween(160),
-        label = "toggleBg"
-    )
-
-    Box(
-        modifier = modifier
-            .width(44.dp)
-            .height(24.dp)
-            .clip(RoundedCornerShape(99.dp))
-            .background(trackBg)
-            .clickable { onCheckedChange(!checked) }
-            .padding(2.5.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = thumbOffset.dp)
-                .size(19.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-        )
-    }
-}
-
-/** Web Selectable Pill (.zp-pi in cineplayer.css) */
-@Composable
-private fun ZpPill(
-    label: String,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val bg = if (isSelected) ZpRed else Color(0x18FFFFFF)
-    val borderCol = if (isSelected) Color.Transparent else Color(0x22FFFFFF)
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, borderCol, RoundedCornerShape(8.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-            color = Color.White
-        )
-    }
-}
-
-/** Web Section Header (.zp-sec in cineplayer.css) */
-@Composable
-private fun ZpSec(title: String) {
-    Text(
-        text = title,
-        color = Color(0xFFDDDDDD),
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
-    )
-}
-
-/** Web Explanatory Note (.zp-note in cineplayer.css) */
-@Composable
-private fun ZpNote(text: String) {
-    Text(
-        text = text,
-        color = Color(0x99FFFFFF),
-        fontSize = 11.sp,
-        lineHeight = 15.sp,
-        modifier = Modifier.padding(vertical = 4.dp)
-    )
-}
-
-/** Web Setting Row with Toggle (.zp-row in cineplayer.css) */
-@Composable
-private fun ZpRow(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            color = Color.White,
-            fontSize = 13.5.sp,
-            fontWeight = FontWeight.Medium
-        )
-        ZpToggle(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-/** Web AniSkip floating button (.zp-sk in cineplayer.css) */
-@Composable
-private fun ZpAniSkipBtn(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xD9000000))
-            .border(1.dp, ZpRed, RoundedCornerShape(8.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(
-            Icons.Default.FastForward,
-            contentDescription = null,
-            tint = ZpRed,
-            modifier = Modifier.size(16.dp)
-        )
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color(0x22FFFFFF))
-                .border(1.dp, Color(0x4DFFFFFF), RoundedCornerShape(4.dp))
-                .padding(horizontal = 5.dp, vertical = 1.dp)
-        ) {
-            Text(
-                text = "Tab",
-                color = Color.White.copy(alpha = 0.75f),
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-/** Web Episode Welcome Card (.zp-card in cineplayer.css) */
-@Composable
-private fun ZpEpisodeCard(
-    title: String,
-    episode: Int,
-    episodeTitle: String?,
-    isDub: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .padding(start = 20.dp, bottom = 48.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xB3000000))
-            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(8.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(ZpRed)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "Episode $episode" + (if (!episodeTitle.isNullOrBlank()) " · $episodeTitle" else "") + (if (isDub) " · DUB" else " · SUB"),
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.78f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -1117,59 +619,6 @@ fun CinePlayerView(
     var isUpNextCanceled by remember(episode, streamUrl) { mutableStateOf(false) }
     var showPlayerSettingsModal by remember { mutableStateOf(false) }
     var activeSettingsTab by remember { mutableStateOf(PlayerSettingsTab.MAIN) }
-
-    // Web CinePlayer State: Video, Picture, Playback & Shaders
-    var currentIsDub by remember(isDub) { mutableStateOf(isDub) }
-    var videoAspectRatio by remember { mutableStateOf("Fit") }
-    var videoZoomFactor by remember { mutableFloatStateOf(100f) }
-    var isMirrored by remember { mutableStateOf(false) }
-    var isUpscalerEnabled by remember { mutableStateOf(false) }
-    var upscalerMode by remember { mutableStateOf("modeA") }
-    var upscalerIntensity by remember { mutableIntStateOf(80) }
-    var videoFilterPreset by remember { mutableStateOf("off") }
-    var videoBrightness by remember { mutableIntStateOf(100) }
-    var videoContrast by remember { mutableIntStateOf(100) }
-    var videoSaturation by remember { mutableIntStateOf(100) }
-    var skipStepSeconds by remember { mutableIntStateOf(10) }
-    var holdSpeedMultiplier by remember { mutableFloatStateOf(2.0f) }
-    var autoHideTimeoutMs by remember { mutableLongStateOf(3200L) }
-    var skipFillerEnabled by remember { mutableStateOf(false) }
-    var showRemainingTime by remember { mutableStateOf(false) }
-    var showEpisodeWelcomeCard by remember { mutableStateOf(true) }
-
-    LaunchedEffect(episode, streamUrl) {
-        showEpisodeWelcomeCard = true
-        kotlinx.coroutines.delay(4000L)
-        showEpisodeWelcomeCard = false
-    }
-
-    val videoColorMatrix = remember(
-        videoFilterPreset,
-        videoBrightness,
-        videoContrast,
-        videoSaturation,
-        isUpscalerEnabled,
-        upscalerIntensity,
-        upscalerMode
-    ) {
-        computeVideoColorMatrix(
-            preset = videoFilterPreset,
-            brightnessPct = videoBrightness,
-            contrastPct = videoContrast,
-            saturationPct = videoSaturation,
-            upscalerEnabled = isUpscalerEnabled,
-            upscalerIntensity = upscalerIntensity,
-            upscalerMode = upscalerMode
-        )
-    }
-
-    val currentResizeMode = when (videoAspectRatio) {
-        "Fill" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-        "Stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-        "16:9" -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
-        "4:3" -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
-        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-    }
 
     // Mini player handoff: start already in NATIVE_EXO with the parked stream so no loader flashes
     val handoff = remember(streamUrl) { MiniPlayerManager.peek(anilistId, episode, streamUrl) }
@@ -2744,18 +2193,13 @@ fun CinePlayerView(
                     AndroidView(
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = (if (isMirrored) -1f else 1f) * (videoZoomFactor / 100f)
-                                scaleY = videoZoomFactor / 100f
-                                colorFilter = ColorFilter.colorMatrix(videoColorMatrix)
-                            }
                             .onSizeChanged { glassBackdrop.hostWidth = it.width }
                             .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier)
                             .then(if (com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) Modifier.prismalGlassLayer(playerPrismalBackdrop) else Modifier),
                         factory = { ctx ->
                             (LayoutInflater.from(ctx).inflate(com.nyyrox.aniverse.R.layout.cine_player_texture, null, false) as PlayerView).apply {
                                 useController = false
-                                this.resizeMode = currentResizeMode
+                                this.resizeMode = resizeMode
                                 setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                                 findViewById<View>(androidx.media3.ui.R.id.exo_shutter)?.visibility = View.GONE
                                 player = exoPlayer
@@ -2771,7 +2215,7 @@ fun CinePlayerView(
                             if (view.player !== exoPlayer) {
                                 view.player = exoPlayer
                             }
-                            view.resizeMode = currentResizeMode
+                            view.resizeMode = resizeMode
                             // Hide basic Android SubtitleView whenever player UI caption is shown
                             if (isCaptionsEnabled && activeCuesText != null) {
                                 view.subtitleView?.visibility = View.GONE
@@ -3484,334 +2928,582 @@ fun CinePlayerView(
                         }
                     }
 
-                    // Web CinePlayer Overlay (.zp-sc/.zp-top/.zp-mid/.zp-bot)
-                    var zpLastVol by remember { mutableFloatStateOf(0.5f) }
-
-                    // Floating AniSkip Button (.zp-sk)
-                    val currentSkipInterval = skipIntervals.find { currentPositionMs in it.startTimeMs..it.endTimeMs }
-                    if (currentSkipInterval != null && !isInPip) {
-                        val isIntro = currentSkipInterval.skipType.contains("op", ignoreCase = true) || currentSkipInterval.skipType.contains("intro", ignoreCase = true)
-                        ZpAniSkipBtn(
-                            label = if (isIntro) "Skip Opening" else "Skip Ending",
-                            onClick = {
-                                PlayerPlaybackPlugin.seekTo(exoPlayer, currentSkipInterval.endTimeMs)
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 20.dp, bottom = if (showControls) 86.dp else 24.dp)
-                        )
-                    }
-
-                    // Floating Episode Welcome Card (.zp-card)
-                    if (showEpisodeWelcomeCard && !showControls && !isInPip) {
-                        ZpEpisodeCard(
-                            title = title,
-                            episode = episode,
-                            episodeTitle = episodeTitle,
-                            isDub = isDub,
-                            modifier = Modifier.align(Alignment.BottomStart)
-                        )
-                    }
-
-                    // Floating Hold-to-Speed Badge (.zp-hold)
-                    if (isHolding2x && !isInPip) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 18.dp)
-                                .clip(RoundedCornerShape(99.dp))
-                                .background(Color(0xCC000000))
-                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(99.dp))
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(Icons.Default.FastForward, null, tint = ZpRed, modifier = Modifier.size(16.dp))
-                                Text(
-                                    text = (if (holdSpeedMultiplier % 1f == 0f) holdSpeedMultiplier.toInt().toString() else holdSpeedMultiplier.toString()) + "× Speed",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
+                    // 1. iOS-style Gradient Scrim — dark top + dark bottom, transparent center
                     AnimatedVisibility(
                         visible = showControls && !isScreenLocked && !isInPip,
-                        enter = fadeIn(tween(200)),
-                        exit = fadeOut(tween(200)),
+                        enter = fadeIn(animationSpec = tween(140, easing = LinearEasing)),
+                        exit = fadeOut(animationSpec = tween(120, easing = LinearEasing)),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        val u = if (glassCompact) 9.dp else 12.dp
-                        val tap = if (glassCompact) 32.dp else 38.dp
-                        val ping = { showControls = true; isAutoHideTransition = false; controlsTimeoutKey++ }
-                        val openTab = { tab: PlayerSettingsTab, a: Rect ->
-                            morphAnchor = a; activeSettingsTab = tab; showPlayerSettingsModal = true; controlsTimeoutKey++
-                        }
-                        val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || subtitleTracks.any { it.isSelected })
-
-                        Box(Modifier.fillMaxSize()) {
-                            // .zp-sc scrim
-                            Box(
-                                Modifier.fillMaxSize().background(
+                        val overlayOpacity = playerCustomization.glass.overlayOpacity
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
                                     Brush.verticalGradient(
-                                        0f to Color.Black.copy(alpha = 0.55f),
-                                        0.22f to Color.Transparent,
-                                        0.66f to Color.Transparent,
-                                        1f to Color.Black.copy(alpha = 0.75f)
+                                        0.0f to Color(0x00000000).copy(alpha = (0.72f * overlayOpacity).coerceIn(0f, 1f)),
+                                        0.22f to Color(0x00000000).copy(alpha = (0.42f * overlayOpacity).coerceIn(0f, 1f)),
+                                        0.45f to Color(0x00000000),
+                                        0.72f to Color(0x00000000).copy(alpha = (0.35f * overlayOpacity).coerceIn(0f, 1f)),
+                                        1.0f to Color(0x00000000).copy(alpha = (0.78f * overlayOpacity).coerceIn(0f, 1f))
                                     )
                                 )
-                            )
+                        )
+                    }
 
-                            // .zp-top
-                            Row(
-                                Modifier
-                                    .align(Alignment.TopCenter)
-                                    .fillMaxWidth()
-                                    .padding(start = u * 1.6f, end = u * 1.6f, top = u * 1.2f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(u)
-                            ) {
-                                ZpBtn(tap, onClick = { onBack() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(tap * 0.52f))
-                                }
-
-                                Column(Modifier.weight(1f)) {
-                                    Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        "Episode $episode" + (if (!episodeTitle.isNullOrBlank()) " · $episodeTitle" else "") + (if (currentIsDub) " · DUB" else " · SUB"),
-                                        color = Color.White.copy(alpha = 0.78f), fontSize = 11.sp, fontWeight = FontWeight.Medium,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    // 2. Top Controls Bar (Arrives first: slides down from top; YouTube fade/slide exit)
+                    AnimatedVisibility(
+                        visible = showControls && !isScreenLocked && !isInPip,
+                        enter = slideInVertically(
+                            animationSpec = tween(180, easing = FastOutSlowInEasing),
+                            initialOffsetY = { -it / 2 }
+                        ) + fadeIn(tween(140, easing = LinearEasing)),
+                        exit = if (isAutoHideTransition) {
+                            slideOutVertically(
+                                animationSpec = tween(180, easing = FastOutLinearInEasing),
+                                targetOffsetY = { -it / 2 }
+                            ) + fadeOut(tween(220, easing = LinearEasing))
+                        } else {
+                            fadeOut(tween(120, easing = LinearEasing))
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = if (glassCompact) 12.dp else 20.dp, vertical = if (glassCompact) 8.dp else 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Top-left glass pill: back/minimize, settings, PiP, quality, lock
+                            GlassPill {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    if (!isFullscreen && onCollapseToMiniPlayer != null) {
+                                        GlassPillIcon(
+                                            icon = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Collapse to Mini-player",
+                                            onClick = { onCollapseToMiniPlayer() }
+                                        )
+                                    } else if (isFullscreen) {
+                                        GlassPillIcon(
+                                            icon = Icons.Default.ArrowBack,
+                                            contentDescription = "Exit Fullscreen",
+                                            onClick = { onToggleFullscreen() }
+                                        )
+                                    }
+                                    GlassPillIcon(
+                                        icon = Icons.Outlined.Settings,
+                                        contentDescription = "Settings",
+                                        onClick = { morphAnchor = it
+                                            activeSettingsTab = PlayerSettingsTab.MAIN
+                                            showPlayerSettingsModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                    )
+                                    GlassPillIcon(
+                                        icon = Icons.Outlined.PictureInPictureAlt,
+                                        contentDescription = "Picture in Picture",
+                                        onClick = {
+                                            (context as? ComponentActivity)?.let { act ->
+                                                MainActivity.enterPip(act)
+                                            }
+                                        }
+                                    )
+                                    GlassPillIcon(
+                                        icon = Icons.Outlined.HighQuality,
+                                        contentDescription = "Quality",
+                                        onClick = { morphAnchor = it
+                                            activeSettingsTab = PlayerSettingsTab.QUALITY
+                                            showPlayerSettingsModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                    )
+                                    GlassPillIcon(
+                                        icon = if (isScreenLocked) playerCustomization.themePack.lockIcon else playerCustomization.themePack.unlockIcon,
+                                        contentDescription = "Lock Screen",
+                                        iconSize = 16.dp,
+                                        onClick = {
+                                            isScreenLocked = true
+                                            showControls = false
+                                            showUnlockPrompt = false
+                                        }
                                     )
                                 }
+                            }
 
-                                Row(horizontalArrangement = Arrangement.spacedBy(u * 0.7f), verticalAlignment = Alignment.CenterVertically) {
-                                    if (audioTracks.size > 1) {
-                                        ZpBtn(tap, isPill = true, onClick = { openTab(PlayerSettingsTab.AUDIO, it) }) {
-                                            Icon(Icons.Default.Translate, "Audio track", tint = Color.White, modifier = Modifier.size(15.dp))
-                                            Spacer(Modifier.width(4.dp))
-                                            Text(
-                                                audioTracks.firstOrNull { it.isSelected }?.label ?: "Audio",
-                                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    } else {
-                                        ZpBtn(tap, isPill = true, onClick = {
-                                            currentIsDub = !currentIsDub
-                                            val targetLang = if (currentIsDub) "en" else "ja"
-                                            audioTracks.firstOrNull { it.language.startsWith(targetLang, ignoreCase = true) || (if (currentIsDub) it.label.contains("Dub", true) else it.label.contains("Sub", true)) }?.let { tr ->
-                                                exoPlayer?.let { p ->
-                                                    try {
-                                                        val group = p.currentTracks.groups[tr.groupIndex]
-                                                        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
-                                                            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                                                            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, tr.trackIndex))
-                                                            .build()
-                                                    } catch (_: Exception) {}
-                                                }
-                                            }
-                                        }) {
-                                            Text(
-                                                if (isDub) "DUB" else "SUB",
-                                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
+                            // Top-right glass pill: fullscreen button
+                            GlassPill {
+                                GlassPillIcon(
+                                    icon = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
+                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
+                                    onClick = { onToggleFullscreen() }
+                                )
+                            }
+                        }
+                    }
 
-                                    if (availableServers.isNotEmpty()) {
-                                        val activeSrv = availableServers.find { it.streamUrl == streamUrl } ?: availableServers.firstOrNull()
-                                        ZpBtn(tap, isPill = true, onClick = { openTab(PlayerSettingsTab.SERVER, it) }) {
-                                            Icon(Icons.Default.Dns, "Servers", tint = Color.White, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(4.dp))
-                                            Text(
-                                                (activeSrv?.serverName ?: "Server") + " HD",
-                                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
-                                            )
-                                        }
-                                    }
-
-                                    ZpBtn(tap, onClick = { openTab(PlayerSettingsTab.MAIN, it) }) {
-                                        Icon(Icons.Outlined.Settings, "Settings", tint = Color.White, modifier = Modifier.size(tap * 0.52f))
-                                    }
-
-                                    ZpBtn(tap, onClick = { onToggleFullscreen() }) {
+                    // 3. Center Controls Deck (YouTube fade/scale exit)
+                    AnimatedVisibility(
+                        visible = (showControls || isSkipActive) && !isScreenLocked && !isInPip,
+                        enter = scaleIn(
+                            initialScale = 0.88f,
+                            animationSpec = tween(170, easing = FastOutSlowInEasing)
+                        ) + fadeIn(tween(130, easing = LinearEasing)),
+                        exit = if (isAutoHideTransition) {
+                            scaleOut(
+                                targetScale = 0.92f,
+                                animationSpec = tween(160, easing = FastOutLinearInEasing)
+                            ) + fadeOut(tween(200, easing = LinearEasing))
+                        } else {
+                            fadeOut(tween(110, easing = LinearEasing))
+                        },
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .scale(playerCustomization.placement.centerScale)
+                            .offset(y = playerCustomization.placement.centerOffsetY.dp)
+                    ) {
+                        val centerLayout = playerCustomization.placement.centerLayout
+                        val buttonSpacing = if (glassCompact) 2.dp else if (centerLayout == CenterControlsLayout.WIDE_SPACED) 14.dp else 6.dp
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(buttonSpacing)
+                        ) {
+                                if (centerLayout == CenterControlsLayout.STANDARD_5 || centerLayout == CenterControlsLayout.WIDE_SPACED) {
+                                    GlassIconButton(
+                                        onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
+                                            controlsTimeoutKey++
+                                            onPreviousEpisode()
+                                        },
+                                        enabled = hasPreviousEpisode,
+                                        size = if (glassCompact) 26.dp else 32.dp,
+                                        modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.prevEpDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.prevEpDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.prevEpScale)
+                                    ) {
                                         Icon(
-                                            if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                            if (isFullscreen) "Exit fullscreen" else "Fullscreen", tint = Color.White, modifier = Modifier.size(tap * 0.52f)
+                                            imageVector = playerCustomization.themePack.prevIcon,
+                                            contentDescription = "Previous Episode",
+                                            tint = Color(0xE6FFFFFF),
+                                            modifier = Modifier.size(if (glassCompact) 13.dp else 16.dp)
                                         )
                                     }
                                 }
-                            }
 
-                            // .zp-mid
-                            Row(
-                                Modifier.align(Alignment.Center),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(u * 1.8f)
-                            ) {
-                                ZpBtn(u * 3.4f, enabled = hasPreviousEpisode, onClick = { ping(); onPreviousEpisode() }) {
-                                    Icon(Icons.Default.SkipPrevious, "Previous episode", tint = Color.White, modifier = Modifier.size(u * 3.4f * 0.52f))
-                                }
-                                ZpSeekBtn(isForward = false, seconds = skipStepSeconds, size = u * 4f, onClick = {
-                                    ping()
-                                    PlayerPlaybackPlugin.seekBy(exoPlayer, -skipStepSeconds * 1000L)
-                                })
-                                ZpHeroBtn(
-                                    isPlaying = isPlaying,
-                                    size = minOf(u * 6f, 76.dp),
-                                    onClick = {
-                                        ping()
-                                        PlayerPlaybackPlugin.togglePlayPause(exoPlayer, context)
-                                    }
-                                )
-                                ZpSeekBtn(isForward = true, seconds = skipStepSeconds, size = u * 4f, onClick = {
-                                    ping()
-                                    PlayerPlaybackPlugin.seekBy(exoPlayer, skipStepSeconds * 1000L)
-                                })
-                                ZpBtn(u * 3.4f, enabled = hasNextEpisode, onClick = { ping(); onNextEpisode() }) {
-                                    Icon(Icons.Default.SkipNext, "Next episode", tint = Color.White, modifier = Modifier.size(u * 3.4f * 0.52f))
-                                }
-                            }
-
-                            // .zp-bot
-                            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = u * 1.6f, end = u * 1.6f, bottom = u * 0.6f)) {
-                                // .zp-sr: time | seek | duration
-                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(u)) {
-                                    val activePosMs = if (isScrubbing) scrubPositionMs else currentPositionMs
-                                    Text(
-                                        formatTime(activePosMs),
-                                        color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 40.dp)
-                                    )
-                                    BoxWithConstraints(Modifier.weight(1f).height(28.dp), contentAlignment = Alignment.CenterStart) {
-                                        val w = maxWidth
-                                        val playedFrac = if (durationMs > 0L) (activePosMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-                                        val bufferedFrac = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-
-                                        // .zp-tr
-                                        Box(
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .height(if (isScrubbing) 5.dp else 3.dp)
-                                                .clip(CircleShape)
-                                                .background(Color.White.copy(alpha = 0.18f))
-                                        ) {
-                                            Box(Modifier.fillMaxHeight().fillMaxWidth(bufferedFrac).background(Color.White.copy(alpha = 0.28f)))
-                                            Box(Modifier.fillMaxHeight().fillMaxWidth(playedFrac).background(ZpRed))
-                                            if (durationMs > 0L) {
-                                                skipIntervals.forEach { iv ->
-                                                    val s = (iv.startTimeMs.toFloat() / durationMs).coerceIn(0f, 1f)
-                                                    val e = (iv.endTimeMs.toFloat() / durationMs).coerceIn(0f, 1f)
-                                                    if (e > s) {
-                                                        val isIntro = iv.skipType.contains("op", ignoreCase = true) || iv.skipType.contains("intro", ignoreCase = true)
-                                                        val segColor = if (isIntro) Color(0x9900E5FF) else Color(0x99FF9100)
-                                                        Box(Modifier.offset(x = w * s).width(w * (e - s)).fillMaxHeight().background(segColor))
-                                                    }
+                                if (centerLayout != CenterControlsLayout.PLAY_ONLY) {
+                                    GlassIconButton(
+                                        onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
+                                            controlsTimeoutKey++
+                                            PlayerPlaybackPlugin.seekBy(exoPlayer, -10000L)
+                                            if (doubleTapSide == "LEFT") {
+                                                accumulatedSeekSeconds += 10
+                                            } else {
+                                                accumulatedSeekSeconds = 10
+                                            }
+                                            doubleTapSide = "LEFT"
+                                            doubleTapTriggerKey++
+                                            val curKey = doubleTapTriggerKey
+                                            scope.launch {
+                                                delay(1200)
+                                                if (doubleTapTriggerKey == curKey) {
+                                                    doubleTapSide = null
+                                                    accumulatedSeekSeconds = 0
+                                                    controlsTimeoutKey++
                                                 }
                                             }
+                                        },
+                                        size = if (glassCompact) 34.dp else 42.dp,
+                                        modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.rewindDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.rewindDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.rewindScale)
+                                    ) {
+                                        if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
+                                            IosSeek10Icon(
+                                                isForward = false,
+                                                modifier = Modifier.size(if (glassCompact) 22.dp else 28.dp),
+                                                tint = Color(0xE6FFFFFF),
+                                                fontSize = if (glassCompact) 8.sp else 9.5.sp
+                                            )
+                                        } else {
+                                            val seekIcon = when (playerCustomization.icons.seekStyle) {
+                                                SeekIconStyle.CHEVRONS -> Icons.Default.FastRewind
+                                                SeekIconStyle.ROCKETS -> Icons.Default.FastRewind
+                                                SeekIconStyle.MINIMAL_ARROWS -> Icons.Default.ChevronLeft
+                                                else -> Icons.Default.Replay10
+                                            }
+                                            Icon(
+                                                imageVector = seekIcon,
+                                                contentDescription = "Rewind 10s",
+                                                tint = Color(0xE6FFFFFF),
+                                                modifier = Modifier.size(if (glassCompact) 18.dp else 22.dp)
+                                            )
                                         }
-                                        // .zp-th
-                                        Box(
-                                            Modifier
-                                                .offset(x = (w * playedFrac - 6.dp).coerceAtLeast(0.dp))
-                                                .size(if (isScrubbing) 14.dp else 10.dp)
-                                                .clip(CircleShape)
-                                                .background(Color.White)
-                                                .border(2.dp, ZpRed, CircleShape)
+                                    }
+                                }
+
+                                GlassIconButton(
+                                    onClick = {
+                                        showControls = true
+                                        isAutoHideTransition = false
+                                        controlsTimeoutKey++
+                                        PlayerPlaybackPlugin.togglePlayPause(exoPlayer, context)
+                                    },
+                                    isHero = true,
+                                    size = if (glassCompact) 44.dp else 56.dp,
+                                    modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.playPauseDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.playPauseDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.playPauseScale) 
+                                ) {
+                                    AnimatedContent(
+                                        targetState = isPlaying,
+                                        transitionSpec = {
+                                            (fadeIn(animationSpec = tween(140)) + scaleIn(initialScale = 0.8f, animationSpec = tween(140)))
+                                                .togetherWith(fadeOut(animationSpec = tween(100)) + scaleOut(targetScale = 0.8f, animationSpec = tween(100)))
+                                        },
+                                        label = "heroPlayPauseMorph"
+                                    ) { playing ->
+                                        GlassPlayPauseGlyph(
+                                            isPlaying = playing,
+                                            modifier = Modifier.size(if (glassCompact) 18.dp else 24.dp),
+                                            tint = Color.White
                                         )
-                                        // .zp-tip
-                                        if (isScrubbing && durationMs > 0L) {
+                                    }
+                                }
+
+                                if (centerLayout != CenterControlsLayout.PLAY_ONLY) {
+                                    GlassIconButton(
+                                        onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
+                                            controlsTimeoutKey++
+                                            PlayerPlaybackPlugin.seekBy(exoPlayer, 10000L)
+                                            if (doubleTapSide == "RIGHT") {
+                                                accumulatedSeekSeconds += 10
+                                            } else {
+                                                accumulatedSeekSeconds = 10
+                                            }
+                                            doubleTapSide = "RIGHT"
+                                            doubleTapTriggerKey++
+                                            val curKey = doubleTapTriggerKey
+                                            scope.launch {
+                                                delay(1200)
+                                                if (doubleTapTriggerKey == curKey) {
+                                                    doubleTapSide = null
+                                                    accumulatedSeekSeconds = 0
+                                                    controlsTimeoutKey++
+                                                }
+                                            }
+                                        },
+                                        size = if (glassCompact) 34.dp else 42.dp,
+                                        modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.forwardDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.forwardDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.forwardScale)
+                                    ) {
+                                        if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
+                                            IosSeek10Icon(
+                                                isForward = true,
+                                                modifier = Modifier.size(if (glassCompact) 22.dp else 28.dp),
+                                                tint = Color(0xE6FFFFFF),
+                                                fontSize = if (glassCompact) 8.sp else 9.5.sp
+                                            )
+                                        } else {
+                                            val seekIcon = when (playerCustomization.icons.seekStyle) {
+                                                SeekIconStyle.CHEVRONS -> Icons.Default.FastForward
+                                                SeekIconStyle.ROCKETS -> Icons.Default.FastForward
+                                                SeekIconStyle.MINIMAL_ARROWS -> Icons.Default.ChevronRight
+                                                else -> Icons.Default.Forward10
+                                            }
+                                            Icon(
+                                                imageVector = seekIcon,
+                                                contentDescription = "Forward 10s",
+                                                tint = Color(0xE6FFFFFF),
+                                                modifier = Modifier.size(if (glassCompact) 18.dp else 22.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (centerLayout == CenterControlsLayout.STANDARD_5 || centerLayout == CenterControlsLayout.WIDE_SPACED) {
+                                    GlassIconButton(
+                                        onClick = {
+                                            showControls = true
+                                            isAutoHideTransition = false
+                                            controlsTimeoutKey++
+                                            onNextEpisode()
+                                        },
+                                        enabled = hasNextEpisode,
+                                        size = if (glassCompact) 26.dp else 32.dp,
+                                        modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.nextEpDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.nextEpDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.nextEpScale)
+                                    ) {
+                                        Icon(
+                                            imageVector = playerCustomization.themePack.nextIcon,
+                                            contentDescription = "Next Episode",
+                                            tint = Color(0xE6FFFFFF),
+                                            modifier = Modifier.size(if (glassCompact) 13.dp else 16.dp)
+                                        )
+                                    }
+                                }
+                        }
+                    }
+
+                    // 4. Bottom Bar: Scrubber & Time (YouTube fade & morphing timeline)
+                    AnimatedVisibility(
+                        visible = showControls && !isScreenLocked && !isInPip,
+                        enter = slideInVertically(
+                            animationSpec = tween(180, easing = FastOutSlowInEasing),
+                            initialOffsetY = { it / 2 }
+                        ) + fadeIn(tween(140, easing = LinearEasing)),
+                        exit = if (isAutoHideTransition) {
+                            slideOutVertically(
+                                animationSpec = tween(220, easing = FastOutLinearInEasing),
+                                targetOffsetY = { it / 3 }
+                            ) + fadeOut(tween(240, easing = LinearEasing))
+                        } else {
+                            fadeOut(tween(130, easing = LinearEasing))
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .offset { IntOffset(0, (playerCustomization.hudLayout.seekbarDeltaY * 400f).roundToInt()) }
+                            .scale(playerCustomization.hudLayout.seekbarScale)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = if (glassCompact) 12.dp else 20.dp, end = if (glassCompact) 12.dp else 20.dp, top = 4.dp, bottom = if (glassCompact) 4.dp else 8.dp)
+                        ) {
+                            val timeTextAlpha by animateFloatAsState(
+                                targetValue = if (showControls && !isAutoHideTransition) 1f else if (showControls) 0.5f else 0f,
+                                animationSpec = tween(if (isAutoHideTransition) 180 else 100),
+                                label = "timeTextAlpha"
+                            )
+                            val animatedSeekbarHeight by animateFloatAsState(
+                                targetValue = if (showControls && !isAutoHideTransition) playerCustomization.placement.seekbarHeightDp else 2.5f,
+                                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                label = "animatedSeekbarHeight"
+                            )
+                            // Info (left) + quick pill: captions / audio / speed (right)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
+                                    if (!glassCompact && hasCustomEpName) {
+                                        Text(
+                                            text = "Episode $episode: $episodeTitle",
+                                            fontSize = 11.5.sp,
+                                            color = Color.White.copy(alpha = 0.75f),
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    val displayTitle = if (hasCustomEpName || isFullscreen) title else "$title • Ep. $episode"
+                                    Text(
+                                        text = displayTitle,
+                                        fontSize = if (glassCompact) 14.sp else 16.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(Modifier.width(12.dp))
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || subtitleTracks.any { it.isSelected })
+                                    val circleBtnSize = if (glassCompact) 32.dp else 36.dp
+                                    val iconSize = if (glassCompact) 16.dp else 18.dp
+
+                                    var audioAnchor by remember { mutableStateOf<Rect?>(null) }
+                                    var captionsAnchor by remember { mutableStateOf<Rect?>(null) }
+                                    var speedAnchor by remember { mutableStateOf<Rect?>(null) }
+
+                                    // Audio Track Button
+                                    GlassIconButton(
+                                        size = circleBtnSize,
+                                        modifier = Modifier.onGloballyPositioned { audioAnchor = it.boundsInWindow() },
+                                        onClick = {
+                                            morphAnchor = audioAnchor
+                                            activeSettingsTab = PlayerSettingsTab.AUDIO
+                                            showPlayerSettingsModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.GraphicEq,
+                                            contentDescription = "Audio Tracks",
+                                            tint = if (audioTracks.any { it.isSelected }) playerCustomization.accentColor.color else Color.White,
+                                            modifier = Modifier.size(iconSize)
+                                        )
+                                    }
+
+                                    // Captions / Subtitles Button
+                                    GlassIconButton(
+                                        size = circleBtnSize,
+                                        modifier = Modifier.onGloballyPositioned { captionsAnchor = it.boundsInWindow() },
+                                        onClick = {
+                                            morphAnchor = captionsAnchor
+                                            showCaptionModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Subtitles,
+                                            contentDescription = "Subtitles",
+                                            tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White,
+                                            modifier = Modifier.size(iconSize)
+                                        )
+                                    }
+
+                                    // Playback Speed Button (Directly opens Speed Tab)
+                                    GlassIconButton(
+                                        size = circleBtnSize,
+                                        modifier = Modifier.onGloballyPositioned { speedAnchor = it.boundsInWindow() },
+                                        onClick = {
+                                            morphAnchor = speedAnchor
+                                            activeSettingsTab = PlayerSettingsTab.SPEED
+                                            showPlayerSettingsModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Speed,
+                                            contentDescription = "Playback Speed",
+                                            tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
+                                            modifier = Modifier.size(iconSize)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(2.dp))
+
+                            // Time bar: elapsed | seekbar | remaining
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = formatTime(if (isScrubbing) scrubPositionMs else currentPositionMs),
+                                    fontSize = 11.5.sp,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.graphicsLayer { alpha = timeTextAlpha }
+                                )
+
+                                BoxWithConstraints(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(28.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                val totalWidth = maxWidth
+                                val activePosMs = if (isScrubbing) scrubPositionMs else currentPositionMs
+                                val playedFrac = if (durationMs > 0L) (activePosMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                                val bufferedFrac = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+
+                                // Custom Seekbar Track & Thumb Renderer
+                                CineSeekbarRenderer(
+                                    style = playerCustomization.seekbarStyle,
+                                    palette = themePalette,
+                                    accentColor = playerCustomization.accentColor.color,
+                                    playedFrac = playedFrac,
+                                    bufferedFrac = bufferedFrac,
+                                    isScrubbing = isScrubbing,
+                                    heightDp = animatedSeekbarHeight,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                // AniSkip Segment Highlights Overlay (Clean translucent white)
+                                if (durationMs > 0L && skipIntervals.isNotEmpty()) {
+                                    skipIntervals.forEach { interval ->
+                                        val startFrac = (interval.startTimeMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                                        val endFrac = (interval.endTimeMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                                        val widthFrac = (endFrac - startFrac).coerceAtLeast(0f)
+                                        if (widthFrac > 0.005f) {
+                                            val isIntro = interval.skipType.equals("op", ignoreCase = true) || interval.skipType.equals("recap", ignoreCase = true)
+                                            val highlightColor = if (isIntro) Color(0x60FFFFFF) else Color(0x35FFFFFF)
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(start = totalWidth * startFrac)
+                                                    .width(totalWidth * widthFrac)
+                                                    .height(playerCustomization.placement.seekbarHeightDp.dp)
+                                                    .clip(RoundedCornerShape(1.dp))
+                                                    .background(highlightColor)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Live Seek Tooltip Bubble while scrubbing
+                                if (isScrubbing && durationMs > 0L) {
+                                    val bubbleOffset = (totalWidth * playedFrac) - 24.dp
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(start = bubbleOffset.coerceAtLeast(0.dp))
+                                            .align(Alignment.TopStart)
+                                            .offset(y = (-12).dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0xEE0A0E1A))
+                                            .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
                                             Text(
                                                 text = formatTime(scrubPositionMs),
-                                                color = Color.White,
-                                                fontSize = 11.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                modifier = Modifier
-                                                    .align(Alignment.TopStart)
-                                                    .offset(x = (w * playedFrac - 24.dp).coerceAtLeast(0.dp), y = (-26).dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(Color(0xD9000000))
-                                                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                                            )
-                                        }
-                                        Slider(
-                                            value = playedFrac,
-                                            onValueChange = { f ->
-                                                controlsTimeoutKey++
-                                                isScrubbing = true
-                                                scrubPositionMs = (f * durationMs).toLong().coerceIn(0L, durationMs)
-                                            },
-                                            onValueChangeFinished = {
-                                                isScrubbing = false
-                                                currentPositionMs = scrubPositionMs
-                                                PlayerPlaybackPlugin.seekTo(exoPlayer, scrubPositionMs)
-                                                controlsTimeoutKey++
-                                            },
-                                            colors = SliderDefaults.colors(thumbColor = Color.Transparent, activeTrackColor = Color.Transparent, inactiveTrackColor = Color.Transparent),
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                    val remainingMs = (durationMs - activePosMs).coerceAtLeast(0L)
-                                    Text(
-                                        text = if (showRemainingTime) "-${formatTime(remainingMs)}" else formatTime(durationMs),
-                                        color = Color.White.copy(alpha = 0.78f),
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.widthIn(min = 44.dp).clickable { showRemainingTime = !showRemainingTime }
-                                    )
-                                }
-
-                                Spacer(Modifier.height(4.dp))
-
-                                // .zp-cr: volume | spacer | speed, quality, CC, settings, PiP, fullscreen
-                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(u * 0.4f)) {
-                                    ZpBtn(tap, onClick = {
-                                        ping()
-                                        val v = if (currentVolumeFraction > 0f) { zpLastVol = currentVolumeFraction; 0f } else zpLastVol
-                                        PlayerGesturePlugin.setVolumeFraction(context, v)
-                                        currentVolumeFraction = v
-                                    }) {
-                                        Icon(
-                                            if (currentVolumeFraction == 0f) Icons.AutoMirrored.Filled.VolumeOff else if (currentVolumeFraction < 0.5f) Icons.AutoMirrored.Filled.VolumeDown else Icons.AutoMirrored.Filled.VolumeUp,
-                                            if (currentVolumeFraction == 0f) "Unmute" else "Mute", tint = Color.White, modifier = Modifier.size(tap * 0.52f)
-                                        )
-                                    }
-                                    Spacer(Modifier.weight(1f))
-                                    ZpBtn(tap, isPill = true, onClick = { openTab(PlayerSettingsTab.SPEED, it) }) {
-                                        Text(
-                                            (if (playbackSpeed % 1f == 0f) playbackSpeed.toInt().toString() else playbackSpeed.toString()) + "×",
-                                            color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                    if (qualityTracks.isNotEmpty()) {
-                                        ZpBtn(tap, isPill = true, onClick = { openTab(PlayerSettingsTab.QUALITY, it) }) {
-                                            Text(
-                                                qualityTracks.firstOrNull { it.isSelected }?.label ?: "Auto",
-                                                color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
+                                                color = Color.White.copy(alpha = 0.90f)
                                             )
                                         }
                                     }
-                                    ZpBtn(tap, isSelected = isCaptionActive, onClick = { morphAnchor = it; showCaptionModal = true; controlsTimeoutKey++ }) {
-                                        Text("CC", color = if (isCaptionActive) ZpRed else Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold)
-                                    }
-                                    ZpBtn(tap, onClick = { openTab(PlayerSettingsTab.MAIN, it) }) {
-                                        Icon(Icons.Outlined.Settings, "Settings", tint = Color.White, modifier = Modifier.size(tap * 0.52f))
-                                    }
-                                    ZpBtn(tap, onClick = { (context as? ComponentActivity)?.let { MainActivity.enterPip(it) } }) {
-                                        Icon(Icons.Outlined.PictureInPictureAlt, "Picture in picture", tint = Color.White, modifier = Modifier.size(tap * 0.52f))
-                                    }
-                                    ZpBtn(tap, onClick = { onToggleFullscreen() }) {
-                                        Icon(
-                                            if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                            if (isFullscreen) "Exit fullscreen" else "Fullscreen", tint = Color.White, modifier = Modifier.size(tap * 0.52f)
-                                        )
-                                    }
+
+                                // Touch Slider (Transparent thumb so our custom circular pointer displays)
+                                Slider(
+                                    value = playedFrac,
+                                    onValueChange = { frac ->
+                                        controlsTimeoutKey++
+                                        isScrubbing = true
+                                        scrubPositionMs = (frac * durationMs).toLong().coerceIn(0L, durationMs)
+                                    },
+                                    onValueChangeFinished = {
+                                        isScrubbing = false
+                                        currentPositionMs = scrubPositionMs
+                                        PlayerPlaybackPlugin.seekTo(exoPlayer, scrubPositionMs)
+                                        controlsTimeoutKey++
+                                    },
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.Transparent,
+                                        activeTrackColor = Color.Transparent,
+                                        inactiveTrackColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier.fillMaxSize()
+                                )
                                 }
+
+                                Text(
+                                    text = if (showTimeRemaining && durationMs > 0L) {
+                                        val rem = (durationMs - (if (isScrubbing) scrubPositionMs else currentPositionMs)).coerceAtLeast(0L)
+                                        "-${formatTime(rem)}"
+                                    } else {
+                                        formatTime(durationMs)
+                                    },
+                                    fontSize = 11.5.sp,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .graphicsLayer { alpha = timeTextAlpha }
+                                        .clickable { showTimeRemaining = !showTimeRemaining }
+                                )
                             }
                         }
                     }
@@ -3875,6 +3567,10 @@ fun CinePlayerView(
                         .build()
                 }
             },
+            resizeMode = resizeMode,
+            onSelectResizeMode = { mode: Int ->
+                notifyFitChange(mode)
+            },
             playbackSpeed = playbackSpeed,
             onSelectSpeed = { spd: Float ->
                 playbackSpeed = spd
@@ -3916,67 +3612,10 @@ fun CinePlayerView(
                 storageManager.setAutoSkipIntroOutro(checked)
                 onToggleAutoSkipIntroOutro(checked)
             },
-            skipFillerEnabled = skipFillerEnabled,
-            onToggleSkipFiller = { checked: Boolean ->
-                skipFillerEnabled = checked
-            },
             availableServers = availableServers,
             currentStreamUrl = streamUrl,
             onSelectServer = { srv ->
                 onSelectServer?.invoke(srv)
-            },
-            isDub = currentIsDub,
-            onToggleDub = { dub ->
-                currentIsDub = dub
-                val targetLang = if (currentIsDub) "en" else "ja"
-                audioTracks.firstOrNull { it.language.startsWith(targetLang, ignoreCase = true) || (if (currentIsDub) it.label.contains("Dub", true) else it.label.contains("Sub", true)) }?.let { tr ->
-                    exoPlayer?.let { p ->
-                        try {
-                            val group = p.currentTracks.groups[tr.groupIndex]
-                            p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
-                                .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, tr.trackIndex))
-                                .build()
-                        } catch (_: Exception) {}
-                    }
-                }
-            },
-            videoAspectRatio = videoAspectRatio,
-            onSelectAspectRatio = { videoAspectRatio = it },
-            videoZoomFactor = videoZoomFactor,
-            onZoomChange = { videoZoomFactor = it },
-            isMirrored = isMirrored,
-            onToggleMirror = { isMirrored = it },
-            isUpscalerEnabled = isUpscalerEnabled,
-            onToggleUpscaler = { isUpscalerEnabled = it },
-            upscalerMode = upscalerMode,
-            onSelectUpscalerMode = { upscalerMode = it },
-            upscalerIntensity = upscalerIntensity,
-            onUpscalerIntensityChange = { upscalerIntensity = it },
-            videoFilterPreset = videoFilterPreset,
-            onSelectFilterPreset = { videoFilterPreset = it },
-            videoBrightness = videoBrightness,
-            onBrightnessChange = { videoBrightness = it },
-            videoContrast = videoContrast,
-            onContrastChange = { videoContrast = it },
-            videoSaturation = videoSaturation,
-            onSaturationChange = { videoSaturation = it },
-            onResetPicture = {
-                videoFilterPreset = "off"
-                videoBrightness = 100
-                videoContrast = 100
-                videoSaturation = 100
-            },
-            skipStepSeconds = skipStepSeconds,
-            onSelectSkipStep = { skipStepSeconds = it },
-            holdSpeedMultiplier = holdSpeedMultiplier,
-            onSelectHoldRate = { holdSpeedMultiplier = it },
-            autoHideTimeoutMs = autoHideTimeoutMs,
-            onSelectAutoHide = { autoHideTimeoutMs = it },
-            onResetPlayback = {
-                skipStepSeconds = 10
-                holdSpeedMultiplier = 2.0f
-                autoHideTimeoutMs = 3200L
             }
         )
     }
@@ -5557,7 +5196,6 @@ private fun DialoguePanelModal(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PlayerSettingsModal(
     activeTab: PlayerSettingsTab,
@@ -5569,6 +5207,8 @@ private fun PlayerSettingsModal(
     currentCustomization: CinePlayerCustomizationSettings = CinePlayerCustomizationSettings(),
     qualityTracks: List<QualityTrackInfo>,
     onSelectQuality: (QualityTrackInfo) -> Unit,
+    resizeMode: Int,
+    onSelectResizeMode: (Int) -> Unit,
     playbackSpeed: Float,
     onSelectSpeed: (Float) -> Unit,
     audioTracks: List<AudioTrackInfo>,
@@ -5577,58 +5217,21 @@ private fun PlayerSettingsModal(
     onToggleAutoPlayNext: (Boolean) -> Unit,
     autoSkipIntroOutroEnabled: Boolean,
     onToggleAutoSkipIntroOutro: (Boolean) -> Unit,
-    skipFillerEnabled: Boolean = false,
-    onToggleSkipFiller: (Boolean) -> Unit = {},
     availableServers: List<StreamServerOption> = emptyList(),
     currentStreamUrl: String = "",
     onSelectServer: (StreamServerOption) -> Unit = {},
-    isDub: Boolean = false,
-    onToggleDub: (Boolean) -> Unit = {},
-    videoAspectRatio: String = "Fit",
-    onSelectAspectRatio: (String) -> Unit = {},
-    videoZoomFactor: Float = 100f,
-    onZoomChange: (Float) -> Unit = {},
-    isMirrored: Boolean = false,
-    onToggleMirror: (Boolean) -> Unit = {},
-    isUpscalerEnabled: Boolean = false,
-    onToggleUpscaler: (Boolean) -> Unit = {},
-    upscalerMode: String = "modeA",
-    onSelectUpscalerMode: (String) -> Unit = {},
-    upscalerIntensity: Int = 80,
-    onUpscalerIntensityChange: (Int) -> Unit = {},
-    videoFilterPreset: String = "off",
-    onSelectFilterPreset: (String) -> Unit = {},
-    videoBrightness: Int = 100,
-    onBrightnessChange: (Int) -> Unit = {},
-    videoContrast: Int = 100,
-    onContrastChange: (Int) -> Unit = {},
-    videoSaturation: Int = 100,
-    onSaturationChange: (Int) -> Unit = {},
-    onResetPicture: () -> Unit = {},
-    skipStepSeconds: Int = 10,
-    onSelectSkipStep: (Int) -> Unit = {},
-    holdSpeedMultiplier: Float = 2.0f,
-    onSelectHoldRate: (Float) -> Unit = {},
-    autoHideTimeoutMs: Long = 3200L,
-    onSelectAutoHide: (Long) -> Unit = {},
-    onResetPlayback: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var mainTabSelection by remember { mutableStateOf("video") }
-
     GlassDialog(
         anchor = anchor,
         onDismiss = onDismiss
     ) {
         Box(
             modifier = modifier
-                .widthIn(max = 420.dp)
-                .fillMaxWidth(0.92f)
+                .widthIn(max = 330.dp)
                 .wrapContentHeight()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xF00A0A0A))
-                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(16.dp))
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .glassPanel()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             when (activeTab) {
                 PlayerSettingsTab.MAIN -> {
@@ -5636,9 +5239,8 @@ private fun PlayerSettingsModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        // Header
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -5646,9 +5248,10 @@ private fun PlayerSettingsModal(
                         ) {
                             Text(
                                 text = "Settings",
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color.White,
+                                modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 6.dp)
                             )
                             IconButton(
                                 onClick = onDismiss,
@@ -5663,427 +5266,236 @@ private fun PlayerSettingsModal(
                             }
                         }
 
-                        // .zp-tabs: [ Video ] [ Picture ] [ Playback ]
+                        // Audio (multi-audio)
+                        if (audioTracks.isNotEmpty()) {
+                            SettingsItemRow(
+                                icon = Icons.Outlined.GraphicEq,
+                                title = "Audio",
+                                subtitle = audioTracks.find { it.isSelected }?.label ?: "${audioTracks.size} Available",
+                                onClick = { onTabChange(PlayerSettingsTab.AUDIO) }
+                            )
+                        }
+
+                        // Captions
+                        SettingsItemRow(
+                            icon = Icons.Outlined.Subtitles,
+                            title = "Captions",
+                            onClick = onOpenCaptions
+                        )
+
+                        // Playback speed
+                        SettingsItemRow(
+                            icon = Icons.Outlined.Speed,
+                            title = "Playback Speed",
+                            subtitle = "${playbackSpeed}x",
+                            onClick = { onTabChange(PlayerSettingsTab.SPEED) }
+                        )
+
+                        // Aspect Ratio / Video Fit
+                        val fitSubtitle = when (resizeMode) {
+                            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Crop to Fill / Zoom"
+                            AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Stretch"
+                            else -> "Fit to Screen"
+                        }
+                        SettingsItemRow(
+                            icon = Icons.Default.AspectRatio,
+                            title = "Aspect Ratio",
+                            subtitle = fitSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.ORIENTATION) }
+                        )
+
+                        // Server (only when there is a choice)
+                        if (availableServers.size > 1) {
+                            val activeSrv = availableServers.find { it.streamUrl == currentStreamUrl } ?: availableServers.firstOrNull()
+                            SettingsItemRow(
+                                icon = Icons.Default.Dns,
+                                title = "Server",
+                                subtitle = activeSrv?.serverName ?: "Server",
+                                onClick = { onTabChange(PlayerSettingsTab.SERVER) }
+                            )
+                        }
+
+                        // Player Gestures
+                        val g = currentCustomization.gestures
+                        val activeGesturesCount = listOf(
+                            g.volumeEnabled,
+                            g.brightnessEnabled,
+                            g.swipeSeekEnabled,
+                            g.holdTo2xEnabled,
+                            g.doubleTapSeekEnabled,
+                            g.pinchToZoomEnabled
+                        ).count { it }
+                        val gestureSubtitle = when {
+                            !g.masterEnabled || activeGesturesCount == 0 -> "Gestures disabled"
+                            activeGesturesCount == 6 -> "All gestures enabled"
+                            else -> "$activeGesturesCount of 6 enabled"
+                        }
+                        SettingsItemRow(
+                            icon = Icons.Default.TouchApp,
+                            title = "Player Gestures",
+                            subtitle = gestureSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.GESTURES) }
+                        )
+
+                        // Player Themes & Colors
+                        SettingsItemRow(
+                            icon = Icons.Default.DashboardCustomize,
+                            title = "Player Themes & Colors",
+                            subtitle = currentCustomization.themePack.displayName,
+                            onClick = { onTabChange(PlayerSettingsTab.THEME_PACKS) }
+                        )
+
+                        // Liquid Glassmorphism Transparency Optimization Toggle
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        var glassEnabled by remember { mutableStateOf(com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    val newVal = !glassEnabled
+                                    glassEnabled = newVal
+                                    com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
+                                    try {
+                                        val sm = com.nyyrox.aniverse.data.StorageManager(ctx)
+                                        val cur = sm.getThemeSettings()
+                                        sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
+                                    } catch (_: Throwable) {}
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            listOf(
-                                "video" to "Video",
-                                "picture" to "Picture",
-                                "play" to "Playback"
-                            ).forEach { (k, label) ->
-                                val isSelected = mainTabSelection == k
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { mainTabSelection = k }
-                                        .padding(vertical = 6.dp)
-                                ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
                                     Text(
-                                        text = label,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.55f)
+                                        text = "Liquid Glassmorphism",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
                                     )
-                                    Spacer(Modifier.height(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(0.85f)
-                                            .height(2.dp)
-                                            .background(if (isSelected) ZpRed else Color.Transparent)
+                                    Text(
+                                        text = if (glassEnabled) "AGSL refraction & blur enabled" else "Optimized flat render (Fast)",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
                                     )
                                 }
                             }
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                                checked = glassEnabled,
+                                onCheckedChange = { newVal ->
+                                    glassEnabled = newVal
+                                    com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
+                                    try {
+                                        val sm = com.nyyrox.aniverse.data.StorageManager(ctx)
+                                        val cur = sm.getThemeSettings()
+                                        sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
+                                    } catch (_: Throwable) {}
+                                }
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .height(0.5.dp)
+                                .background(Color(0x26FFFFFF))
+                        )
+
+                        // 5. Auto-Play Next
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { onToggleAutoPlayNext(!autoPlayNextEnabled) }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Auto-Play Next",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (autoPlayNextEnabled) "Plays next episode" else "Pause at end",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
+                            }
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                                checked = autoPlayNextEnabled,
+                                onCheckedChange = { onToggleAutoPlayNext(it) }
+                            )
+                        }
+
+                        // 6. Auto-Skip Intro/Outro
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { onToggleAutoSkipIntroOutro(!autoSkipIntroOutroEnabled) }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FastForward,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Auto-Skip Intro & Outro",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (autoSkipIntroOutroEnabled) "Auto skip theme songs" else "Manual skip button",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
+                            }
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                                checked = autoSkipIntroOutroEnabled,
+                                onCheckedChange = { onToggleAutoSkipIntroOutro(it) }
+                            )
                         }
 
                         Spacer(Modifier.height(4.dp))
-
-                        // Tab 1: Video
-                        if (mainTabSelection == "video") {
-                            ZpSec("Aspect ratio")
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                VIDEO_ASPECTS.forEach { ar ->
-                                    ZpPill(
-                                        label = ar,
-                                        isSelected = videoAspectRatio == ar,
-                                        onClick = { onSelectAspectRatio(ar) }
-                                    )
-                                }
-                            }
-
-                            ZpSec("Zoom (${videoZoomFactor.toInt()}%)")
-                            Slider(
-                                value = videoZoomFactor,
-                                onValueChange = onZoomChange,
-                                valueRange = 100f..150f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = ZpRed,
-                                    inactiveTrackColor = Color(0x33FFFFFF)
-                                ),
-                                modifier = Modifier.fillMaxWidth().height(26.dp)
-                            )
-
-                            ZpRow(
-                                title = "Mirror video",
-                                checked = isMirrored,
-                                onCheckedChange = onToggleMirror
-                            )
-
-                            ZpSec("4K upscaler (GPU)")
-                            ZpRow(
-                                title = "Anime4K GPU upscaling",
-                                checked = isUpscalerEnabled,
-                                onCheckedChange = onToggleUpscaler
-                            )
-
-                            if (isUpscalerEnabled) {
-                                ZpSec("Anime4K Model / Shader Preset")
-                                FlowRow(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    ANIME4K_MODES.forEach { m ->
-                                        ZpPill(
-                                            label = m.label,
-                                            isSelected = upscalerMode == m.id,
-                                            onClick = { onSelectUpscalerMode(m.id) }
-                                        )
-                                    }
-                                }
-
-                                val currentModeDesc = ANIME4K_MODES.find { it.id == upscalerMode }?.desc ?: ""
-                                ZpNote(currentModeDesc)
-
-                                ZpSec("Upscale Intensity ($upscalerIntensity%)")
-                                Slider(
-                                    value = upscalerIntensity.toFloat(),
-                                    onValueChange = { onUpscalerIntensityChange(it.toInt()) },
-                                    valueRange = 0f..100f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color.White,
-                                        activeTrackColor = ZpRed,
-                                        inactiveTrackColor = Color(0x33FFFFFF)
-                                    ),
-                                    modifier = Modifier.fillMaxWidth().height(26.dp)
-                                )
-                            }
-
-                            ZpNote("Runs in real-time on your GPU with neural shaders. Best on 720p–1080p anime.")
-                        }
-
-                        // Tab 2: Picture
-                        if (mainTabSelection == "picture") {
-                            ZpSec("Visual Enhancements & Shaders")
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                VIDEO_FILTER_PRESETS.forEach { p ->
-                                    ZpPill(
-                                        label = p.label,
-                                        isSelected = videoFilterPreset == p.id,
-                                        onClick = { onSelectFilterPreset(p.id) }
-                                    )
-                                }
-                            }
-
-                            ZpSec("Brightness ($videoBrightness%)")
-                            Slider(
-                                value = videoBrightness.toFloat(),
-                                onValueChange = { onBrightnessChange(it.toInt()) },
-                                valueRange = 70f..130f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = ZpRed,
-                                    inactiveTrackColor = Color(0x33FFFFFF)
-                                ),
-                                modifier = Modifier.fillMaxWidth().height(26.dp)
-                            )
-
-                            ZpSec("Contrast ($videoContrast%)")
-                            Slider(
-                                value = videoContrast.toFloat(),
-                                onValueChange = { onContrastChange(it.toInt()) },
-                                valueRange = 70f..140f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = ZpRed,
-                                    inactiveTrackColor = Color(0x33FFFFFF)
-                                ),
-                                modifier = Modifier.fillMaxWidth().height(26.dp)
-                            )
-
-                            ZpSec("Color Saturation ($videoSaturation%)")
-                            Slider(
-                                value = videoSaturation.toFloat(),
-                                onValueChange = { onSaturationChange(it.toInt()) },
-                                valueRange = 70f..160f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = ZpRed,
-                                    inactiveTrackColor = Color(0x33FFFFFF)
-                                ),
-                                modifier = Modifier.fillMaxWidth().height(26.dp)
-                            )
-
-                            if (videoFilterPreset != "off" || videoBrightness != 100 || videoContrast != 100 || videoSaturation != 100) {
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 8.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0x18FFFFFF))
-                                        .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
-                                        .clickable { onResetPicture() }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                ) {
-                                    Text("Reset visual shaders", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                                }
-                            }
-                        }
-
-                        // Tab 3: Playback
-                        if (mainTabSelection == "play") {
-                            ZpSec("Automation")
-                            ZpRow(
-                                title = "Autoplay next episode",
-                                checked = autoPlayNextEnabled,
-                                onCheckedChange = onToggleAutoPlayNext
-                            )
-                            ZpRow(
-                                title = "Auto-skip intro & outro",
-                                checked = autoSkipIntroOutroEnabled,
-                                onCheckedChange = onToggleAutoSkipIntroOutro
-                            )
-                            ZpRow(
-                                title = "Skip filler episodes",
-                                checked = skipFillerEnabled,
-                                onCheckedChange = onToggleSkipFiller
-                            )
-
-                            ZpSec("Skip step (buttons, double-tap)")
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                listOf(5 to "5s", 10 to "10s", 15 to "15s", 30 to "30s").forEach { (s, l) ->
-                                    ZpPill(
-                                        label = l,
-                                        isSelected = skipStepSeconds == s,
-                                        onClick = { onSelectSkipStep(s) }
-                                    )
-                                }
-                            }
-
-                            ZpSec("Hold-to-speed rate")
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                listOf(1.5f to "1.5×", 2.0f to "2×", 3.0f to "3×", 4.0f to "4×").forEach { (r, l) ->
-                                    ZpPill(
-                                        label = l,
-                                        isSelected = holdSpeedMultiplier == r,
-                                        onClick = { onSelectHoldRate(r) }
-                                    )
-                                }
-                            }
-
-                            ZpSec("Auto-hide controls")
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                listOf(2000L to "2s", 3200L to "3s", 5000L to "5s", 0L to "Never").forEach { (t, l) ->
-                                    ZpPill(
-                                        label = l,
-                                        isSelected = autoHideTimeoutMs == t,
-                                        onClick = { onSelectAutoHide(t) }
-                                    )
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 8.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
-                                    .clickable { onResetPlayback() }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp)
-                            ) {
-                                Text("Reset playback options", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                            }
-                        }
-                    }
-                }
-
-                PlayerSettingsTab.SERVER -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                IconButton(
-                                    onClick = { onTabChange(PlayerSettingsTab.MAIN) },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Text("Servers", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(99.dp))
-                                .background(Color(0x1FFFFFFF))
-                                .padding(3.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(99.dp))
-                                    .background(if (!isDub) ZpRed else Color.Transparent)
-                                    .clickable { onToggleDub(false) }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("SUB", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(99.dp))
-                                    .background(if (isDub) ZpRed else Color.Transparent)
-                                    .clickable { onToggleDub(true) }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("DUB", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-
-                        availableServers.forEach { srv ->
-                            val isSelected = srv.streamUrl == currentStreamUrl
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) ZpRed.copy(alpha = 0.35f) else Color(0x10FFFFFF))
-                                    .border(1.dp, if (isSelected) ZpRed else Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
-                                    .clickable {
-                                        onSelectServer(srv)
-                                        onDismiss()
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Default.Dns, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    Text(srv.serverName, color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(Color(0x22FFFFFF))
-                                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("HD", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = ZpRed, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-
-                PlayerSettingsTab.AUDIO -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                IconButton(onClick = { onTabChange(PlayerSettingsTab.MAIN) }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-                                Text("Audio Track", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                        }
-
-                        audioTracks.forEach { track ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (track.isSelected) ZpRed.copy(alpha = 0.35f) else Color(0x10FFFFFF))
-                                    .border(1.dp, if (track.isSelected) ZpRed else Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
-                                    .clickable {
-                                        onSelectAudio(track)
-                                        onDismiss()
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Default.Translate, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    Text(track.label, color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                if (track.isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = ZpRed, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -6092,48 +5504,163 @@ private fun PlayerSettingsModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        SubHeader(title = "Quality", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+
+                        if (qualityTracks.isEmpty()) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                IconButton(onClick = { onTabChange(PlayerSettingsTab.MAIN) }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-                                Text("Quality", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(text = "Auto (Native Quality)", color = OttPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
                             }
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                        } else {
+                            qualityTracks.forEach { track ->
+                                val isSelected = track.isSelected
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            onSelectQuality(track)
+                                            onDismiss()
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = track.label,
+                                        color = if (isSelected) OttPrimary else Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
                             }
                         }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
 
-                        qualityTracks.forEach { track ->
+                PlayerSettingsTab.SERVER -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SubHeader(title = "Select Server", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+
+                        if (availableServers.isEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "Default Direct Server", color = OttPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                            }
+                        } else {
+                            availableServers.forEach { srv ->
+                                val isSelected = srv.streamUrl == currentStreamUrl
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            onSelectServer(srv)
+                                            onDismiss()
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = srv.serverName,
+                                            color = if (isSelected) OttPrimary else Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        Text(
+                                            text = if (srv.isHls) "Direct HLS Stream (Proxied)" else "Direct Stream",
+                                            color = Color(0xFF94A3B8),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
+
+                PlayerSettingsTab.ORIENTATION -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SubHeader(title = "Orientation / Video Fit", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+
+                        val options = listOf(
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Fit to Screen", "Preserve original aspect ratio"),
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Crop to Fill / Zoom", "Fill display by zooming"),
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Stretch", "Stretch video to edges")
+                        )
+
+                        options.forEach { (mode, title, sub) ->
+                            val isSelected = resizeMode == mode
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (track.isSelected) ZpRed.copy(alpha = 0.35f) else Color(0x10FFFFFF))
-                                    .border(1.dp, if (track.isSelected) ZpRed else Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                    .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
                                     .clickable {
-                                        onSelectQuality(track)
+                                        onSelectResizeMode(mode)
                                         onDismiss()
                                     }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(track.label, color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
-                                if (track.isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = ZpRed, modifier = Modifier.size(18.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = title,
+                                        color = if (isSelected) OttPrimary else Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(text = sub, color = OttSecondary, fontSize = 11.sp)
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
 
@@ -6142,56 +5669,441 @@ private fun PlayerSettingsModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                IconButton(onClick = { onTabChange(PlayerSettingsTab.MAIN) }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-                                Text("Playback Speed", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                        }
+                        SubHeader(title = "Playback Speed", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
 
-                        listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f).forEach { spd ->
+                        listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { spd ->
                             val isSelected = playbackSpeed == spd
-                            val label = (if (spd % 1f == 0f) spd.toInt().toString() else spd.toString()) + "×"
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) ZpRed.copy(alpha = 0.35f) else Color(0x10FFFFFF))
-                                    .border(1.dp, if (isSelected) ZpRed else Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                    .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
                                     .clickable {
                                         onSelectSpeed(spd)
                                         onDismiss()
                                     }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(label, color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (spd == 1.0f) "1.0x (Normal)" else "${spd}x",
+                                    color = if (isSelected) OttPrimary else Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
                                 if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = ZpRed, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
 
-                else -> {
-                    LaunchedEffect(Unit) {
-                        onTabChange(PlayerSettingsTab.MAIN)
+                PlayerSettingsTab.AUDIO -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SubHeader(title = "Audio Track", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+
+                        if (audioTracks.isEmpty()) {
+                            Text(
+                                text = "Native Stream Audio (Default)",
+                                color = OttSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp)
+                            )
+                        } else {
+                            audioTracks.forEach { track ->
+                                val isSelected = track.isSelected
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            onSelectAudio(track)
+                                            onDismiss()
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = track.label,
+                                        color = if (isSelected) OttPrimary else Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
+
+                PlayerSettingsTab.THEME_PACKS -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SubHeader(
+                            title = "Player Theme Packs",
+                            onBack = { onTabChange(PlayerSettingsTab.MAIN) },
+                            onClose = onDismiss
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .height(1.dp)
+                                .background(Color(0x1FFFFFFF))
+                        )
+
+                        PlayerThemePack.values().forEach { pack ->
+                            val isSelected = currentCustomization.themePack == pack
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) currentCustomization.accentColor.color.copy(alpha = 0.20f) else Color.Transparent)
+                                    .clickable {
+                                        val newSettings = pack.applyTo(currentCustomization)
+                                        onApplyCustomization(newSettings)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0x15FFFFFF)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = when (pack) {
+                                                PlayerThemePack.ZENKAI_CLASSIC -> Icons.Default.PlayCircle
+                                                PlayerThemePack.CYBER_TECH -> Icons.Default.FastForward
+                                                PlayerThemePack.SAMURAI_BLADE -> Icons.Default.PlayArrow
+                                                PlayerThemePack.MINIMAL_NEO -> Icons.Default.PlayArrow
+                                                PlayerThemePack.RETRO_ARCADE -> Icons.Default.PlayCircle
+                                            },
+                                            contentDescription = null,
+                                            tint = Color.White.copy(alpha = 0.90f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    Column {
+                                        Text(
+                                            text = pack.displayName,
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = pack.description,
+                                            color = Color(0xFF94A3B8),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .height(1.dp)
+                                .background(Color(0x1FFFFFFF))
+                        )
+
+                        Text(
+                            text = "PLAYER ACCENT COLOR",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            PlayerAccentColor.entries.forEach { accent ->
+                                val isColorSelected = currentCustomization.accentColor == accent
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(accent.color)
+                                        .border(
+                                            width = if (isColorSelected) 2.5.dp else 1.dp,
+                                            color = if (isColorSelected) Color.White else Color(0x35FFFFFF),
+                                            shape = CircleShape
+                                        )
+                                        .clickable {
+                                            val newSettings = currentCustomization.copy(accentColor = accent)
+                                            onApplyCustomization(newSettings)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isColorSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = accent.displayName,
+                                            tint = if (accent == PlayerAccentColor.PURE_WHITE) Color.Black else Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
+
+                PlayerSettingsTab.GESTURES -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SubHeader(
+                            title = "Player Gestures",
+                            onBack = { onTabChange(PlayerSettingsTab.MAIN) },
+                            onClose = onDismiss
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .height(1.dp)
+                                .background(Color(0x1FFFFFFF))
+                        )
+
+                        val g = currentCustomization.gestures
+
+                        // Master Switch Card: "Enable All Gestures"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (g.masterEnabled) Color(0x2234C759)
+                                    else Color(0x15FFFFFF)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (g.masterEnabled) Color(0x5534C759) else Color(0x22FFFFFF),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    val targetMaster = !g.masterEnabled
+                                    val newGestures = if (targetMaster) {
+                                        g.copy(
+                                            masterEnabled = true,
+                                            volumeEnabled = true,
+                                            brightnessEnabled = true,
+                                            swipeSeekEnabled = true,
+                                            holdTo2xEnabled = true,
+                                            doubleTapSeekEnabled = true,
+                                            pinchToZoomEnabled = true
+                                        )
+                                    } else {
+                                        g.copy(masterEnabled = false)
+                                    }
+                                    onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text(
+                                    text = "Enable All Gestures",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (g.masterEnabled) "All gestures enabled" else "Master switch: all gestures disabled",
+                                    color = if (g.masterEnabled) Color(0xFF86EFAC) else Color(0xFF94A3B8),
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Switch(
+                                checked = g.masterEnabled,
+                                onCheckedChange = { isChecked ->
+                                    val newGestures = if (isChecked) {
+                                        g.copy(
+                                            masterEnabled = true,
+                                            volumeEnabled = true,
+                                            brightnessEnabled = true,
+                                            swipeSeekEnabled = true,
+                                            holdTo2xEnabled = true,
+                                            doubleTapSeekEnabled = true,
+                                            pinchToZoomEnabled = true
+                                        )
+                                    } else {
+                                        g.copy(masterEnabled = false)
+                                    }
+                                    onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFF34C759),
+                                    uncheckedThumbColor = Color.White,
+                                    uncheckedTrackColor = Color(0x40FFFFFF)
+                                )
+                            )
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Text(
+                            text = "INDIVIDUAL GESTURES",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                        )
+
+                        // 1. Volume Swipe Gesture
+                        GestureToggleRow(
+                            icon = Icons.Default.VolumeUp,
+                            title = "Volume Gesture",
+                            subtitle = "Swipe right side vertically to adjust volume",
+                            checked = g.masterEnabled && g.volumeEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    volumeEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        // 2. Brightness Swipe Gesture
+                        GestureToggleRow(
+                            icon = Icons.Default.BrightnessMedium,
+                            title = "Brightness Gesture",
+                            subtitle = "Swipe left side vertically to adjust brightness",
+                            checked = g.masterEnabled && g.brightnessEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    brightnessEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        // 3. Horizontal Swipe to Seek
+                        GestureToggleRow(
+                            icon = Icons.Default.FastForward,
+                            title = "Swipe to Seek",
+                            subtitle = "Swipe horizontally to scrub forward or backward",
+                            checked = g.masterEnabled && g.swipeSeekEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    swipeSeekEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        // 4. Hold to 2x Speed
+                        GestureToggleRow(
+                            icon = Icons.Default.Speed,
+                            title = "Hold to 2x Speed",
+                            subtitle = "Long press anywhere during playback for 2x speed",
+                            checked = g.masterEnabled && g.holdTo2xEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    holdTo2xEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        // 5. Double-Tap to Seek / Play-Pause
+                        GestureToggleRow(
+                            icon = Icons.Default.Forward10,
+                            title = "Double Tap Gestures",
+                            subtitle = "Double tap sides to seek 10s, double tap center to play/pause",
+                            checked = g.masterEnabled && g.doubleTapSeekEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    doubleTapSeekEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        // 6. Pinch to Change Ratio
+                        GestureToggleRow(
+                            icon = Icons.Default.AspectRatio,
+                            title = "Pinch to Change Ratio",
+                            subtitle = "Pinch or drag with two fingers to adjust video aspect ratio",
+                            checked = g.masterEnabled && g.pinchToZoomEnabled,
+                            masterEnabled = g.masterEnabled,
+                            onCheckedChange = { isChecked ->
+                                val newGestures = g.copy(
+                                    masterEnabled = if (isChecked) true else g.masterEnabled,
+                                    pinchToZoomEnabled = isChecked
+                                )
+                                onApplyCustomization(currentCustomization.copy(gestures = newGestures))
+                            }
+                        )
+
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
             }
@@ -6440,4 +6352,3 @@ private fun YtBottomProgressBar(
         }
     }
 }
-
