@@ -67,6 +67,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -174,23 +182,23 @@ internal fun rememberHomePalette(): HomePalette {
     val glassOn = ts.isGlassmorphismEnabled && PrismalGlass.supportsRefraction
     return remember(c.bg, glassOn) {
         if (dark) HomePalette(
-            dark = true, glassOn = glassOn, bg = c.bg,
+            dark = true, glassOn = glassOn, bg = Color(0xFF000000),
             text = Color(0xFFFFFFFF),
             textSub = Color(0xFFD6D0D3),
             textMuted = Color(0xFF9D959A),
             accentA = Color(0xFFFFFFFF),
             accentB = Color(0xFFFFFFFF),
             accentText = Color(0xFFB4ACB0),
-            onAccent = Color(0xFF0E0A0C),
-            flatFill = Color(0xE61E1619),
-            glassBorder = Color(0x33FFFFFF),
-            skeleton = Color(0xFF241A1F),
-            skeletonHi = Color(0xFF33262D),
-            glow = Color(0x14FFFFFF),
+            onAccent = Color(0xFF000000),
+            flatFill = Color(0xFF121215),
+            glassBorder = Color(0x22FFFFFF),
+            skeleton = Color(0xFF18181C),
+            skeletonHi = Color(0xFF24242A),
+            glow = Color.Transparent,
             rating = Color(0xFFFF4757),
-            gradTop = Color(0xFF45172A),
-            gradMid = Color(0xFF1F0F16),
-            gradBot = Color(0xFF0B090B)
+            gradTop = Color(0xFF000000),
+            gradMid = Color(0xFF000000),
+            gradBot = Color(0xFF000000)
         ) else HomePalette(
             dark = false, glassOn = glassOn, bg = c.bg,
             text = Color(0xFF0D0A0B),
@@ -569,189 +577,273 @@ private fun HomeHero(
     vm: MainViewModel,
     p: HomePalette,
     listScrolling: Boolean,
-    onAnimeClick: (Int) -> Unit
+    onAnimeClick: (Int) -> Unit,
+    onPlayClick: ((Int, Int) -> Unit)? = null
 ) {
-    val reduced = LocalThemeSettings.current.isReducedMotionEnabled
-    val n = shows.size
+    if (shows.isEmpty()) return
+    val count = shows.size
+    val pagerState = rememberPagerState(pageCount = { count })
     val scope = rememberCoroutineScope()
-    var position by remember { mutableFloatStateOf(0f) }
-    var dragging by remember { mutableStateOf(false) }
-    var animJob by remember { mutableStateOf<Job?>(null) }
-    val scrollingNow by rememberUpdatedState(listScrolling)
-    val center by remember { derivedStateOf { floor(position + 0.5f).toInt() } }
-    val current = Math.floorMod(center, n)
-    val travel = with(LocalDensity.current) { (HeroCardW * 0.70f).toPx() }
 
-    fun animateTo(target: Float, velocity: Float = 0f) {
-        animJob?.cancel()
-        animJob = scope.launch {
-            animate(
-                initialValue = position, targetValue = target, initialVelocity = velocity,
-                animationSpec = spring(dampingRatio = 0.82f, stiffness = 170f)
-            ) { v, _ -> position = v }
-        }
-    }
-
-    fun settle(fingerVelocityPx: Float) {
-        val v = -fingerVelocityPx / travel
-        val nearest = floor(position + 0.5f)
-        val target = floor(position + v * 0.15f + 0.5f).coerceIn(nearest - 1f, nearest + 1f)
-        animateTo(target, v)
-    }
-
-    LaunchedEffect(center, n) {
-        for (k in -1..2) vm.loadTmdbArtwork(shows[Math.floorMod(center + k, n)])
-    }
-
-    LaunchedEffect(n, dragging, reduced) {
-        if (n < 2 || dragging || reduced) return@LaunchedEffect
+    // Smooth auto-cycle every 7 seconds, pauses during manual scroll
+    LaunchedEffect(pagerState, listScrolling) {
         while (true) {
-            delay(6000)
-            if (!scrollingNow) animateTo(floor(position + 0.5f) + 1f)
+            delay(7000)
+            if (!listScrolling && !pagerState.isScrollInProgress && count > 1) {
+                val next = (pagerState.currentPage + 1) % count
+                pagerState.animateScrollToPage(next, animationSpec = tween(700, easing = FastOutSlowInEasing))
+            }
         }
     }
 
-    // slow shared "breathing" phase, only ever read in draw lambdas (no recomposition)
-    val breath = rememberInfiniteTransition(label = "breath")
-    val phase by breath.animateFloat(
-        initialValue = 0f, targetValue = TWO_PI,
-        animationSpec = infiniteRepeatable(tween(5600, easing = LinearEasing)),
-        label = "phase"
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(520.dp)
+            .background(Color.Black)
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val anime = shows[page]
+            val artwork = vm.tmdbArtworks[anime.id]
+            val backdrop = artwork?.backdropUrl?.takeIf { it.isNotBlank() }
+                ?: anime.banner?.takeIf { it.isNotBlank() }
+                ?: anime.cover
 
-    Box(Modifier.fillMaxWidth()) {
-        HeroBackdrop(shows[current].cover, p, Modifier.matchParentSize())
-
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            // clears the floating top bar (separate file)
-            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
-
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(HeroCardH + 32.dp)
-                    .draggable(
-                        orientation = Orientation.Horizontal,
-                        enabled = n > 1,
-                        state = rememberDraggableState { d -> position -= d / travel },
-                        onDragStarted = { dragging = true; animJob?.cancel() },
-                        onDragStopped = { v -> dragging = false; settle(v) }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                val order = if (n < 2) listOf(center)
-                else (center - 2..center + 2).sortedByDescending { abs(it - center) }
-                // far first, centre last = drawn on top
-                for (i in order) {
-                    val anime = shows[Math.floorMod(i, n)]
-                    key(i) {
-                        Box(
-                            Modifier
-                                .width(HeroCardW)
-                                .height(HeroCardH)
-                                .graphicsLayer {
-                                    val x = i - position            // 0 = centre, +1 right slot, -1 left slot
-                                    val ax = abs(x)
-                                    val a = ax.coerceAtMost(1f)     // cards past the slot park behind it
-                                    val side = if (x < 0f) -1f else 1f
-                                    val bw = if (reduced) 0f else sin(phase + i * 1.3f)
-                                    translationX = side * 0.26f * a * size.width
-                                    translationY = (a * 6f + bw * (1.5f + 2.5f * a)) * density
-                                    rotationY = -side * 30f * a
-                                    rotationZ = side * a * 4f + bw * 0.7f * (0.3f + a)
-                                    val sc = 1f - 0.08f * a + bw * 0.006f
-                                    scaleX = sc
-                                    scaleY = sc
-                                    alpha = when {
-                                        ax <= 1f -> 1f
-                                        ax >= 2f -> 0f
-                                        else -> 2f - ax
-                                    }
-                                    cameraDistance = 18f * density
-                                }
-                                .shadow(12.dp, HeroCardShape, clip = false)
-                                .clip(HeroCardShape)
-                                .background(p.skeleton)
-                                .tap {
-                                    if (i == center) onAnimeClick(anime.id) else animateTo(i.toFloat())
-                                }
-                        ) {
-                            AsyncImage(
-                                model = anime.cover, contentDescription = anime.displayTitle,
-                                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-                            )
-                            // depth: back cards are dimmed, not see-through
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { alpha = 0.30f * abs(i - position).coerceAtMost(1f) }
-                                    .background(Color.Black)
-                            )
-                        }
-                    }
-                }
+            LaunchedEffect(anime.id) {
+                vm.loadTmdbArtwork(anime)
             }
 
-            Spacer(Modifier.height(22.dp))
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = backdrop,
+                    contentDescription = anime.displayTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
 
-            Crossfade(targetState = current, label = "heroInfo") { idx ->
-                val anime = shows[Math.floorMod(idx, n)]
-                val artwork = vm.tmdbArtworks[anime.id]
-                val title = artwork?.title?.takeIf { it.isNotBlank() } ?: anime.displayTitle
-                val logo = artwork?.logoUrl?.takeIf { it.isNotBlank() }
-                val genres = anime.genres.take(2).joinToString(" • ")
-                Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (logo != null) {
-                      Box(contentAlignment = Alignment.Center) {
-                        if (!p.dark) {
-                            AsyncImage(
-                                model = logo, contentDescription = null,
-                                modifier = Modifier.heightIn(max = 64.dp).fillMaxWidth(0.62f).offset(y = 2.dp).blur(3.dp),
-                                contentScale = ContentScale.Fit,
-                                colorFilter = ColorFilter.tint(Color(0x4D000000))
+                // Top scrim for status bar clearance
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xD0000000), Color.Transparent)
                             )
-                        }
-                        SubcomposeAsyncImage(
-                            model = logo, contentDescription = title,
-                            modifier = Modifier.heightIn(max = 64.dp).fillMaxWidth(0.62f),
-                            contentScale = ContentScale.Fit,
-                            error = {
-                                Text(
-                                    title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
-                                    fontWeight = FontWeight.Bold, maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                        )
+                )
+
+                // Subtle ambient dark overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0x2E000000))
+                )
+
+                // Multi-stop cinematic bottom dark gradient: smoothly dissolves hero into page background with zero line
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    Color(0x35000000),
+                                    Color(0x80000000),
+                                    Color(0xDE000000),
+                                    Color(0xFF000000),
+                                    Color(0xFF000000)
                                 )
-                            }
+                            )
                         )
-                      }
-                    } else {
-                        Text(
-                            title, color = p.text, fontSize = 22.sp, lineHeight = 26.sp,
-                            fontWeight = FontWeight.Bold, maxLines = 2,
-                            overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
-                        )
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        if (!anime.displayFormat.isNullOrBlank()) {
-                            Text(anime.displayFormat ?: "", color = p.textSub, fontSize = 13.sp, maxLines = 1)
-                        }
-                        if (ratingText(anime) != null) {
-                            if (!anime.displayFormat.isNullOrBlank()) Text("  ·  ", color = p.textMuted, fontSize = 13.sp)
-                            RatingText(anime, p, 14.dp, 14.sp)
-                        }
-                    }
-                    if (genres.isNotBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(genres, color = p.textMuted, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                )
+            }
+        }
+
+        // Foreground details & actions aligned to bottom
+        val currentAnime = shows[pagerState.currentPage % count]
+        val currentArtwork = vm.tmdbArtworks[currentAnime.id]
+        val logo = currentArtwork?.logoUrl?.takeIf { it.isNotBlank() }
+        val title = currentArtwork?.title?.takeIf { it.isNotBlank() } ?: currentAnime.displayTitle
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // TMDB Logo or Title Text
+            if (logo != null) {
+                AsyncImage(
+                    model = logo,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .heightIn(max = 66.dp)
+                        .fillMaxWidth(0.72f),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // Metadata row: Airing | ★ 8.8 | TV-14 | TV | 1999 | Action, Adventure
+            val rating = ratingText(currentAnime)
+            val format = currentAnime.displayFormat ?: "TV"
+            val year = currentAnime.seasonYear?.toString() ?: ""
+            val genres = currentAnime.genres.take(2).joinToString(", ")
+            val metaList = listOfNotNull(
+                currentAnime.status.takeIf { it.isNotBlank() && it != "UNKNOWN" },
+                rating?.let { "\u2605 $it" },
+                format.takeIf { it.isNotBlank() },
+                year.takeIf { it.isNotBlank() },
+                genres.takeIf { it.isNotBlank() }
+            )
+
+            Text(
+                text = metaList.joinToString("  |  "),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xD9FFFFFF),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Synopsis
+            val desc = currentAnime.description.replace(Regex("<[^>]+>"), "").trim()
+            if (desc.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = desc,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = Color(0xB3FFFFFF),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 14.dp)
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // Action Buttons: White pill "Watch now" + circular action buttons
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // "Watch now" button
+                Button(
+                    onClick = {
+                        if (onPlayClick != null) onPlayClick(currentAnime.id, 1)
+                        else onAnimeClick(currentAnime.id)
+                    },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    contentPadding = PaddingValues(horizontal = 26.dp, vertical = 11.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Watch now",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+
+                Spacer(Modifier.width(12.dp))
+
+                // Watchlist button
+                val inList = vm.isInWatchlist(currentAnime.id)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x66000000))
+                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                        .clickable { vm.toggleWatchlist(currentAnime) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (inList) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = "Watchlist",
+                        tint = if (inList) Color(0xFFFF4757) else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(10.dp))
+
+                // Info / Details button
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x66000000))
+                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                        .clickable { onAnimeClick(currentAnime.id) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Details",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
+
+            // Carousel pager dots matching Image 3
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val dotCount = count.coerceAtMost(10)
+                for (i in 0 until dotCount) {
+                    val isCurrent = (pagerState.currentPage % count) == i
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .height(4.dp)
+                            .width(if (isCurrent) 22.dp else 5.dp)
+                            .clip(CircleShape)
+                            .background(if (isCurrent) Color.White else Color(0x55FFFFFF))
+                            .clickable {
+                                scope.launch {
+                                    pagerState.animateScrollToPage(i)
+                                }
+                            }
+                    )
+                }
+            }
         }
     }
 }
@@ -762,16 +854,7 @@ internal fun HomeBackdrop(p: HomePalette) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(p.pageBrush)
-            .drawBehind {
-                drawRect(
-                    Brush.radialGradient(
-                        listOf(p.glow, Color.Transparent),
-                        center = Offset(size.width * 0.5f, size.height * 0.24f),
-                        radius = size.width * 0.9f
-                    )
-                )
-            }
+            .background(p.bg)
     )
 }
 
@@ -961,7 +1044,7 @@ private fun ContinueRow(
     if (entries.isEmpty()) return
 
     Column(Modifier.fillMaxWidth()) {
-        SectionTitle("Continue", p)
+        SectionTitle("Continue Watching", p, "Pick up where you left off")
         val st = rememberLazyListState()
         LazyRow(
             state = st,
@@ -1218,7 +1301,8 @@ private fun HomeFeed(
                 HomeHero(
                     shows = heroShows, vm = vm, p = p,
                     listScrolling = lazyListState.isScrollInProgress,
-                    onAnimeClick = onAnimeClick
+                    onAnimeClick = onAnimeClick,
+                    onPlayClick = onPlayClick
                 )
             }
         }

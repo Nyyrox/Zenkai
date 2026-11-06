@@ -99,6 +99,17 @@ import com.nyyrox.aniverse.data.manga.MangaHistoryItem
 import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import com.nyyrox.aniverse.viewmodel.MainViewModel
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import java.util.Locale
+
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -264,250 +275,256 @@ private fun MangaHero(
     onMangaClick: (String, String?, String?) -> Unit,
     onBookmark: (MangaCard) -> Unit
 ) {
-    val reduced = LocalThemeSettings.current.isReducedMotionEnabled
-    val n = shows.size
+    if (shows.isEmpty()) return
+    val count = shows.size
+    val pagerState = rememberPagerState(pageCount = { count })
     val scope = rememberCoroutineScope()
-    var position by remember { mutableFloatStateOf(0f) }
-    var dragging by remember { mutableStateOf(false) }
-    var animJob by remember { mutableStateOf<Job?>(null) }
-    val scrollingNow by rememberUpdatedState(listScrolling)
-    val center by remember { derivedStateOf { floor(position + 0.5f).toInt() } }
-    val current = Math.floorMod(center, n)
-    val travel = with(LocalDensity.current) { (HeroCardW * 0.70f).toPx() }
 
-    fun animateTo(target: Float, velocity: Float = 0f) {
-        animJob?.cancel()
-        animJob = scope.launch {
-            animate(
-                initialValue = position, targetValue = target, initialVelocity = velocity,
-                animationSpec = spring(dampingRatio = 0.82f, stiffness = 170f)
-            ) { v, _ -> position = v }
-        }
-    }
-
-    fun settle(fingerVelocityPx: Float) {
-        val v = -fingerVelocityPx / travel
-        val nearest = floor(position + 0.5f)
-        val target = floor(position + v * 0.15f + 0.5f).coerceIn(nearest - 1f, nearest + 1f)
-        animateTo(target, v)
-    }
-
-    LaunchedEffect(n, dragging, reduced) {
-        if (n < 2 || dragging || reduced) return@LaunchedEffect
+    LaunchedEffect(pagerState, listScrolling) {
         while (true) {
-            delay(6000)
-            if (!scrollingNow) animateTo(floor(position + 0.5f) + 1f)
+            delay(7000)
+            if (!listScrolling && !pagerState.isScrollInProgress && count > 1) {
+                val next = (pagerState.currentPage + 1) % count
+                pagerState.animateScrollToPage(next, animationSpec = tween(700, easing = FastOutSlowInEasing))
+            }
         }
     }
 
-    val breath = rememberInfiniteTransition(label = "breath")
-    val phase by breath.animateFloat(
-        initialValue = 0f, targetValue = TWO_PI,
-        animationSpec = infiniteRepeatable(tween(5600, easing = LinearEasing)),
-        label = "phase"
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(520.dp)
+            .background(Color.Black)
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val manga = shows[page]
+            val backdrop = manga.banner?.takeIf { it.isNotBlank() } ?: manga.poster
 
-    Box(Modifier.fillMaxWidth()) {
-        HeroPosterBackdrop(shows[current].poster, p, Modifier.matchParentSize())
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = backdrop,
+                    contentDescription = manga.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
 
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(96.dp))
-
-            // 3D Carousel Cards
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(HeroCardH + 32.dp)
-                    .draggable(
-                        orientation = Orientation.Horizontal,
-                        enabled = n > 1,
-                        state = rememberDraggableState { d -> position -= d / travel },
-                        onDragStarted = { dragging = true; animJob?.cancel() },
-                        onDragStopped = { v -> dragging = false; settle(v) }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                val order = if (n < 2) listOf(center)
-                else (center - 2..center + 2).sortedByDescending { abs(it - center) }
-
-                for (i in order) {
-                    val manga = shows[Math.floorMod(i, n)]
-                    key(i) {
-                        Box(
-                            Modifier
-                                .width(HeroCardW)
-                                .height(HeroCardH)
-                                .graphicsLayer {
-                                    val x = i - position
-                                    val ax = abs(x)
-                                    val a = ax.coerceAtMost(1f)
-                                    val side = if (x < 0f) -1f else 1f
-                                    val bw = if (reduced) 0f else sin(phase + i * 1.3f)
-                                    translationX = side * 0.26f * a * size.width
-                                    translationY = (a * 6f + bw * (1.5f + 2.5f * a)) * density
-                                    rotationY = -side * 30f * a
-                                    rotationZ = side * a * 4f + bw * 0.7f * (0.3f + a)
-                                    val sc = 1f - 0.08f * a + bw * 0.006f
-                                    scaleX = sc
-                                    scaleY = sc
-                                    alpha = when {
-                                        ax <= 1f -> 1f
-                                        ax >= 2f -> 0f
-                                        else -> 2f - ax
-                                    }
-                                    cameraDistance = 18f * density
-                                }
-                                .shadow(12.dp, HeroCardShape, clip = false)
-                                .clip(HeroCardShape)
-                                .shimmer(p)
-                                .clickable {
-                                    if (i == center) onMangaClick(manga.id, manga.title, manga.poster) else animateTo(i.toFloat())
-                                }
-                        ) {
-                            AsyncImage(
-                                model = manga.poster,
-                                contentDescription = manga.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                // Top scrim for status bar clearance
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xD0000000), Color.Transparent)
                             )
-                            // Dim background cards for depth
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { alpha = 0.32f * abs(i - position).coerceAtMost(1f) }
-                                    .background(Color.Black)
+                        )
+                )
+
+                // Subtle ambient dark overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0x2E000000))
+                )
+
+                // Multi-stop cinematic bottom dark gradient: smoothly dissolves hero into page background with zero line
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    Color(0x35000000),
+                                    Color(0x80000000),
+                                    Color(0xDE000000),
+                                    Color(0xFF000000),
+                                    Color(0xFF000000)
+                                )
                             )
-                        }
-                    }
-                }
+                        )
+                )
+            }
+        }
+
+        // Foreground details & actions aligned to bottom
+        val currentManga = shows[pagerState.currentPage % count]
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = currentManga.title,
+                color = Color.White,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            // Metadata row: MANGA | ★ 8.8 | Ch. 120 | Action, Adventure
+            val fmt = currentManga.format ?: currentManga.type ?: "MANGA"
+            val rating = currentManga.rating ?: currentManga.score?.let { String.format(Locale.US, "%.1f", it) }
+            val chapter = currentManga.chapter?.takeIf { it.isNotBlank() }?.let { if (it.startsWith("Ch", true)) it else "Ch. $it" }
+            val genres = currentManga.genres.take(2).joinToString(", ")
+            val metaList = listOfNotNull(
+                fmt.uppercase(),
+                rating?.let { "\u2605 $it" },
+                chapter,
+                genres.takeIf { it.isNotBlank() }
+            )
+
+            Text(
+                text = metaList.joinToString("  |  "),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xD9FFFFFF),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            currentManga.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = desc.replace(Regex("<[^>]*>"), "").trim(),
+                    fontSize = 12.5.sp,
+                    color = Color(0xB3FFFFFF),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
             }
 
             Spacer(Modifier.height(18.dp))
 
-            // Metadata & Action Buttons for Current Card
-            Crossfade(targetState = current, label = "heroMangaInfo") { idx ->
-                val manga = shows[Math.floorMod(idx, n)]
-                val genres = manga.genres.take(2).joinToString(" • ")
-
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            // Action Buttons: White pill "Read now" + Circular buttons for Save and Details
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Read Now Button - Solid pure white pill
+                Button(
+                    onClick = { onMangaClick(currentManga.id, currentManga.title, currentManga.poster) },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = manga.title,
-                        color = p.text,
-                        fontSize = 20.sp,
-                        lineHeight = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
+                    Icon(
+                        imageVector = Icons.Default.AutoStories,
+                        contentDescription = "Read now",
+                        tint = Color.Black,
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        val fmt = manga.format ?: manga.type ?: "MANGA"
-                        Text(fmt.uppercase(), color = p.textSub, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        if (manga.rating != null) {
-                            Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
-                            Icon(Icons.Default.Star, contentDescription = null, tint = p.rating, modifier = Modifier.size(13.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(manga.rating, color = p.rating, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        if (genres.isNotBlank()) {
-                            Text("  ·  ", color = p.textMuted, fontSize = 12.sp)
-                            Text(genres, color = p.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Read now",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
 
-                    Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.width(14.dp))
 
-                    // Clean Glass CTAs: "Read Now" & "Bookmark"
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            Modifier
-                                .clip(CircleShape)
-                                .background(p.accentBrush)
-                                .clickable { onMangaClick(manga.id, manga.title, manga.poster) }
-                                .padding(horizontal = 22.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.AutoStories, contentDescription = null, tint = p.onAccent, modifier = Modifier.size(17.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Read Now", color = p.onAccent, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
-                        }
+                // Bookmark Icon Button
+                Button(
+                    onClick = { onBookmark(currentManga) },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0x33FFFFFF),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BookmarkBorder,
+                        contentDescription = "Bookmark",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
-                        Row(
-                            Modifier
-                                .clip(CircleShape)
-                                .background(p.chipBg)
-                                .clickable { onBookmark(manga) }
-                                .padding(horizontal = 18.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.BookmarkBorder, contentDescription = null, tint = p.text, modifier = Modifier.size(17.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Bookmark", color = p.text, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(10.dp))
+
+                // Info / Details Button
+                Button(
+                    onClick = { onMangaClick(currentManga.id, currentManga.title, currentManga.poster) },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0x33FFFFFF),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Details",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // Pager Indicators
+            if (count > 1) {
+                Row(
+                    modifier = Modifier.padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val activeIndex = pagerState.currentPage % count
+                    repeat(count.coerceAtMost(10)) { i ->
+                        if (i == activeIndex) {
+                            Box(
+                                modifier = Modifier
+                                    .width(28.dp)
+                                    .height(4.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x66FFFFFF))
+                                    .clickable {
+                                        scope.launch {
+                                            pagerState.animateScrollToPage(i)
+                                        }
+                                    }
+                            )
                         }
                     }
                 }
             }
-
-            Spacer(Modifier.height(14.dp))
         }
     }
 }
-
-@Composable
-private fun HeroPosterBackdrop(poster: String?, p: HomePalette, modifier: Modifier) {
-    val ctx = LocalContext.current
-    Crossfade(
-        targetState = poster,
-        modifier = modifier
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    Brush.verticalGradient(0.40f to Color.Black, 1f to Color.Transparent),
-                    blendMode = BlendMode.DstIn
-                )
-            },
-        label = "heroBackdrop"
-    ) { url ->
-        val req = remember(url) { ImageRequest.Builder(ctx).data(url).size(96, 144).build() }
-        Box(Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = req,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(24.dp)
-                    .graphicsLayer {
-                        scaleX = 1.25f
-                        scaleY = 1.25f
-                        alpha = if (p.dark) 0.55f else 0.45f
-                    }
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(listOf(p.gradTop.copy(alpha = 0.40f), Color.Transparent))
-                    )
-            )
-        }
-    }
-}
-
-// ── Continue Reading Rail ────────────────────────────────────────────────────
 
 @Composable
 private fun MangaContinueRow(
