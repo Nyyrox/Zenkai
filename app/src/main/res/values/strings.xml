@@ -1,3 +1,44 @@
 <resources>
     <string name="app_name">Zenkai</string>
+
+    <!-- Player Screen Strings -->
+    <string name="player_episodes_header">Episodes</string>
+    <string name="player_now_playing">Now playing</string>
+    <string name="player_synopsis_more">more</string>
+    <string name="player_synopsis_less">less</string>
+    <string name="player_action_download">Download</string>
+    <string name="player_action_mark_watched">Mark watched</string>
+    <string name="player_action_share">Share</string>
+    <string name="player_action_download_all">Download all</string>
+    <string name="player_audio_sub">SUB</string>
+    <string name="player_audio_dub">DUB</string>
+    <string name="player_quality_hd">HD</string>
+    <string name="player_server_unavailable">Unavailable</string>
+    <string name="player_no_source_available">No source available</string>
+    <string name="player_action_retry">Retry</string>
+    <string name="player_action_lock">Lock</string>
+    <string name="player_action_unlock">Unlock</string>
+    <string name="player_action_settings">Settings</string>
+    <string name="player_action_quality">Quality</string>
+    <string name="player_action_pip">Picture-in-picture</string>
+    <string name="player_action_subtitles">Subtitles</string>
+    <string name="player_action_audio_track">Audio track</string>
+    <string name="player_action_speed">Speed</string>
+    <string name="player_action_play">Play</string>
+    <string name="player_action_pause">Pause</string>
+    <string name="player_action_previous_episode">Previous episode</string>
+    <string name="player_action_next_episode">Next episode</string>
+    <string name="player_action_rewind_10">Rewind 10 seconds</string>
+    <string name="player_action_fast_forward_10">Fast forward 10 seconds</string>
+    <string name="player_action_fullscreen">Fullscreen</string>
+    <string name="player_action_exit_fullscreen">Exit fullscreen</string>
+    <string name="player_action_back">Back</string>
+    <string name="player_action_close">Close</string>
+    <string name="player_speed_2x_indicator">2×</string>
+    <string name="player_ten_seconds">10</string>
+    <string name="player_episode_n_title">Episode %1$d · %2$s</string>
+    <string name="player_episode_cd_format">Episode %1$d, %2$s, %3$s, %4$s</string>
+    <string name="player_selected">selected</string>
+    <string name="player_not_selected">not selected</string>
+    <string name="player_source_row_format">%1$s · %2$s %3$s ⌄</string>
 </resources>

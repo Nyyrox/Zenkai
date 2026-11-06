@@ -623,7 +623,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     CommunityScreen(
                                         vm = vm,
                                         onBack = { pop() },
-                                        onAnimeClick = { vm.openAnimeDetail(it) }
+                                        onAnimeClick = { vm.openAnimeDetail(it) },
+                                        onOpenUserProfile = { push("public_profile:$it") }
                                     )
                                 }
 

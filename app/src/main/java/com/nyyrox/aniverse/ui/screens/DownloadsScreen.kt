@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1194,5 +1195,51 @@ fun IosDeleteConfirmationDialog(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+internal fun PlayerGlassButton(
+    backdrop: com.styropyr0.prismal.sources.PrismalGlassLayer?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 40.dp,
+    circle: Boolean = false,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
+) {
+    val sized = if (circle) modifier.width(height) else modifier
+    val pad = if (circle) androidx.compose.foundation.layout.PaddingValues(0.dp) else androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)
+    if (backdrop != null) {
+        com.styropyr0.prismal.components.PrismalGlassButton(
+            onClick = onClick,
+            backdrop = backdrop,
+            modifier = sized,
+            height = height,
+            surfaceColor = Color.Black.copy(alpha = 0.3f),
+            contentPadding = pad,
+            content = content
+        )
+    } else {
+        val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        val pressed by source.collectIsPressedAsState()
+        val scale by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (pressed) 0.94f else 1f,
+            animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 500f),
+            label = "btnPress"
+        )
+        Row(
+            modifier = sized
+                .height(height)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(CircleShape)
+                .background(Color(0x14FFFFFF))
+                .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                .clickable(interactionSource = source, indication = null, onClick = onClick)
+                .padding(pad),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+            content = content
+        )
     }
 }
