@@ -1,6 +1,7 @@
 package com.nyyrox.aniverse.data.mapping
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -8,6 +9,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.File
 import java.io.InputStreamReader
 import java.text.Normalizer
 import java.util.Locale
@@ -19,7 +21,7 @@ data class AnimeMappingEntry(
     val season: Int? = 1,
     val startEpisode: Int? = 1,
     val dekhoSlug: String? = null,
-    val episodeOffset: Int = 0
+    val episodeOffset: Int? = null
 )
 
 data class EpisodeCandidate(
@@ -28,16 +30,22 @@ data class EpisodeCandidate(
     val finalEp: Int,
     val isMovie: Boolean,
     val source: String,
-    val candidateSlugs: List<String> = emptyList()
+    val candidateSlugs: List<String> = emptyList(),
+    val slug: String = if (isMovie) saltId else "$saltId-${season ?: 1}x$finalEp"
 )
 
 object AnimeMappingRepository {
+    private const val TAG = "AnimeMappingRepo"
+
+    // Primary: Zenkai Web GitHub anime-mapping.json
+    private const val GITHUB_MAPPING_URL = "https://raw.githubusercontent.com/nyyrox2/Zenkai/main/public/anime-mapping.json"
+    private const val GITHUB_MAPPING_FALLBACK_URL = "https://raw.githubusercontent.com/nyyrox2/Zenkai/master/public/anime-mapping.json"
     private const val VERCEL_MAPPING_URL = "https://aniversee.vercel.app/anime-mapping.json"
-    private const val VERCEL_FALLBACK_URL = "https://aniverse-downloader.vercel.app/api/anime-mapping.json"
+    private const val CACHE_FILE_NAME = "anime-mapping-cache.json"
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     private val mappingCache = ConcurrentHashMap<String, List<AnimeMappingEntry>>().apply {
@@ -64,28 +72,46 @@ object AnimeMappingRepository {
         put("166873", listOf(AnimeMappingEntry("mushoku-tensei-jobless-reincarnation", 2, 1, "mushoku-tensei-jobless-reincarnation", 13)))
         put("178789", listOf(AnimeMappingEntry("mushoku-tensei-jobless-reincarnation", 3, 1, "mushoku-tensei-jobless-reincarnation", 0)))
     }
+
     private var isInitialized = false
     private var isSyncedFromRemote = false
+    private var appContext: Context? = null
 
     /**
      * Initializes the mapping repository using the bundled assets/anime-mapping.json
-     * and triggers a background sync with the Vercel CDN.
+     * (synced with the Zenkai Web GitHub repository) and triggers a background sync.
      */
     fun init(context: Context) {
         if (isInitialized) return
+        appContext = context.applicationContext
+
+        // 1. Try reading disk cache if previously downloaded from GitHub
+        try {
+            val cacheFile = File(context.filesDir, CACHE_FILE_NAME)
+            if (cacheFile.exists() && cacheFile.length() > 1000) {
+                val cachedText = cacheFile.readText(Charsets.UTF_8)
+                parseMappingJson(cachedText)
+                Log.d(TAG, "Loaded mapping from disk cache (${mappingCache.size} titles)")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error reading disk cache: ${e.message}")
+        }
+
+        // 2. Load bundled assets/anime-mapping.json (exact copy from Zenkai Web GitHub)
         try {
             context.assets.open("anime-mapping.json").use { stream ->
                 InputStreamReader(stream, Charsets.UTF_8).use { reader ->
                     val text = reader.readText()
                     parseMappingJson(text)
+                    Log.d(TAG, "Loaded bundled assets mapping (${mappingCache.size} titles)")
                 }
             }
             isInitialized = true
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error loading bundled anime-mapping.json", e)
         }
 
-        // Background sync with Vercel CDN mapping JSON
+        // 3. Background sync with GitHub Zenkai Web mapping
         CoroutineScope(Dispatchers.IO).launch {
             syncRemoteMappings()
         }
@@ -107,7 +133,11 @@ object AnimeMappingRepository {
                             val season = if (item.isNull("season")) null else item.optInt("season", 1)
                             val startEp = if (item.isNull("startEpisode")) 1 else item.optInt("startEpisode", 1)
                             val dekhoSlug = item.optString("dekhoSlug").takeIf { it.isNotBlank() }
-                            val episodeOffset = item.optInt("episodeOffset", 0)
+                            val episodeOffset = if (item.has("episodeOffset") && !item.isNull("episodeOffset")) {
+                                item.optInt("episodeOffset")
+                            } else {
+                                null
+                            }
                             list.add(AnimeMappingEntry(saltId, season, startEp, dekhoSlug, episodeOffset))
                         }
                     }
@@ -119,7 +149,11 @@ object AnimeMappingRepository {
                             val season = if (item.isNull("season")) null else item.optInt("season", 1)
                             val startEp = if (item.isNull("startEpisode")) 1 else item.optInt("startEpisode", 1)
                             val dekhoSlug = item.optString("dekhoSlug").takeIf { it.isNotBlank() }
-                            val episodeOffset = item.optInt("episodeOffset", 0)
+                            val episodeOffset = if (item.has("episodeOffset") && !item.isNull("episodeOffset")) {
+                                item.optInt("episodeOffset")
+                            } else {
+                                null
+                            }
                             list.add(AnimeMappingEntry(saltId, season, startEp, dekhoSlug, episodeOffset))
                         }
                     }
@@ -129,7 +163,7 @@ object AnimeMappingRepository {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error parsing mapping JSON", e)
         }
     }
 
@@ -145,7 +179,7 @@ object AnimeMappingRepository {
             .replace(Regex("""\s*:\s*Part\s+\d+\s*$""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""\s*Part\s+\d+\s*$""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""\s*Cour\s+\d+\s*$""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""\s*[-–]\s*Season\s+\d+\s*$""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\s*[-—]\s*Season\s+\d+\s*$""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""\s*:.*$"""), "")
             .trim()
     }
@@ -158,9 +192,7 @@ object AnimeMappingRepository {
             .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
         return normalized.lowercase(Locale.US)
             .replace("&", " and ")
-            .replace("['’`]".toRegex(), "")
             .replace("[^a-z0-9]+".toRegex(), "-")
-            .replace("-+".toRegex(), "-")
             .trim('-')
     }
 
@@ -225,34 +257,42 @@ object AnimeMappingRepository {
 
     /**
      * Resolves the best mapping candidate for an episode.
-     * Always checks the Vercel CDN mapping first; if absent, applies robust slug generation.
+     * Follows the exact logic of pickMapping in Zenkai Web server/mapping.js:
+     * - Sorts entries descending by startEpisode
+     * - Picks entry where episode >= startEpisode
+     * - If episodeOffset is defined: finalEp = episode + episodeOffset
+     * - If episodeOffset is not defined: finalEp = episode (continuous, does not subtract startEpisode)
+     * - isMovie = isMovie || season == null || season == 0
+     * - slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
      */
     fun resolveCandidate(
         anilistId: Int,
         episode: Int,
-        fallbackTitle: String? = null
+        fallbackTitle: String? = null,
+        isMovie: Boolean = false
     ): EpisodeCandidate {
         val entries = getEntries(anilistId)
         if (entries.isNotEmpty()) {
-            val picked = entries
-                .sortedByDescending { it.startEpisode ?: 1 }
-                .firstOrNull { episode >= (it.startEpisode ?: 1) } ?: entries.first()
+            val sorted = entries.sortedByDescending { it.startEpisode ?: 1 }
+            val picked = sorted.firstOrNull { episode >= (it.startEpisode ?: 1) } ?: entries.first()
 
-            val startEp = picked.startEpisode ?: 1
-            val finalEp = if (picked.episodeOffset != 0) {
+            val finalEp = if (picked.episodeOffset != null) {
                 maxOf(1, episode + picked.episodeOffset)
             } else {
-                maxOf(1, episode - startEp + 1)
+                episode
             }
-            val isMovie = picked.season == null || picked.season == 0
+            val isMov = isMovie || picked.season == null || picked.season == 0
             val candidates = generateCandidateSlugs(picked.saltId)
+            val slug = if (isMov) picked.saltId else "${picked.saltId}-${picked.season ?: 1}x$finalEp"
+
             return EpisodeCandidate(
                 saltId = picked.saltId,
                 season = picked.season,
                 finalEp = finalEp,
-                isMovie = isMovie,
-                source = "vercel-cdn-mapping",
-                candidateSlugs = candidates
+                isMovie = isMov,
+                source = "github-zenkai-mapping",
+                candidateSlugs = candidates,
+                slug = slug
             )
         }
 
@@ -261,27 +301,30 @@ object AnimeMappingRepository {
         val baseSlug = toSlug(cleanTitle).ifBlank { "anime" }
         val normalizedSlug = normalizeSlug(baseSlug)
         val candidates = generateCandidateSlugs(baseSlug)
+        val slug = if (isMovie) normalizedSlug else "$normalizedSlug-1x$episode"
 
         return EpisodeCandidate(
             saltId = normalizedSlug,
             season = 1,
             finalEp = episode,
-            isMovie = false,
+            isMovie = isMovie,
             source = "auto-slug",
-            candidateSlugs = candidates
+            candidateSlugs = candidates,
+            slug = slug
         )
     }
 
     /**
-     * Asynchronously syncs latest mappings from remote Vercel CDN in background.
+     * Asynchronously syncs latest mappings from Zenkai Web GitHub repository in background.
      */
     suspend fun syncRemoteMappings(): Boolean = withContext(Dispatchers.IO) {
-        val urls = listOf(VERCEL_MAPPING_URL, VERCEL_FALLBACK_URL)
+        val urls = listOf(GITHUB_MAPPING_URL, GITHUB_MAPPING_FALLBACK_URL, VERCEL_MAPPING_URL)
         for (u in urls) {
             try {
                 val req = Request.Builder()
                     .url(u)
                     .addHeader("Accept", "application/json")
+                    .addHeader("User-Agent", "Zenkai-Android-App")
                     .build()
                 client.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
@@ -289,11 +332,22 @@ object AnimeMappingRepository {
                         if (body.length > 500) {
                             parseMappingJson(body)
                             isSyncedFromRemote = true
+                            Log.d(TAG, "Synced ${mappingCache.size} mappings from GitHub ($u)")
+
+                            // Cache to disk so app retains updated mappings offline
+                            appContext?.let { ctx ->
+                                try {
+                                    val cacheFile = File(ctx.filesDir, CACHE_FILE_NAME)
+                                    cacheFile.writeText(body, Charsets.UTF_8)
+                                } catch (_: Exception) {}
+                            }
                             return@withContext true
                         }
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync mapping from $u: ${e.message}")
+            }
         }
         false
     }

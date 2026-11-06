@@ -151,7 +151,10 @@ class MainActivity : ComponentActivity() {
         com.nyyrox.aniverse.player.StreamProxyServer.start()
 
         // Initialize AniBridge v3 Mapping Engine
-        com.nyyrox.aniverse.data.mapping.AniBridgeResolver.init(this)
+        com.nyyrox.aniverse.data.mapping.AniBridgeResolver.init(this)
+
+        // Initialize Anime Mapping from Zenkai Web GitHub
+        com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.init(this)
 
         // Initialize Discord Integration & Credentials
         com.nyyrox.aniverse.data.discord.DiscordAccountManager.init(this)
