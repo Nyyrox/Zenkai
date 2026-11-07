@@ -2609,7 +2609,7 @@ fun CinePlayerView(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = if (isInPip) 6.dp else if (showControls) (captionConfig.bottomPaddingDp + 48f).dp else captionConfig.bottomPaddingDp.dp)
+                                .padding(bottom = if (isInPip) 6.dp else if (showControls) (captionConfig.bottomPaddingDp + 96f).dp else (captionConfig.bottomPaddingDp + 18f).dp)
                                 .padding(horizontal = if (isInPip) 8.dp else 24.dp)
                                 .then(
                                     if (captionConfig.hasBgBox && captionConfig.bgAlpha > 0f) {
@@ -3034,91 +3034,156 @@ fun CinePlayerView(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Top-left glass pill: back/minimize, settings, PiP, quality, lock
-                            GlassPill {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            // Top-left: Back / Minimize button & Series / Episode Title hierarchy
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                GlassIconButton(
+                                    size = if (glassCompact) 34.dp else 40.dp,
+                                    onClick = {
+                                        if (!isFullscreen && onCollapseToMiniPlayer != null) {
+                                            onCollapseToMiniPlayer()
+                                        } else if (isFullscreen) {
+                                            onToggleFullscreen()
+                                        } else {
+                                            onBack()
+                                        }
+                                    }
                                 ) {
-                                    if (!isFullscreen && onCollapseToMiniPlayer != null) {
-                                        GlassPillIcon(
-                                            icon = Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Collapse to Mini-player",
-                                            onClick = { onCollapseToMiniPlayer() }
-                                        )
-                                    } else if (isFullscreen) {
-                                        GlassPillIcon(
-                                            icon = Icons.Default.ArrowBack,
-                                            contentDescription = "Exit Fullscreen",
-                                            onClick = { onToggleFullscreen() }
-                                        )
-                                    }
-                                    GlassPillIcon(
-                                        icon = Icons.Outlined.Settings,
-                                        contentDescription = "Settings",
-                                        onClick = { morphAnchor = it
-                                            activeSettingsTab = PlayerSettingsTab.MAIN
-                                            showPlayerSettingsModal = true
-                                            controlsTimeoutKey++
-                                        }
+                                    Icon(
+                                        imageVector = if (!isFullscreen && onCollapseToMiniPlayer != null) Icons.Default.KeyboardArrowDown else Icons.Default.ArrowBack,
+                                        contentDescription = if (isFullscreen) "Exit Fullscreen" else "Back",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (glassCompact) 20.dp else 22.dp)
                                     )
-                                    GlassPillIcon(
-                                        icon = Icons.Outlined.PictureInPictureAlt,
-                                        contentDescription = "Picture in Picture",
-                                        onClick = {
-                                            (context as? ComponentActivity)?.let { act ->
-                                                MainActivity.enterPip(act)
-                                            }
-                                        }
+                                }
+
+                                Spacer(Modifier.width(10.dp))
+
+                                val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    Text(
+                                        text = title,
+                                        fontSize = if (glassCompact) 13.5.sp else 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    GlassPillIcon(
-                                        icon = Icons.Outlined.HighQuality,
-                                        contentDescription = "Quality",
-                                        onClick = { morphAnchor = it
-                                            activeSettingsTab = PlayerSettingsTab.QUALITY
-                                            showPlayerSettingsModal = true
-                                            controlsTimeoutKey++
-                                        }
-                                    )
-                                    if (upscalerSettings.enabled) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0x22FFFFFF))
-                                                .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(8.dp))
-                                                .clickable {
-                                                    morphAnchor = null
-                                                    activeSettingsTab = PlayerSettingsTab.UPSCALER
-                                                    showPlayerSettingsModal = true
-                                                    controlsTimeoutKey++
-                                                }
-                                                .padding(horizontal = 7.dp, vertical = 3.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "4K",
-                                                color = Color.White,
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        }
-                                    }
-                                    GlassPillIcon(
-                                        icon = if (isScreenLocked) playerCustomization.themePack.lockIcon else playerCustomization.themePack.unlockIcon,
-                                        contentDescription = "Lock Screen",
-                                        iconSize = 16.dp,
-                                        onClick = {
-                                            isScreenLocked = true
-                                            showControls = false
-                                            showUnlockPrompt = false
-                                        }
+                                    Text(
+                                        text = if (hasCustomEpName) "Episode $episode: $episodeTitle" else "Episode $episode",
+                                        fontSize = if (glassCompact) 11.sp else 12.5.sp,
+                                        color = Color(0xB3FFFFFF),
+                                        fontWeight = FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
 
-                            // Top-right spacer for balance
-                            Spacer(Modifier.size(36.dp))
+                            Spacer(Modifier.width(16.dp))
+
+                            // Top-right: Quick utility buttons matching Netflix & Web CinePlayer
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(if (glassCompact) 6.dp else 8.dp)
+                            ) {
+                                // Sub/Dub indicator & switcher badge
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0x35000000))
+                                        .clickable {
+                                            activeSettingsTab = PlayerSettingsTab.AUDIO
+                                            showPlayerSettingsModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (isDub) "DUB" else "SUB",
+                                        color = if (isDub) playerCustomization.accentColor.color else Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+
+                                if (upscalerSettings.enabled) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0x35000000))
+                                            .clickable {
+                                                morphAnchor = null
+                                                activeSettingsTab = PlayerSettingsTab.UPSCALER
+                                                showPlayerSettingsModal = true
+                                                controlsTimeoutKey++
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "4K",
+                                            color = playerCustomization.accentColor.color,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+                                }
+
+                                GlassIconButton(
+                                    size = if (glassCompact) 34.dp else 40.dp,
+                                    onClick = {
+                                        (context as? ComponentActivity)?.let { act ->
+                                            MainActivity.enterPip(act)
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PictureInPictureAlt,
+                                        contentDescription = "Picture in Picture",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (glassCompact) 17.dp else 19.dp)
+                                    )
+                                }
+
+                                GlassIconButton(
+                                    size = if (glassCompact) 34.dp else 40.dp,
+                                    onClick = {
+                                        isScreenLocked = true
+                                        showControls = false
+                                        showUnlockPrompt = false
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = playerCustomization.themePack.unlockIcon,
+                                        contentDescription = "Lock Screen",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (glassCompact) 16.dp else 18.dp)
+                                    )
+                                }
+
+                                GlassIconButton(
+                                    size = if (glassCompact) 34.dp else 40.dp,
+                                    onClick = {
+                                        morphAnchor = null
+                                        activeSettingsTab = PlayerSettingsTab.MAIN
+                                        showPlayerSettingsModal = true
+                                        controlsTimeoutKey++
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Settings,
+                                        contentDescription = "Settings",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (glassCompact) 17.dp else 20.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -3143,7 +3208,7 @@ fun CinePlayerView(
                             .offset(y = playerCustomization.placement.centerOffsetY.dp)
                     ) {
                         val centerLayout = playerCustomization.placement.centerLayout
-                        val buttonSpacing = if (glassCompact) 2.dp else if (centerLayout == CenterControlsLayout.WIDE_SPACED) 14.dp else 6.dp
+                        val buttonSpacing = if (glassCompact) 10.dp else if (centerLayout == CenterControlsLayout.WIDE_SPACED) 28.dp else 20.dp
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(buttonSpacing)
@@ -3157,7 +3222,7 @@ fun CinePlayerView(
                                             onPreviousEpisode()
                                         },
                                         enabled = hasPreviousEpisode,
-                                        size = if (glassCompact) 32.dp else 38.dp,
+                                        size = if (glassCompact) 34.dp else 40.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.prevEpDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.prevEpDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.prevEpScale)
                                     ) {
                                         Icon(
@@ -3193,7 +3258,7 @@ fun CinePlayerView(
                                                 }
                                             }
                                         },
-                                        size = if (glassCompact) 38.dp else 46.dp,
+                                        size = if (glassCompact) 40.dp else 48.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.rewindDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.rewindDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.rewindScale)
                                     ) {
                                         if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
@@ -3228,7 +3293,7 @@ fun CinePlayerView(
                                         PlayerPlaybackPlugin.togglePlayPause(exoPlayer, context)
                                     },
                                     isHero = true,
-                                    size = if (glassCompact) 44.dp else 56.dp,
+                                    size = if (glassCompact) 52.dp else 64.dp,
                                     modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.playPauseDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.playPauseDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.playPauseScale) 
                                 ) {
                                     AnimatedContent(
@@ -3241,7 +3306,7 @@ fun CinePlayerView(
                                     ) { playing ->
                                         GlassPlayPauseGlyph(
                                             isPlaying = playing,
-                                            modifier = Modifier.size(if (glassCompact) 18.dp else 24.dp),
+                                            modifier = Modifier.size(if (glassCompact) 22.dp else 28.dp),
                                             tint = Color.White
                                         )
                                     }
@@ -3271,7 +3336,7 @@ fun CinePlayerView(
                                                 }
                                             }
                                         },
-                                        size = if (glassCompact) 38.dp else 46.dp,
+                                        size = if (glassCompact) 40.dp else 48.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.forwardDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.forwardDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.forwardScale)
                                     ) {
                                         if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
@@ -3307,7 +3372,7 @@ fun CinePlayerView(
                                             onNextEpisode()
                                         },
                                         enabled = hasNextEpisode,
-                                        size = if (glassCompact) 32.dp else 38.dp,
+                                        size = if (glassCompact) 34.dp else 40.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.nextEpDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.nextEpDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.nextEpScale)
                                     ) {
                                         Icon(
@@ -3321,99 +3386,6 @@ fun CinePlayerView(
                         }
                     }
 
-                    // 3b. Right-Side Unified Vertical Control Group
-                    AnimatedVisibility(
-                        visible = showControls && !isScreenLocked && !isInPip,
-                        enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.92f, animationSpec = tween(140)),
-                        exit = if (isAutoHideTransition) {
-                            fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(180))
-                        } else {
-                            fadeOut(tween(110))
-                        },
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = if (glassCompact) 12.dp else 24.dp)
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(if (glassCompact) 8.dp else 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            val rightBtnSize = if (glassCompact) 34.dp else 40.dp
-                            val rightIconSize = if (glassCompact) 16.dp else 19.dp
-
-                            // Fullscreen
-                            GlassIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    onToggleFullscreen()
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
-                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-
-                            // Audio Track Button
-                            val isAudioSelected = audioTracks.any { it.isSelected } || isDub
-                            GlassIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    activeSettingsTab = PlayerSettingsTab.AUDIO
-                                    showPlayerSettingsModal = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.GraphicEq,
-                                    contentDescription = "Audio Tracks",
-                                    tint = if (isAudioSelected) playerCustomization.accentColor.color else Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-
-                            // Subtitles Button
-                            val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || activeLoadedSubtitleUrl != null || subtitleTracks.any { it.isSelected })
-                            GlassIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    showCaptionModal = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Subtitles,
-                                    contentDescription = "Subtitles",
-                                    tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-
-                            // Speed Button
-                            GlassIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    activeSettingsTab = PlayerSettingsTab.SPEED
-                                    showPlayerSettingsModal = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Speed,
-                                    contentDescription = "Playback Speed",
-                                    tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-                        }
-                    }
 
                     // 4. Bottom Bar: Scrubber & Time (YouTube fade & morphing timeline)
                     AnimatedVisibility(
@@ -3451,33 +3423,7 @@ fun CinePlayerView(
                                 animationSpec = tween(220, easing = FastOutSlowInEasing),
                                 label = "animatedSeekbarHeight"
                             )
-                            // Episode info hierarchy (full width with generous breathing room)
-                            val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (hasCustomEpName) "Episode $episode: $episodeTitle" else "Episode $episode",
-                                    fontSize = if (glassCompact) 11.sp else 12.5.sp,
-                                    color = Color(0xB3FFFFFF),
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = title,
-                                    fontSize = if (glassCompact) 15.sp else 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
 
-                            Spacer(Modifier.height(10.dp))
 
                             // Time bar: elapsed | seekbar | remaining
                             Row(
@@ -3596,6 +3542,116 @@ fun CinePlayerView(
                                         .graphicsLayer { alpha = timeTextAlpha }
                                         .clickable { showTimeRemaining = !showTimeRemaining }
                                 )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            // Bottom Controls Action Row: Audio/Server on left, Speed, Quality, Subtitles, Fullscreen on right
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Left: Audio / Server info quick selector
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            activeSettingsTab = PlayerSettingsTab.AUDIO
+                                            showPlayerSettingsModal = true
+                                            controlsTimeoutKey++
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.GraphicEq,
+                                        contentDescription = "Audio Track",
+                                        tint = playerCustomization.accentColor.color,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = if (isDub) "Dubbed" else "Subtitled",
+                                        fontSize = 12.sp,
+                                        color = Color(0xB3FFFFFF),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                // Right: Speed, Quality, Subtitles (CC), Fullscreen
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(if (glassCompact) 8.dp else 12.dp)
+                                ) {
+                                    // Speed Badge Button
+                                    Text(
+                                        text = if (playbackSpeed == 1.0f) "1x" else "${playbackSpeed}x",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable {
+                                                activeSettingsTab = PlayerSettingsTab.SPEED
+                                                showPlayerSettingsModal = true
+                                                controlsTimeoutKey++
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+
+                                    // Quality Badge Button
+                                    val currentQualityLabel = qualityTracks.firstOrNull { it.isSelected }?.label ?: if (preferredQualityHeight > 0) "${preferredQualityHeight}p" else "Auto"
+                                    Text(
+                                        text = currentQualityLabel,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable {
+                                                activeSettingsTab = PlayerSettingsTab.QUALITY
+                                                showPlayerSettingsModal = true
+                                                controlsTimeoutKey++
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+
+                                    // Subtitles (CC) Button
+                                    val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || activeLoadedSubtitleUrl != null || subtitleTracks.any { it.isSelected })
+                                    IconButton(
+                                        onClick = {
+                                            showCaptionModal = true
+                                            controlsTimeoutKey++
+                                        },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Subtitles,
+                                            contentDescription = "Subtitles",
+                                            tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White.copy(alpha = 0.85f),
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+
+                                    // Fullscreen Button
+                                    IconButton(
+                                        onClick = {
+                                            onToggleFullscreen()
+                                            controlsTimeoutKey++
+                                        },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
+                                            contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
