@@ -1427,6 +1427,23 @@ private fun BoxTabContent(
                 }
             }
         }
+
+        // Height From Bottom
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            val pos = captionConfig.bottomPaddingDp.roundToInt()
+            Text("HEIGHT FROM BOTTOM (${pos}dp)", color = Color(0xFF888E9E), fontSize = 11.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Slider(
+                value = captionConfig.bottomPaddingDp,
+                onValueChange = { onConfigChange(captionConfig.copy(bottomPaddingDp = it)) },
+                valueRange = 4f..60f,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color(0xFFE50914),
+                    inactiveTrackColor = Color(0x33FFFFFF)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 

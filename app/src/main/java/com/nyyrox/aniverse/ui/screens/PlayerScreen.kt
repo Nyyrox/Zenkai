@@ -415,7 +415,7 @@ fun PlayerScreen(
     // Fetch direct captions and OpenSubtitles from SubtitleRepository in background
     var externalSubtitles by remember { mutableStateOf<List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>>(emptyList()) }
     val isCurrentDub = currentProvider.isDub || selectedCategory == "DUB"
-    LaunchedEffect(anime.id, currentEpisode, isCurrentDub) {
+    LaunchedEffect(anime.id, currentEpisode, isCurrentDub, currentProvider.name) {
         externalSubtitles = emptyList()
         try {
             val isMovie = anime.format?.equals("MOVIE", ignoreCase = true) == true
@@ -426,7 +426,8 @@ fun PlayerScreen(
                 episode = currentEpisode,
                 season = season,
                 isMovie = isMovie,
-                audio = audioMode
+                audio = audioMode,
+                activeServerName = currentProvider.name
             )
             externalSubtitles = subs
         } catch (_: Exception) {}
@@ -1057,11 +1058,15 @@ fun PlayerScreen(
                     val combinedSubtitles = if (isPlayingOffline) {
                         (downloadedEpInfo?.subtitles ?: emptyList()).ifEmpty { externalSubtitles }
                     } else {
+                        val activeServer = currentProvider.name.lowercase(java.util.Locale.US)
                         ((if (playInZenkaiPlayer && sniffedStreamSubs.isNotEmpty()) sniffedStreamSubs else activeDirectSubs) + externalSubtitles)
                             .distinctBy { it.url }
                             .sortedWith(
                                 compareByDescending<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> {
-                                    it.source.startsWith("Direct") || it.source == "Anikoto"
+                                    val s = it.source.lowercase(java.util.Locale.US)
+                                    if (activeServer.isNotBlank() && s.contains(activeServer)) 3
+                                    else if (s.contains("flixcloud") || s.contains("megaplay") || s.contains("vidstream") || s.contains("acdn") || s.startsWith("direct")) 2
+                                    else 1
                                 }.thenByDescending {
                                     it.isDefault
                                 }.thenByDescending {

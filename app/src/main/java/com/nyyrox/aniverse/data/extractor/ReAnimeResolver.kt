@@ -244,7 +244,7 @@ object ReAnimeResolver {
                                 language = subLabel.take(3).lowercase(),
                                 url = subUrl,
                                 isDefault = s.optBoolean("default", i == 0),
-                                source = "Re:Anime"
+                                source = "FlixCloud"
                             )
                         )
                     }

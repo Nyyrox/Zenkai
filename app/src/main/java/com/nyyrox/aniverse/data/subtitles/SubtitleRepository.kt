@@ -448,9 +448,123 @@ object SubtitleRepository {
     }
 
     /**
+     * Extracts WebVTT/SRT subtitles from ACDN / AnimeSalt / AnimeDekho players.
+     */
+    suspend fun fetchAcdnSubtitles(
+        anilistId: Int,
+        episode: Int,
+        animeTitle: String
+    ): List<SubtitleTrack> = withContext(Dispatchers.IO) {
+        if (anilistId <= 0 || !com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anilistId)) {
+            return@withContext emptyList()
+        }
+        val cacheKey = "acdn:$anilistId:$episode"
+        subCache[cacheKey]?.let { return@withContext it }
+        try {
+            val candidate = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.resolveCandidate(anilistId, episode, animeTitle)
+            val saltId = candidate.saltId.ifBlank {
+                com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.normalizeAnimeSaltTitle(animeTitle)
+            }
+            val season = candidate.season ?: 1
+            val finalEp = candidate.finalEp
+            val isMovie = candidate.isMovie
+            val slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
+
+            val servers = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.extractServers(slug, isMovie)
+            val candidateUrls = listOfNotNull(
+                servers.myStreamUrl,
+                servers.abyssUrl
+            ) + servers.allServers.map { it.url }
+
+            val subs = mutableListOf<SubtitleTrack>()
+            val seenUrls = mutableSetOf<String>()
+
+            for (playerUrl in candidateUrls) {
+                try {
+                    val asCdnMatch = Regex("""https?://([a-zA-Z0-9_.-]+)/video/([a-zA-Z0-9_-]+)""", RegexOption.IGNORE_CASE).find(playerUrl)
+                    val targetUrl = if (asCdnMatch != null) {
+                        "https://${asCdnMatch.groupValues[1]}/video/${asCdnMatch.groupValues[2]}"
+                    } else playerUrl
+
+                    val domain = try { java.net.URI(targetUrl).host ?: "animesalt.cx" } catch (_: Exception) { "animesalt.cx" }
+                    val req = Request.Builder()
+                        .url(targetUrl)
+                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                        .addHeader("Referer", "https://animesalt.cx/")
+                        .build()
+                    val html = client.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) resp.body?.string().orEmpty() else ""
+                    }
+                    if (html.isBlank()) continue
+
+                    val pjsRegex = Regex("""(?:playerjsSubtitle|Subtitle)\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                    val pjsMatch = pjsRegex.find(html)
+                    if (pjsMatch != null) {
+                        val raw = pjsMatch.groupValues[1].trim()
+                        val parts = raw.split(Regex(""",(?=\[|https?://)"""))
+                        for (part in parts) {
+                            val p = part.trim()
+                            if (p.isBlank()) continue
+                            val m = Regex("""^\[([^\]]+)\](.*)$""").find(p)
+                            val (label, f) = if (m != null) {
+                                m.groupValues[1].trim() to m.groupValues[2].trim()
+                            } else {
+                                "English" to p
+                            }
+                            var file = if (f.startsWith("//")) "https:$f" else f
+                            if (file.startsWith("http") && seenUrls.add(file)) {
+                                subs.add(
+                                    SubtitleTrack(
+                                        id = "acdn-sub-${subs.size}",
+                                        label = label,
+                                        language = normalizeLanguage(label),
+                                        url = file,
+                                        isDefault = subs.isEmpty(),
+                                        source = "ACDN"
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    val trackRegex = Regex("""<track[^>]+(?:src|data-src)=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
+                    for (tm in trackRegex.findAll(html)) {
+                        val tag = tm.value
+                        var file = tm.groupValues[1].trim()
+                        if (file.startsWith("//")) file = "https:$file"
+                        else if (file.startsWith("/")) file = "https://$domain$file"
+                        val labelMatch = Regex("""label=["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(tag)
+                        val langMatch = Regex("""srclang=["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(tag)
+                        val label = labelMatch?.groupValues?.get(1) ?: langMatch?.groupValues?.get(1) ?: "English"
+                        if (file.startsWith("http") && seenUrls.add(file)) {
+                            subs.add(
+                                SubtitleTrack(
+                                    id = "acdn-track-${subs.size}",
+                                    label = label,
+                                    language = normalizeLanguage(label),
+                                    url = file,
+                                    isDefault = subs.isEmpty(),
+                                    source = "ACDN"
+                                )
+                            )
+                        }
+                    }
+                    if (subs.isNotEmpty()) break
+                } catch (_: Exception) {}
+            }
+            if (subs.isNotEmpty()) {
+                subCache[cacheKey] = subs
+            }
+            subs
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
      * Unified client-side subtitle retrieval:
-     * Concurrently retrieves both official Direct Captions (MegaPlay / Vidstream)
-     * and Community OpenSubtitles (Stremio), prioritizing Direct Captions first.
+     * Concurrently retrieves captions from FlixCloud, MegaPlay, Vidstream,
+     * and Community OpenSubtitles (Stremio), prioritizing the currently playing server's subtitles.
      */
     suspend fun fetchAllSubtitles(
         anilistId: Int,
@@ -458,33 +572,86 @@ object SubtitleRepository {
         episode: Int,
         season: Int = 1,
         isMovie: Boolean = false,
-        audio: String = "sub"
+        audio: String = "sub",
+        activeServerName: String? = null
     ): List<SubtitleTrack> = withContext(Dispatchers.IO) {
         coroutineScope {
+            val flixDeferred = async {
+                try {
+                    val flix = com.nyyrox.aniverse.data.extractor.ReAnimeResolver.resolveStream(
+                        anilistId = anilistId,
+                        episode = episode,
+                        audio = audio,
+                        animeTitle = title,
+                        preferredServer = "FlixCloud"
+                    )
+                    flix?.subtitles.orEmpty().map { it.copy(source = "FlixCloud") }
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
             val directDeferred = async {
-                fetchDirectCaptions(anilistId, episode, audio)
+                try {
+                    fetchDirectCaptions(anilistId, episode, audio)
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            val acdnDeferred = async {
+                try {
+                    fetchAcdnSubtitles(anilistId, episode, title)
+                } catch (_: Exception) {
+                    emptyList()
+                }
             }
             val openSubsDeferred = async {
-                fetchOpenSubtitles(anilistId, title, episode, season, isMovie)
+                try {
+                    fetchOpenSubtitles(anilistId, title, episode, season, isMovie)
+                } catch (_: Exception) {
+                    emptyList()
+                }
             }
 
+            val flixList = flixDeferred.await()
             val directList = directDeferred.await()
+            val acdnList = acdnDeferred.await()
             val openList = openSubsDeferred.await()
 
             val combined = mutableListOf<SubtitleTrack>()
-            combined.addAll(directList)
-
+            combined.addAll(flixList)
+            for (track in directList) {
+                if (combined.none { it.url == track.url }) {
+                    combined.add(track)
+                }
+            }
+            for (track in acdnList) {
+                if (combined.none { it.url == track.url }) {
+                    combined.add(track)
+                }
+            }
             for (openTrack in openList) {
                 if (combined.none { it.url == openTrack.url }) {
                     combined.add(openTrack)
                 }
             }
 
+            val serverKey = activeServerName?.lowercase(Locale.US) ?: ""
+
             combined.sortedWith(
-                compareByDescending<SubtitleTrack> { it.source.startsWith("Direct") || it.source == "Anikoto" }
-                    .thenByDescending { it.isDefault }
-                    .thenByDescending { it.language.equals("English", ignoreCase = true) }
-                    .thenBy { it.label }
+                compareByDescending<SubtitleTrack> { track ->
+                    val src = track.source.lowercase(Locale.US)
+                    when {
+                        serverKey.isNotBlank() && src.contains(serverKey) -> 3
+                        src.contains("flixcloud") || src.contains("megaplay") || src.contains("vidstream") || src.contains("acdn") || src.startsWith("direct") -> 2
+                        else -> 1
+                    }
+                }.thenByDescending {
+                    it.isDefault
+                }.thenByDescending {
+                    it.language.equals("English", ignoreCase = true)
+                }.thenBy {
+                    it.label
+                }
             )
         }
     }

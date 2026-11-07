@@ -398,7 +398,8 @@ data class CaptionCustomization(
     val hasStroke: Boolean = true,
     val strokeColor: Color = Color.Black,
     val strokeWidth: Float = 3.0f,
-    val activePreset: String = "Default"
+    val activePreset: String = "Default",
+    val bottomPaddingDp: Float = 18f
 )
 
 enum class CaptionPlayStatus {
@@ -462,29 +463,35 @@ private fun DoubleTapSeekOverlay(
     transitionStyle: SeekTransitionStyle = SeekTransitionStyle.CHEVRON_SWEEP,
     modifier: Modifier = Modifier
 ) {
-    val nudgeAnim = remember { Animatable(0f) }
+    val alphaAnim = remember { Animatable(0f) }
+    val offsetAnim = remember { Animatable(0f) }
     LaunchedEffect(triggerKey) {
-        nudgeAnim.snapTo(if (isForward) -6f else 6f)
-        nudgeAnim.animateTo(
+        alphaAnim.snapTo(0.9f)
+        offsetAnim.snapTo(if (isForward) -4f else 4f)
+        offsetAnim.animateTo(
             targetValue = if (isForward) 4f else -4f,
-            animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium)
+            animationSpec = tween(200, easing = FastOutSlowInEasing)
         )
-        nudgeAnim.animateTo(0f, tween(120))
+        alphaAnim.animateTo(0.6f, tween(140))
     }
 
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .fillMaxWidth(0.44f)
+            .fillMaxWidth(0.40f)
+            .clip(
+                if (isForward) RoundedCornerShape(topStart = 100.dp, bottomStart = 100.dp)
+                else RoundedCornerShape(topEnd = 100.dp, bottomEnd = 100.dp)
+            )
             .background(
                 Brush.horizontalGradient(
                     if (isForward) listOf(
                         Color.Transparent,
-                        Color.Black.copy(alpha = 0.12f),
-                        Color.Black.copy(alpha = 0.40f)
+                        Color.White.copy(alpha = 0.04f),
+                        Color.White.copy(alpha = 0.12f)
                     ) else listOf(
-                        Color.Black.copy(alpha = 0.40f),
-                        Color.Black.copy(alpha = 0.12f),
+                        Color.White.copy(alpha = 0.12f),
+                        Color.White.copy(alpha = 0.04f),
                         Color.Transparent
                     )
                 )
@@ -493,29 +500,30 @@ private fun DoubleTapSeekOverlay(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.offset(x = offsetAnim.value.dp).graphicsLayer { this.alpha = alphaAnim.value }
         ) {
-            Box(
-                modifier = Modifier
-                    .offset(x = nudgeAnim.value.dp)
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x33000000))
-                    .border(1.dp, Color(0x33FFFFFF), CircleShape),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy((-4).dp)
             ) {
                 Icon(
-                    imageVector = if (isForward) Icons.Default.FastForward else Icons.Default.FastRewind,
+                    imageVector = if (isForward) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                Icon(
+                    imageVector = if (isForward) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
             }
-
             Text(
                 text = "${if (isForward) "+" else "-"}${accumulatedSeconds}s",
                 color = Color.White,
-                fontSize = 14.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.4.sp
             )
@@ -966,15 +974,22 @@ fun CinePlayerView(
         selectedSubSeason = season
         selectedSubEpisode = episode
 
-        // 2. Find best candidate from externalSubtitles (prioritizing Direct official stream captions) or fetch directly
+        // 2. Find best candidate from externalSubtitles (prioritizing active server captions) or fetch directly
+        val activeServer = serverName.lowercase(Locale.US)
         var candidateTrack = externalSubtitles.firstOrNull {
             (it.language.equals(preferredSubLanguage, ignoreCase = true) || it.label.contains(preferredSubLanguage, ignoreCase = true)) &&
-            (it.source.startsWith("Direct") || it.source == "Anikoto")
+            activeServer.isNotBlank() && it.source.lowercase(Locale.US).contains(activeServer)
+        } ?: externalSubtitles.firstOrNull {
+            (it.language.equals(preferredSubLanguage, ignoreCase = true) || it.label.contains(preferredSubLanguage, ignoreCase = true)) &&
+            (it.source.startsWith("Direct") || it.source == "Anikoto" || it.source == "FlixCloud" || it.source == "ACDN" || it.source == "MegaPlay" || it.source == "Vidstream")
         } ?: externalSubtitles.firstOrNull {
             it.language.equals(preferredSubLanguage, ignoreCase = true) || it.label.contains(preferredSubLanguage, ignoreCase = true)
         } ?: externalSubtitles.firstOrNull {
             (it.language.equals("English", ignoreCase = true) || it.label.contains("English", ignoreCase = true)) &&
-            (it.source.startsWith("Direct") || it.source == "Anikoto")
+            activeServer.isNotBlank() && it.source.lowercase(Locale.US).contains(activeServer)
+        } ?: externalSubtitles.firstOrNull {
+            (it.language.equals("English", ignoreCase = true) || it.label.contains("English", ignoreCase = true)) &&
+            (it.source.startsWith("Direct") || it.source == "Anikoto" || it.source == "FlixCloud" || it.source == "ACDN" || it.source == "MegaPlay" || it.source == "Vidstream")
         } ?: externalSubtitles.firstOrNull {
             it.language.equals("English", ignoreCase = true) || it.label.contains("English", ignoreCase = true)
         } ?: externalSubtitles.firstOrNull()
@@ -987,16 +1002,23 @@ fun CinePlayerView(
                     title = title,
                     episode = episode,
                     season = season,
-                    audio = if (isDub) "dub" else "sub"
+                    audio = if (isDub) "dub" else "sub",
+                    activeServerName = serverName
                 )
                 candidateTrack = fetched.firstOrNull {
                     (it.language.equals(preferredSubLanguage, ignoreCase = true) || it.label.contains(preferredSubLanguage, ignoreCase = true)) &&
-                    (it.source.startsWith("Direct") || it.source == "Anikoto")
+                    activeServer.isNotBlank() && it.source.lowercase(Locale.US).contains(activeServer)
+                } ?: fetched.firstOrNull {
+                    (it.language.equals(preferredSubLanguage, ignoreCase = true) || it.label.contains(preferredSubLanguage, ignoreCase = true)) &&
+                    (it.source.startsWith("Direct") || it.source == "Anikoto" || it.source == "FlixCloud" || it.source == "ACDN" || it.source == "MegaPlay" || it.source == "Vidstream")
                 } ?: fetched.firstOrNull {
                     it.language.equals(preferredSubLanguage, ignoreCase = true) || it.label.contains(preferredSubLanguage, ignoreCase = true)
                 } ?: fetched.firstOrNull {
                     (it.language.equals("English", ignoreCase = true) || it.label.contains("English", ignoreCase = true)) &&
-                    (it.source.startsWith("Direct") || it.source == "Anikoto")
+                    activeServer.isNotBlank() && it.source.lowercase(Locale.US).contains(activeServer)
+                } ?: fetched.firstOrNull {
+                    (it.language.equals("English", ignoreCase = true) || it.label.contains("English", ignoreCase = true)) &&
+                    (it.source.startsWith("Direct") || it.source == "Anikoto" || it.source == "FlixCloud" || it.source == "ACDN" || it.source == "MegaPlay" || it.source == "Vidstream")
                 } ?: fetched.firstOrNull {
                     it.language.equals("English", ignoreCase = true) || it.label.contains("English", ignoreCase = true)
                 } ?: fetched.firstOrNull()
@@ -2480,16 +2502,16 @@ fun CinePlayerView(
                         Row(
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xFA12151B))
-                                .border(1.dp, Color(0x22FFFFFF), CircleShape)
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                                .background(Color(0xB3181D28))
+                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = "2x",
                                 color = Color.White,
-                                fontSize = 13.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.3.sp
                             )
@@ -2568,7 +2590,7 @@ fun CinePlayerView(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = if (isInPip) 6.dp else if (showControls) 88.dp else 36.dp)
+                                .padding(bottom = if (isInPip) 6.dp else if (showControls) (captionConfig.bottomPaddingDp + 48f).dp else captionConfig.bottomPaddingDp.dp)
                                 .padding(horizontal = if (isInPip) 8.dp else 24.dp)
                                 .then(
                                     if (captionConfig.hasBgBox && captionConfig.bgAlpha > 0f) {
@@ -3052,14 +3074,8 @@ fun CinePlayerView(
                                 }
                             }
 
-                            // Top-right glass pill: fullscreen button
-                            GlassPill {
-                                GlassPillIcon(
-                                    icon = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
-                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
-                                    onClick = { onToggleFullscreen() }
-                                )
-                            }
+                            // Top-right spacer for balance
+                            Spacer(Modifier.size(36.dp))
                         }
                     }
 
@@ -3098,14 +3114,14 @@ fun CinePlayerView(
                                             onPreviousEpisode()
                                         },
                                         enabled = hasPreviousEpisode,
-                                        size = if (glassCompact) 26.dp else 32.dp,
+                                        size = if (glassCompact) 32.dp else 38.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.prevEpDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.prevEpDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.prevEpScale)
                                     ) {
                                         Icon(
                                             imageVector = playerCustomization.themePack.prevIcon,
                                             contentDescription = "Previous Episode",
                                             tint = Color(0xE6FFFFFF),
-                                            modifier = Modifier.size(if (glassCompact) 13.dp else 16.dp)
+                                            modifier = Modifier.size(if (glassCompact) 15.dp else 18.dp)
                                         )
                                     }
                                 }
@@ -3134,7 +3150,7 @@ fun CinePlayerView(
                                                 }
                                             }
                                         },
-                                        size = if (glassCompact) 34.dp else 42.dp,
+                                        size = if (glassCompact) 38.dp else 46.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.rewindDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.rewindDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.rewindScale)
                                     ) {
                                         if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
@@ -3212,7 +3228,7 @@ fun CinePlayerView(
                                                 }
                                             }
                                         },
-                                        size = if (glassCompact) 34.dp else 42.dp,
+                                        size = if (glassCompact) 38.dp else 46.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.forwardDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.forwardDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.forwardScale)
                                     ) {
                                         if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
@@ -3248,17 +3264,111 @@ fun CinePlayerView(
                                             onNextEpisode()
                                         },
                                         enabled = hasNextEpisode,
-                                        size = if (glassCompact) 26.dp else 32.dp,
+                                        size = if (glassCompact) 32.dp else 38.dp,
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.nextEpDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.nextEpDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.nextEpScale)
                                     ) {
                                         Icon(
                                             imageVector = playerCustomization.themePack.nextIcon,
                                             contentDescription = "Next Episode",
                                             tint = Color(0xE6FFFFFF),
-                                            modifier = Modifier.size(if (glassCompact) 13.dp else 16.dp)
+                                            modifier = Modifier.size(if (glassCompact) 15.dp else 18.dp)
                                         )
                                     }
                                 }
+                        }
+                    }
+
+                    // 3b. Right-Side Unified Vertical Control Group
+                    AnimatedVisibility(
+                        visible = showControls && !isScreenLocked && !isInPip,
+                        enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.92f, animationSpec = tween(140)),
+                        exit = if (isAutoHideTransition) {
+                            fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(180))
+                        } else {
+                            fadeOut(tween(110))
+                        },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = if (glassCompact) 12.dp else 24.dp)
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(if (glassCompact) 8.dp else 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            val rightBtnSize = if (glassCompact) 34.dp else 40.dp
+                            val rightIconSize = if (glassCompact) 16.dp else 19.dp
+
+                            // Fullscreen
+                            GlassIconButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    onToggleFullscreen()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
+                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+
+                            // Audio Track Button
+                            val isAudioSelected = audioTracks.any { it.isSelected } || isDub
+                            GlassIconButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    activeSettingsTab = PlayerSettingsTab.AUDIO
+                                    showPlayerSettingsModal = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.GraphicEq,
+                                    contentDescription = "Audio Tracks",
+                                    tint = if (isAudioSelected) playerCustomization.accentColor.color else Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+
+                            // Subtitles Button
+                            val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || activeLoadedSubtitleUrl != null || subtitleTracks.any { it.isSelected })
+                            GlassIconButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    showCaptionModal = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Subtitles,
+                                    contentDescription = "Subtitles",
+                                    tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+
+                            // Speed Button
+                            GlassIconButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    activeSettingsTab = PlayerSettingsTab.SPEED
+                                    showPlayerSettingsModal = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Speed,
+                                    contentDescription = "Playback Speed",
+                                    tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
                         }
                     }
 
@@ -3298,110 +3408,33 @@ fun CinePlayerView(
                                 animationSpec = tween(220, easing = FastOutSlowInEasing),
                                 label = "animatedSeekbarHeight"
                             )
-                            // Info (left) + quick pill: captions / audio / speed (right)
-                            Row(
+                            // Episode info hierarchy (full width with generous breathing room)
+                            val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Bottom
+                                    .padding(horizontal = 4.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f, fill = false)) {
-                                    val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
-                                    if (!glassCompact && hasCustomEpName) {
-                                        Text(
-                                            text = "Episode $episode: $episodeTitle",
-                                            fontSize = 11.5.sp,
-                                            color = Color.White.copy(alpha = 0.75f),
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    val displayTitle = if (hasCustomEpName || isFullscreen) title else "$title • Ep. $episode"
-                                    Text(
-                                        text = displayTitle,
-                                        fontSize = if (glassCompact) 14.sp else 16.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-
-                                Spacer(Modifier.width(12.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || subtitleTracks.any { it.isSelected })
-                                    val circleBtnSize = if (glassCompact) 32.dp else 36.dp
-                                    val iconSize = if (glassCompact) 16.dp else 18.dp
-
-                                    var audioAnchor by remember { mutableStateOf<Rect?>(null) }
-                                    var captionsAnchor by remember { mutableStateOf<Rect?>(null) }
-                                    var speedAnchor by remember { mutableStateOf<Rect?>(null) }
-
-                                    // Audio Track Button
-                                    GlassIconButton(
-                                        size = circleBtnSize,
-                                        modifier = Modifier.onGloballyPositioned { audioAnchor = it.boundsInWindow() },
-                                        onClick = {
-                                            morphAnchor = audioAnchor
-                                            activeSettingsTab = PlayerSettingsTab.AUDIO
-                                            showPlayerSettingsModal = true
-                                            controlsTimeoutKey++
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.GraphicEq,
-                                            contentDescription = "Audio Tracks",
-                                            tint = if (audioTracks.any { it.isSelected }) playerCustomization.accentColor.color else Color.White,
-                                            modifier = Modifier.size(iconSize)
-                                        )
-                                    }
-
-                                    // Captions / Subtitles Button
-                                    GlassIconButton(
-                                        size = circleBtnSize,
-                                        modifier = Modifier.onGloballyPositioned { captionsAnchor = it.boundsInWindow() },
-                                        onClick = {
-                                            morphAnchor = captionsAnchor
-                                            showCaptionModal = true
-                                            controlsTimeoutKey++
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Subtitles,
-                                            contentDescription = "Subtitles",
-                                            tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White,
-                                            modifier = Modifier.size(iconSize)
-                                        )
-                                    }
-
-                                    // Playback Speed Button (Directly opens Speed Tab)
-                                    GlassIconButton(
-                                        size = circleBtnSize,
-                                        modifier = Modifier.onGloballyPositioned { speedAnchor = it.boundsInWindow() },
-                                        onClick = {
-                                            morphAnchor = speedAnchor
-                                            activeSettingsTab = PlayerSettingsTab.SPEED
-                                            showPlayerSettingsModal = true
-                                            controlsTimeoutKey++
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Speed,
-                                            contentDescription = "Playback Speed",
-                                            tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
-                                            modifier = Modifier.size(iconSize)
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = if (hasCustomEpName) "Episode $episode: $episodeTitle" else "Episode $episode",
+                                    fontSize = if (glassCompact) 11.sp else 12.5.sp,
+                                    color = Color(0xB3FFFFFF),
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = title,
+                                    fontSize = if (glassCompact) 15.sp else 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
 
-                            Spacer(Modifier.height(2.dp))
+                            Spacer(Modifier.height(10.dp))
 
                             // Time bar: elapsed | seekbar | remaining
                             Row(
@@ -3652,7 +3685,8 @@ fun CinePlayerView(
                         title = queryTitle,
                         episode = selectedSubEpisode,
                         season = selectedSubSeason,
-                        audio = if (isDub) "dub" else "sub"
+                        audio = if (isDub) "dub" else "sub",
+                        activeServerName = serverName
                     )
                 } catch (_: Exception) {
                     emptyList()
