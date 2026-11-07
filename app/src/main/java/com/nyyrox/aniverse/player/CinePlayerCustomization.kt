@@ -18,13 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import com.styropyr0.prismal.drawPrismalGlass
-import com.styropyr0.prismal.effects.applyPrismalGlassEffects
-import com.styropyr0.prismal.specular.PrismalSpecular
-import com.styropyr0.prismal.specular.PrismalSpecularStyle
-import com.styropyr0.prismal.depth.PrismalDepthShadow
-import com.styropyr0.prismal.depth.PrismalDepthInset
-import com.styropyr0.prismal.LocalPrismalBackdrop
+
 import com.nyyrox.aniverse.ui.theme.LocalThemeSettings
 import androidx.compose.ui.util.lerp
 import androidx.compose.foundation.layout.Row
@@ -1027,7 +1021,6 @@ fun CineSeekbarRenderer(
     val maxOffsetPx = (trackWidthPx - thumbSizePx).coerceAtLeast(0f)
     val thumbOffsetXPx = (maxOffsetPx * clampedPlayed).roundToInt()
 
-    val prismalBackdrop = LocalPrismalBackdrop.current
     val isGlassEnabled = LocalThemeSettings.current.isGlassmorphismEnabled
 
     Box(
@@ -1066,7 +1059,7 @@ fun CineSeekbarRenderer(
                         )
                     }
                 }
-                // Thumb Head with velocity squash/stretch and live video refraction
+                // Thumb Head with velocity squash/stretch (clean Compose)
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(thumbOffsetXPx, 0) }
@@ -1075,50 +1068,12 @@ fun CineSeekbarRenderer(
                             scaleX = thumbScaleX
                             scaleY = thumbScaleY
                         }
-                        .then(
-                            if (isGlassEnabled && prismalBackdrop != null) {
-                                Modifier.drawPrismalGlass(
-                                    backdrop = prismalBackdrop,
-                                    shape = { CircleShape },
-                                    effects = {
-                                        applyPrismalGlassEffects(
-                                            density = density,
-                                            adaptiveLuminance = false,
-                                            luminance = 0.5f,
-                                            blurRadiusPx = with(density) { 14.dp.toPx() } * (1f - pressProgress * 0.5f),
-                                            refractionHeightPx = with(density) { 12.dp.toPx() } * pressProgress,
-                                            refractionAmountPx = with(density) { 18.dp.toPx() } * pressProgress,
-                                            chromaticAberration = 1f,
-                                            useVibrancy = true,
-                                            saturation = 1.35f
-                                        )
-                                    },
-                                    specular = {
-                                        PrismalSpecular.Default.copy(
-                                            alpha = 0.75f + (0.25f * pressProgress)
-                                        )
-                                    },
-                                    depthShadow = {
-                                        PrismalDepthShadow(radius = 6.dp * pressProgress, alpha = 0.8f)
-                                    },
-                                    depthInset = {
-                                        PrismalDepthInset(radius = 4.dp * pressProgress, alpha = pressProgress)
-                                    },
-                                    onDrawSurface = {
-                                        val solidAlpha = (1f - pressProgress * 0.75f).coerceIn(0.18f, 1f)
-                                        drawRect(accentColor.copy(alpha = solidAlpha))
-                                    }
-                                )
-                            } else {
-                                Modifier
-                                    .shadow(4.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(accentColor)
-                            }
-                        )
+                        .shadow(if (pressProgress > 0.1f) 6.dp else 2.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(accentColor)
                         .border(
-                            1.2.dp,
-                            if (pressProgress > 0.1f) Color(0x75FFFFFF) else accentColor.copy(alpha = 0.85f),
+                            1.5.dp,
+                            if (pressProgress > 0.1f) Color.White else Color(0x90FFFFFF),
                             CircleShape
                         )
                 )
@@ -1413,75 +1368,21 @@ fun GlassBackdropCapture(backdrop: GlassBackdrop, playerView: PlayerView?, enabl
  */
 fun Modifier.glassSurface(
     shape: Shape,
-    tint: Color = Color(0x18FFFFFF), // translucent glass tint for crisper transparency
+    tint: Color = Color(0xB310141D), // Elegant dark translucent background matching APK UI
     wash: Color = Color.Transparent,
     elevation: Dp = 4.dp,
     pressed: Boolean = false,
     borderWidth: Dp = 1.dp,
-    borderColor: Color = Color(0x38FFFFFF), // rgba(255, 255, 255, 0.22)
+    borderColor: Color = Color(0x28FFFFFF),
     useBackdrop: Boolean = true
 ): Modifier = composed {
-    val isGlassEnabled = com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled
-    if (!isGlassEnabled) {
-        return@composed this
-            .shadow(if (elevation > 0.dp) 2.dp else 0.dp, shape, clip = false)
-            .clip(shape)
-            .background(Color(0x40101420))
-            .drawBehind { if (pressed) drawRect(Color(0x33FFFFFF)) }
-            .border(borderWidth, Color(0x28FFFFFF), shape)
-    }
-    val prismalBackdrop = LocalPrismalBackdrop.current
-    if (useBackdrop && prismalBackdrop != null) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        return@composed this.drawPrismalGlass(
-            backdrop = prismalBackdrop,
-            shape = { shape },
-            effects = {
-                applyPrismalGlassEffects(
-                    density = density,
-                    adaptiveLuminance = false,
-                    luminance = 0.5f,
-                    blurRadiusPx = with(density) { 10.dp.toPx() },
-                    refractionHeightPx = with(density) { 8.dp.toPx() },
-                    refractionAmountPx = with(density) { 10.dp.toPx() },
-                    useVibrancy = true,
-                    saturation = 1.3f
-                )
-            },
-            specular = {
-                PrismalSpecular(
-                    width = 0.8.dp,
-                    blurRadius = 0.5.dp,
-                    alpha = if (pressed) 1.0f else 0.75f,
-                    style = PrismalSpecularStyle.Default
-                )
-            },
-            depthShadow = {
-                PrismalDepthShadow(radius = elevation, alpha = 0.5f)
-            },
-            onDrawSurface = {
-                drawRect(tint)
-                if (wash != Color.Transparent) drawRect(wash)
-                if (pressed) drawRect(Color(0x33FFFFFF))
-            }
-        )
-    }
-    // Android 12+: real live backdrop blur of the video (Haze / AGSL). Below 12: plain translucent glass.
-    val haze = if (useBackdrop) LocalGlassHaze.current else null
     this
-        .shadow(elevation, shape, clip = false, ambientColor = Color(0x33000000), spotColor = Color(0x33000000))
+        .shadow(if (elevation > 0.dp) 2.dp else 0.dp, shape, clip = false)
         .clip(shape)
-        .then(
-            if (haze != null) Modifier.hazeEffect(haze) {
-                blurRadius = 12.dp
-                tints = listOf(HazeTint(tint))
-                noiseFactor = 0.02f
-            } else Modifier.background(tint)
-        )
-        .background(wash)
-        .background(Brush.verticalGradient(listOf(Color(0x18FFFFFF), Color(0x06FFFFFF), Color(0x04000000))))
-        .drawBehind { if (pressed) drawRect(Color(0x33FFFFFF)) }
-        .border(borderWidth, Brush.verticalGradient(listOf(borderColor.copy(alpha = 0.45f), borderColor)), shape)
+        .background(if (pressed) Color(0xD91E232E) else tint)
+        .then(if (wash != Color.Transparent) Modifier.background(wash) else Modifier)
+        .drawBehind { if (pressed) drawRect(Color(0x20FFFFFF)) }
+        .border(borderWidth, if (pressed) Color(0x44FFFFFF) else borderColor, shape)
 }
 
 @Composable
@@ -1762,66 +1663,14 @@ fun rememberCrossWindowBlur(): Boolean {
     }
 }
 
-/** Frosted-glass panel: blurred backdrop (window blur) + smoky tint + top-lit frost + specular rim. */
-fun Modifier.glassPanel(radius: Dp = 28.dp): Modifier = composed {
-    val isGlassEnabled = com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled
+/** Frosted panel matching the APK UI design tokens. */
+fun Modifier.glassPanel(radius: Dp = 24.dp): Modifier = composed {
     val shape = RoundedCornerShape(radius)
-    if (!isGlassEnabled) {
-        return@composed this
-            .shadow(6.dp, shape, clip = false)
-            .clip(shape)
-            .background(Color(0xF2121418))
-            .border(1.dp, Color(0x28FFFFFF), shape)
-    }
-    val prismalBackdrop = LocalPrismalBackdrop.current
-    if (prismalBackdrop != null) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        return@composed this.drawPrismalGlass(
-            backdrop = prismalBackdrop,
-            shape = { shape },
-            effects = {
-                applyPrismalGlassEffects(
-                    density = density,
-                    adaptiveLuminance = false,
-                    luminance = 0.5f,
-                    blurRadiusPx = with(density) { 24.dp.toPx() },
-                    refractionHeightPx = with(density) { 16.dp.toPx() },
-                    refractionAmountPx = with(density) { 24.dp.toPx() },
-                    useVibrancy = true,
-                    saturation = 1.35f
-                )
-            },
-            specular = {
-                PrismalSpecular(
-                    width = 1.dp,
-                    blurRadius = 0.5.dp,
-                    alpha = 0.9f,
-                    style = PrismalSpecularStyle.Default
-                )
-            },
-            depthShadow = {
-                PrismalDepthShadow(radius = 24.dp, alpha = 0.9f)
-            },
-            onDrawSurface = {
-                drawRect(Color(0xB310141E))
-            }
-        )
-    }
-    val blur = rememberCrossWindowBlur()
     this
-        .shadow(24.dp, shape, clip = false, ambientColor = Color(0x66000000), spotColor = Color(0x66000000))
+        .shadow(16.dp, shape, clip = false)
         .clip(shape)
-        .background(if (blur) Color(0x5C10141B) else Color(0xF2121418))
-        .background(Brush.verticalGradient(listOf(Color(0x2EFFFFFF), Color(0x0AFFFFFF), Color(0x18000000))))
-        .border(
-            1.2.dp,
-            Brush.linearGradient(
-                listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF), Color(0x0DFFFFFF), Color(0x47FFFFFF)),
-                start = Offset.Zero,
-                end = Offset.Infinite
-            ),
-            shape
-        )
+        .background(Color(0xFA12151B))
+        .border(1.dp, Color(0x22FFFFFF), shape)
 }
 
 

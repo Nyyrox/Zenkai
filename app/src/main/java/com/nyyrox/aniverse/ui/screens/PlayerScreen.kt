@@ -13,9 +13,7 @@ import com.nyyrox.aniverse.player.CineStreamLoader
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.TextStyle
-import com.styropyr0.prismal.components.PrismalHorizontalSelector
-import com.styropyr0.prismal.components.PrismalSegmentedControl
-import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
+
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import android.annotation.SuppressLint
@@ -162,12 +160,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.Dp
-import com.styropyr0.prismal.components.PrismalGlassButton
-import com.styropyr0.prismal.drawPrismalGlass
-import com.styropyr0.prismal.prismalGlassEffects
-import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
-import com.styropyr0.prismal.sources.PrismalGlassLayer
-import com.styropyr0.prismal.sources.prismalGlassLayer
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
@@ -893,17 +886,6 @@ fun PlayerScreen(
             }
         }
     }
-
-    // One backdrop (ambient artwork) sampled by every glass surface. null = glass off.
-    val glassLayer = rememberPrismalGlassLayer()
-    // Shader glass needs Android 13+ (AGSL) and a device with headroom; everything else gets the flat AMOLED cards.
-    val glassOk = remember {
-        android.os.Build.VERSION.SDK_INT >= 33 &&
-            context.getSystemService(android.app.ActivityManager::class.java)?.isLowRamDevice != true
-    }
-    // Follows Profile > Liquid Glassmorphism, same switch the details page uses.
-    val glassSetting = vm.themeSettings.isGlassmorphismEnabled
-    val backdrop = if (liquidGlass && glassSetting && glassOk) glassLayer else null
 
     val progress = dragProgress.value
     val bgAlpha = if (!isFullscreen) (1f - progress * 1.6f).coerceIn(0f, 1f) else 1f
@@ -1836,39 +1818,27 @@ private fun GlassmorphicControlChip(
  * The player page itself no longer wraps content in this (no cards); it's only for callers that still want a panel.
  */
 @Composable
-fun Modifier.playerGlass(backdrop: PrismalGlassLayer?, radius: Dp = 22.dp): Modifier {
+fun Modifier.playerGlass(backdrop: Any? = null, radius: Dp = 22.dp): Modifier {
     val c = LocalAppColors.current
-    val isDark = LocalIsDark.current
     val shape = RoundedCornerShape(radius)
-    if (backdrop == null) {
-        return this
-            .clip(shape)
-            .background(c.surface)
-            .border(1.dp, c.glass.border, shape)
-    }
-    val density = LocalDensity.current
-    val effects = remember(density) { prismalGlassEffects(density) }
-    val scrim = if (isDark) Color.Black.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.5f)
-    return this.drawPrismalGlass(
-        backdrop = backdrop,
-        shape = { PrismalRoundedRectangle(radius) },
-        effects = effects,
-        onDrawSurface = { drawRect(scrim) }
-    )
+    return this
+        .clip(shape)
+        .background(c.surface)
+        .border(1.dp, c.glass.border, shape)
 }
 
 /**
  * PlayerAmbientArt kept as a no-op to eliminate gradients, blurred artwork blobs, and color bleeding.
  */
 @Composable
-fun PlayerAmbientArt(layer: PrismalGlassLayer?, model: Any?, modifier: Modifier = Modifier) {
+fun PlayerAmbientArt(layer: Any? = null, model: Any? = null, modifier: Modifier = Modifier) {
     // Intentionally no-op: pure black & white design with no artwork blur or gradients
 }
 
 /** Glass pill button (circle when [circle]); flat pill with spring press when glass is off. [active] = solid accent. */
 @Composable
 fun PlayerGlassButton(
-    backdrop: PrismalGlassLayer?,
+    backdrop: Any? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     height: Dp = 40.dp,
@@ -1968,7 +1938,7 @@ private fun PlayerMonochromeAction(
 @Composable
 private fun PlayerAction(
     label: String,
-    backdrop: PrismalGlassLayer?,
+    backdrop: Any? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     active: Boolean = false,
@@ -2089,7 +2059,7 @@ private fun PlayerSegmented(
     onSelected: (Int) -> Unit,
     disabledLabels: Set<String> = emptySet(),
     onDisabledClick: (String) -> Unit = {},
-    backdrop: PrismalGlassLayer?,
+    backdrop: Any? = null,
     modifier: Modifier = Modifier,
     height: Dp = 44.dp
 ) {

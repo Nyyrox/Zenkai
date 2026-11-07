@@ -15,9 +15,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.hazeSource
-import com.styropyr0.prismal.sources.prismalGlassLayer
-import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
-import com.styropyr0.prismal.LocalPrismalBackdrop
+
 import android.view.LayoutInflater
 import android.os.Message
 import android.webkit.WebViewClient
@@ -1841,13 +1839,9 @@ fun CinePlayerView(
             }
 
             PlayerEngineMode.NATIVE_EXO -> {
-                val playerPrismalBackdrop = com.styropyr0.prismal.sources.rememberPrismalGlassLayer()
                 var exoSurfaceCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-                CompositionLocalProvider(
-                    com.styropyr0.prismal.LocalPrismalBackdrop provides playerPrismalBackdrop
-                ) {
-                    // ExoPlayer Surface Container
-                    Box(
+                // ExoPlayer Surface Container
+                Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .onGloballyPositioned { exoSurfaceCoordinates = it }
@@ -2199,8 +2193,7 @@ fun CinePlayerView(
                         modifier = Modifier
                             .fillMaxSize()
                             .onSizeChanged { glassBackdrop.hostWidth = it.width }
-                            .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier)
-                            .then(if (com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) Modifier.prismalGlassLayer(playerPrismalBackdrop) else Modifier),
+                            .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier),
                         factory = { ctx ->
                             (LayoutInflater.from(ctx).inflate(com.nyyrox.aniverse.R.layout.cine_player_texture, null, false) as PlayerView).apply {
                                 useController = false
@@ -3522,7 +3515,6 @@ fun CinePlayerView(
                     ) {
                         YtBottomLoadingBar(accentColor = playerCustomization.accentColor.color)
                     }
-                }
                 }
             }
 
@@ -5363,74 +5355,6 @@ private fun PlayerSettingsModal(
                             title = "Player Themes & Colors",
                             subtitle = currentCustomization.themePack.displayName,
                             onClick = { onTabChange(PlayerSettingsTab.THEME_PACKS) }
-                        )
-
-                        // Liquid Glassmorphism Transparency Optimization Toggle
-                        val ctx = androidx.compose.ui.platform.LocalContext.current
-                        var glassEnabled by remember { mutableStateOf(com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled) }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable {
-                                    val newVal = !glassEnabled
-                                    glassEnabled = newVal
-                                    com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
-                                    try {
-                                        val sm = com.nyyrox.aniverse.data.StorageManager(ctx)
-                                        val cur = sm.getThemeSettings()
-                                        sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
-                                    } catch (_: Throwable) {}
-                                }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Column {
-                                    Text(
-                                        text = "Liquid Glassmorphism",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = if (glassEnabled) "AGSL refraction & blur enabled" else "Optimized flat render (Fast)",
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 11.5.sp
-                                    )
-                                }
-                            }
-                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
-                                checked = glassEnabled,
-                                onCheckedChange = { newVal ->
-                                    glassEnabled = newVal
-                                    com.styropyr0.prismal.PrismalGlass.isGlassmorphismEnabled = newVal
-                                    try {
-                                        val sm = com.nyyrox.aniverse.data.StorageManager(ctx)
-                                        val cur = sm.getThemeSettings()
-                                        sm.saveThemeSettings(cur.copy(isGlassmorphismEnabled = newVal))
-                                    } catch (_: Throwable) {}
-                                }
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                                .height(0.5.dp)
-                                .background(Color(0x26FFFFFF))
                         )
 
                         // 5. Auto-Play Next
