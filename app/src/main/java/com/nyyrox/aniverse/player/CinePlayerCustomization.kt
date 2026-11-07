@@ -1895,10 +1895,12 @@ val VIDEO_FILTER_PRESETS: List<VideoFilterPresetItem> = listOf(
 
 fun computeVideoFilterColorMatrix(
     vfx: VideoFiltersState,
-    upscaler: UpscalerState
+    upscaler: UpscalerState = UpscalerState()
 ): android.graphics.ColorMatrix? {
-    if (vfx.isDefault && !upscaler.enabled) {
-        return null
+    // IMPORTANT: Upscaler is purely super-resolution spatial scaling.
+    // It MUST NEVER apply a color-crushing ColorMatrix, ensuring 100% authentic anime colors identical to the source.
+    if (vfx.isDefault) {
+        return null // Pure native hardware decode without any intermediate color filtering
     }
 
     var baseSat = 1.0f
@@ -1908,54 +1910,23 @@ fun computeVideoFilterColorMatrix(
 
     when (vfx.preset) {
         "vibrant" -> {
-            baseSat = 1.28f
-            baseCon = 1.06f
+            baseSat = 1.25f
+            baseCon = 1.05f
             baseBri = 1.02f
         }
         "cinema" -> {
-            baseCon = 1.18f
-            baseSat = 1.10f
-            baseBri = 0.98f
-        }
-        "sharp" -> {
-            baseCon = 1.14f
-            baseBri = 1.02f
-        }
-        "warm" -> {
-            sepiaAmount = 0.20f
+            baseCon = 1.12f
             baseSat = 1.08f
             baseBri = 0.98f
         }
-    }
-
-    if (upscaler.enabled) {
-        val intensity = (upscaler.intensity.coerceIn(0, 100) / 100f)
-        when (upscaler.mode) {
-            "modeA" -> {
-                baseCon *= (1.0f + 0.07f * intensity)
-                baseSat *= (1.0f + 0.05f * intensity)
-                baseBri *= (1.0f + 0.01f * intensity)
-            }
-            "modeB" -> {
-                baseCon *= (1.0f + 0.03f * intensity)
-                baseSat *= (1.0f + 0.02f * intensity)
-            }
-            "modeC" -> {
-                baseCon *= (1.0f + 0.12f * intensity)
-                baseBri *= (1.0f + 0.02f * intensity)
-            }
-            "modeAA" -> {
-                baseCon *= (1.0f + 0.14f * intensity)
-                baseSat *= (1.0f + 0.06f * intensity)
-                baseBri *= (1.0f + 0.02f * intensity)
-            }
-            "denoise" -> {
-                baseCon *= (1.0f + 0.05f * intensity)
-                baseSat *= (1.0f + 0.03f * intensity)
-            }
-            "fast" -> {
-                baseCon *= (1.0f + 0.05f * intensity)
-            }
+        "sharp" -> {
+            baseCon = 1.10f
+            baseBri = 1.02f
+        }
+        "warm" -> {
+            sepiaAmount = 0.18f
+            baseSat = 1.05f
+            baseBri = 0.98f
         }
     }
 
@@ -1963,31 +1934,24 @@ fun computeVideoFilterColorMatrix(
     val finalCon = baseCon * (vfx.contrast / 100f)
     val finalBri = baseBri * (vfx.brightness / 100f)
 
-    val finalMatrix = android.graphics.ColorMatrix()
-
-    if (abs(finalCon - 1.0f) > 0.001f) {
-        val scale = finalCon
-        val translate = (1.0f - scale) * 128f
-        val conMatrix = android.graphics.ColorMatrix(floatArrayOf(
-            scale, 0f, 0f, 0f, translate,
-            0f, scale, 0f, 0f, translate,
-            0f, 0f, scale, 0f, translate,
-            0f, 0f, 0f, 1f, 0f
-        ))
-        finalMatrix.postConcat(conMatrix)
+    // Standard saturation
+    val satMatrix = android.graphics.ColorMatrix().apply {
+        setSaturation(finalSat)
     }
 
-    if (abs(finalSat - 1.0f) > 0.001f) {
-        val satMatrix = android.graphics.ColorMatrix()
-        satMatrix.setSaturation(finalSat)
-        finalMatrix.postConcat(satMatrix)
-    }
+    // Standard contrast & brightness without black crush:
+    // f(x) = c * (x - 128) + 128 + bOffset = c * x + (128 * (1 - c) + bOffset)
+    val bOffset = (finalBri - 1.0f) * 255f
+    val translate = 128f * (1.0f - finalCon) + bOffset
+    val conMatrix = android.graphics.ColorMatrix(floatArrayOf(
+        finalCon, 0f, 0f, 0f, translate,
+        0f, finalCon, 0f, 0f, translate,
+        0f, 0f, finalCon, 0f, translate,
+        0f, 0f, 0f, 1f, 0f
+    ))
 
-    if (abs(finalBri - 1.0f) > 0.001f) {
-        val briMatrix = android.graphics.ColorMatrix()
-        briMatrix.setScale(finalBri, finalBri, finalBri, 1.0f)
-        finalMatrix.postConcat(briMatrix)
-    }
+    val resultMatrix = android.graphics.ColorMatrix()
+    resultMatrix.setConcat(conMatrix, satMatrix)
 
     if (sepiaAmount > 0.001f) {
         val inv = 1f - sepiaAmount
@@ -1997,10 +1961,10 @@ fun computeVideoFilterColorMatrix(
             0.272f * sepiaAmount, 0.534f * sepiaAmount, inv + 0.131f * sepiaAmount, 0f, 0f,
             0f, 0f, 0f, 1f, 0f
         ))
-        finalMatrix.postConcat(sepiaMatrix)
+        resultMatrix.postConcat(sepiaMatrix)
     }
 
-    return finalMatrix
+    return resultMatrix
 }
 
 fun findTextureView(root: View?): TextureView? {
@@ -2022,8 +1986,13 @@ fun applyVideoEffects(
 ) {
     if (playerView == null) return
     val tv = (playerView.videoSurfaceView as? TextureView) ?: findTextureView(playerView) ?: return
+
+    // Ensure TextureView hardware buffer is fully opaque for optimum GPU rendering
+    tv.isOpaque = true
+
     val matrix = computeVideoFilterColorMatrix(vfx, upscaler)
     if (matrix == null) {
+        // Zero color-filter overhead: native decode bit-perfect stream
         tv.setLayerType(View.LAYER_TYPE_HARDWARE, null)
     } else {
         val paint = Paint().apply {

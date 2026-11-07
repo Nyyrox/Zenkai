@@ -3083,23 +3083,23 @@ fun CinePlayerView(
                                     if (upscalerSettings.enabled) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(Color(0xFFE50914).copy(alpha = 0.25f))
-                                                .border(1.dp, Color(0xFFE50914), RoundedCornerShape(6.dp))
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0x22FFFFFF))
+                                                .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(8.dp))
                                                 .clickable {
                                                     morphAnchor = null
                                                     activeSettingsTab = PlayerSettingsTab.UPSCALER
                                                     showPlayerSettingsModal = true
                                                     controlsTimeoutKey++
                                                 }
-                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                                .padding(horizontal = 7.dp, vertical = 3.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = "4K",
                                                 color = Color.White,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Black,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.5.sp
                                             )
                                         }
@@ -5316,7 +5316,7 @@ private fun PlayerSettingsModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(
                             title = "AI 4K Upscaler",
@@ -5326,39 +5326,33 @@ private fun PlayerSettingsModal(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 8.dp)
                                 .height(1.dp)
                                 .background(Color(0x1FFFFFFF))
                         )
 
-                        // Master Toggle Card
+                        // Master Switch with LiquidGlassSwitch lever
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (upscalerSettings.enabled) Color(0xFFE50914).copy(alpha = 0.16f) else Color(0x15FFFFFF))
-                                .border(
-                                    1.dp,
-                                    if (upscalerSettings.enabled) Color(0xFFE50914).copy(alpha = 0.5f) else Color(0x22FFFFFF),
-                                    RoundedCornerShape(12.dp)
-                                )
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     onUpscalerChange(upscalerSettings.copy(enabled = !upscalerSettings.enabled))
                                 }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(34.dp)
                                         .clip(CircleShape)
-                                        .background(if (upscalerSettings.enabled) Color(0xFFE50914) else Color(0x22FFFFFF)),
+                                        .background(Color(0x22FFFFFF)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -5372,129 +5366,107 @@ private fun PlayerSettingsModal(
                                     Text(
                                         text = "Anime4K AI Upscaling",
                                         color = Color.White,
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (upscalerSettings.enabled) "Active · GPU Real-Time" else "Disabled · Tap to enable",
-                                        color = if (upscalerSettings.enabled) Color(0xFFFF5252) else OttTextMuted,
-                                        fontSize = 11.sp
+                                        text = if (upscalerSettings.enabled) "Active · GPU Super-Resolution" else "Real-time 2x upscale for anime",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
                                     )
                                 }
                             }
-                            Switch(
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
                                 checked = upscalerSettings.enabled,
                                 onCheckedChange = { isChecked ->
                                     onUpscalerChange(upscalerSettings.copy(enabled = isChecked))
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFFE50914),
-                                    uncheckedThumbColor = Color(0xFFAAAAAA),
-                                    uncheckedTrackColor = Color(0x33FFFFFF)
-                                )
+                                }
                             )
                         }
 
                         if (upscalerSettings.enabled) {
-                            Text(
-                                text = "Anime4K Model / Shader Preset",
-                                color = OttTextMuted,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(top = 4.dp)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .height(1.dp)
+                                    .background(Color(0x1FFFFFFF))
                             )
 
-                            // Grid of 6 presets (2 columns x 3 rows)
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                ANIME4K_MODES.chunked(2).forEach { rowModes ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        rowModes.forEach { modeItem ->
-                                            val isSelected = upscalerSettings.mode == modeItem.id
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(38.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(
-                                                        if (isSelected) Color(0xFFE50914)
-                                                        else Color(0x1FFFFFFF)
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (isSelected) Color(0xFFFF4B4B)
-                                                        else Color(0x22FFFFFF),
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .clickable {
-                                                        onUpscalerChange(upscalerSettings.copy(mode = modeItem.id))
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = modeItem.label,
-                                                    color = Color.White,
-                                                    fontSize = 12.5.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                                )
-                                            }
+                            Text(
+                                text = "Model / Shader Preset",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+
+                            ANIME4K_MODES.forEach { modeItem ->
+                                val isSelected = upscalerSettings.mode == modeItem.id
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            onUpscalerChange(upscalerSettings.copy(mode = modeItem.id))
                                         }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                        Text(
+                                            text = modeItem.label,
+                                            color = if (isSelected) OttPrimary else Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        Text(
+                                            text = modeItem.desc,
+                                            color = OttSecondary,
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = OttPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
                                     }
                                 }
                             }
 
-                            // Descriptive note about selected preset
-                            val activeDesc = ANIME4K_MODES.find { it.id == upscalerSettings.mode }?.desc ?: ""
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x12FFFFFF))
-                                    .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.Top,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = Color(0xFF38BDF8),
-                                        modifier = Modifier.size(15.dp).padding(top = 1.dp)
-                                    )
-                                    Text(
-                                        text = activeDesc,
-                                        color = Color(0xFFD1D5DB),
-                                        fontSize = 11.5.sp,
-                                        lineHeight = 15.sp
-                                    )
-                                }
-                            }
+                                    .padding(vertical = 6.dp)
+                                    .height(1.dp)
+                                    .background(Color(0x1FFFFFFF))
+                            )
 
-                            // Intensity slider
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "Upscale Intensity",
-                                    color = OttTextMuted,
-                                    fontSize = 12.sp,
+                                    color = Color.White,
+                                    fontSize = 13.5.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
                                     text = "${upscalerSettings.intensity}%",
-                                    color = Color.White,
+                                    color = Color(0xFF94A3B8),
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                             Slider(
@@ -5506,30 +5478,14 @@ private fun PlayerSettingsModal(
                                 steps = 19,
                                 colors = SliderDefaults.colors(
                                     thumbColor = Color.White,
-                                    activeTrackColor = Color(0xFFE50914),
+                                    activeTrackColor = Color(0x99FFFFFF),
                                     inactiveTrackColor = Color(0x28FFFFFF)
                                 ),
-                                modifier = Modifier.fillMaxWidth().height(26.dp)
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(24.dp)
                             )
                         }
 
-                        // Info footer
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0x0CFFFFFF))
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = "Runs in real-time on your GPU with neural shaders. Best on 720p-1080p anime.",
-                                color = OttTextMuted,
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
 
@@ -5538,129 +5494,104 @@ private fun PlayerSettingsModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(
-                            title = "Visual Enhancements & Shaders",
+                            title = "Visual Enhancements",
                             onBack = { onTabChange(PlayerSettingsTab.MAIN) },
                             onClose = onDismiss
                         )
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 8.dp)
                                 .height(1.dp)
                                 .background(Color(0x1FFFFFFF))
                         )
 
                         Text(
-                            text = "Presets",
-                            color = OttTextMuted,
+                            text = "Color & Contrast Presets",
+                            color = Color(0xFF94A3B8),
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
 
-                        // Preset chips
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                listOf(VIDEO_FILTER_PRESETS[0], VIDEO_FILTER_PRESETS[1]).forEach { p ->
-                                    val isSelected = videoFilters.preset == p.id
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) Color(0xFFE50914) else Color(0x1FFFFFFF))
-                                            .border(1.dp, if (isSelected) Color(0xFFFF4B4B) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                onVideoFiltersChange(videoFilters.copy(preset = p.id))
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = p.label,
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
+                        val presetDescriptions = mapOf(
+                            "off" to "Standard untouched video colors",
+                            "vibrant" to "Richer anime colors and enhanced saturation",
+                            "cinema" to "Expanded dynamic range and cinema contrast",
+                            "sharp" to "Crisp outlines and edge definition",
+                            "warm" to "Reduced blue light with soft amber tones"
+                        )
 
+                        VIDEO_FILTER_PRESETS.forEach { p ->
+                            val isSelected = videoFilters.preset == p.id
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                listOf(VIDEO_FILTER_PRESETS[2], VIDEO_FILTER_PRESETS[3]).forEach { p ->
-                                    val isSelected = videoFilters.preset == p.id
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) Color(0xFFE50914) else Color(0x1FFFFFFF))
-                                            .border(1.dp, if (isSelected) Color(0xFFFF4B4B) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                onVideoFiltersChange(videoFilters.copy(preset = p.id))
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = p.label,
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
-
-                            val warmPreset = VIDEO_FILTER_PRESETS[4]
-                            val isWarmSelected = videoFilters.preset == warmPreset.id
-                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isWarmSelected) Color(0xFFE50914) else Color(0x1FFFFFFF))
-                                    .border(1.dp, if (isWarmSelected) Color(0xFFFF4B4B) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                    .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
                                     .clickable {
-                                        onVideoFiltersChange(videoFilters.copy(preset = warmPreset.id))
-                                    },
-                                contentAlignment = Alignment.Center
+                                        onVideoFiltersChange(videoFilters.copy(preset = p.id))
+                                    }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = warmPreset.label,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isWarmSelected) FontWeight.Bold else FontWeight.Medium
-                                )
+                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                    Text(
+                                        text = p.label,
+                                        color = if (isSelected) OttPrimary else Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        text = presetDescriptions[p.id] ?: "",
+                                        color = OttSecondary,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = OttPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
 
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .height(1.dp)
+                                .background(Color(0x1FFFFFFF))
+                        )
+
                         // Brightness Slider
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Brightness",
-                                color = OttTextMuted,
-                                fontSize = 12.sp,
+                                color = Color.White,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = "${videoFilters.brightness}%",
-                                color = Color.White,
+                                color = Color(0xFF94A3B8),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                         Slider(
@@ -5672,29 +5603,31 @@ private fun PlayerSettingsModal(
                             steps = 29,
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
-                                activeTrackColor = Color(0xFFE50914),
+                                activeTrackColor = Color(0x99FFFFFF),
                                 inactiveTrackColor = Color(0x28FFFFFF)
                             ),
-                            modifier = Modifier.fillMaxWidth().height(26.dp)
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(24.dp)
                         )
 
                         // Contrast Slider
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Contrast",
-                                color = OttTextMuted,
-                                fontSize = 12.sp,
+                                color = Color.White,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = "${videoFilters.contrast}%",
-                                color = Color.White,
+                                color = Color(0xFF94A3B8),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                         Slider(
@@ -5706,29 +5639,31 @@ private fun PlayerSettingsModal(
                             steps = 34,
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
-                                activeTrackColor = Color(0xFFE50914),
+                                activeTrackColor = Color(0x99FFFFFF),
                                 inactiveTrackColor = Color(0x28FFFFFF)
                             ),
-                            modifier = Modifier.fillMaxWidth().height(26.dp)
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(24.dp)
                         )
 
                         // Color Saturation Slider
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Color Saturation",
-                                color = OttTextMuted,
-                                fontSize = 12.sp,
+                                color = Color.White,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = "${videoFilters.saturation}%",
-                                color = Color.White,
+                                color = Color(0xFF94A3B8),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                         Slider(
@@ -5740,10 +5675,10 @@ private fun PlayerSettingsModal(
                             steps = 17,
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
-                                activeTrackColor = Color(0xFFE50914),
+                                activeTrackColor = Color(0x99FFFFFF),
                                 inactiveTrackColor = Color(0x28FFFFFF)
                             ),
-                            modifier = Modifier.fillMaxWidth().height(26.dp)
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(24.dp)
                         )
 
                         // Reset visual shaders button
@@ -5751,11 +5686,11 @@ private fun PlayerSettingsModal(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 4.dp)
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
                                     .height(38.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x24FFFFFF))
-                                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0x22FFFFFF))
+                                    .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(10.dp))
                                     .clickable {
                                         onVideoFiltersChange(VideoFiltersState())
                                     },
@@ -5774,12 +5709,14 @@ private fun PlayerSettingsModal(
                                     Text(
                                         text = "Reset visual shaders",
                                         color = Color.White,
-                                        fontSize = 12.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
                             }
                         }
+
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
             }
