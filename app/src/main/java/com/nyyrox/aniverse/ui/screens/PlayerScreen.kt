@@ -314,41 +314,53 @@ fun PlayerScreen(
             targetId = anime.id.toString()
         )
     }
-    val initialProv = ALL_PROVIDERS.firstOrNull { it.id == initialProviderId }
-        ?: vm.preferredServerId?.let { prefId -> ALL_PROVIDERS.firstOrNull { it.id == prefId } }
-        ?: com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders("sub", anime.id).first()
     val isAcdnMapped = remember(anime.id) {
         com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id)
     }
-    val safeInitialProv = if (!isAcdnMapped && (initialProv.id.contains("animesalt") || initialProv.id.contains("acdn"))) {
-        com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders("sub", anime.id).first()
-    } else {
-        initialProv
+    val initialIsDub = remember {
+        val prefs = context.getSharedPreferences("playback_settings", android.content.Context.MODE_PRIVATE)
+        prefs.getString("default_audio", "sub")?.contains("dub", ignoreCase = true) == true
     }
-    var currentProvider by remember(animeId, initialProviderId) { mutableStateOf(safeInitialProv) }
-    var selectedSourceMode by remember { mutableStateOf(if (initialProv.isDirectStream) "DIRECT" else "EMBED") }
-    var selectedCategory by remember {
+    var isDubSelected by remember { mutableStateOf(initialIsDub) }
+    var currentServerType by remember(anime.id, currentEpisode) { mutableStateOf<com.nyyrox.aniverse.data.extractor.ServerType?>(null) }
+    var currentProvider by remember(anime.id, currentEpisode) {
         mutableStateOf(
-            if (initialProv.isDirectStream) {
-                if (initialProv.isDub) "DUB" else "SUB"
+            if (isAcdnMapped) {
+                com.nyyrox.aniverse.data.Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true)
             } else {
-                if (initialProv.isMulti) "MULTI" else if (initialProv.isDub) "DUB" else "SUB"
+                com.nyyrox.aniverse.data.Provider("flixcloud-sub", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true)
             }
         )
     }
+
+    var directStreamResult by remember(currentEpisode, isDubSelected) {
+        mutableStateOf<com.nyyrox.aniverse.data.extractor.DirectStreamResult?>(null)
+    }
+    var isDirectStreamLoading by remember(currentEpisode, isDubSelected) {
+        mutableStateOf(false)
+    }
+    var directStreamFailed by remember(currentEpisode, isDubSelected) {
+        mutableStateOf(false)
+    }
+    var manualSelectedServer by remember(currentEpisode) {
+        mutableStateOf<com.nyyrox.aniverse.data.extractor.StreamServerOption?>(null)
+    }
+
+    var selectedSourceMode by remember { mutableStateOf("DIRECT") }
+    val selectedCategory = if (isDubSelected) "DUB" else "SUB"
     var isServerDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    var sniffedStreamUrl by remember(currentProvider.id, currentEpisode) { mutableStateOf<String?>(null) }
-    var sniffedStreamHeaders by remember(currentProvider.id, currentEpisode) { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var sniffedStreamSubs by remember(currentProvider.id, currentEpisode) { mutableStateOf<List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>>(emptyList()) }
-    var playInZenkaiPlayer by remember(currentProvider.id, currentEpisode) { mutableStateOf(false) }
-    var isSniffingStream by remember(currentProvider.id, currentEpisode) { mutableStateOf(false) }
+    var sniffedStreamUrl by remember(currentEpisode) { mutableStateOf<String?>(null) }
+    var sniffedStreamHeaders by remember(currentEpisode) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var sniffedStreamSubs by remember(currentEpisode) { mutableStateOf<List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>>(emptyList()) }
+    var playInZenkaiPlayer by remember(currentEpisode) { mutableStateOf(false) }
+    var isSniffingStream by remember(currentEpisode) { mutableStateOf(false) }
     var showDownloadSheetEpisode by remember { mutableStateOf<Pair<Int, String?>?>(null) }
     var showDownloadRangeSheet by remember { mutableStateOf<IntRange?>(null) }
 
-    // Dynamically query available direct servers for this anime & episode
-    var availableDirectServers by remember(anime.id, selectedCategory, currentEpisode) {
-        mutableStateOf(com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory, anime.id))
+    // Dynamically query available direct servers for download sheets
+    val availableDirectServers = remember(anime.id, isDubSelected) {
+        com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(if (isDubSelected) "dub" else "sub", anime.id)
     }
 
     // Dynamically track episode audio availability (SUB vs DUB)
@@ -370,17 +382,8 @@ fun PlayerScreen(
                 animeTitle = anime.title
             )
             audioAvailability = avail
-            // If current episode does not have DUB available, auto fallback to SUB
-            if (!avail.hasDub && selectedCategory == "DUB") {
-                selectedCategory = "SUB"
-                if (currentProvider.isDub || currentProvider.id.contains("dub", ignoreCase = true)) {
-                    val subProv = availableDirectServers.firstOrNull { !it.isDub && !it.isMulti }
-                        ?: ALL_PROVIDERS.firstOrNull { it.isEmbedOnly && !it.isDub && !it.isMulti }
-                    if (subProv != null) {
-                        currentProvider = subProv
-                        vm.setPreferredServer(subProv.id)
-                    }
-                }
+            if (!avail.hasDub && isDubSelected) {
+                isDubSelected = false
                 android.widget.Toast.makeText(
                     context,
                     "Dub is not available for Episode $currentEpisode. Switched to Sub.",
@@ -390,48 +393,29 @@ fun PlayerScreen(
         } catch (_: Exception) {}
     }
 
-    LaunchedEffect(anime.id, selectedCategory, currentEpisode) {
-        try {
-            val servers = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getAvailableDirectProviders(
-                anilistId = anime.id,
-                audioMode = selectedCategory,
-                episode = currentEpisode
-            )
-            val filtered = if (!isAcdnMapped) {
-                servers.filter { !it.id.contains("animesalt") && !it.id.contains("acdn") }
-            } else {
-                servers
-            }
-            if (filtered.isNotEmpty()) {
-                availableDirectServers = filtered
-                // If in DIRECT mode and current provider is not in the available list, smoothly select the first available
-                if (selectedSourceMode == "DIRECT" && filtered.none { it.id == currentProvider.id }) {
-                    currentProvider = filtered.first()
-                    vm.setPreferredServer(filtered.first().id)
-                }
-            } else {
-                availableDirectServers = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory, anime.id)
-            }
-        } catch (_: Exception) {}
-    }
-
     fun switchToNextServer() {
-        val currentList = if (selectedSourceMode == "DIRECT") {
-            availableDirectServers
-        } else {
-            when (selectedCategory) {
-                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnMapped || !it.id.contains("animesalt")) }
-                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-            }
+        val nextServer = when (currentServerType) {
+            com.nyyrox.aniverse.data.extractor.ServerType.ACDN -> com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD
+            com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD -> com.nyyrox.aniverse.data.extractor.ServerType.VIDSTREAM
+            com.nyyrox.aniverse.data.extractor.ServerType.VIDSTREAM -> com.nyyrox.aniverse.data.extractor.ServerType.MEGAPLAY
+            com.nyyrox.aniverse.data.extractor.ServerType.MEGAPLAY -> if (isAcdnMapped) com.nyyrox.aniverse.data.extractor.ServerType.ACDN else com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD
+            null -> com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD
         }
-        if (currentList.isEmpty()) return
-        val currentIndex = currentList.indexOfFirst { it.id == currentProvider.id }
-        val nextIndex = if (currentIndex >= 0) (currentIndex + 1) % currentList.size else 0
-        val nextProv = currentList[nextIndex]
-        if (nextProv.id != currentProvider.id) {
-            currentProvider = nextProv
-            vm.setPreferredServer(nextProv.id)
+        coroutineScope.launch {
+            try {
+                val priorityRes = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.resolvePriorityStream(
+                    anilistId = anime.id,
+                    episode = currentEpisode,
+                    isDub = isDubSelected,
+                    animeTitle = anime.title,
+                    preferredServer = nextServer
+                )
+                if (priorityRes != null) {
+                    currentServerType = priorityRes.serverType
+                    currentProvider = priorityRes.provider
+                    directStreamResult = priorityRes.result
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -533,42 +517,58 @@ fun PlayerScreen(
         }
     }
 
-    var directStreamResult by remember(currentProvider.id, currentEpisode) {
-        mutableStateOf<com.nyyrox.aniverse.data.extractor.DirectStreamResult?>(null)
-    }
-    var isDirectStreamLoading by remember(currentProvider.id, currentEpisode) {
-        mutableStateOf(false)
-    }
-    var directStreamFailed by remember(currentProvider.id, currentEpisode) {
-        mutableStateOf(false)
-    }
-    var manualSelectedServer by remember(currentProvider.id, currentEpisode) {
-        mutableStateOf<com.nyyrox.aniverse.data.extractor.StreamServerOption?>(null)
+
+
+    LaunchedEffect(anime.id, currentEpisode, isDubSelected) {
+        isDirectStreamLoading = true
+        directStreamFailed = false
+        try {
+            val priorityRes = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.resolvePriorityStream(
+                anilistId = anime.id,
+                episode = currentEpisode,
+                isDub = isDubSelected,
+                animeTitle = anime.title,
+                preferredServer = null
+            )
+            if (priorityRes != null) {
+                currentServerType = priorityRes.serverType
+                currentProvider = priorityRes.provider
+                directStreamResult = priorityRes.result
+                directStreamFailed = false
+            } else {
+                directStreamResult = null
+                directStreamFailed = true
+            }
+        } catch (_: Exception) {
+            directStreamFailed = true
+        } finally {
+            isDirectStreamLoading = false
+        }
     }
 
-    LaunchedEffect(currentProvider.id, currentEpisode) {
-        if (currentProvider.isDirectStream) {
+    val onSwitchAudioStream: (Boolean) -> Unit = { targetDub ->
+        isDubSelected = targetDub
+        coroutineScope.launch {
             isDirectStreamLoading = true
-            directStreamFailed = false
             try {
-                val res = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.resolveDirectStream(
+                val activeServer = currentServerType ?: com.nyyrox.aniverse.data.extractor.ServerType.VIDSTREAM
+                val priorityRes = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.resolvePriorityStream(
                     anilistId = anime.id,
                     episode = currentEpisode,
-                    providerId = currentProvider.id,
-                    isDub = currentProvider.isDub,
-                    animeTitle = anime.title
+                    isDub = targetDub,
+                    animeTitle = anime.title,
+                    preferredServer = activeServer
                 )
-                directStreamResult = res
-                directStreamFailed = (res == null)
+                if (priorityRes != null) {
+                    currentServerType = priorityRes.serverType
+                    currentProvider = priorityRes.provider
+                    directStreamResult = priorityRes.result
+                    directStreamFailed = false
+                }
             } catch (_: Exception) {
-                directStreamFailed = true
             } finally {
                 isDirectStreamLoading = false
             }
-        } else {
-            directStreamResult = null
-            directStreamFailed = false
-            isDirectStreamLoading = false
         }
     }
 
@@ -843,35 +843,15 @@ fun PlayerScreen(
     }
 
 
-    // ── Source / audio / Zenkai-player actions (shared by the Servers tab and the header) ──
+    // ── Source / audio / Zenkai-player actions ──
     fun selectSourceMode(modeKey: String) {
-        com.nyyrox.aniverse.util.AppHaptics.tick(context)
-        if (selectedSourceMode == modeKey) return
         selectedSourceMode = modeKey
-        if (modeKey == "DIRECT") {
-            vm.setPlayEmbed(false)
-            if (selectedCategory == "MULTI") selectedCategory = "SUB"
-            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedCategory)
-            availableDirectServers = nextDirect
-            val prov = nextDirect.first()
-            currentProvider = prov
-            vm.setPreferredServer(prov.id)
-        } else {
-            vm.setPlayEmbed(true)
-            val embedList = when (selectedCategory) {
-                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnMapped || !it.id.contains("animesalt")) }
-                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-            }
-            val prov = embedList.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-            currentProvider = prov
-            vm.setPreferredServer(prov.id)
-        }
     }
 
     fun selectCategory(catKey: String) {
         com.nyyrox.aniverse.util.AppHaptics.tick(context)
-        if (catKey == "DUB" && !audioAvailability.hasDub) {
+        val targetDub = catKey.equals("dub", ignoreCase = true)
+        if (targetDub && !audioAvailability.hasDub) {
             android.widget.Toast.makeText(
                 context,
                 "Dub is not available for Episode $currentEpisode",
@@ -879,24 +859,7 @@ fun PlayerScreen(
             ).show()
             return
         }
-        if (selectedCategory == catKey) return
-        selectedCategory = catKey
-        if (selectedSourceMode == "DIRECT") {
-            val nextDirect = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(catKey, anime.id)
-            availableDirectServers = nextDirect
-            val newProv = nextDirect.first()
-            currentProvider = newProv
-            vm.setPreferredServer(newProv.id)
-        } else {
-            val embedServers = when (catKey) {
-                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnMapped || !it.id.contains("animesalt")) }
-                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-            }
-            val newProv = embedServers.firstOrNull() ?: ALL_PROVIDERS.first { it.isEmbedOnly }
-            currentProvider = newProv
-            vm.setPreferredServer(newProv.id)
-        }
+        onSwitchAudioStream(targetDub)
     }
 
     fun toggleZenkaiPlayer() {
@@ -1216,13 +1179,42 @@ fun PlayerScreen(
                             }
                         },
                         onPlaybackFailed = {
-                            // User explicitly requested: do NOT auto switch servers
-                            android.util.Log.d("PlayerScreen", "Playback issue encountered; staying on selected server: ${currentProvider.name}")
+                            val nextServer = when (currentServerType) {
+                                com.nyyrox.aniverse.data.extractor.ServerType.ACDN -> com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD
+                                com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD -> com.nyyrox.aniverse.data.extractor.ServerType.VIDSTREAM
+                                com.nyyrox.aniverse.data.extractor.ServerType.VIDSTREAM -> com.nyyrox.aniverse.data.extractor.ServerType.MEGAPLAY
+                                com.nyyrox.aniverse.data.extractor.ServerType.MEGAPLAY -> null
+                                null -> null
+                            }
+                            if (nextServer != null) {
+                                coroutineScope.launch {
+                                    isDirectStreamLoading = true
+                                    try {
+                                        val fallback = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.resolvePriorityStream(
+                                            anilistId = anime.id,
+                                            episode = currentEpisode,
+                                            isDub = isDubSelected,
+                                            animeTitle = anime.title,
+                                            preferredServer = nextServer
+                                        )
+                                        if (fallback != null) {
+                                            currentServerType = fallback.serverType
+                                            currentProvider = fallback.provider
+                                            directStreamResult = fallback.result
+                                            directStreamFailed = false
+                                        }
+                                    } catch (_: Exception) {
+                                    } finally {
+                                        isDirectStreamLoading = false
+                                    }
+                                }
+                            }
                         },
-                        availableServers = directStreamResult?.availableServers ?: emptyList(),
-                        onSelectServer = { srv ->
-                            manualSelectedServer = srv
-                        }
+                        availableServers = emptyList(),
+                        onSelectServer = null,
+                        serverName = currentProvider.name,
+                        hasDubAvailable = audioAvailability.hasDub,
+                        onSwitchAudioStream = onSwitchAudioStream
                     )
                 }
             }
@@ -1364,183 +1356,32 @@ fun PlayerScreen(
                         }
                     }
 
-                    // ───────── Servers: one toggle, one row of chips ─────────
-                    item(key = "servers_card") {
-                        val isAcdnSupported = isAcdnMapped
-                        val hasDub = audioAvailability.hasDub
-
-                        val servers = if (isDirect) {
-                            when (selectedCategory) {
-                                "DUB" -> availableDirectServers.filter { (it.isDub || it.isMulti) && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                "MULTI" -> availableDirectServers.filter { it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
-                            }.ifEmpty { availableDirectServers.filter { isAcdnSupported || !it.id.contains("animesalt") } }
-                        } else {
-                            when (selectedCategory) {
-                                "DUB" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isDub && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                "MULTI" -> ALL_PROVIDERS.filter { it.isEmbedOnly && it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
-                                else -> ALL_PROVIDERS.filter { it.isEmbedOnly && !it.isDub && !it.isMulti && (isAcdnSupported || !it.id.contains("animesalt")) }
-                            }
-                        }
-                        val audioKeys = if (isDirect) {
-                            listOf("SUB", "DUB")
-                        } else {
-                            listOf("SUB", "DUB", "MULTI")
-                        }
-                        val disabledKeys = if (!hasDub) setOf("DUB") else emptySet()
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 32.dp)
-                        ) {
-                            // SUB | DUB (| MULTI): full-width, translucent & disabled when DUB is unavailable
-                            MonochromeSegmentedControl(
-                                labels = audioKeys,
-                                selectedIndex = audioKeys.indexOf(selectedCategory).coerceAtLeast(0),
-                                onSelected = { selectCategory(audioKeys[it]) },
-                                disabledLabels = disabledKeys,
-                                onDisabledClick = { label ->
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        "$label is not available for Episode $currentEpisode",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                },
-                                isDark = isDark,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp),
-                                height = 44.dp
-                            )
-
-                            Spacer(Modifier.height(16.dp))
-
-                            // Label + source switch (Direct HD / Embed)
+                    if (isPlayingOffline) {
+                        item(key = "offline_banner") {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp),
+                                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(playerSurface)
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(16.dp))
+                                    Text("Playing offline copy", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = playerTextPrimary)
+                                }
                                 Text(
-                                    text = "Servers",
+                                    text = "Switch to online",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = playerTextMuted
+                                    color = playerTextPrimary,
+                                    modifier = Modifier.clickable { playOfflineMode = false }
                                 )
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { selectSourceMode(if (isDirect) "EMBED" else "DIRECT") }
-                                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = if (isDirect) "Direct HD" else "Embed",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = playerTextPrimary
-                                    )
-                                    Icon(
-                                        Icons.Default.SwapHoriz,
-                                        contentDescription = "Switch source",
-                                        tint = playerTextMuted,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.height(8.dp))
-
-                            if (servers.isEmpty()) {
-                                Text(
-                                    text = "No servers available for this audio category.",
-                                    fontSize = 13.sp,
-                                    color = playerTextMuted,
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                                )
-                            } else {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 20.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    items(servers, key = { it.id }) { prov ->
-                                        val isSelected = prov.id == currentProvider.id
-                                        val badgeText = prov.serverBadge.replace("Direct HD", "HD").replace("Direct", "HD")
-
-                                        Row(
-                                            modifier = Modifier
-                                                .height(40.dp)
-                                                .clip(RoundedCornerShape(20.dp))
-                                                .background(if (isSelected) playerActiveBg else playerSurfaceElevated)
-                                                .clickable {
-                                                    com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                                    currentProvider = prov
-                                                    vm.setPreferredServer(prov.id)
-                                                }
-                                                .padding(horizontal = 16.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            if (isSelected) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(6.dp)
-                                                        .clip(CircleShape)
-                                                        .background(playerAccent)
-                                                )
-                                            }
-                                            Text(
-                                                text = prov.name,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                color = if (isSelected) playerActiveContent else playerTextPrimary,
-                                                maxLines = 1
-                                            )
-                                            if (badgeText.isNotBlank()) {
-                                                Text(
-                                                    text = badgeText,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = if (isSelected) playerActiveContent.copy(alpha = 0.6f) else playerTextMuted
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (isPlayingOffline) {
-                                Spacer(Modifier.height(16.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 20.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(playerSurface)
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = playerTextPrimary, modifier = Modifier.size(16.dp))
-                                        Text("Playing offline copy", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = playerTextPrimary)
-                                    }
-                                    Text(
-                                        text = "Switch to online",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = playerTextPrimary,
-                                        modifier = Modifier.clickable { playOfflineMode = false }
-                                    )
-                                }
                             }
                         }
                     }

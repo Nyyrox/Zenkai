@@ -44,6 +44,19 @@ data class EpisodeAudioAvailability(
     val hasAcdn: Boolean = false
 )
 
+enum class ServerType {
+    ACDN,
+    FLIXCLOUD,
+    VIDSTREAM,
+    MEGAPLAY
+}
+
+data class PriorityStreamResult(
+    val serverType: ServerType,
+    val provider: Provider,
+    val result: DirectStreamResult
+)
+
 object DirectStreamResolver {
     private val audioAvailabilityCache = ConcurrentHashMap<String, EpisodeAudioAvailability>()
     private val ANIVEXA_WORKER_BASE: String
@@ -342,11 +355,8 @@ object DirectStreamResolver {
                     ?: AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "vidstream")
             }
             isFlixCloud -> {
-                // FlixCloud: Direct HLS or ReAnime Flix API (with fallback to MegaPlay/Vidstream)
+                // FlixCloud: Genuine Direct HLS via ReAnime Flix API (multi-audio: native + english-2)
                 ReAnimeResolver.resolveStream(anilistId, episode, audio, animeTitle, preferredServer = "FlixCloud")
-                    ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, audio, server = "bcdn")
-                    ?: AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "bcdn")
-                    ?: AnikotoResolver.resolveStream(anilistId, episode, audio, animeTitle, server = "vidstream")
             }
             else -> {
                 // Default fallback
@@ -380,6 +390,113 @@ object DirectStreamResolver {
             directStreamCache[cacheKey] = taggedResult
         }
         taggedResult
+    }
+
+    /**
+     * Priority order stream resolver:
+     * 1st: ACDN (if anime mapping json has the anime mapped, then try that; else fallback to FlixCloud)
+     * 2nd: FlixCloud (if not available on acdn / not in mapping json, switch to FlixCloud)
+     * 3rd: VidStream (if not available on FlixCloud, switch to Vidstream)
+     * 4th: MegaPlay (then on MegaPlay)
+     */
+    suspend fun resolvePriorityStream(
+        anilistId: Int,
+        episode: Int,
+        isDub: Boolean = false,
+        animeTitle: String = "",
+        preferredServer: ServerType? = null
+    ): PriorityStreamResult? = withContext(Dispatchers.IO) {
+        val targetAudio = if (isDub) "dub" else "sub"
+        val isMapped = anilistId > 0 && AnimeMappingRepository.isMapped(anilistId)
+
+        // When a specific server is targeted (e.g. switching audio between sub and dub on VidStream or MegaPlay)
+        if (preferredServer != null) {
+            when (preferredServer) {
+                ServerType.ACDN -> {
+                    if (isMapped) {
+                        val acdn = resolveAnimeSaltDirect(anilistId, episode, animeTitle)
+                        if (acdn != null && acdn.streamUrl.isNotBlank()) {
+                            val prov = Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true)
+                            return@withContext PriorityStreamResult(ServerType.ACDN, prov, acdn)
+                        }
+                    }
+                }
+                ServerType.FLIXCLOUD -> {
+                    val flix = ReAnimeResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, preferredServer = "FlixCloud")
+                    if (flix != null && flix.streamUrl.isNotBlank()) {
+                        val prov = Provider("flixcloud-$targetAudio", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true)
+                        return@withContext PriorityStreamResult(ServerType.FLIXCLOUD, prov, flix)
+                    }
+                }
+                ServerType.VIDSTREAM -> {
+                    val vid = AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, server = "vidstream")
+                        ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, targetAudio, server = "vidstream")
+                    if (vid != null && vid.streamUrl.isNotBlank()) {
+                        val prov = Provider("vidstream-direct-$targetAudio", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true)
+                        return@withContext PriorityStreamResult(ServerType.VIDSTREAM, prov, vid)
+                    }
+                }
+                ServerType.MEGAPLAY -> {
+                    val mega = AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, server = "bcdn")
+                        ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, targetAudio, server = "bcdn")
+                    if (mega != null && mega.streamUrl.isNotBlank()) {
+                        val prov = Provider("megaplay-direct-$targetAudio", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true)
+                        return@withContext PriorityStreamResult(ServerType.MEGAPLAY, prov, mega)
+                    }
+                }
+            }
+        }
+
+        // 1st: ACDN (if anime mapping json has the anime mapped, then try that; else fallback to FlixCloud)
+        if (isMapped) {
+            try {
+                val acdn = resolveAnimeSaltDirect(anilistId, episode, animeTitle)
+                if (acdn != null && acdn.streamUrl.isNotBlank()) {
+                    val prov = Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true)
+                    return@withContext PriorityStreamResult(ServerType.ACDN, prov, acdn)
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 2nd: FlixCloud (if not available on acdn / not in mapping json, switch to FlixCloud)
+        try {
+            val flix = ReAnimeResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, preferredServer = "FlixCloud")
+                ?: if (isDub) ReAnimeResolver.resolveStream(anilistId, episode, "sub", animeTitle, preferredServer = "FlixCloud") else null
+            if (flix != null && flix.streamUrl.isNotBlank()) {
+                val prov = Provider("flixcloud-$targetAudio", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true)
+                return@withContext PriorityStreamResult(ServerType.FLIXCLOUD, prov, flix)
+            }
+        } catch (_: Exception) {}
+
+        // 3rd: VidStream (if not available on FlixCloud, switch to Vidstream)
+        try {
+            val vid = AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, server = "vidstream")
+                ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, targetAudio, server = "vidstream")
+                ?: if (isDub) {
+                    AnikotoResolver.resolveStream(anilistId, episode, "sub", animeTitle, server = "vidstream")
+                        ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, "sub", server = "vidstream")
+                } else null
+            if (vid != null && vid.streamUrl.isNotBlank()) {
+                val prov = Provider("vidstream-direct-$targetAudio", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true)
+                return@withContext PriorityStreamResult(ServerType.VIDSTREAM, prov, vid)
+            }
+        } catch (_: Exception) {}
+
+        // 4th: MegaPlay (then on MegaPlay)
+        try {
+            val mega = AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, server = "bcdn")
+                ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, targetAudio, server = "bcdn")
+                ?: if (isDub) {
+                    AnikotoResolver.resolveStream(anilistId, episode, "sub", animeTitle, server = "bcdn")
+                        ?: AnikotoResolver.resolveDirectMegaPlayWithServer(anilistId, episode, "sub", server = "bcdn")
+                } else null
+            if (mega != null && mega.streamUrl.isNotBlank()) {
+                val prov = Provider("megaplay-direct-$targetAudio", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true)
+                return@withContext PriorityStreamResult(ServerType.MEGAPLAY, prov, mega)
+            }
+        } catch (_: Exception) {}
+
+        null
     }
 
     private suspend fun resolveAnimeSaltDirect(

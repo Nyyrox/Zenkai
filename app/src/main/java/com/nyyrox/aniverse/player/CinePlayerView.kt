@@ -280,8 +280,8 @@ private fun formatAudioTrackLabel(format: androidx.media3.common.Format, index: 
 
     val langCode = when {
         rawLang.isNotBlank() && rawLang != "und" -> rawLang
-        rawId.contains("jpn") || rawId.contains("ja") || (!rawLabel.isNullOrBlank() && rawLabel.contains("jap", ignoreCase = true)) -> "ja"
-        rawId.contains("eng") || rawId.contains("en") || (!rawLabel.isNullOrBlank() && rawLabel.contains("eng", ignoreCase = true)) -> "en"
+        rawId.contains("jpn") || rawId.contains("ja") || (!rawLabel.isNullOrBlank() && (rawLabel.contains("jap", ignoreCase = true) || rawLabel.contains("native", ignoreCase = true))) -> "ja"
+        rawId.contains("eng") || rawId.contains("en") || (!rawLabel.isNullOrBlank() && (rawLabel.contains("eng", ignoreCase = true) || rawLabel.contains("dub", ignoreCase = true))) -> "en"
         rawId.contains("hin") || rawId.contains("hi") || (!rawLabel.isNullOrBlank() && rawLabel.contains("hin", ignoreCase = true)) -> "hi"
         rawId.contains("tam") || rawId.contains("ta") || (!rawLabel.isNullOrBlank() && rawLabel.contains("tam", ignoreCase = true)) -> "ta"
         rawId.contains("tel") || rawId.contains("te") || (!rawLabel.isNullOrBlank() && rawLabel.contains("tel", ignoreCase = true)) -> "te"
@@ -332,6 +332,8 @@ private fun formatAudioTrackLabel(format: androidx.media3.common.Format, index: 
     }
 
     val baseTitle = when {
+        !rawLabel.isNullOrBlank() && rawLabel.contains("native", ignoreCase = true) -> "Japanese (Native)"
+        !rawLabel.isNullOrBlank() && (rawLabel.contains("english-2", ignoreCase = true) || rawLabel.equals("english", ignoreCase = true)) -> "English (Dub)"
         !isGenericLabel -> rawLabel!!
         languageName.isNotBlank() -> languageName
         else -> "Audio Track ${index + 1}"
@@ -569,7 +571,10 @@ fun CinePlayerView(
     onProgressUpdate: (currentMs: Long, durationMs: Long) -> Unit = { _, _ -> },
     onPlaybackFailed: () -> Unit = {},
     availableServers: List<StreamServerOption> = emptyList(),
-    onSelectServer: ((StreamServerOption) -> Unit)? = null
+    onSelectServer: ((StreamServerOption) -> Unit)? = null,
+    serverName: String = "",
+    hasDubAvailable: Boolean = true,
+    onSwitchAudioStream: ((Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -3616,7 +3621,11 @@ fun CinePlayerView(
             currentStreamUrl = streamUrl,
             onSelectServer = { srv ->
                 onSelectServer?.invoke(srv)
-            }
+            },
+            serverName = serverName,
+            isDub = isDub,
+            hasDubAvailable = hasDubAvailable,
+            onSwitchAudioStream = onSwitchAudioStream
         )
     }
 
@@ -5220,6 +5229,10 @@ private fun PlayerSettingsModal(
     availableServers: List<StreamServerOption> = emptyList(),
     currentStreamUrl: String = "",
     onSelectServer: (StreamServerOption) -> Unit = {},
+    serverName: String = "",
+    isDub: Boolean = false,
+    hasDubAvailable: Boolean = true,
+    onSwitchAudioStream: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     GlassDialog(
@@ -5266,12 +5279,19 @@ private fun PlayerSettingsModal(
                             }
                         }
 
-                        // Audio (multi-audio)
-                        if (audioTracks.isNotEmpty()) {
+                        // Audio (multi-audio or single-audio stream)
+                        val isSingleAudioServer = serverName.contains("vidstream", ignoreCase = true) ||
+                                serverName.contains("megaplay", ignoreCase = true)
+                        if (audioTracks.isNotEmpty() || isSingleAudioServer) {
+                            val audioSubtitle = if (isSingleAudioServer) {
+                                if (isDub) "English (Dub)" else "Japanese (Sub)"
+                            } else {
+                                audioTracks.find { it.isSelected }?.label ?: "${audioTracks.size} Available"
+                            }
                             SettingsItemRow(
                                 icon = Icons.Outlined.GraphicEq,
                                 title = "Audio",
-                                subtitle = audioTracks.find { it.isSelected }?.label ?: "${audioTracks.size} Available",
+                                subtitle = audioSubtitle,
                                 onClick = { onTabChange(PlayerSettingsTab.AUDIO) }
                             )
                         }
@@ -5715,7 +5735,55 @@ private fun PlayerSettingsModal(
                         SubHeader(title = "Audio Track", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
                         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
 
-                        if (audioTracks.isEmpty()) {
+                        val isSingleAudioServer = serverName.contains("vidstream", ignoreCase = true) ||
+                                serverName.contains("megaplay", ignoreCase = true)
+
+                        if (isSingleAudioServer) {
+                            // Vidstream and MegaPlay: single audio output per stream; switch stream when chosen
+                            val audioOptions = listOf(
+                                Pair(false, "Japanese (Sub)"),
+                                Pair(true, "English (Dub)")
+                            )
+                            audioOptions.forEach { (dubOpt, label) ->
+                                val isSelected = (isDub == dubOpt)
+                                val isAvailable = !dubOpt || hasDubAvailable
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .clickable(enabled = isAvailable) {
+                                            if (!isSelected && isAvailable) {
+                                                onSwitchAudioStream?.invoke(dubOpt)
+                                                onDismiss()
+                                            }
+                                        }
+                                        .padding(vertical = 12.dp, horizontal = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = label,
+                                            color = if (!isAvailable) OttSecondary.copy(alpha = 0.4f) else if (isSelected) OttPrimary else Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        if (!isAvailable) {
+                                            Text(
+                                                text = "Unavailable for this episode",
+                                                color = OttSecondary.copy(alpha = 0.4f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        } else if (audioTracks.isEmpty()) {
                             Text(
                                 text = "Native Stream Audio (Default)",
                                 color = OttSecondary,

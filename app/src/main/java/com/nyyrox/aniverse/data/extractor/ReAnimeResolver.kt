@@ -51,27 +51,9 @@ object ReAnimeResolver {
             return@withContext cached
         }
 
-        // Tier 1: Fast & Verified Direct HLS Extraction (MegaPlay / Vidstream)
+        // Tier 1: Client-Side Re:Anime Flix API + EncDec Decryption (Genuine FlixCloud with native + english-2 audio)
         try {
-            val fallback = AnikotoResolver.resolveDirectMegaPlayWithServer(
-                anilistId, episode, targetAudio, "bcdn"
-            ) ?: AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, "bcdn")
-              ?: AnikotoResolver.resolveStream(anilistId, episode, targetAudio, animeTitle, "vidstream")
-
-            if (fallback != null && fallback.audio.equals(targetAudio, ignoreCase = true)) {
-                val reanimeTagged = fallback.copy(
-                    serverId = "flixcloud-$targetAudio",
-                    serverName = "FlixCloud",
-                    audio = targetAudio
-                )
-                streamCache[cacheKey] = reanimeTagged
-                return@withContext reanimeTagged
-            }
-        } catch (_: Exception) {}
-
-        // Tier 2: Client-Side Re:Anime Flix API + EncDec Decryption
-        try {
-            val reanimeStream = withTimeoutOrNull(6000L) {
+            val reanimeStream = withTimeoutOrNull(8000L) {
                 resolveReanimeFlix(anilistId, episode, targetAudio, preferredServer)
             }
             if (reanimeStream != null && !reanimeStream.streamUrl.contains("slopnet")) {
@@ -122,7 +104,6 @@ object ReAnimeResolver {
             }
 
             if (matchingServers.isEmpty()) {
-                if (audio == "dub") return@withContext null
                 servers.optJSONObject(0)?.let { matchingServers.add(it) }
             }
 
