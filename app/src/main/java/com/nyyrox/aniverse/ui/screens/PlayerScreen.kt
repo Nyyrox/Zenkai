@@ -1195,9 +1195,67 @@ fun PlayerScreen(
                                 }
                             }
                         },
-                        availableServers = emptyList(),
-                        onSelectServer = null,
-                        serverName = currentProvider.name,
+                        availableServers = remember(directStreamResult, availableDirectServers) {
+                            val fromDirect = directStreamResult?.availableServers.orEmpty()
+                            if (fromDirect.isNotEmpty()) {
+                                fromDirect
+                            } else {
+                                availableDirectServers.map { prov ->
+                                    com.nyyrox.aniverse.data.extractor.StreamServerOption(
+                                        serverId = prov.id,
+                                        serverName = prov.name,
+                                        streamUrl = "",
+                                        isHls = prov.isDirectStream
+                                    )
+                                }
+                            }
+                        },
+                        onSelectServer = { selectedOpt ->
+                            coroutineScope.launch {
+                                val targetProvider = ALL_PROVIDERS.find {
+                                    it.id == selectedOpt.serverId || it.name.equals(selectedOpt.serverName, ignoreCase = true)
+                                }
+                                if (targetProvider != null) {
+                                    currentProvider = targetProvider
+                                    vm.setPreferredServer(targetProvider.id)
+                                    val serverType = when {
+                                        targetProvider.id.contains("acdn", ignoreCase = true) -> com.nyyrox.aniverse.data.extractor.ServerType.ACDN
+                                        targetProvider.id.contains("flixcloud", ignoreCase = true) -> com.nyyrox.aniverse.data.extractor.ServerType.FLIXCLOUD
+                                        targetProvider.id.contains("vidstream", ignoreCase = true) -> com.nyyrox.aniverse.data.extractor.ServerType.VIDSTREAM
+                                        targetProvider.id.contains("megaplay", ignoreCase = true) -> com.nyyrox.aniverse.data.extractor.ServerType.MEGAPLAY
+                                        else -> null
+                                    }
+                                    isDirectStreamLoading = true
+                                    try {
+                                        val res = com.nyyrox.aniverse.data.extractor.DirectStreamResolver.resolvePriorityStream(
+                                            anilistId = anime.id,
+                                            episode = currentEpisode,
+                                            isDub = isDubSelected,
+                                            animeTitle = anime.title,
+                                            preferredServer = serverType
+                                        )
+                                        if (res != null) {
+                                            currentServerType = res.serverType
+                                            currentProvider = res.provider
+                                            directStreamResult = res.result
+                                            directStreamFailed = false
+                                        }
+                                    } catch (_: Exception) {
+                                    } finally {
+                                        isDirectStreamLoading = false
+                                    }
+                                } else if (selectedOpt.streamUrl.isNotBlank()) {
+                                    directStreamResult = directStreamResult?.copy(
+                                        serverId = selectedOpt.serverId,
+                                        serverName = selectedOpt.serverName,
+                                        streamUrl = selectedOpt.streamUrl,
+                                        isHls = selectedOpt.isHls,
+                                        headers = selectedOpt.headers
+                                    )
+                                }
+                            }
+                        },
+                        serverName = directStreamResult?.serverName?.ifBlank { currentProvider.name } ?: currentProvider.name,
                         hasDubAvailable = audioAvailability.hasDub,
                         onSwitchAudioStream = onSwitchAudioStream
                     )

@@ -1872,13 +1872,71 @@ data class Anime4KModeItem(
 )
 
 val ANIME4K_MODES: List<Anime4KModeItem> = listOf(
-    Anime4KModeItem("modeA", "Mode A", "Balanced restoration & 2x upscale (Best for 720p/1080p anime)"),
-    Anime4KModeItem("modeB", "Mode B", "Soft restoration (Reduces compression ringing & artifacts)"),
-    Anime4KModeItem("modeC", "Mode C", "Sharp outlines & high detail for crisp modern animation"),
-    Anime4KModeItem("modeAA", "Mode AA", "Double-pass ultra restoration for maximum clean detail"),
-    Anime4KModeItem("denoise", "Denoise", "Artifact removal & debanding + 2x CNN upscale"),
-    Anime4KModeItem("fast", "Fast CNN", "Lightweight 2x neural net (low battery / integrated GPU)")
+    Anime4KModeItem("ultra4k", "4K Ultra Clarity", "RCAS + Line Reconstruction (Best visual clarity)"),
+    Anime4KModeItem("modeA", "Anime4K Balanced", "Optimal edge restoration & clarity for 720p/1080p"),
+    Anime4KModeItem("modeC", "Crisp Outlines", "Sharp dark line-art enhancement for modern anime"),
+    Anime4KModeItem("modeB", "Soft Restoration", "Reduces compression ringing & aliasing artifacts"),
+    Anime4KModeItem("fast", "Performance (Eco)", "Lightweight contrast-adaptive sharpening (Low battery)")
 )
+
+private const val CAS_AGSL = """
+    uniform shader content;
+    uniform float2 size;
+    uniform float sharpness;
+    uniform float brightness;
+    uniform float contrast;
+    uniform float saturation;
+    uniform float sepia;
+
+    half4 main(float2 coord) {
+        half4 center = content.eval(coord);
+        half3 rgb = center.rgb;
+
+        if (sharpness > 0.001) {
+            half4 n = content.eval(coord + float2(0.0, -1.0));
+            half4 s = content.eval(coord + float2(0.0, 1.0));
+            half4 e = content.eval(coord + float2(1.0, 0.0));
+            half4 w = content.eval(coord + float2(-1.0, 0.0));
+
+            half3 minRGB = min(min(min(n.rgb, s.rgb), min(e.rgb, w.rgb)), rgb);
+            half3 maxRGB = max(max(max(n.rgb, s.rgb), max(e.rgb, w.rgb)), rgb);
+
+            half3 ampRGB = clamp(min(minRGB, 1.0 - maxRGB) / (maxRGB + 0.0001), 0.0, 1.0);
+            half3 wRGB = sqrt(ampRGB) * (-0.14 * sharpness);
+
+            half3 sumNeighbors = n.rgb + s.rgb + e.rgb + w.rgb;
+            rgb = (rgb + sumNeighbors * wRGB) / (half3(1.0) + half3(4.0) * wRGB);
+            rgb = clamp(rgb, minRGB, maxRGB);
+        }
+
+        if (contrast != 1.0) {
+            rgb = (rgb - half3(0.5)) * contrast + half3(0.5);
+        }
+
+        if (brightness != 1.0) {
+            rgb = rgb * brightness;
+        }
+
+        if (saturation != 1.0) {
+            half luma = dot(rgb, half3(0.2126, 0.7152, 0.0722));
+            rgb = mix(half3(luma), rgb, saturation);
+        }
+
+        if (sepia > 0.001) {
+            half3 sepiaCol = half3(
+                dot(rgb, half3(0.393, 0.769, 0.189)),
+                dot(rgb, half3(0.349, 0.686, 0.168)),
+                dot(rgb, half3(0.272, 0.534, 0.131))
+            );
+            rgb = mix(rgb, sepiaCol, sepia);
+        }
+
+        return half4(clamp(rgb, 0.0, 1.0), center.a);
+    }
+"""
+
+@Volatile
+private var cachedCasShader: Any? = null
 
 data class VideoFilterPresetItem(
     val id: String,
@@ -1987,18 +2045,86 @@ fun applyVideoEffects(
     if (playerView == null) return
     val tv = (playerView.videoSurfaceView as? TextureView) ?: findTextureView(playerView) ?: return
 
-    // Ensure TextureView hardware buffer is fully opaque for optimum GPU rendering
     tv.isOpaque = true
+
+    val isFilterDefault = vfx.isDefault
+    val isUpscalerActive = upscaler.enabled && upscaler.intensity > 0
+
+    if (!isUpscalerActive && isFilterDefault) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            tv.setRenderEffect(null)
+        }
+        tv.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        tv.invalidate()
+        return
+    }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        try {
+            var shader = cachedCasShader as? android.graphics.RuntimeShader
+            if (shader == null) {
+                shader = android.graphics.RuntimeShader(CAS_AGSL)
+                cachedCasShader = shader
+            }
+
+            val baseSharpness = when (upscaler.mode) {
+                "ultra4k" -> 1.15f
+                "modeC" -> 0.95f
+                "modeA" -> 0.80f
+                "modeB" -> 0.50f
+                "fast" -> 0.38f
+                else -> 0.80f
+            }
+            val effSharpness = if (isUpscalerActive) baseSharpness * (upscaler.intensity / 100f) else 0f
+
+            var baseBri = 1.0f
+            var baseCon = 1.0f
+            var baseSat = 1.0f
+            var sepiaVal = 0.0f
+            when (vfx.preset) {
+                "vibrant" -> { baseSat = 1.25f; baseCon = 1.05f; baseBri = 1.02f }
+                "cinema" -> { baseCon = 1.12f; baseSat = 1.08f; baseBri = 0.98f }
+                "sharp" -> { baseCon = 1.10f; baseBri = 1.02f }
+                "warm" -> { sepiaVal = 0.18f; baseSat = 1.05f; baseBri = 0.98f }
+            }
+            val finBri = baseBri * (vfx.brightness / 100f)
+            val finCon = baseCon * (vfx.contrast / 100f)
+            val finSat = baseSat * (vfx.saturation / 100f)
+
+            val w = tv.width.toFloat().coerceAtLeast(1f)
+            val h = tv.height.toFloat().coerceAtLeast(1f)
+
+            shader.setFloatUniform("size", w, h)
+            shader.setFloatUniform("sharpness", effSharpness)
+            shader.setFloatUniform("brightness", finBri)
+            shader.setFloatUniform("contrast", finCon)
+            shader.setFloatUniform("saturation", finSat)
+            shader.setFloatUniform("sepia", sepiaVal)
+
+            val renderEffect = android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "content")
+            tv.setRenderEffect(renderEffect)
+            tv.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            tv.invalidate()
+            return
+        } catch (_: Exception) {}
+    }
 
     val matrix = computeVideoFilterColorMatrix(vfx, upscaler)
     if (matrix == null) {
-        // Zero color-filter overhead: native decode bit-perfect stream
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            tv.setRenderEffect(null)
+        }
         tv.setLayerType(View.LAYER_TYPE_HARDWARE, null)
     } else {
-        val paint = Paint().apply {
-            colorFilter = ColorMatrixColorFilter(matrix)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val colorFilter = ColorMatrixColorFilter(matrix)
+            tv.setRenderEffect(android.graphics.RenderEffect.createColorFilterEffect(colorFilter))
+        } else {
+            val paint = Paint().apply {
+                colorFilter = ColorMatrixColorFilter(matrix)
+            }
+            tv.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
         }
-        tv.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
     }
     tv.invalidate()
 }

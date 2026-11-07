@@ -4411,13 +4411,15 @@ private fun PlayerSettingsModal(
     onUpscalerChange: (UpscalerState) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var isAutoServer by remember { mutableStateOf(true) }
+
     GlassDialog(
         anchor = anchor,
         onDismiss = onDismiss
     ) {
         Box(
             modifier = modifier
-                .widthIn(max = 330.dp)
+                .widthIn(max = 340.dp)
                 .wrapContentHeight()
                 .glassPanel()
                 .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -4455,31 +4457,38 @@ private fun PlayerSettingsModal(
                             }
                         }
 
-                        // Audio (multi-audio or single-audio stream)
-                        val isSingleAudioServer = serverName.contains("vidstream", ignoreCase = true) ||
-                                serverName.contains("megaplay", ignoreCase = true)
-                        if (audioTracks.isNotEmpty() || isSingleAudioServer) {
-                            val audioSubtitle = if (isSingleAudioServer) {
-                                if (isDub) "English (Dub)" else "Japanese (Sub)"
-                            } else {
-                                audioTracks.find { it.isSelected }?.label ?: "${audioTracks.size} Available"
-                            }
+                        // 1. Server & Audio Track (Always visible in CinePlayer)
+                        val serverSubtitle = if (isAutoServer) {
+                            if (serverName.isNotBlank()) "Auto ($serverName)" else "Auto (Best)"
+                        } else {
+                            serverName.ifBlank { "Manual" }
+                        }
+                        SettingsItemRow(
+                            icon = Icons.Default.Dns,
+                            title = "Server & Audio",
+                            subtitle = serverSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.SERVER) }
+                        )
+
+                        // 2. Audio Track details (if multi audio available)
+                        if (audioTracks.size > 1) {
+                            val activeAudio = audioTracks.find { it.isSelected }?.label ?: "${audioTracks.size} Available"
                             SettingsItemRow(
                                 icon = Icons.Outlined.GraphicEq,
-                                title = "Audio",
-                                subtitle = audioSubtitle,
+                                title = "Audio Track",
+                                subtitle = activeAudio,
                                 onClick = { onTabChange(PlayerSettingsTab.AUDIO) }
                             )
                         }
 
-                        // Captions
+                        // 3. Captions
                         SettingsItemRow(
                             icon = Icons.Outlined.Subtitles,
                             title = "Captions",
                             onClick = onOpenCaptions
                         )
 
-                        // Playback speed
+                        // 4. Playback Speed
                         SettingsItemRow(
                             icon = Icons.Outlined.Speed,
                             title = "Playback Speed",
@@ -4487,7 +4496,7 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.SPEED) }
                         )
 
-                        // Aspect Ratio / Video Fit
+                        // 5. Aspect Ratio / Video Fit
                         val fitSubtitle = when (resizeMode) {
                             AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Crop to Fill / Zoom"
                             AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Stretch"
@@ -4500,46 +4509,35 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.ORIENTATION) }
                         )
 
-                        // AI 4K Upscaler (Anime4K)
+                        // 6. AI Upscaler (Clean standard row, subtitle shows mode)
                         val upscalerSubtitle = if (upscalerSettings.enabled) {
                             val m = ANIME4K_MODES.find { it.id == upscalerSettings.mode }?.label ?: "Mode A"
-                            "ON · $m (${upscalerSettings.intensity}%)"
+                            "4K · $m"
                         } else {
                             "Off"
                         }
                         SettingsItemRow(
                             icon = Icons.Default.AutoAwesome,
-                            title = "AI 4K Upscaler (Anime4K)",
+                            title = "AI Upscaler",
                             subtitle = upscalerSubtitle,
                             onClick = { onTabChange(PlayerSettingsTab.UPSCALER) }
                         )
 
-                        // Visual Enhancements & Shaders
+                        // 7. Visual Enhancements & Shaders
                         val vfxSubtitle = if (!videoFilters.isDefault) {
                             val pName = VIDEO_FILTER_PRESETS.find { it.id == videoFilters.preset }?.label ?: "Custom"
-                            "$pName (B:${videoFilters.brightness}%, C:${videoFilters.contrast}%, S:${videoFilters.saturation}%)"
+                            pName
                         } else {
                             "Default"
                         }
                         SettingsItemRow(
                             icon = Icons.Default.Tune,
-                            title = "Visual Enhancements & Shaders",
+                            title = "Visual Enhancements",
                             subtitle = vfxSubtitle,
                             onClick = { onTabChange(PlayerSettingsTab.PICTURE) }
                         )
 
-                        // Server (only when there is a choice)
-                        if (availableServers.size > 1) {
-                            val activeSrv = availableServers.find { it.streamUrl == currentStreamUrl } ?: availableServers.firstOrNull()
-                            SettingsItemRow(
-                                icon = Icons.Default.Dns,
-                                title = "Server",
-                                subtitle = activeSrv?.serverName ?: "Server",
-                                onClick = { onTabChange(PlayerSettingsTab.SERVER) }
-                            )
-                        }
-
-                        // Player Gestures
+                        // 8. Player Gestures
                         val g = currentCustomization.gestures
                         val activeGesturesCount = listOf(
                             g.volumeEnabled,
@@ -4561,7 +4559,7 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.GESTURES) }
                         )
 
-                        // Player Themes & Colors
+                        // 9. Player Themes & Colors
                         SettingsItemRow(
                             icon = Icons.Default.DashboardCustomize,
                             title = "Player Themes & Colors",
@@ -4569,11 +4567,11 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.THEME_PACKS) }
                         )
 
-                        // 5. Auto-Play Next
+                        // 10. Auto-Play Next
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable { onToggleAutoPlayNext(!autoPlayNextEnabled) }
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -4610,11 +4608,11 @@ private fun PlayerSettingsModal(
                             )
                         }
 
-                        // 6. Auto-Skip Intro/Outro
+                        // 11. Auto-Skip Intro/Outro
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable { onToggleAutoSkipIntroOutro(!autoSkipIntroOutroEnabled) }
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -4663,13 +4661,13 @@ private fun PlayerSettingsModal(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(title = "Quality", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
                         if (qualityTracks.isEmpty()) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -4683,8 +4681,7 @@ private fun PlayerSettingsModal(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                         .clickable {
                                             onSelectQuality(track)
                                             onDismiss()
@@ -4716,30 +4713,177 @@ private fun PlayerSettingsModal(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        SubHeader(title = "Select Server", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+                        SubHeader(title = "Server & Audio", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
+
+                        // 1. Auto-Select Master Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { isAutoServer = !isAutoServer }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Auto-Select Best Server",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (isAutoServer) "Active · Auto-routes to lowest latency" else "Manual server selection enabled",
+                                        color = if (isAutoServer) Color(0xFF86EFAC) else Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
+                            }
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                                checked = isAutoServer,
+                                onCheckedChange = { isAutoServer = it }
+                            )
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
+
+                        // 2. Audio Version (Sub / Dub)
+                        Text(
+                            text = "AUDIO VERSION",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Sub Button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (!isDub) Color(0x28FFFFFF) else Color(0x0EFFFFFF))
+                                    .clickable {
+                                        if (isDub) {
+                                            onSwitchAudioStream?.invoke(false)
+                                        }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (!isDub) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(16.dp))
+                                    }
+                                    Text(
+                                        text = "Sub (Japanese)",
+                                        color = if (!isDub) OttPrimary else Color(0xCCFFFFFF),
+                                        fontSize = 13.sp,
+                                        fontWeight = if (!isDub) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            // Dub Button
+                            val dubAvailable = hasDubAvailable
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isDub) Color(0x28FFFFFF) else Color(0x0EFFFFFF))
+                                    .clickable(enabled = dubAvailable) {
+                                        if (!isDub && dubAvailable) {
+                                            onSwitchAudioStream?.invoke(true)
+                                        }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isDub) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(16.dp))
+                                    }
+                                    Text(
+                                        text = if (dubAvailable) "Dub (English)" else "Dub (N/A)",
+                                        color = when {
+                                            !dubAvailable -> Color(0x40FFFFFF)
+                                            isDub -> OttPrimary
+                                            else -> Color(0xCCFFFFFF)
+                                        },
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isDub) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
+
+                        // 3. Available Servers List
+                        Text(
+                            text = "AVAILABLE SERVERS",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+
+                        if (isAutoServer) {
+                            Text(
+                                text = "Auto mode is active. Tap any server to lock manual playback.",
+                                color = Color(0xFF64748B),
+                                fontSize = 11.5.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
 
                         if (availableServers.isEmpty()) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "Default Direct Server", color = OttPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text(text = "Default Direct Stream", color = OttPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
                             }
                         } else {
                             availableServers.forEach { srv ->
-                                val isSelected = srv.streamUrl == currentStreamUrl
+                                val isSelected = (!isAutoServer && (srv.streamUrl == currentStreamUrl || srv.serverName.equals(serverName, ignoreCase = true))) ||
+                                        (isAutoServer && srv.serverName.equals(serverName, ignoreCase = true))
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                         .clickable {
+                                            isAutoServer = false
                                             onSelectServer(srv)
                                             onDismiss()
                                         }
@@ -4755,7 +4899,7 @@ private fun PlayerSettingsModal(
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
                                         Text(
-                                            text = if (srv.isHls) "Direct HLS Stream (Proxied)" else "Direct Stream",
+                                            text = if (srv.isHls) "Direct HLS Stream · Low Latency" else "Direct Video Stream",
                                             color = Color(0xFF94A3B8),
                                             fontSize = 11.sp
                                         )
@@ -4778,7 +4922,7 @@ private fun PlayerSettingsModal(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(title = "Orientation / Video Fit", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
                         val options = listOf(
                             Triple(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Fit to Screen", "Preserve original aspect ratio"),
@@ -4792,8 +4936,7 @@ private fun PlayerSettingsModal(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                    .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                     .clickable {
                                         onSelectResizeMode(mode)
                                         onDismiss()
@@ -4828,7 +4971,7 @@ private fun PlayerSettingsModal(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(title = "Playback Speed", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
                         listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { spd ->
                             val isSelected = playbackSpeed == spd
@@ -4836,8 +4979,7 @@ private fun PlayerSettingsModal(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                    .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                     .clickable {
                                         onSelectSpeed(spd)
                                         onDismiss()
@@ -4869,62 +5011,14 @@ private fun PlayerSettingsModal(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(title = "Audio Track", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(1.dp).background(Color(0x1FFFFFFF)))
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
-                        val isSingleAudioServer = serverName.contains("vidstream", ignoreCase = true) ||
-                                serverName.contains("megaplay", ignoreCase = true)
-
-                        if (isSingleAudioServer) {
-                            // Vidstream and MegaPlay: single audio output per stream; switch stream when chosen
-                            val audioOptions = listOf(
-                                Pair(false, "Japanese (Sub)"),
-                                Pair(true, "English (Dub)")
-                            )
-                            audioOptions.forEach { (dubOpt, label) ->
-                                val isSelected = (isDub == dubOpt)
-                                val isAvailable = !dubOpt || hasDubAvailable
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
-                                        .clickable(enabled = isAvailable) {
-                                            if (!isSelected && isAvailable) {
-                                                onSwitchAudioStream?.invoke(dubOpt)
-                                                onDismiss()
-                                            }
-                                        }
-                                        .padding(vertical = 12.dp, horizontal = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = label,
-                                            color = if (!isAvailable) OttSecondary.copy(alpha = 0.4f) else if (isSelected) OttPrimary else Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                        if (!isAvailable) {
-                                            Text(
-                                                text = "Unavailable for this episode",
-                                                color = OttSecondary.copy(alpha = 0.4f),
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
-                                    }
-                                }
-                            }
-                        } else if (audioTracks.isEmpty()) {
+                        if (audioTracks.isEmpty()) {
                             Text(
                                 text = "Native Stream Audio (Default)",
                                 color = OttSecondary,
                                 fontSize = 13.sp,
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp)
+                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp)
                             )
                         } else {
                             audioTracks.forEach { track ->
@@ -4933,8 +5027,7 @@ private fun PlayerSettingsModal(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                         .clickable {
                                             onSelectAudio(track)
                                             onDismiss()
@@ -4976,7 +5069,7 @@ private fun PlayerSettingsModal(
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                                 .height(1.dp)
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color(0x14FFFFFF))
                         )
 
                         PlayerThemePack.values().forEach { pack ->
@@ -4984,7 +5077,7 @@ private fun PlayerSettingsModal(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(10.dp))
                                     .background(if (isSelected) currentCustomization.accentColor.color.copy(alpha = 0.20f) else Color.Transparent)
                                     .clickable {
                                         val newSettings = pack.applyTo(currentCustomization)
@@ -5049,9 +5142,9 @@ private fun PlayerSettingsModal(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 6.dp)
                                 .height(1.dp)
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color(0x14FFFFFF))
                         )
 
                         Text(
@@ -5120,25 +5213,16 @@ private fun PlayerSettingsModal(
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                                 .height(1.dp)
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color(0x14FFFFFF))
                         )
 
                         val g = currentCustomization.gestures
 
-                        // Master Switch Card: "Enable All Gestures"
+                        // Master Switch
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (g.masterEnabled) Color(0x2234C759)
-                                    else Color(0x15FFFFFF)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (g.masterEnabled) Color(0x5534C759) else Color(0x22FFFFFF),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
                                     val targetMaster = !g.masterEnabled
                                     val newGestures = if (targetMaster) {
@@ -5156,7 +5240,7 @@ private fun PlayerSettingsModal(
                                     }
                                     onApplyCustomization(currentCustomization.copy(gestures = newGestures))
                                 }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -5165,15 +5249,15 @@ private fun PlayerSettingsModal(
                                     text = "Enable All Gestures",
                                     color = Color.White,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = if (g.masterEnabled) "All gestures enabled" else "Master switch: all gestures disabled",
+                                    text = if (g.masterEnabled) "All gestures enabled" else "Master switch: gestures off",
                                     color = if (g.masterEnabled) Color(0xFF86EFAC) else Color(0xFF94A3B8),
-                                    fontSize = 11.sp
+                                    fontSize = 11.5.sp
                                 )
                             }
-                            Switch(
+                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
                                 checked = g.masterEnabled,
                                 onCheckedChange = { isChecked ->
                                     val newGestures = if (isChecked) {
@@ -5190,17 +5274,17 @@ private fun PlayerSettingsModal(
                                         g.copy(masterEnabled = false)
                                     }
                                     onApplyCustomization(currentCustomization.copy(gestures = newGestures))
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF34C759),
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = Color(0x40FFFFFF)
-                                )
+                                }
                             )
                         }
 
-                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .height(1.dp)
+                                .background(Color(0x14FFFFFF))
+                        )
 
                         Text(
                             text = "INDIVIDUAL GESTURES",
@@ -5208,10 +5292,9 @@ private fun PlayerSettingsModal(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
 
-                        // 1. Volume Swipe Gesture
                         GestureToggleRow(
                             icon = Icons.Default.VolumeUp,
                             title = "Volume Gesture",
@@ -5227,7 +5310,6 @@ private fun PlayerSettingsModal(
                             }
                         )
 
-                        // 2. Brightness Swipe Gesture
                         GestureToggleRow(
                             icon = Icons.Default.BrightnessMedium,
                             title = "Brightness Gesture",
@@ -5243,7 +5325,6 @@ private fun PlayerSettingsModal(
                             }
                         )
 
-                        // 3. Horizontal Swipe to Seek
                         GestureToggleRow(
                             icon = Icons.Default.FastForward,
                             title = "Swipe to Seek",
@@ -5259,7 +5340,6 @@ private fun PlayerSettingsModal(
                             }
                         )
 
-                        // 4. Hold to 2x Speed
                         GestureToggleRow(
                             icon = Icons.Default.Speed,
                             title = "Hold to 2x Speed",
@@ -5275,7 +5355,6 @@ private fun PlayerSettingsModal(
                             }
                         )
 
-                        // 5. Double-Tap to Seek / Play-Pause
                         GestureToggleRow(
                             icon = Icons.Default.Forward10,
                             title = "Double Tap Gestures",
@@ -5291,7 +5370,6 @@ private fun PlayerSettingsModal(
                             }
                         )
 
-                        // 6. Pinch to Change Ratio
                         GestureToggleRow(
                             icon = Icons.Default.AspectRatio,
                             title = "Pinch to Change Ratio",
@@ -5319,27 +5397,27 @@ private fun PlayerSettingsModal(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         SubHeader(
-                            title = "AI 4K Upscaler",
+                            title = "AI Upscaler",
                             onBack = { onTabChange(PlayerSettingsTab.MAIN) },
                             onClose = onDismiss
                         )
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 6.dp)
                                 .height(1.dp)
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color(0x14FFFFFF))
                         )
 
-                        // Master Switch with LiquidGlassSwitch lever
+                        // Master Switch with LiquidGlassSwitch
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
                                     onUpscalerChange(upscalerSettings.copy(enabled = !upscalerSettings.enabled))
                                 }
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -5348,30 +5426,22 @@ private fun PlayerSettingsModal(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0x22FFFFFF)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
                                 Column {
                                     Text(
-                                        text = "Anime4K AI Upscaling",
+                                        text = "Enable GPU 4K Upscaler",
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (upscalerSettings.enabled) "Active · GPU Super-Resolution" else "Real-time 2x upscale for anime",
-                                        color = Color(0xFF94A3B8),
+                                        text = if (upscalerSettings.enabled) "Active · GPU Super-Resolution" else "Real-time edge & line clarity",
+                                        color = if (upscalerSettings.enabled) Color(0xFF86EFAC) else Color(0xFF94A3B8),
                                         fontSize = 11.5.sp
                                     )
                                 }
@@ -5390,14 +5460,15 @@ private fun PlayerSettingsModal(
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp)
                                     .height(1.dp)
-                                    .background(Color(0x1FFFFFFF))
+                                    .background(Color(0x14FFFFFF))
                             )
 
                             Text(
-                                text = "Model / Shader Preset",
+                                text = "QUALITY PRESET",
                                 color = Color(0xFF94A3B8),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
 
@@ -5407,8 +5478,7 @@ private fun PlayerSettingsModal(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                        .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                         .clickable {
                                             onUpscalerChange(upscalerSettings.copy(mode = modeItem.id))
                                         }
@@ -5446,7 +5516,7 @@ private fun PlayerSettingsModal(
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp)
                                     .height(1.dp)
-                                    .background(Color(0x1FFFFFFF))
+                                    .background(Color(0x14FFFFFF))
                             )
 
                             Row(
@@ -5504,16 +5574,17 @@ private fun PlayerSettingsModal(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 6.dp)
                                 .height(1.dp)
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color(0x14FFFFFF))
                         )
 
                         Text(
-                            text = "Color & Contrast Presets",
+                            text = "COLOR & CONTRAST PRESETS",
                             color = Color(0xFF94A3B8),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
 
@@ -5531,8 +5602,7 @@ private fun PlayerSettingsModal(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                    .border(1.dp, if (isSelected) Color(0x35FFFFFF) else Color.Transparent, RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                     .clickable {
                                         onVideoFiltersChange(videoFilters.copy(preset = p.id))
                                     }
@@ -5570,7 +5640,7 @@ private fun PlayerSettingsModal(
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                                 .height(1.dp)
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color(0x14FFFFFF))
                         )
 
                         // Brightness Slider
@@ -5689,8 +5759,7 @@ private fun PlayerSettingsModal(
                                     .padding(horizontal = 8.dp, vertical = 6.dp)
                                     .height(38.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0x22FFFFFF))
-                                    .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(10.dp))
+                                    .background(Color(0x1FFFFFFF))
                                     .clickable {
                                         onVideoFiltersChange(VideoFiltersState())
                                     },
@@ -5747,20 +5816,12 @@ private fun GestureToggleRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.weight(1f).padding(end = 8.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (checked) Color(0x2234C759) else Color(0x15FFFFFF)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (checked) Color(0xFF34C759) else Color(0x80FFFFFF),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (checked) Color.White else Color(0x80FFFFFF),
+                modifier = Modifier.size(18.dp)
+            )
             Column {
                 Text(
                     text = title,
@@ -5776,15 +5837,9 @@ private fun GestureToggleRow(
                 )
             }
         }
-        Switch(
+        com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF34C759),
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0x40FFFFFF)
-            )
+            onCheckedChange = onCheckedChange
         )
     }
 }
@@ -5799,7 +5854,7 @@ private fun SettingsItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(10.dp))
             .clickable { onClick() }
             .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -5825,8 +5880,8 @@ private fun SettingsItemRow(
                 if (subtitle.isNotEmpty()) {
                     Text(
                         text = subtitle,
-                        color = Color(0x99FFFFFF),
-                        fontSize = 11.sp
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.5.sp
                     )
                 }
             }
