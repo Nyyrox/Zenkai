@@ -48,6 +48,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -379,14 +380,25 @@ data class SubtitleTrackInfo(
 
 data class CaptionCustomization(
     val fontSizeSp: Float = 18f,
+    val sizeScale: Float = 1.0f,
+    val sizePreset: String = "Medium",
+    val fontFamilyName: String = "Roboto",
     val textColor: Color = Color.White,
     val bgAlpha: Float = 0.55f,
+    val bgColor: Color = Color.Black,
+    val hasBgBox: Boolean = true,
+    val boxCornerRadiusDp: Float = 6f,
     val textAlpha: Float = 1.0f,
     val hasShadow: Boolean = true,
     val isBold: Boolean = true,
+    val isItalic: Boolean = false,
+    val isUppercase: Boolean = false,
+    val letterSpacingSp: Float = 0f,
+    val weightPreset: String = "Normal",
     val hasStroke: Boolean = true,
     val strokeColor: Color = Color.Black,
-    val strokeWidth: Float = 3.0f
+    val strokeWidth: Float = 3.0f,
+    val activePreset: String = "Default"
 )
 
 enum class CaptionPlayStatus {
@@ -450,71 +462,62 @@ private fun DoubleTapSeekOverlay(
     transitionStyle: SeekTransitionStyle = SeekTransitionStyle.CHEVRON_SWEEP,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "seekTransition")
-    val animPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(650, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
-
-    val scaleAnim = remember { Animatable(1.18f) }
+    val nudgeAnim = remember { Animatable(0f) }
     LaunchedEffect(triggerKey) {
-        scaleAnim.snapTo(1.22f)
-        scaleAnim.animateTo(
-            targetValue = 1.0f,
-            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
+        nudgeAnim.snapTo(if (isForward) -6f else 6f)
+        nudgeAnim.animateTo(
+            targetValue = if (isForward) 4f else -4f,
+            animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium)
         )
+        nudgeAnim.animateTo(0f, tween(120))
     }
 
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .fillMaxWidth(0.42f),
+            .fillMaxWidth(0.44f)
+            .background(
+                Brush.horizontalGradient(
+                    if (isForward) listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.12f),
+                        Color.Black.copy(alpha = 0.40f)
+                    ) else listOf(
+                        Color.Black.copy(alpha = 0.40f),
+                        Color.Black.copy(alpha = 0.12f),
+                        Color.Transparent
+                    )
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.scale(scaleAnim.value)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Animated Chevrons with smooth sine wave pulse
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .offset(x = nudgeAnim.value.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x33000000))
+                    .border(1.dp, Color(0x33FFFFFF), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                for (i in 0..2) {
-                    val idx = if (isForward) i else (2 - i)
-                    val waveOffset = idx * 0.28f
-                    val waveNorm = (animPhase + waveOffset) % 1f
-                    val alpha = 0.35f + 0.65f * kotlin.math.sin(waveNorm * Math.PI.toFloat()).coerceAtLeast(0f)
-
-                    Icon(
-                        imageVector = if (isForward) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = alpha),
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                Icon(
+                    imageVector = if (isForward) Icons.Default.FastForward else Icons.Default.FastRewind,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
             Text(
                 text = "${if (isForward) "+" else "-"}${accumulatedSeconds}s",
                 color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.5.sp
-            )
-
-            Text(
-                text = if (isForward) "FORWARD" else "REWIND",
-                color = Color.White.copy(alpha = 0.70f),
-                fontSize = 9.5.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
+                letterSpacing = 0.4.sp
             )
         }
     }
@@ -769,6 +772,7 @@ fun CinePlayerView(
     var qualityTracks by remember { mutableStateOf<List<QualityTrackInfo>>(emptyList()) }
     var subtitleTracks by remember { mutableStateOf<List<SubtitleTrackInfo>>(emptyList()) }
     var showCaptionModal by remember { mutableStateOf(false) }
+    var showCaptionSettingsModal by remember { mutableStateOf(false) }
     val glassBackdrop = remember { GlassBackdrop() }
     val useGlassBlur = Build.VERSION.SDK_INT >= 31      // Android 12+: TextureView + Haze backdrop blur
     val hazeState = rememberHazeState()
@@ -2467,37 +2471,33 @@ fun CinePlayerView(
                     // 2X Speed Hold Indicator Badge (Appears at TopCenter)
                     AnimatedVisibility(
                         visible = isHolding2x && !isInPip,
-                        enter = fadeIn(tween(140)) + scaleIn(tween(140)),
-                        exit = fadeOut(tween(180)) + scaleOut(tween(180)),
+                        enter = fadeIn(tween(120)) + scaleIn(initialScale = 0.9f, animationSpec = tween(120)),
+                        exit = fadeOut(tween(140)) + scaleOut(targetScale = 0.9f, animationSpec = tween(140)),
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 28.dp)
+                            .padding(top = 24.dp)
                     ) {
                         Row(
                             modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 7.dp),
+                                .clip(CircleShape)
+                                .background(Color(0xFA12151B))
+                                .border(1.dp, Color(0x22FFFFFF), CircleShape)
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.FastForward,
-                                contentDescription = "2X Speed",
-                                tint = OttPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
                             Text(
-                                text = "2X Speed",
+                                text = "2x",
                                 color = Color.White,
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.5.sp,
-                                style = LocalTextStyle.current.copy(
-                                    shadow = Shadow(
-                                        color = Color.Black.copy(alpha = 0.85f),
-                                        offset = Offset(1f, 1f),
-                                        blurRadius = 4f
-                                    )
-                                )
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.3.sp
+                            )
+                            Icon(
+                                imageVector = Icons.Default.FastForward,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(15.dp)
                             )
                         }
                     }
@@ -2557,22 +2557,36 @@ fun CinePlayerView(
 
                     // Active Subtitle / Caption Overlay
                     if (isCaptionsEnabled && activeCuesText != null) {
-                        val bgCol = if (isInPip) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = captionConfig.bgAlpha)
-                        val displayText = if (translationTargetLangCode != null) (translatedCueText ?: activeCuesText!!) else activeCuesText!!
+                        val rawText = if (translationTargetLangCode != null) (translatedCueText ?: activeCuesText!!) else activeCuesText!!
+                        val displayText = if (captionConfig.isUppercase) rawText.uppercase() else rawText
+                        val fontFam = resolveFontFamily(captionConfig.fontFamilyName)
+                        val effectiveSp = if (isInPip) (captionConfig.fontSizeSp * captionConfig.sizeScale * 0.75f).sp else (captionConfig.fontSizeSp * captionConfig.sizeScale).sp
+                        val fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal
+                        val fontStyle = if (captionConfig.isItalic) FontStyle.Italic else FontStyle.Normal
+                        val letterSpacing = captionConfig.letterSpacingSp.sp
+
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = if (isInPip) 6.dp else if (showControls) 88.dp else 36.dp)
                                 .padding(horizontal = if (isInPip) 8.dp else 24.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(bgCol)
-                                .padding(horizontal = if (isInPip) 6.dp else 12.dp, vertical = if (isInPip) 2.dp else 6.dp)
+                                .then(
+                                    if (captionConfig.hasBgBox && captionConfig.bgAlpha > 0f) {
+                                        Modifier
+                                            .clip(RoundedCornerShape(captionConfig.boxCornerRadiusDp.dp))
+                                            .background(captionConfig.bgColor.copy(alpha = captionConfig.bgAlpha))
+                                            .padding(horizontal = if (isInPip) 6.dp else 12.dp, vertical = if (isInPip) 2.dp else 5.dp)
+                                    } else Modifier
+                                )
                         ) {
                             if (captionConfig.hasStroke && captionConfig.strokeWidth > 0f) {
                                 Text(
                                     text = displayText,
-                                    fontSize = if (isInPip) (captionConfig.fontSizeSp * 0.75f).sp else captionConfig.fontSizeSp.sp,
-                                    fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
+                                    fontFamily = fontFam,
+                                    fontSize = effectiveSp,
+                                    fontWeight = fontWeight,
+                                    fontStyle = fontStyle,
+                                    letterSpacing = letterSpacing,
                                     textAlign = TextAlign.Center,
                                     style = LocalTextStyle.current.copy(
                                         color = captionConfig.strokeColor,
@@ -2586,8 +2600,11 @@ fun CinePlayerView(
                             Text(
                                 text = displayText,
                                 color = captionConfig.textColor.copy(alpha = captionConfig.textAlpha),
-                                fontSize = if (isInPip) (captionConfig.fontSizeSp * 0.75f).sp else captionConfig.fontSizeSp.sp,
-                                fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
+                                fontFamily = fontFam,
+                                fontSize = effectiveSp,
+                                fontWeight = fontWeight,
+                                fontStyle = fontStyle,
+                                letterSpacing = letterSpacing,
                                 textAlign = TextAlign.Center,
                                 style = if (captionConfig.hasShadow) {
                                     LocalTextStyle.current.copy(
@@ -2939,11 +2956,12 @@ fun CinePlayerView(
                                 .fillMaxSize()
                                 .background(
                                     Brush.verticalGradient(
-                                        0.0f to Color(0x00000000).copy(alpha = (0.72f * overlayOpacity).coerceIn(0f, 1f)),
-                                        0.22f to Color(0x00000000).copy(alpha = (0.42f * overlayOpacity).coerceIn(0f, 1f)),
-                                        0.45f to Color(0x00000000),
-                                        0.72f to Color(0x00000000).copy(alpha = (0.35f * overlayOpacity).coerceIn(0f, 1f)),
-                                        1.0f to Color(0x00000000).copy(alpha = (0.78f * overlayOpacity).coerceIn(0f, 1f))
+                                        0.0f to Color.Black.copy(alpha = (0.70f * overlayOpacity).coerceIn(0f, 1f)),
+                                        0.18f to Color.Black.copy(alpha = (0.38f * overlayOpacity).coerceIn(0f, 1f)),
+                                        0.35f to Color.Transparent,
+                                        0.68f to Color.Transparent,
+                                        0.85f to Color.Black.copy(alpha = (0.38f * overlayOpacity).coerceIn(0f, 1f)),
+                                        1.0f to Color.Black.copy(alpha = (0.75f * overlayOpacity).coerceIn(0f, 1f))
                                     )
                                 )
                         )
@@ -3621,1092 +3639,167 @@ fun CinePlayerView(
         )
     }
 
-    // Subtitle Customization Modal (Responsive Tabs & Dual-Pane Layout)
-    if (showCaptionModal) {
-        var modalTab by remember { mutableIntStateOf(0) }
-        var showSearch by remember { mutableStateOf(false) }
-
-        GlassDialog(
-            anchor = morphAnchor,
-            centered = true,
-            onDismiss = { showCaptionModal = false }
-        ) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth(0.94f)
-                    .widthIn(max = 560.dp)
-                    .fillMaxHeight(0.86f)
-                    .glassPanel(28.dp)
-            ) {
-                val isNarrow = maxWidth < 620.dp
-
-                // Subtitle Search & Retrieval logic
-                LaunchedEffect(selectedSubSeason, selectedSubEpisode, showCaptionModal) {
-                    if (showCaptionModal) {
-                        isSearchingCaptions = true
-                        captionSearchMessage = null
-                        try {
-                            val queryTitle = captionSearchQuery.ifBlank { title }
-                            val directSubs = try {
-                                SubtitleRepository.fetchAllSubtitles(
-                                    anilistId = anilistId,
-                                    title = queryTitle,
-                                    episode = selectedSubEpisode,
-                                    season = selectedSubSeason,
-                                    audio = if (isDub) "dub" else "sub"
-                                )
-                            } catch (_: Exception) {
-                                emptyList()
-                            }
-                            val searchSubs = if (directSubs.isEmpty()) {
-                                try {
-                                    SubtitleRepository.searchSubtitlesByTitle(
-                                        title = queryTitle,
-                                        season = selectedSubSeason,
-                                        episode = selectedSubEpisode
-                                    )
-                                } catch (_: Exception) {
-                                    emptyList()
-                                }
-                            } else emptyList()
-
-                            searchedSubtitles = (directSubs + searchSubs).distinctBy { it.url }
-                            captionSearchMessage = if (searchedSubtitles.isNotEmpty()) {
-                                "Found ${searchedSubtitles.size} captions for S${selectedSubSeason}:E${selectedSubEpisode}"
-                            } else {
-                                "No subtitles found for S${selectedSubSeason}:E${selectedSubEpisode}"
-                            }
-                        } catch (_: Exception) {
-                            searchedSubtitles = emptyList()
-                            captionSearchMessage = "Unable to fetch subtitles"
-                        } finally {
-                            isSearchingCaptions = false
-                        }
-                    }
+    // Subtitle Search & Retrieval logic
+    LaunchedEffect(selectedSubSeason, selectedSubEpisode, showCaptionModal) {
+        if (showCaptionModal) {
+            isSearchingCaptions = true
+            captionSearchMessage = null
+            try {
+                val queryTitle = captionSearchQuery.ifBlank { title }
+                val directSubs = try {
+                    SubtitleRepository.fetchAllSubtitles(
+                        anilistId = anilistId,
+                        title = queryTitle,
+                        episode = selectedSubEpisode,
+                        season = selectedSubSeason,
+                        audio = if (isDub) "dub" else "sub"
+                    )
+                } catch (_: Exception) {
+                    emptyList()
                 }
-
-                val availableExternal = remember(externalSubtitles, searchedSubtitles, selectedSubEpisode, episode) {
-                    if (searchedSubtitles.isNotEmpty()) {
-                        searchedSubtitles
-                    } else if (selectedSubEpisode == episode) {
-                        externalSubtitles
-                    } else {
-                        searchedSubtitles
+                val searchSubs = if (directSubs.isEmpty()) {
+                    try {
+                        SubtitleRepository.searchSubtitlesByTitle(
+                            title = queryTitle,
+                            season = selectedSubSeason,
+                            episode = selectedSubEpisode
+                        )
+                    } catch (_: Exception) {
+                        emptyList()
                     }
+                } else emptyList()
+
+                searchedSubtitles = (directSubs + searchSubs).distinctBy { it.url }
+                captionSearchMessage = if (searchedSubtitles.isNotEmpty()) {
+                    "Found ${searchedSubtitles.size} captions for S${selectedSubSeason}:E${selectedSubEpisode}"
+                } else {
+                    "No subtitles found for S${selectedSubSeason}:E${selectedSubEpisode}"
                 }
-
-                val availableLanguages = remember(availableExternal) {
-                    val set = linkedSetOf("All")
-                    availableExternal.forEach { s ->
-                        if (s.language.isNotBlank()) set.add(s.language)
-                    }
-                    set.toList()
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(if (isNarrow) 12.dp else 16.dp)
-                ) {
-                    // Header: title + actions
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Subtitles, contentDescription = null, tint = GlassAccent, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Subtitles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            GlassPill(onClick = { uploadSubLauncher.launch("*/*") }) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
-                                    Icon(Icons.Default.UploadFile, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Upload", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            GlassPill(onClick = { showCaptionModal = false; showDialoguePanel = true }) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
-                                    Icon(Icons.Default.FormatListBulleted, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Dialogue", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            IconButton(
-                                onClick = { showCaptionModal = false },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(10.dp))
-
-                    // 3-part segmented tabs
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color(0x22FFFFFF))
-                            .padding(3.dp)
-                    ) {
-                        listOf("Captions", "Style", "Sync").forEachIndexed { i, label ->
-                            val sel = modalTab == i
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(if (sel) Color.White else Color.Transparent)
-                                    .clickable { modalTab = i }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(label, color = if (sel) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Reusable Captions List Content
-                    val captionsContent: @Composable () -> Unit = {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Current caption + turn off
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Now showing", color = Color(0x99FFFFFF), fontSize = 10.5.sp)
-                                    Text(
-                                        text = if (isCaptionsEnabled && activeCaptionTitle != "Off") activeCaptionTitle else "Off",
-                                        color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (captionPlayStatus == CaptionPlayStatus.ERROR && captionErrorText != null) {
-                                        Text(captionErrorText ?: "Error loading subtitle", color = Color(0xFFFF6B6B), fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                }
-                                if (isCaptionsEnabled && (activeCaptionTitle != "Off" || activeLoadedCues.isNotEmpty())) {
-                                    GlassPill(onClick = {
-                                        isCaptionsEnabled = false
-                                        activeLoadedCues = emptyList()
-                                        activeLoadedSubtitleUrl = null
-                                        activeCuesText = null
-                                        captionPlayStatus = CaptionPlayStatus.OFF
-                                        activeCaptionTitle = "Off"
-                                        exoPlayer?.let { p ->
-                                            p.trackSelectionParameters = p.trackSelectionParameters
-                                                .buildUpon()
-                                                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-                                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                                                .build()
-                                        }
-                                    }) {
-                                        Text("Turn off", color = Color(0xFFFF6B6B), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
-                                    }
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                GlassPill(onClick = { showSearch = !showSearch }) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
-                                        Icon(Icons.Default.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Find more", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            if (showSearch) {
-                            // Season & Episode Quick Picker Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                // Season Stepper
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(
-                                        text = "SEASON",
-                                        color = OttSecondary,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 0.5.sp,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(if (selectedSubSeason > 1) Color(0x2EFFFFFF) else Color(0x10FFFFFF))
-                                            .clickable(enabled = selectedSubSeason > 1) {
-                                                selectedSubSeason -= 1
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            "−",
-                                            color = if (selectedSubSeason > 1) Color.White else Color(0x40FFFFFF),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(GlassAccent.copy(alpha = 0.21f))
-                                            .border(1.dp, GlassAccent.copy(alpha = 0.50f), OttPillShape)
-                                            .padding(horizontal = 7.dp, vertical = 2.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "S$selectedSubSeason",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color(0x2EFFFFFF))
-                                            .clickable {
-                                                selectedSubSeason += 1
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("+", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                // Separator
-                                Box(
-                                    modifier = Modifier
-                                        .height(18.dp)
-                                        .width(1.dp)
-                                        .background(Color(0x20FFFFFF))
-                                )
-
-                                // Episode Stepper
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(
-                                        text = "EPISODE",
-                                        color = OttSecondary,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 0.5.sp,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(if (selectedSubEpisode > 1) Color(0x2EFFFFFF) else Color(0x10FFFFFF))
-                                            .clickable(enabled = selectedSubEpisode > 1) {
-                                                selectedSubEpisode -= 1
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            "−",
-                                            color = if (selectedSubEpisode > 1) Color.White else Color(0x40FFFFFF),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OttPillShape)
-                                            .background(GlassAccent.copy(alpha = 0.21f))
-                                            .border(1.dp, GlassAccent.copy(alpha = 0.50f), OttPillShape)
-                                            .padding(horizontal = 7.dp, vertical = 2.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "EP $selectedSubEpisode",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color(0x2EFFFFFF))
-                                            .clickable {
-                                                selectedSubEpisode += 1
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("+", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            // Show Name Search Box
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(42.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = OttTextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                BasicTextField(
-                                    value = captionSearchQuery,
-                                    onValueChange = { captionSearchQuery = it },
-                                    singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
-                                    ),
-                                    cursorBrush = SolidColor(GlassAccent),
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                    keyboardActions = KeyboardActions(
-                                        onSearch = {
-                                            if (captionSearchQuery.isNotBlank()) {
-                                                isSearchingCaptions = true
-                                                captionSearchMessage = null
-                                                scope.launch {
-                                                    try {
-                                                        val res = SubtitleRepository.searchSubtitlesByTitle(
-                                                            title = captionSearchQuery,
-                                                            season = selectedSubSeason,
-                                                            episode = selectedSubEpisode
-                                                        )
-                                                        searchedSubtitles = res
-                                                        captionSearchMessage = if (res.isNotEmpty()) {
-                                                            "Found ${res.size} captions"
-                                                        } else {
-                                                            "No subtitles found"
-                                                        }
-                                                    } catch (_: Exception) {
-                                                        captionSearchMessage = "Error searching subtitles"
-                                                    } finally {
-                                                        isSearchingCaptions = false
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    ),
-                                    modifier = Modifier.weight(1f),
-                                    decorationBox = { innerTextField ->
-                                        if (captionSearchQuery.isEmpty()) {
-                                            Text(
-                                                text = "Search show name...",
-                                                color = OttTextMuted,
-                                                fontSize = 12.sp,
-                                                maxLines = 1,
-                                                softWrap = false
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                )
-
-                                if (captionSearchQuery.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { captionSearchQuery = "" },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Clear,
-                                            contentDescription = "Clear",
-                                            tint = OttTextMuted,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-
-                                // Search Action Button (High Contrast Red)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(GlassAccent)
-                                        .clickable {
-                                            if (captionSearchQuery.isNotBlank()) {
-                                                isSearchingCaptions = true
-                                                captionSearchMessage = null
-                                                scope.launch {
-                                                    try {
-                                                        val res = SubtitleRepository.searchSubtitlesByTitle(
-                                                            title = captionSearchQuery,
-                                                            season = selectedSubSeason,
-                                                            episode = selectedSubEpisode
-                                                        )
-                                                        searchedSubtitles = res
-                                                        captionSearchMessage = if (res.isNotEmpty()) {
-                                                            "Found ${res.size} captions"
-                                                        } else {
-                                                            "No subtitles found"
-                                                        }
-                                                    } catch (_: Exception) {
-                                                        captionSearchMessage = "Error searching subtitles"
-                                                    } finally {
-                                                        isSearchingCaptions = false
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Search,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Text(
-                                            text = "Search",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                }
-                            }
-
-                            }
-
-                            if (isSearchingCaptions) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(12.dp),
-                                        color = GlassAccent,
-                                        strokeWidth = 1.5.dp
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "Searching OpenSubtitles...",
-                                        color = OttTextMuted,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            } else if (captionSearchMessage != null) {
-                                Text(
-                                    text = captionSearchMessage ?: "",
-                                    color = if (searchedSubtitles.isNotEmpty()) Color(0xFF30D158) else OttTextMuted,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            var selectedSourceFilter by remember { mutableStateOf("All") }
-                            var selectedLanguageFilter by remember { mutableStateOf("All") }
-
-                            val hasStreamSubs = remember(availableExternal) {
-                                availableExternal.any { it.source.startsWith("Stream", ignoreCase = true) || it.source.contains("Direct", ignoreCase = true) || it.source.contains("KAA", ignoreCase = true) || it.source.contains("Reanime", ignoreCase = true) }
-                            }
-                            val hasOpenSubs = remember(availableExternal) {
-                                availableExternal.any { it.source.contains("OpenSubtitles", ignoreCase = true) || it.source.contains("Stremio", ignoreCase = true) }
-                            }
-
-                            // Dynamic Language Filter Chips
-                            if (availableLanguages.size > 1) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    availableLanguages.forEach { lang ->
-                                        val isSel = selectedLanguageFilter.equals(lang, ignoreCase = true)
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(999.dp))
-                                                .background(if (isSel) Color.White else Color(0x16FFFFFF))
-                                                .border(0.5.dp, if (isSel) Color.White else Color(0x22FFFFFF), RoundedCornerShape(999.dp))
-                                                .clickable { selectedLanguageFilter = lang }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = lang,
-                                                color = if (isSel) Color.Black else Color.White,
-                                                fontSize = 12.sp,
-                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                                maxLines = 1,
-                                                softWrap = false
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Scrollable Subtitles List
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val filteredExternal = availableExternal.filter { sub ->
-                                    val matchesLang = selectedLanguageFilter.equals("All", ignoreCase = true) || sub.language.equals(selectedLanguageFilter, ignoreCase = true)
-                                    val matchesSource = when (selectedSourceFilter) {
-                                        "Stream" -> sub.source.startsWith("Stream", ignoreCase = true) || sub.source.contains("Direct", ignoreCase = true) || sub.source.contains("KAA", ignoreCase = true) || sub.source.contains("Reanime", ignoreCase = true)
-                                        "OpenSubtitles" -> sub.source.contains("OpenSubtitles", ignoreCase = true) || sub.source.contains("Stremio", ignoreCase = true)
-                                        else -> true
-                                    }
-                                    matchesLang && matchesSource
-                                }.sortedByDescending { sub ->
-                                    if (sub.source.startsWith("Stream", ignoreCase = true) || sub.source.contains("Direct", ignoreCase = true)) 2 else 1
-                                }
-
-                                Text(
-                                    text = "Available (${filteredExternal.size})",
-                                    color = OttTextMuted,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-
-                                if (filteredExternal.isEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "No subtitles matching filters.\nType a show name above to search OpenSubtitles.",
-                                            color = OttTextMuted,
-                                            fontSize = 11.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                } else {
-                                    filteredExternal.forEach { sub ->
-                                        val isDownloadingThis = downloadingSubtitleId == sub.id
-                                        val isCurrent = isCaptionsEnabled && (activeLoadedSubtitleUrl == sub.url || (activeLoadedSubtitleUrl == null && activeCaptionTitle == sub.label)) && captionPlayStatus == CaptionPlayStatus.PLAYING
-
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isCurrent) Color(0x2810B981) else Color(0x14FFFFFF))
-                                                .border(
-                                                    1.dp,
-                                                    if (isCurrent) Color(0xFF30D158) else Color(0x22FFFFFF),
-                                                    RoundedCornerShape(10.dp)
-                                                )
-                                                .clickable(enabled = !isDownloadingThis) {
-                                                    val previousTitle = activeCaptionTitle
-                                                    val previousUrl = activeLoadedSubtitleUrl
-                                                    captionPlayStatus = CaptionPlayStatus.DOWNLOADING
-                                                    downloadingSubtitleId = sub.id
-                                                    captionErrorText = null
-                                                    preferredSubLanguage = sub.language
-
-                                                    scope.launch {
-                                                        try {
-                                                            val dlResult = SubtitleRepository.downloadSubtitleFile(context, sub)
-                                                            dlResult.onSuccess { file ->
-                                                                try {
-                                                                    val raw = file.readText(Charsets.UTF_8)
-                                                                    val cues = SubtitleParser.parse(raw)
-                                                                    if (cues.isNotEmpty()) {
-                                                                        activeLoadedCues = cues
-                                                                        activeLoadedSubtitleUrl = sub.url
-                                                                        isCaptionsEnabled = true
-                                                                        activeCaptionTitle = sub.label
-                                                                        captionPlayStatus = CaptionPlayStatus.PLAYING
-                                                                        captionErrorText = null
-                                                                        downloadingSubtitleId = null
-
-                                                                        val pos = (currentPositionMs - subSyncMs + 120L).coerceAtLeast(0L)
-                                                                        val activeCues = findActiveCuesAt(cues, pos)
-                                                                        activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
-                                                                    } else {
-                                                                        captionPlayStatus = CaptionPlayStatus.ERROR
-                                                                        captionErrorText = "No dialogue cues found in ${sub.label}"
-                                                                        activeCaptionTitle = previousTitle
-                                                                        activeLoadedSubtitleUrl = previousUrl
-                                                                        downloadingSubtitleId = null
-                                                                    }
-                                                                } catch (e: Exception) {
-                                                                    captionPlayStatus = CaptionPlayStatus.ERROR
-                                                                    captionErrorText = "Failed to parse subtitle cues"
-                                                                    activeCaptionTitle = previousTitle
-                                                                    activeLoadedSubtitleUrl = previousUrl
-                                                                    downloadingSubtitleId = null
-                                                                }
-                                                            }.onFailure { err ->
-                                                                captionPlayStatus = CaptionPlayStatus.ERROR
-                                                                captionErrorText = err.message ?: "Failed to download subtitle"
-                                                                activeCaptionTitle = previousTitle
-                                                                activeLoadedSubtitleUrl = previousUrl
-                                                                downloadingSubtitleId = null
-                                                            }
-                                                        } catch (e: Exception) {
-                                                            captionPlayStatus = CaptionPlayStatus.ERROR
-                                                            captionErrorText = e.message ?: "Failed to download subtitle"
-                                                            activeCaptionTitle = previousTitle
-                                                            activeLoadedSubtitleUrl = previousUrl
-                                                            downloadingSubtitleId = null
-                                                        }
-                                                    }
-                                                }
-                                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(GlassAccent.copy(alpha = 0.21f))
-                                                            .border(0.5.dp, GlassAccent.copy(alpha = 0.38f), RoundedCornerShape(4.dp))
-                                                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = sub.language.uppercase(),
-                                                            fontSize = 9.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Color.White,
-                                                            maxLines = 1,
-                                                            softWrap = false
-                                                        )
-                                                    }
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(Color(0x22FFFFFF))
-                                                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = sub.source,
-                                                            fontSize = 8.5.sp,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = Color(0xFFCAD5E2),
-                                                            maxLines = 1,
-                                                            softWrap = false
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(Modifier.height(4.dp))
-                                                Text(
-                                                    text = sub.label,
-                                                    color = Color.White,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    softWrap = false
-                                                )
-                                            }
-
-                                            Spacer(Modifier.width(8.dp))
-
-                                            when {
-                                                isDownloadingThis -> {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(18.dp),
-                                                        color = Color.White,
-                                                        strokeWidth = 2.dp
-                                                    )
-                                                }
-                                                isCurrent -> {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(OttPillShape)
-                                                            .background(Color(0x3010B981))
-                                                            .border(0.8.dp, Color(0xFF30D158), OttPillShape)
-                                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                                    ) {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                                        ) {
-                                                            Icon(
-                                                                Icons.Default.Check,
-                                                                contentDescription = "Active",
-                                                                tint = Color(0xFF30D158),
-                                                                modifier = Modifier.size(12.dp)
-                                                            )
-                                                            Text(
-                                                                text = "PLAYING",
-                                                                color = Color(0xFF30D158),
-                                                                fontSize = 9.5.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                maxLines = 1,
-                                                                softWrap = false
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                                else -> {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(OttPillShape)
-                                                            .background(Color(0x20FFFFFF))
-                                                            .border(0.8.dp, Color(0x35FFFFFF), OttPillShape)
-                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                    ) {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                                        ) {
-                                                            Icon(
-                                                                Icons.Default.Download,
-                                                                contentDescription = null,
-                                                                tint = Color.White,
-                                                                modifier = Modifier.size(11.dp)
-                                                            )
-                                                            Text(
-                                                                text = "Select",
-                                                                color = Color.White,
-                                                                fontSize = 10.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                maxLines = 1,
-                                                                softWrap = false
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-
-                    val styleContent: @Composable () -> Unit = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Live Preview Box
-                            Text(
-                                text = "Preview",
-                                color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0x33000000))
-                                    .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(14.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color.Black.copy(alpha = captionConfig.bgAlpha))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    if (captionConfig.hasStroke && captionConfig.strokeWidth > 0f) {
-                                        Text(
-                                            text = "Aniverse Subtitle Preview",
-                                            fontSize = captionConfig.fontSizeSp.sp,
-                                            fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1,
-                                            softWrap = false,
-                                            style = LocalTextStyle.current.copy(
-                                                color = captionConfig.strokeColor,
-                                                drawStyle = Stroke(
-                                                    width = captionConfig.strokeWidth,
-                                                    join = StrokeJoin.Round
-                                                )
-                                            )
-                                        )
-                                    }
-                                    Text(
-                                        text = "Aniverse Subtitle Preview",
-                                        color = captionConfig.textColor.copy(alpha = captionConfig.textAlpha),
-                                        fontSize = captionConfig.fontSizeSp.sp,
-                                        fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        style = if (captionConfig.hasShadow) {
-                                            LocalTextStyle.current.copy(
-                                                shadow = Shadow(
-                                                    color = Color.Black,
-                                                    offset = Offset(2f, 2f),
-                                                    blurRadius = 4f
-                                                )
-                                            )
-                                        } else LocalTextStyle.current
-                                    )
-                                }
-                            }
-
-                            GlassSliderRow(
-                                label = "Size",
-                                valueText = "${(((captionConfig.fontSizeSp - 10f) / 30f) * 100f).roundToInt().coerceIn(0, 100)}",
-                                value = ((captionConfig.fontSizeSp - 10f) / 30f) * 100f,
-                                onChange = { captionConfig = captionConfig.copy(fontSizeSp = 10f + it / 100f * 30f) }
-                            )
-                            GlassSliderRow(
-                                label = "Background",
-                                valueText = "${(captionConfig.bgAlpha * 100f).roundToInt()}",
-                                value = captionConfig.bgAlpha * 100f,
-                                onChange = { captionConfig = captionConfig.copy(bgAlpha = it / 100f) }
-                            )
-                            GlassSliderRow(
-                                label = "Outline",
-                                valueText = "${((captionConfig.strokeWidth / 8f) * 100f).roundToInt().coerceIn(0, 100)}",
-                                value = (captionConfig.strokeWidth / 8f) * 100f,
-                                onChange = {
-                                    val w = it / 100f * 8f
-                                    captionConfig = captionConfig.copy(strokeWidth = w, hasStroke = w > 0.05f)
-                                }
-                            )
-                            Text(
-                                text = "Text color",
-                                color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                listOf(
-                                    Color(0xFFFFFFFF),
-                                    Color(0xFFFFEB3B),
-                                    Color(0xFF00E5FF),
-                                    Color(0xFF69F0AE),
-                                    Color(0xFFFF80AB)
-                                ).forEach { col ->
-                                    val isSel = captionConfig.textColor == col
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(col)
-                                            .border(
-                                                width = if (isSel) 2.5.dp else 1.dp,
-                                                color = if (isSel) GlassAccent else Color(0x40FFFFFF),
-                                                shape = CircleShape
-                                            )
-                                            .clickable {
-                                                captionConfig = captionConfig.copy(textColor = col)
-                                            }
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "Outline color",
-                                color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                listOf(
-                                    Color(0xFF000000),
-                                    Color(0xFF262626),
-                                    Color(0xFF4A4A4A),
-                                    Color(0xFF8B0000),
-                                    Color(0xFF0D1B2A),
-                                    Color(0xFFFFFFFF)
-                                ).forEach { col ->
-                                    val isSel = captionConfig.strokeColor == col
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(col)
-                                            .border(
-                                                width = if (isSel) 2.5.dp else 1.dp,
-                                                color = if (isSel) GlassAccent else Color(0x40FFFFFF),
-                                                shape = CircleShape
-                                            )
-                                            .clickable {
-                                                captionConfig = captionConfig.copy(strokeColor = col)
-                                            }
-                                    )
-                                }
-                            }
-
-                        }
-                    }
-
-                    val syncContent: @Composable () -> Unit = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            GlassSliderRow(
-                                label = "Subtitle delay",
-                                valueText = (if (subSyncMs > 0) "+" else "") + String.format(Locale.US, "%.2fs", subSyncMs / 1000.0),
-                                value = subSyncMs / 1000f,
-                                range = -10f..10f,
-                                onChange = { subSyncMs = (it * 4f).roundToInt() * 250L }
-                            )
-                            if (subSyncMs != 0L) {
-                                Text(
-                                    "Reset",
-                                    color = GlassAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.clickable { subSyncMs = 0L }.padding(vertical = 2.dp)
-                                )
-                            }
-                            // Real-time Subtitle Translation
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Translate,
-                                        contentDescription = null,
-                                        tint = GlassAccent,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "Live translation",
-                                        color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                                        softWrap = false,
-                                        maxLines = 1
-                                    )
-                                }
-                                if (translationTargetLangCode != null) {
-                                    val langName = TranslationService.SUPPORTED_LANGUAGES.entries.firstOrNull { it.value == translationTargetLangCode }?.key ?: translationTargetLangCode.orEmpty()
-                                    Text(
-                                        text = langName,
-                                        color = Color(0xFF30D158),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val isOff = translationTargetLangCode == null
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(if (isOff) Color.White else Color(0x14FFFFFF))
-                                        .border(0.5.dp, if (isOff) Color.White else Color(0x22FFFFFF), RoundedCornerShape(999.dp))
-                                        .clickable { translationTargetLangCode = null }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "Off",
-                                        color = if (isOff) Color.Black else Color.White,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = if (isOff) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-
-                                TranslationService.SUPPORTED_LANGUAGES.forEach { (name, code) ->
-                                    val isSelected = translationTargetLangCode == code
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(999.dp))
-                                            .background(if (isSelected) GlassAccent else Color(0x14FFFFFF))
-                                            .border(0.5.dp, if (isSelected) GlassAccent else Color(0x22FFFFFF), RoundedCornerShape(999.dp))
-                                            .clickable { translationTargetLangCode = code }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = name,
-                                            color = Color.White,
-                                            fontSize = 10.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                }
-                            }
-
-                        }
-                    }
-
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        when (modalTab) {
-                            0 -> captionsContent()
-                            1 -> styleContent()
-                            else -> syncContent()
-                        }
-                    }
-                }
+            } catch (_: Exception) {
+                searchedSubtitles = emptyList()
+                captionSearchMessage = "Unable to fetch subtitles"
+            } finally {
+                isSearchingCaptions = false
             }
         }
+    }
+
+    val availableExternal = remember(externalSubtitles, searchedSubtitles, selectedSubEpisode, episode) {
+        if (searchedSubtitles.isNotEmpty()) {
+            searchedSubtitles
+        } else if (selectedSubEpisode == episode) {
+            externalSubtitles
+        } else {
+            searchedSubtitles
+        }
+    }
+
+    // Modern Subtitles Selector Modal (Image 1)
+    if (showCaptionModal) {
+        SubtitlesModal(
+            availableSubtitles = availableExternal,
+            isCaptionsEnabled = isCaptionsEnabled,
+            activeCaptionTitle = activeCaptionTitle,
+            activeSubtitleUrl = activeLoadedSubtitleUrl,
+            downloadingSubtitleId = downloadingSubtitleId,
+            onSelectSubtitle = { sub ->
+                val previousTitle = activeCaptionTitle
+                val previousUrl = activeLoadedSubtitleUrl
+                captionPlayStatus = CaptionPlayStatus.DOWNLOADING
+                downloadingSubtitleId = sub.id
+                captionErrorText = null
+                preferredSubLanguage = sub.language
+
+                scope.launch {
+                    try {
+                        val dlResult = SubtitleRepository.downloadSubtitleFile(context, sub)
+                        dlResult.onSuccess { file ->
+                            try {
+                                val raw = file.readText(Charsets.UTF_8)
+                                val cues = SubtitleParser.parse(raw)
+                                if (cues.isNotEmpty()) {
+                                    activeLoadedCues = cues
+                                    activeLoadedSubtitleUrl = sub.url
+                                    isCaptionsEnabled = true
+                                    activeCaptionTitle = sub.label
+                                    captionPlayStatus = CaptionPlayStatus.PLAYING
+                                    captionErrorText = null
+                                    downloadingSubtitleId = null
+
+                                    val pos = (currentPositionMs - subSyncMs + 120L).coerceAtLeast(0L)
+                                    val activeCues = findActiveCuesAt(cues, pos)
+                                    activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
+                                } else {
+                                    captionPlayStatus = CaptionPlayStatus.ERROR
+                                    captionErrorText = "No dialogue cues found in ${sub.label}"
+                                    activeCaptionTitle = previousTitle
+                                    activeLoadedSubtitleUrl = previousUrl
+                                    downloadingSubtitleId = null
+                                }
+                            } catch (e: Exception) {
+                                captionPlayStatus = CaptionPlayStatus.ERROR
+                                captionErrorText = "Failed to parse subtitle cues"
+                                activeCaptionTitle = previousTitle
+                                activeLoadedSubtitleUrl = previousUrl
+                                downloadingSubtitleId = null
+                            }
+                        }.onFailure { err ->
+                            captionPlayStatus = CaptionPlayStatus.ERROR
+                            captionErrorText = err.message ?: "Failed to download subtitle"
+                            activeCaptionTitle = previousTitle
+                            activeLoadedSubtitleUrl = previousUrl
+                            downloadingSubtitleId = null
+                        }
+                    } catch (e: Exception) {
+                        captionPlayStatus = CaptionPlayStatus.ERROR
+                        captionErrorText = e.message ?: "Failed to download subtitle"
+                        activeCaptionTitle = previousTitle
+                        activeLoadedSubtitleUrl = previousUrl
+                        downloadingSubtitleId = null
+                    }
+                }
+            },
+            onTurnOffCaptions = {
+                isCaptionsEnabled = false
+                activeLoadedCues = emptyList()
+                activeLoadedSubtitleUrl = null
+                activeCuesText = null
+                captionPlayStatus = CaptionPlayStatus.OFF
+                activeCaptionTitle = "Off"
+                exoPlayer?.let { p ->
+                    p.trackSelectionParameters = p.trackSelectionParameters
+                        .buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                        .build()
+                }
+            },
+            onOpenSettings = {
+                showCaptionModal = false
+                showCaptionSettingsModal = true
+            },
+            onOpenDialoguePanel = {
+                showCaptionModal = false
+                showDialoguePanel = true
+            },
+            onUploadClick = { uploadSubLauncher.launch("*/*") },
+            onDismiss = { showCaptionModal = false },
+            anchor = morphAnchor
+        )
+    }
+
+    // Full Subtitle / Caption Settings Modal (Images 2, 3, 4)
+    if (showCaptionSettingsModal) {
+        CaptionSettingsModal(
+            captionConfig = captionConfig,
+            onConfigChange = { newCfg -> captionConfig = newCfg },
+            isCaptionsEnabled = isCaptionsEnabled,
+            onToggleCaptions = { isCaptionsEnabled = it },
+            subSyncMs = subSyncMs,
+            onAdjustSync = { delta -> subSyncMs += delta },
+            onResetSync = { subSyncMs = 0L },
+            onDismiss = { showCaptionSettingsModal = false }
+        )
     }
     // Real-time Dialogue & Transcript Panel Modal
     if (showDialoguePanel) {

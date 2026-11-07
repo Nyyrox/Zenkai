@@ -218,7 +218,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import coil3.request.ImageRequest
-import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
 
 // The tabs item sits at this index in the LazyColumn (hero, meta, tabs).
 private const val TABS_INDEX = 2
@@ -539,8 +538,7 @@ fun DetailScreen(
         label = "redDotBlink"
     )
 
-    // Liquid glass follows the Profile toggle + device support through the shared palette (same as Home).
-    val glassOn = p.glassOn
+
     val shareAnime: () -> Unit = {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -1108,7 +1106,9 @@ fun DetailScreen(
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxSize()
-                                                    .homeGlass(p, 20.dp)
+                                                    .clip(RoundedCornerShape(20.dp))
+                                                    .background(if (p.dark) Color(0xCC161B26) else Color(0xEBFFFFFF))
+                                                    .border(1.dp, if (p.dark) Color(0x22FFFFFF) else Color(0x14000000), RoundedCornerShape(20.dp))
                                                     .padding(horizontal = 12.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1203,7 +1203,9 @@ fun DetailScreen(
                                                         android.widget.Toast.LENGTH_SHORT
                                                     ).show()
                                                 }
-                                                .homeGlass(p, 999.dp)
+                                                .clip(CircleShape)
+                                                .background(if (p.dark) Color(0xCC161B26) else Color(0xEBFFFFFF))
+                                                .border(1.dp, if (p.dark) Color(0x22FFFFFF) else Color(0x14000000), CircleShape)
                                                 .padding(horizontal = 12.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1619,8 +1621,9 @@ fun DetailScreen(
                     exit.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
                     curtainDone = true
                 }
+                val prioritizedPoster = tmdbDetails?.posters?.firstOrNull() ?: tmdbDetails?.backdropUrl ?: cachedPoster ?: anime.cover
                 DetailLoadingCard(
-                    cachedPoster = cachedPoster,
+                    cachedPoster = prioritizedPoster,
                     title = knownTitle,
                     meta = knownMeta,
                     onBack = handleBack,
@@ -1642,12 +1645,8 @@ fun DetailScreen(
             }
             .background(p.bg) // after graphicsLayer so the bg fades too (else it blacks out Home on back)
     ) {
-        if (glassOn) {
-            GlassBackdropHost(background = { DetailBackdrop(p, heroImageUrl) }) { content() }
-        } else {
-            DetailBackdrop(p, heroImageUrl)
-            content()
-        }
+        DetailBackdrop(p, heroImageUrl)
+        content()
     }
 
     // === DIALOGS & BOTTOM SHEETS ===
@@ -1892,7 +1891,9 @@ private fun GlassCircleButton(
         modifier = Modifier
             .size(size)
             .pressable(0.9f, onClick = onClick)
-            .homeGlass(p, 999.dp),
+            .clip(CircleShape)
+            .background(if (p.dark) Color(0xCC161B26) else Color(0xEBFFFFFF))
+            .border(1.dp, if (p.dark) Color(0x22FFFFFF) else Color(0x14000000), CircleShape),
         contentAlignment = Alignment.Center,
         content = content
     )
@@ -1903,30 +1904,6 @@ private fun GlassCircleButton(
 private fun DetailBackdrop(p: HomePalette, art: String?) {
     Box(Modifier.fillMaxSize()) {
         HomeBackdrop(p)
-        if (p.glassOn && !art.isNullOrBlank()) {
-            val ctx = LocalContext.current
-            val req = remember(art) { ImageRequest.Builder(ctx).data(art).size(96, 144).build() }
-            AsyncImage(
-                model = req,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(420.dp)
-                    .graphicsLayer {
-                        compositingStrategy = CompositingStrategy.Offscreen
-                        alpha = if (p.dark) 0.5f else 0.4f
-                    }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            Brush.verticalGradient(0.30f to Color.Black, 1f to Color.Transparent),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-                    .blur(24.dp)
-            )
-        }
     }
 }
 

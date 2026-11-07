@@ -71,6 +71,14 @@ object AnimeMappingRepository {
         put("146065", listOf(AnimeMappingEntry("mushoku-tensei-jobless-reincarnation", 2, 1, "mushoku-tensei-jobless-reincarnation", 0)))
         put("166873", listOf(AnimeMappingEntry("mushoku-tensei-jobless-reincarnation", 2, 1, "mushoku-tensei-jobless-reincarnation", 13)))
         put("178789", listOf(AnimeMappingEntry("mushoku-tensei-jobless-reincarnation", 3, 1, "mushoku-tensei-jobless-reincarnation", 0)))
+
+        // Built-in mapping overrides for Black Clover
+        put("97940", listOf(AnimeMappingEntry("black-clover", 1, 1, "black-clover")))
+        put("195604", listOf(
+            AnimeMappingEntry("black-clover", 2, 1, "black-clover"),
+            AnimeMappingEntry("black-clover-season-2", 1, 1, "black-clover-season-2"),
+            AnimeMappingEntry("black-clover-2nd-season", 1, 1, "black-clover-2nd-season")
+        ))
     }
 
     private var isInitialized = false

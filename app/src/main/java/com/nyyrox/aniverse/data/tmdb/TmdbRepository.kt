@@ -78,7 +78,10 @@ data class TmdbSeasonInfo(
 
 object TmdbRepository {
     private const val TMDB_VERCEL_BASE = "https://aniversee.vercel.app/api/tmdb"
+    private const val TMDB_DIRECT_API_BASE = "https://api.themoviedb.org/3"
     private const val TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
+    private const val TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlYjdkMWM0ZTgwMGUzM2FiMmE3Y2I3NDA5YmM4NjQ2YSIsIm5iZiI6MTc3OTUzMDcxOS40MzIsInN1YiI6IjZhMTE3YmRmYTlhNjNlYmFiOWUzYjc4YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Z9pa96oJEyicf6wAoaKGKJd9ldapeiOdktoJd4xcgLo"
+    private const val TMDB_API_KEY = "eb7d1c4e800e33ab2a7cb7409bc8646a"
 
     private val client = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
@@ -92,6 +95,56 @@ object TmdbRepository {
     private val artworkCache = ConcurrentHashMap<String, TmdbArtwork?>()
     private val detailsCache = ConcurrentHashMap<String, TmdbDetails?>()
     private val idCache = ConcurrentHashMap<String, TmdbSearchResult?>()
+
+    /**
+     * Resilient fetcher: tries Vercel proxy first (which handles CDN caching and bypasses regional ISP blocks),
+     * and seamlessly falls back to direct TMDB API with bearer authentication if the proxy is unavailable.
+     */
+    suspend fun executeTmdbGet(endpointPath: String, queryParams: String = ""): String? = withContext(Dispatchers.IO) {
+        val cleanPath = if (endpointPath.startsWith("/")) endpointPath else "/$endpointPath"
+
+        // Tier 1: Vercel Proxy
+        try {
+            val vercelUrl = if (queryParams.isBlank()) "$TMDB_VERCEL_BASE$cleanPath" else "$TMDB_VERCEL_BASE$cleanPath?$queryParams"
+            val req = Request.Builder()
+                .url(vercelUrl)
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) ZENKAI/v3")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body.string()
+                    if (body.isNotBlank() && (body.startsWith("{") || body.startsWith("["))) {
+                        return@withContext body
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Tier 2: Direct TMDB API fallback
+        try {
+            val sep = if (queryParams.isBlank()) "?" else "?$queryParams&"
+            val directUrl = "$TMDB_DIRECT_API_BASE$cleanPath${sep}api_key=$TMDB_API_KEY"
+            val req = Request.Builder()
+                .url(directUrl)
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer $TMDB_BEARER_TOKEN")
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body.string()
+                    if (body.isNotBlank() && (body.startsWith("{") || body.startsWith("["))) {
+                        return@withContext body
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        null
+    }
 
     private fun cleanTitle(title: String): String {
         return title
@@ -137,22 +190,14 @@ object TmdbRepository {
         val preferredType = if (isMovie) "movie" else "tv"
         val query = cleanTitle(title)
         val encodedQuery = URLEncoder.encode(query, "UTF-8")
-        val searchUrl = "$TMDB_VERCEL_BASE/search/multi?query=$encodedQuery"
 
         try {
-            val request = Request.Builder()
-                .url(searchUrl)
-                .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    idCache[cacheKey] = null
-                    return@withContext null
-                }
-                val raw = response.body.string()
-                val json = JSONObject(raw)
+            val raw = executeTmdbGet("/search/multi", "query=$encodedQuery")
+            if (raw.isNullOrBlank()) {
+                idCache[cacheKey] = null
+                return@withContext null
+            }
+            val json = JSONObject(raw)
                 val results = json.optJSONArray("results") ?: return@withContext null
 
                 var bestMatch: TmdbSearchResult? = null
@@ -176,7 +221,6 @@ object TmdbRepository {
 
                 idCache[cacheKey] = bestMatch
                 return@withContext bestMatch
-            }
         } catch (e: Exception) {
             return@withContext null
         }
@@ -200,22 +244,13 @@ object TmdbRepository {
             return@withContext null
         }
 
-        val detailsUrl = "$TMDB_VERCEL_BASE/${resolved.type}/${resolved.id}?append_to_response=images&include_image_language=en,null"
-
         try {
-            val request = Request.Builder()
-                .url(detailsUrl)
-                .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    artworkCache[cacheKey] = null
-                    return@withContext null
-                }
-                val raw = response.body.string()
-                val json = JSONObject(raw)
+            val raw = executeTmdbGet("/${resolved.type}/${resolved.id}", "append_to_response=images&include_image_language=en,null")
+            if (raw.isNullOrBlank()) {
+                artworkCache[cacheKey] = null
+                return@withContext null
+            }
+            val json = JSONObject(raw)
 
                 // Pick Backdrop
                 val backdropPath = json.optString("backdrop_path").takeIf { it.isNotBlank() }
@@ -276,7 +311,6 @@ object TmdbRepository {
 
                 artworkCache[cacheKey] = artwork
                 return@withContext artwork
-            }
         } catch (e: Exception) {
             return@withContext null
         }
@@ -299,22 +333,13 @@ object TmdbRepository {
             return@withContext null
         }
 
-        val detailsUrl = "$TMDB_VERCEL_BASE/${resolved.type}/${resolved.id}?append_to_response=credits,images,external_ids,videos&include_image_language=en,null"
-
         try {
-            val request = Request.Builder()
-                .url(detailsUrl)
-                .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    detailsCache[cacheKey] = null
-                    return@withContext null
-                }
-                val raw = response.body.string()
-                val json = JSONObject(raw)
+            val raw = executeTmdbGet("/${resolved.type}/${resolved.id}", "append_to_response=credits,images,external_ids,videos&include_image_language=en,null")
+            if (raw.isNullOrBlank()) {
+                detailsCache[cacheKey] = null
+                return@withContext null
+            }
+            val json = JSONObject(raw)
 
                 val showTitle = json.optString("title").ifBlank { json.optString("name", title) }
                 val overview = json.optString("overview").takeIf { it.isNotBlank() }
@@ -495,9 +520,27 @@ object TmdbRepository {
                     videos = videosList
                 )
 
+                // If AniBridge or resolved season indicates sequel season (> 1), fetch season-specific poster
+                val aniBridge = if (anilistId > 0) AniBridgeResolver.resolve(anilistId) else null
+                val defaultSeason = aniBridge?.defaultSeason ?: 1
+                if (resolved.type == "tv" && defaultSeason > 1) {
+                    try {
+                        val seasonRaw = executeTmdbGet("/tv/${resolved.id}/season/$defaultSeason")
+                        if (!seasonRaw.isNullOrBlank()) {
+                            val sJson = JSONObject(seasonRaw)
+                            val sPoster = sJson.optString("poster_path").takeIf { it.isNotBlank() }
+                            if (sPoster != null) {
+                                val sPosterUrl = "$TMDB_IMAGE_BASE/w500$sPoster"
+                                if (!allPosters.contains(sPosterUrl)) {
+                                    allPosters.add(0, sPosterUrl)
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 detailsCache[cacheKey] = details
                 return@withContext details
-            }
         } catch (e: Exception) {
             return@withContext null
         }
@@ -514,21 +557,13 @@ object TmdbRepository {
         val cached = showSeasonsCache[tmdbId]
         if (cached != null) return@withContext cached
 
-        val url = "$TMDB_VERCEL_BASE/tv/$tmdbId"
         try {
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    showSeasonsCache[tmdbId] = emptyList()
-                    return@withContext emptyList()
-                }
-                val raw = response.body.string()
-                val json = JSONObject(raw)
+            val raw = executeTmdbGet("/tv/$tmdbId")
+            if (raw.isNullOrBlank()) {
+                showSeasonsCache[tmdbId] = emptyList()
+                return@withContext emptyList()
+            }
+            val json = JSONObject(raw)
                 val seasonsArr = json.optJSONArray("seasons") ?: return@withContext emptyList()
 
                 val seasonsList = mutableListOf<TmdbSeasonInfo>()
@@ -544,7 +579,6 @@ object TmdbRepository {
                 seasonsList.sortBy { it.seasonNumber }
                 showSeasonsCache[tmdbId] = seasonsList
                 return@withContext seasonsList
-            }
         } catch (_: Exception) {
             showSeasonsCache[tmdbId] = emptyList()
             return@withContext emptyList()
@@ -562,21 +596,13 @@ object TmdbRepository {
         val cached = rawSeasonCache[cacheKey]
         if (cached != null) return@withContext cached
 
-        val url = "$TMDB_VERCEL_BASE/tv/$tmdbId/season/$seasonNumber"
         try {
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    rawSeasonCache[cacheKey] = emptyList()
-                    return@withContext emptyList()
-                }
-                val raw = response.body.string()
-                val json = JSONObject(raw)
+            val raw = executeTmdbGet("/tv/$tmdbId/season/$seasonNumber")
+            if (raw.isNullOrBlank()) {
+                rawSeasonCache[cacheKey] = emptyList()
+                return@withContext emptyList()
+            }
+            val json = JSONObject(raw)
                 val episodesArr = json.optJSONArray("episodes") ?: return@withContext emptyList()
 
                 val list = ArrayList<TmdbEpisodeStill>(episodesArr.length())
@@ -602,7 +628,6 @@ object TmdbRepository {
 
                 rawSeasonCache[cacheKey] = list
                 return@withContext list
-            }
         } catch (_: Exception) {
             rawSeasonCache[cacheKey] = emptyList()
             return@withContext emptyList()

@@ -1416,12 +1416,12 @@ fun CineButtonContainer(
             .scale(pressScale)
             .glassSurface(
                 shape = shape,
-                tint = if (isHero) Color(0x22FFFFFF) else Color(0x14FFFFFF), // Increased transparency: 0.13 for hero play, 0.08 for seek/other buttons
+                tint = if (isHero) Color(0xCC181D28) else Color(0x9910141E),
                 wash = if (isHero) Color(0x0AFFFFFF) else Color.Transparent,
-                elevation = if (isHero) 5.dp else 2.dp,
+                elevation = if (isHero) 4.dp else 1.dp,
                 pressed = isPressed,
-                borderWidth = if (isHero) 1.2.dp else 0.8.dp,
-                borderColor = if (isHero) Color(0x55FFFFFF) else Color(0x2EFFFFFF)
+                borderWidth = if (isHero) 1.dp else 0.8.dp,
+                borderColor = if (isHero) Color(0x40FFFFFF) else Color(0x1EFFFFFF)
             )
             .then(if (isSelected && !isHero) Modifier.background(accentColor.copy(alpha = 0.25f)) else Modifier),
         contentAlignment = Alignment.Center

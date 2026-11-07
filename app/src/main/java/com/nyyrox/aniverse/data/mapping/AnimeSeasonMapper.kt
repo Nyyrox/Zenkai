@@ -98,6 +98,14 @@ object AnimeSeasonMapper {
             }
         }
 
+        // 9. Black Clover
+        if (t.contains("black clover")) {
+            return when {
+                t.contains("season 2") || t.contains("2nd season") || t.contains("ii") -> 2
+                else -> 1
+            }
+        }
+
         // 6. Generic regex for Season N, Nth Season, Part N, Cour N
         val regexSeason = Regex("""\b(?:season\s*(\d+)|(\d+)(?:st|nd|rd|th)\s*season|part\s*(\d+)|cour\s*(\d+))\b""")
         val match = regexSeason.find(t)

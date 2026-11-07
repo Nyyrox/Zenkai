@@ -93,6 +93,39 @@ object AniBridgeResolver {
     private val resolvedSeriesCache = ConcurrentHashMap<Int, AniBridgeResult?>()
     private val resolvedEpisodeCache = ConcurrentHashMap<String, ResolvedEpisodeMapping>()
 
+    private val BUILTIN_OVERRIDES = mapOf(
+        // Black Clover Season 2 (AniList 195604 -> TMDB 73223 Season 2)
+        195604 to AniBridgeEntry(
+            anilistId = 195604,
+            tmdbShowTargets = listOf(
+                AniBridgeShowTarget(
+                    id = 73223,
+                    season = 2,
+                    ranges = listOf(AniBridgeTargetRange(1, 100, 1, 100))
+                )
+            ),
+            tmdbMovieId = null,
+            tvdbId = 72025,
+            malId = null
+        )
+    )
+
+    private fun applyBuiltinOverrides() {
+        for ((id, entry) in BUILTIN_OVERRIDES) {
+            anilistIndex[id] = entry
+            for (target in entry.tmdbShowTargets) {
+                tmdbToAnilistIndex["${target.id}:${target.season}"] = id
+                if (target.season == 1) {
+                    tmdbToAnilistIndex["${target.id}"] = id
+                }
+            }
+            if (entry.tmdbMovieId != null) {
+                tmdbToAnilistIndex["${entry.tmdbMovieId}:movie"] = id
+                tmdbToAnilistIndex["${entry.tmdbMovieId}"] = id
+            }
+        }
+    }
+
     fun init(context: Context) {
         appContext = context.applicationContext
         if (isInitializing.compareAndSet(false, true)) {
@@ -240,6 +273,7 @@ object AniBridgeResolver {
                         currentSource = "anibridge_cache"
                         isLoaded = true
                         loaded = true
+                        applyBuiltinOverrides()
                         Log.d(TAG, "[ANIBRIDGE] Source: cache (Entries: ${parsed.size})")
                     }
                 }
@@ -257,6 +291,7 @@ object AniBridgeResolver {
                         anilistIndex.putAll(parsed)
                         currentSource = "anibridge_bundled"
                         isLoaded = true
+                        applyBuiltinOverrides()
                         Log.d(TAG, "[ANIBRIDGE] Source: bundled asset (Entries: ${parsed.size})")
                     }
                 }
@@ -298,6 +333,7 @@ object AniBridgeResolver {
                                     resolvedEpisodeCache.clear()
                                     currentSource = "anibridge_remote"
                                     isLoaded = true
+                                    applyBuiltinOverrides()
                                     Log.d(TAG, "[ANIBRIDGE] Source: remote fork update (Entries: ${parsed.size})")
                                     return@withContext
                                 }
@@ -325,7 +361,7 @@ object AniBridgeResolver {
 
         ensureLoaded()
 
-        var entry = anilistIndex[anilistId]
+        var entry = anilistIndex[anilistId] ?: BUILTIN_OVERRIDES[anilistId]
 
         // Retry mapping bridge once before declaring no data
         if (entry == null) {
@@ -379,7 +415,7 @@ object AniBridgeResolver {
 
         ensureLoaded()
 
-        var entry = anilistIndex[anilistId]
+        var entry = anilistIndex[anilistId] ?: BUILTIN_OVERRIDES[anilistId]
 
         // Retry mapping bridge once before falling back
         if (entry == null) {
@@ -494,6 +530,7 @@ object AniBridgeResolver {
                         anilistIndex.putAll(parsed)
                         currentSource = "anibridge_cache"
                         isLoaded = true
+                        applyBuiltinOverrides()
                         Log.d(TAG, "[ANIBRIDGE] Mapping retry reloaded ${parsed.size} entries from cache")
                         return
                     }
@@ -511,6 +548,7 @@ object AniBridgeResolver {
                     anilistIndex.putAll(parsed)
                     currentSource = "anibridge_bundled"
                     isLoaded = true
+                    applyBuiltinOverrides()
                     Log.d(TAG, "[ANIBRIDGE] Mapping retry reloaded ${parsed.size} entries from bundled asset")
                 }
             }
