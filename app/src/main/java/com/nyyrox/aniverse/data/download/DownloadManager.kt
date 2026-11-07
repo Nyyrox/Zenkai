@@ -5,6 +5,7 @@ import android.util.Log
 import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.extractor.DirectStreamResolver
+import com.nyyrox.aniverse.data.extractor.ServerType
 import com.nyyrox.aniverse.player.StreamSniffer
 import com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver
 import com.nyyrox.aniverse.data.mapping.AnimeMappingRepository
@@ -388,7 +389,7 @@ class DownloadManager(private val context: Context) {
     fun downloadAnimeEpisode(
         anime: Anime,
         episode: Int,
-        provider: Provider,
+        provider: Provider? = null,
         episodeTitle: String? = null,
         quality: String = "Auto HD",
         audio: String = "Default",
@@ -413,14 +414,20 @@ class DownloadManager(private val context: Context) {
         val cancelToken = java.util.concurrent.atomic.AtomicBoolean(false)
         animeCancellationTokens[taskKey] = cancelToken
 
+        val isDub = audio.contains("DUB", ignoreCase = true)
+        val audioMode = if (isDub) "dub" else "sub"
+        val effectiveProvider = provider
+            ?: DirectStreamResolver.getDefaultDirectProviders(audioMode).firstOrNull()
+            ?: Provider("auto-direct", "Best Server", "", "HD", isDirectStream = true)
+
         val initialTask = AnimeDownloadTask(
             animeId = anime.id,
             animeTitle = anime.title,
             animeCover = anime.banner ?: anime.cover,
             episode = episode,
             episodeTitle = episodeTitle ?: "Episode $episode",
-            providerId = provider.id,
-            providerName = provider.name,
+            providerId = effectiveProvider.id,
+            providerName = effectiveProvider.name,
             quality = quality,
             audio = audio,
             status = DownloadStatus.QUEUED,
@@ -453,35 +460,8 @@ class DownloadManager(private val context: Context) {
                     return@withPermit
                 }
 
-                val isDub = audio.contains("DUB", ignoreCase = true)
                 val isMulti = audio.contains("MULTI", ignoreCase = true)
-                val audioMode = if (isDub) "dub" else "sub"
-
-                val targetProvider = if (provider.id.startsWith("auto-all") || !provider.isDirectStream || provider.isEmbedOnly) {
-                    val directProviders = DirectStreamResolver.getAvailableDirectProviders(anime.id, audioMode, episode)
-                    var resolvedProv: Provider? = null
-                    for (dp in directProviders) {
-                        try {
-                            val testResolved = DirectStreamResolver.resolveDirectStream(
-                                anilistId = anime.id,
-                                episode = episode,
-                                providerId = dp.id,
-                                isDub = isDub,
-                                animeTitle = anime.title
-                            )
-                            if (testResolved != null && !testResolved.streamUrl.isNullOrBlank()) {
-                                resolvedProv = dp
-                                break
-                            }
-                        } catch (_: Exception) {}
-                    }
-                    resolvedProv
-                        ?: directProviders.firstOrNull()
-                        ?: DirectStreamResolver.getDefaultDirectProviders(audioMode).firstOrNull()
-                        ?: provider
-                } else {
-                    provider
-                }
+                var activeProvider = effectiveProvider
                 val maxAttempts = 5
                 var attempt = 0
                 var downloadSucceeded = false
@@ -499,142 +479,171 @@ class DownloadManager(private val context: Context) {
                     put("cover", anime.banner ?: anime.cover)
                     put("lastDownloadedAt", System.currentTimeMillis())
                 }
-            animeMeta.writeText(aJson.toString())
+                animeMeta.writeText(aJson.toString())
 
-            while (attempt < maxAttempts && !downloadSucceeded) {
-                attempt++
-                if (cancelToken.get()) break
+                while (attempt < maxAttempts && !downloadSucceeded) {
+                    attempt++
+                    if (cancelToken.get()) break
 
-                try {
-                    _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
-                        providerId = targetProvider.id,
-                        providerName = targetProvider.name,
-                        speedFormatted = if (attempt > 1) "Retrying ${targetProvider.name} ($attempt/$maxAttempts)..." else "Connecting to ${targetProvider.name}...",
-                        status = DownloadStatus.DOWNLOADING
-                    ))
-
-                    // If retrying, clear stream cache so fresh manifest/tokens are obtained for this provider
-                    if (attempt > 1) {
-                        DirectStreamResolver.clearDirectStreamCache(targetProvider.id, anime.id, episode, audio)
-                    }
-
-                    // 1. Resolve raw playable stream URL & headers from the targetProvider
-                    var streamUrl: String? = null
-                    var streamHeaders: Map<String, String> = emptyMap()
-                    var streamSubtitles: List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> = emptyList()
-
-                    if (targetProvider.isDirectStream) {
-                        val directResolved = DirectStreamResolver.resolveDirectStream(
-                            anilistId = anime.id,
-                            episode = episode,
-                            providerId = targetProvider.id,
-                            isDub = targetProvider.isDub || audio.contains("DUB", ignoreCase = true),
-                            animeTitle = anime.title
-                        )
-                        if (directResolved != null) {
-                            streamUrl = directResolved.streamUrl
-                            streamHeaders = directResolved.headers
-                            streamSubtitles = directResolved.subtitles
+                    try {
+                        val priorityServerTarget = when (attempt) {
+                            1 -> null // Natural priority: 1st ACDN -> 2nd FlixCloud -> 3rd VidStream -> 4th MegaPlay
+                            2 -> ServerType.FLIXCLOUD
+                            3 -> ServerType.VIDSTREAM
+                            4 -> ServerType.MEGAPLAY
+                            else -> null
                         }
-                    } else {
-                        // Embed server downloads via headless StreamSniffer
-                        val isMovie = anime.format?.equals("MOVIE", ignoreCase = true) == true
-                        val malId = anime.idMal ?: try {
-                            AniBridgeResolver.resolve(anime.id)?.malId
-                        } catch (_: Exception) { null }
-                        val tmdbId = try {
-                            AniBridgeResolver.resolve(anime.id)?.tmdbId
-                        } catch (_: Exception) { null }
 
-                        val embedUrl = if (targetProvider.id.startsWith("animesalt")) {
-                            val candidate = AnimeMappingRepository.resolveCandidate(anime.id, episode, anime.title)
-                            val saltId = candidate.saltId.ifBlank {
-                                AnimeSaltResolver.normalizeAnimeSaltTitle(anime.title)
-                            }
-                            val season = candidate.season ?: 1
-                            val finalEp = candidate.finalEp
-                            val slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
-                            val extracted = AnimeSaltResolver.extractServers(slug, isMovie)
-                            extracted.myStreamUrl ?: extracted.abyssUrl ?: "https://animesalt.cx/episode/$slug/"
-                        } else {
-                            targetProvider.url(
+                        _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                            providerId = activeProvider.id,
+                            providerName = activeProvider.name,
+                            speedFormatted = if (attempt > 1) "Retrying with next server ($attempt/$maxAttempts)..." else "Connecting to best server...",
+                            status = DownloadStatus.DOWNLOADING
+                        ))
+
+                        // If retrying, clear stream cache so fresh manifest/tokens are obtained for this provider
+                        if (attempt > 1) {
+                            DirectStreamResolver.clearDirectStreamCache(activeProvider.id, anime.id, episode, audio)
+                        }
+
+                        // 1. Resolve raw playable stream URL & headers
+                        var streamUrl: String? = null
+                        var streamHeaders: Map<String, String> = emptyMap()
+                        var streamSubtitles: List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> = emptyList()
+
+                        // Try priority stream resolver first
+                        val priorityResult = try {
+                            DirectStreamResolver.resolvePriorityStream(
                                 anilistId = anime.id,
                                 episode = episode,
-                                slug = null,
-                                malId = malId,
-                                tmdbId = tmdbId,
-                                isMovie = isMovie
+                                isDub = isDub,
+                                animeTitle = anime.title,
+                                preferredServer = priorityServerTarget
                             )
+                        } catch (e: Exception) {
+                            Log.w("DownloadManager", "Priority resolver error on attempt $attempt: ${e.message}")
+                            null
                         }
 
-                        if (embedUrl.isNotBlank()) {
-                            _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
-                                providerId = targetProvider.id,
-                                providerName = targetProvider.name,
-                                speedFormatted = "Sniffing stream from ${targetProvider.name}...",
-                                status = DownloadStatus.DOWNLOADING
-                            ))
-
-                            val sniffed = try {
-                                StreamSniffer.sniff(
-                                    context = context,
-                                    embedUrl = embedUrl,
-                                    timeoutMs = 15000L
+                        if (priorityResult != null && !priorityResult.result.streamUrl.isNullOrBlank()) {
+                            activeProvider = priorityResult.provider
+                            streamUrl = priorityResult.result.streamUrl
+                            streamHeaders = priorityResult.result.headers
+                            streamSubtitles = priorityResult.result.subtitles
+                        } else {
+                            if (activeProvider.isDirectStream) {
+                                val directResolved = DirectStreamResolver.resolveDirectStream(
+                                    anilistId = anime.id,
+                                    episode = episode,
+                                    providerId = activeProvider.id,
+                                    isDub = activeProvider.isDub || isDub,
+                                    animeTitle = anime.title
                                 )
-                            } catch (_: Exception) { null }
-
-                            if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
-                                streamUrl = sniffed.streamUrl
-                                streamHeaders = sniffed.headers
-                                streamSubtitles = sniffed.subtitles
+                                if (directResolved != null) {
+                                    streamUrl = directResolved.streamUrl
+                                    streamHeaders = directResolved.headers
+                                    streamSubtitles = directResolved.subtitles
+                                }
                             } else {
-                                lastFailureReason = "Could not sniff stream from ${targetProvider.name}"
+                                // Embed server downloads via headless StreamSniffer
+                                val isMovie = anime.format?.equals("MOVIE", ignoreCase = true) == true
+                                val malId = anime.idMal ?: try {
+                                    AniBridgeResolver.resolve(anime.id)?.malId
+                                } catch (_: Exception) { null }
+                                val tmdbId = try {
+                                    AniBridgeResolver.resolve(anime.id)?.tmdbId
+                                } catch (_: Exception) { null }
+
+                                val embedUrl = if (activeProvider.id.startsWith("animesalt")) {
+                                    val candidate = AnimeMappingRepository.resolveCandidate(anime.id, episode, anime.title)
+                                    val saltId = candidate.saltId.ifBlank {
+                                        AnimeSaltResolver.normalizeAnimeSaltTitle(anime.title)
+                                    }
+                                    val season = candidate.season ?: 1
+                                    val finalEp = candidate.finalEp
+                                    val slug = if (isMovie) saltId else "$saltId-${season}x$finalEp"
+                                    val extracted = AnimeSaltResolver.extractServers(slug, isMovie)
+                                    extracted.myStreamUrl ?: extracted.abyssUrl ?: "https://animesalt.cx/episode/$slug/"
+                                } else {
+                                    activeProvider.url(
+                                        anilistId = anime.id,
+                                        episode = episode,
+                                        slug = null,
+                                        malId = malId,
+                                        tmdbId = tmdbId,
+                                        isMovie = isMovie
+                                    )
+                                }
+
+                                if (embedUrl.isNotBlank()) {
+                                    _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                                        providerId = activeProvider.id,
+                                        providerName = activeProvider.name,
+                                        speedFormatted = "Sniffing stream from ${activeProvider.name}...",
+                                        status = DownloadStatus.DOWNLOADING
+                                    ))
+
+                                    val sniffed = try {
+                                        StreamSniffer.sniff(
+                                            context = context,
+                                            embedUrl = embedUrl,
+                                            timeoutMs = 15000L
+                                        )
+                                    } catch (_: Exception) { null }
+
+                                    if (sniffed != null && sniffed.streamUrl.isNotBlank()) {
+                                        streamUrl = sniffed.streamUrl
+                                        streamHeaders = sniffed.headers
+                                        streamSubtitles = sniffed.subtitles
+                                    } else {
+                                        lastFailureReason = "Could not sniff stream from ${activeProvider.name}"
+                                    }
+                                } else {
+                                    lastFailureReason = "Could not resolve embed URL for ${activeProvider.name}"
+                                }
                             }
-                        } else {
-                            lastFailureReason = "Could not resolve embed URL for ${targetProvider.name}"
                         }
-                    }
 
-                    if (streamUrl.isNullOrBlank()) {
-                        lastFailureReason = "${targetProvider.name} returned no stream URL"
-                        if (attempt < maxAttempts) {
-                            kotlinx.coroutines.delay(2000L * attempt)
-                            continue
-                        } else {
-                            break
+                        if (streamUrl.isNullOrBlank()) {
+                            lastFailureReason = "${activeProvider.name} returned no stream URL"
+                            if (attempt < maxAttempts) {
+                                kotlinx.coroutines.delay(2000L * attempt)
+                                continue
+                            } else {
+                                break
+                            }
                         }
-                    }
 
-                    _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
-                        providerId = targetProvider.id,
-                        providerName = targetProvider.name,
-                        speedFormatted = if (attempt > 1) "Resuming from ${targetProvider.name}..." else "Downloading from ${targetProvider.name}...",
-                        status = DownloadStatus.DOWNLOADING
-                    ))
+                        _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
+                            providerId = activeProvider.id,
+                            providerName = activeProvider.name,
+                            speedFormatted = if (attempt > 1) "Resuming from ${activeProvider.name}..." else "Downloading from ${activeProvider.name}...",
+                            status = DownloadStatus.DOWNLOADING
+                        ))
 
-                    val finalFile = animeDownloader.downloadStream(
-                        streamUrl = streamUrl,
-                        outputDir = epFolder,
-                        headers = streamHeaders,
-                        preferredQuality = quality,
-                        preferredAudio = audio,
-                        isCancelled = { cancelToken.get() },
-                        onProgress = { prog, dlBytes, totBytes, speedStr, compSegs, totSegs ->
-                            val currentTask = initialTask.copy(
-                                providerId = targetProvider.id,
-                                providerName = targetProvider.name,
-                                progress = prog,
-                                downloadedBytes = dlBytes,
-                                totalBytes = totBytes,
-                                speedFormatted = speedStr,
-                                downloadedSegments = compSegs,
-                                totalSegments = totSegs,
-                                status = DownloadStatus.DOWNLOADING
-                            )
-                            _animeTasks.value = _animeTasks.value + (taskKey to currentTask)
-                            DownloadNotificationHelper.updateProgressNotification(context, currentTask)
-                        }
-                    )
+                        val finalFile = animeDownloader.downloadStream(
+                            streamUrl = streamUrl,
+                            outputDir = epFolder,
+                            headers = streamHeaders,
+                            preferredQuality = quality,
+                            preferredAudio = audio,
+                            isCancelled = { cancelToken.get() },
+                            onProgress = { prog, dlBytes, totBytes, speedStr, compSegs, totSegs ->
+                                val currentTask = initialTask.copy(
+                                    providerId = activeProvider.id,
+                                    providerName = activeProvider.name,
+                                    progress = prog,
+                                    downloadedBytes = dlBytes,
+                                    totalBytes = totBytes,
+                                    speedFormatted = speedStr,
+                                    downloadedSegments = compSegs,
+                                    totalSegments = totSegs,
+                                    status = DownloadStatus.DOWNLOADING
+                                )
+                                _animeTasks.value = _animeTasks.value + (taskKey to currentTask)
+                                DownloadNotificationHelper.updateProgressNotification(context, currentTask)
+                            }
+                        )
 
                     // Download subtitles/captions alongside the video file for offline playback
                     val downloadedSubtitles = mutableListOf<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>()
@@ -715,8 +724,8 @@ class DownloadManager(private val context: Context) {
                         put("episodeTitle", episodeTitle.orEmpty())
                         put("animeTitle", anime.title)
                         put("animeCover", anime.banner ?: anime.cover)
-                        put("providerId", targetProvider.id)
-                        put("providerName", targetProvider.name)
+                        put("providerId", activeProvider.id)
+                        put("providerName", activeProvider.name)
                         put("quality", quality)
                         put("audio", audio)
                         put("filePath", finalFile.absolutePath)
@@ -744,8 +753,8 @@ class DownloadManager(private val context: Context) {
                         DownloadPreferences.settings.value.storageLocation == DownloadStorageLocation.EXTERNAL_PUBLIC
                     if (wantsOutside) {
                         _animeTasks.value = _animeTasks.value + (taskKey to initialTask.copy(
-                            providerId = targetProvider.id,
-                            providerName = targetProvider.name,
+                            providerId = activeProvider.id,
+                            providerName = activeProvider.name,
                             progress = 1f,
                             speedFormatted = "Saving to your device...",
                             status = DownloadStatus.DOWNLOADING
@@ -761,8 +770,8 @@ class DownloadManager(private val context: Context) {
                     exportTargets.remove(taskKey)
                     animeCancellationTokens.remove(taskKey)
                     val completedTask = initialTask.copy(
-                        providerId = targetProvider.id,
-                        providerName = targetProvider.name,
+                        providerId = activeProvider.id,
+                        providerName = activeProvider.name,
                         status = DownloadStatus.COMPLETED,
                         progress = 1.0f,
                         localFilePath = finalFile.absolutePath
@@ -775,10 +784,10 @@ class DownloadManager(private val context: Context) {
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.w("DownloadManager", "${targetProvider.name} download attempt $attempt failed: ${e.message}")
-                    lastFailureReason = "${targetProvider.name}: ${e.message ?: "Failed"}"
+                    Log.w("DownloadManager", "${activeProvider.name} download attempt $attempt failed: ${e.message}")
+                    lastFailureReason = "${activeProvider.name}: ${e.message ?: "Failed"}"
                     if (attempt < maxAttempts) {
-                        Log.i("DownloadManager", "Retrying ${targetProvider.name} (attempt ${attempt + 1}/$maxAttempts) after delay...")
+                        Log.i("DownloadManager", "Retrying ${activeProvider.name} (attempt ${attempt + 1}/$maxAttempts) after delay...")
                         kotlinx.coroutines.delay(2000L * attempt)
                     }
                 }
@@ -786,10 +795,10 @@ class DownloadManager(private val context: Context) {
 
             if (!downloadSucceeded && !cancelToken.get()) {
                 animeCancellationTokens.remove(taskKey)
-                val userErrorMessage = "Download stopped on ${targetProvider.name} ($lastFailureReason). Tap Retry to resume."
+                val userErrorMessage = "Download stopped on ${activeProvider.name} ($lastFailureReason). Tap Retry to resume."
                 val failedTask = initialTask.copy(
-                    providerId = targetProvider.id,
-                    providerName = targetProvider.name,
+                    providerId = activeProvider.id,
+                    providerName = activeProvider.name,
                     status = DownloadStatus.FAILED,
                     error = userErrorMessage
                 )
@@ -817,7 +826,7 @@ class DownloadManager(private val context: Context) {
     fun downloadAnimeEpisodes(
         anime: Anime,
         episodes: List<Int>,
-        provider: Provider,
+        provider: Provider? = null,
         quality: String = "Auto HD",
         audio: String = "Default"
     ) {

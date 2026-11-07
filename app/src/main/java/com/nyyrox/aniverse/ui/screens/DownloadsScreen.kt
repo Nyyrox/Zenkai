@@ -146,7 +146,6 @@ fun DownloadsScreen(
         allTasks.filter { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
     }
     val failedTasks = remember(allTasks) { allTasks.filter { it.status == DownloadStatus.FAILED } }
-    var retrySheetTask by remember { mutableStateOf<DownloadTaskInfo?>(null) }
     var deleteConfirmation by remember { mutableStateOf<DeleteConfirmationTarget?>(null) }
     var isDownloadingExpanded by remember { mutableStateOf(true) }
     var isFailedExpanded by remember { mutableStateOf(false) }
@@ -311,8 +310,27 @@ fun DownloadsScreen(
                                         }
                                     },
                                     onChangeServer = {
-                                        if (task.type == DownloadType.ANIME) retrySheetTask = task
-                                        else vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
+                                        if (task.type == DownloadType.ANIME) {
+                                            val retryAnime = com.nyyrox.aniverse.data.Anime(
+                                                id = task.itemId.toIntOrNull() ?: 0,
+                                                title = task.itemTitle.ifBlank { task.title },
+                                                cover = task.cover ?: ""
+                                            )
+                                            val ep = task.chapterId.toIntOrNull() ?: 1
+                                            vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
+                                            val dlQuality = task.quality ?: vm.getLastDownloadQuality() ?: "Auto HD"
+                                            val dlAudio = task.audio ?: vm.getLastDownloadAudio() ?: "Default"
+                                            vm.downloadAnimeEpisode(
+                                                anime = retryAnime,
+                                                episode = ep,
+                                                episodeTitle = task.title,
+                                                quality = dlQuality,
+                                                audio = dlAudio
+                                            )
+                                            android.widget.Toast.makeText(context, "Retrying Ep $ep with best server...", android.widget.Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
+                                        }
                                     },
                                     onDismiss = { vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId) }
                                 )
@@ -393,39 +411,7 @@ fun DownloadsScreen(
         }
     }
 
-    retrySheetTask?.let { task ->
-        val retryAnime = remember(task) {
-            com.nyyrox.aniverse.data.Anime(
-                id = task.itemId.toIntOrNull() ?: 0,
-                title = task.itemTitle.ifBlank { task.title },
-                cover = task.cover ?: ""
-            )
-        }
-        val ep = task.chapterId.toIntOrNull() ?: 1
-        val initialProv = remember(task) {
-            com.nyyrox.aniverse.data.ALL_PROVIDERS.find { it.id == task.providerId }
-        }
 
-        com.nyyrox.aniverse.ui.components.DownloadAnimeOptionsSheet(
-            anime = retryAnime,
-            episode = ep,
-            episodeTitle = task.title,
-            initialProvider = initialProv,
-            onDismiss = { retrySheetTask = null },
-            onStartDownload = { prov, quality, audio ->
-                vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
-                vm.downloadAnimeEpisode(
-                    anime = retryAnime,
-                    episode = ep,
-                    provider = prov,
-                    episodeTitle = task.title,
-                    quality = quality,
-                    audio = audio
-                )
-                retrySheetTask = null
-            }
-        )
-    }
 
     deleteConfirmation?.let { target ->
         IosDeleteConfirmationDialog(target = target, onDismiss = { deleteConfirmation = null })

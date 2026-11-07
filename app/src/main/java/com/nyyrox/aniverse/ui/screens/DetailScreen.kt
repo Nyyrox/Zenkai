@@ -482,9 +482,6 @@ fun DetailScreen(
     var episodeSearchQuery by remember { mutableStateOf("") }
     var isOldestFirst by remember { mutableStateOf(true) }
 
-    var showDownloadSheetEpisode by remember { mutableStateOf<Pair<Int, String?>?>(null) }
-    var showDownloadRangeSheet by remember { mutableStateOf<IntRange?>(null) }
-
     var isSynopsisExpanded by remember { mutableStateOf(false) }
     var showWatchlistStatusDialog by remember { mutableStateOf(false) }
 
@@ -1189,7 +1186,23 @@ fun DetailScreen(
                                         Row(
                                             modifier = Modifier
                                                 .height(34.dp)
-                                                .pressable(0.94f) { showDownloadRangeSheet = curStart..curEnd }
+                                                .pressable(0.94f) {
+                                                    val eps = (curStart..curEnd).toList()
+                                                    val dlQuality = vm.getLastDownloadQuality() ?: "Auto HD"
+                                                    val dlAudio = if (selectedAudioMode.equals("DUB", ignoreCase = true)) "English (Dub)" else "Japanese (Sub)"
+                                                    vm.downloadAnimeEpisodes(
+                                                        anime = anime,
+                                                        episodes = eps,
+                                                        provider = selectedProvider,
+                                                        quality = dlQuality,
+                                                        audio = dlAudio
+                                                    )
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "Downloading ${eps.size} episodes (${curStart}–${curEnd})...",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
                                                 .homeGlass(p, 999.dp)
                                                 .padding(horizontal = 12.dp),
                                             verticalAlignment = Alignment.CenterVertically,
@@ -1334,7 +1347,17 @@ fun DetailScreen(
                                     onDownload = {
                                         if (!isDownloaded && !isDownloading) {
                                             com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                            showDownloadSheetEpisode = epNum to (still?.name ?: "Episode $epNum")
+                                            val dlQuality = vm.getLastDownloadQuality() ?: "Auto HD"
+                                            val dlAudio = if (selectedAudioMode.equals("DUB", ignoreCase = true)) "English (Dub)" else "Japanese (Sub)"
+                                            vm.downloadAnimeEpisode(
+                                                anime = anime,
+                                                episode = epNum,
+                                                provider = selectedProvider,
+                                                episodeTitle = still?.name ?: "Episode $epNum",
+                                                quality = dlQuality,
+                                                audio = dlAudio
+                                            )
+                                            android.widget.Toast.makeText(context, "Downloading Ep $epNum...", android.widget.Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )
@@ -1661,51 +1684,7 @@ fun DetailScreen(
         )
     }
 
-    showDownloadSheetEpisode?.let { (ep, epTitle) ->
-        com.nyyrox.aniverse.ui.components.DownloadAnimeOptionsSheet(
-            anime = anime,
-            episode = ep,
-            episodeTitle = epTitle,
-            initialProvider = selectedProvider,
-            availableDirectServers = availableDirectServers,
-            onDismiss = { showDownloadSheetEpisode = null },
-            onStartDownload = { prov, quality, audio ->
-                vm.downloadAnimeEpisode(
-                    anime = anime,
-                    episode = ep,
-                    provider = prov,
-                    episodeTitle = epTitle,
-                    quality = quality,
-                    audio = audio
-                )
-                android.widget.Toast.makeText(context, "Downloading Ep $ep ($quality · $audio)...", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
 
-    showDownloadRangeSheet?.let { range ->
-        com.nyyrox.aniverse.ui.components.DownloadAnimeOptionsSheet(
-            anime = anime,
-            episodesRange = range,
-            initialProvider = selectedProvider,
-            availableDirectServers = availableDirectServers,
-            onDismiss = { showDownloadRangeSheet = null },
-            onStartBatchDownload = { eps, prov, quality, audio ->
-                vm.downloadAnimeEpisodes(
-                    anime = anime,
-                    episodes = eps,
-                    provider = prov,
-                    quality = quality,
-                    audio = audio
-                )
-                android.widget.Toast.makeText(
-                    context,
-                    "Downloading ${eps.size} episodes (${eps.first()}–${eps.last()}) on ${prov.name} ($quality · $audio)...",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
-            }
-        )
-    }
 
     failedTaskForCurrentAnime?.let { failedTask ->
         AlertDialog(
@@ -1771,10 +1750,20 @@ fun DetailScreen(
                                 failedTask.animeId.toString(),
                                 failedTask.episode.toString()
                             )
-                            showDownloadSheetEpisode = ep to epTitle
+                            val dlQuality = failedTask.quality ?: vm.getLastDownloadQuality() ?: "Auto HD"
+                            val dlAudio = failedTask.audio ?: if (selectedAudioMode.equals("DUB", ignoreCase = true)) "English (Dub)" else "Japanese (Sub)"
+                            vm.downloadAnimeEpisode(
+                                anime = anime,
+                                episode = ep,
+                                provider = selectedProvider,
+                                episodeTitle = epTitle,
+                                quality = dlQuality,
+                                audio = dlAudio
+                            )
+                            android.widget.Toast.makeText(context, "Retrying Ep $ep...", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     ) {
-                        Text("Change Server", color = p.text, fontWeight = FontWeight.Bold)
+                        Text("Retry with Best Server", color = p.text, fontWeight = FontWeight.Bold)
                     }
                     TextButton(
                         onClick = {
