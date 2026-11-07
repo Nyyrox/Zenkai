@@ -1370,14 +1370,13 @@ fun Modifier.glassSurface(
     shape: Shape,
     tint: Color = Color(0xB310141D), // Elegant dark translucent background matching APK UI
     wash: Color = Color.Transparent,
-    elevation: Dp = 4.dp,
+    elevation: Dp = 0.dp,
     pressed: Boolean = false,
     borderWidth: Dp = 1.dp,
     borderColor: Color = Color(0x28FFFFFF),
     useBackdrop: Boolean = true
 ): Modifier = composed {
     this
-        .shadow(if (elevation > 0.dp) 2.dp else 0.dp, shape, clip = false)
         .clip(shape)
         .background(if (pressed) Color(0xD91E232E) else tint)
         .then(if (wash != Color.Transparent) Modifier.background(wash) else Modifier)
@@ -1404,24 +1403,18 @@ fun CineButtonContainer(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "glassPress"
     )
-    val shape = when {
-        !isCircle -> RoundedCornerShape(12.dp)
-        iconPack == IconPackPreset.CYBER_NEON ||
-        iconPack == IconPackPreset.BLADE_SAMURAI ||
-        iconPack == IconPackPreset.RETRO_ARCADE -> RoundedCornerShape(10.dp)
-        else -> CircleShape
-    }
+    val shape = if (isCircle) CircleShape else RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
             .scale(pressScale)
             .glassSurface(
                 shape = shape,
-                tint = if (isHero) Color(0x3D0D111A) else Color(0x280D111A),
-                wash = if (isHero) Color(0x10FFFFFF) else Color(0x06FFFFFF),
-                elevation = if (isHero) 2.dp else 0.dp,
+                tint = Color(0x280D111A),
+                wash = Color(0x06FFFFFF),
+                elevation = 0.dp,
                 pressed = isPressed,
-                borderWidth = if (isHero) 1.dp else 0.75.dp,
-                borderColor = if (isHero) Color(0x28FFFFFF) else Color(0x18FFFFFF)
+                borderWidth = 0.75.dp,
+                borderColor = Color(0x18FFFFFF)
             )
             .then(if (isSelected && !isHero) Modifier.background(accentColor.copy(alpha = 0.25f)) else Modifier),
         contentAlignment = Alignment.Center
