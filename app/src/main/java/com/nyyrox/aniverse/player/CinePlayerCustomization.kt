@@ -1,5 +1,10 @@
 package com.nyyrox.aniverse.player
 
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
+import android.view.ViewGroup
+import kotlin.math.abs
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -1837,4 +1842,194 @@ fun CineStreamLoader(
             }
         }
     }
+}
+
+
+// =========================================================================
+// Video Filters & 4K AI Upscaler (Anime4K) - Mirroring Web CinePlayer
+// =========================================================================
+
+data class VideoFiltersState(
+    val preset: String = "off", // "off", "vibrant", "cinema", "sharp", "warm"
+    val brightness: Int = 100,  // 70..130
+    val contrast: Int = 100,    // 70..140
+    val saturation: Int = 100   // 70..160
+) {
+    val isDefault: Boolean
+        get() = preset == "off" && brightness == 100 && contrast == 100 && saturation == 100
+}
+
+data class UpscalerState(
+    val enabled: Boolean = false,
+    val mode: String = "modeA", // "modeA", "modeB", "modeC", "modeAA", "denoise", "fast"
+    val intensity: Int = 100    // 0..100
+)
+
+data class Anime4KModeItem(
+    val id: String,
+    val label: String,
+    val desc: String
+)
+
+val ANIME4K_MODES: List<Anime4KModeItem> = listOf(
+    Anime4KModeItem("modeA", "Mode A", "Balanced restoration & 2x upscale (Best for 720p/1080p anime)"),
+    Anime4KModeItem("modeB", "Mode B", "Soft restoration (Reduces compression ringing & artifacts)"),
+    Anime4KModeItem("modeC", "Mode C", "Sharp outlines & high detail for crisp modern animation"),
+    Anime4KModeItem("modeAA", "Mode AA", "Double-pass ultra restoration for maximum clean detail"),
+    Anime4KModeItem("denoise", "Denoise", "Artifact removal & debanding + 2x CNN upscale"),
+    Anime4KModeItem("fast", "Fast CNN", "Lightweight 2x neural net (low battery / integrated GPU)")
+)
+
+data class VideoFilterPresetItem(
+    val id: String,
+    val label: String
+)
+
+val VIDEO_FILTER_PRESETS: List<VideoFilterPresetItem> = listOf(
+    VideoFilterPresetItem("off", "Default"),
+    VideoFilterPresetItem("vibrant", "Vibrance"),
+    VideoFilterPresetItem("cinema", "Cinema HDR"),
+    VideoFilterPresetItem("sharp", "Crisp Lines"),
+    VideoFilterPresetItem("warm", "Warm (Eye Care)")
+)
+
+fun computeVideoFilterColorMatrix(
+    vfx: VideoFiltersState,
+    upscaler: UpscalerState
+): android.graphics.ColorMatrix? {
+    if (vfx.isDefault && !upscaler.enabled) {
+        return null
+    }
+
+    var baseSat = 1.0f
+    var baseCon = 1.0f
+    var baseBri = 1.0f
+    var sepiaAmount = 0.0f
+
+    when (vfx.preset) {
+        "vibrant" -> {
+            baseSat = 1.28f
+            baseCon = 1.06f
+            baseBri = 1.02f
+        }
+        "cinema" -> {
+            baseCon = 1.18f
+            baseSat = 1.10f
+            baseBri = 0.98f
+        }
+        "sharp" -> {
+            baseCon = 1.14f
+            baseBri = 1.02f
+        }
+        "warm" -> {
+            sepiaAmount = 0.20f
+            baseSat = 1.08f
+            baseBri = 0.98f
+        }
+    }
+
+    if (upscaler.enabled) {
+        val intensity = (upscaler.intensity.coerceIn(0, 100) / 100f)
+        when (upscaler.mode) {
+            "modeA" -> {
+                baseCon *= (1.0f + 0.07f * intensity)
+                baseSat *= (1.0f + 0.05f * intensity)
+                baseBri *= (1.0f + 0.01f * intensity)
+            }
+            "modeB" -> {
+                baseCon *= (1.0f + 0.03f * intensity)
+                baseSat *= (1.0f + 0.02f * intensity)
+            }
+            "modeC" -> {
+                baseCon *= (1.0f + 0.12f * intensity)
+                baseBri *= (1.0f + 0.02f * intensity)
+            }
+            "modeAA" -> {
+                baseCon *= (1.0f + 0.14f * intensity)
+                baseSat *= (1.0f + 0.06f * intensity)
+                baseBri *= (1.0f + 0.02f * intensity)
+            }
+            "denoise" -> {
+                baseCon *= (1.0f + 0.05f * intensity)
+                baseSat *= (1.0f + 0.03f * intensity)
+            }
+            "fast" -> {
+                baseCon *= (1.0f + 0.05f * intensity)
+            }
+        }
+    }
+
+    val finalSat = baseSat * (vfx.saturation / 100f)
+    val finalCon = baseCon * (vfx.contrast / 100f)
+    val finalBri = baseBri * (vfx.brightness / 100f)
+
+    val finalMatrix = android.graphics.ColorMatrix()
+
+    if (abs(finalCon - 1.0f) > 0.001f) {
+        val scale = finalCon
+        val translate = (1.0f - scale) * 128f
+        val conMatrix = android.graphics.ColorMatrix(floatArrayOf(
+            scale, 0f, 0f, 0f, translate,
+            0f, scale, 0f, 0f, translate,
+            0f, 0f, scale, 0f, translate,
+            0f, 0f, 0f, 1f, 0f
+        ))
+        finalMatrix.postConcat(conMatrix)
+    }
+
+    if (abs(finalSat - 1.0f) > 0.001f) {
+        val satMatrix = android.graphics.ColorMatrix()
+        satMatrix.setSaturation(finalSat)
+        finalMatrix.postConcat(satMatrix)
+    }
+
+    if (abs(finalBri - 1.0f) > 0.001f) {
+        val briMatrix = android.graphics.ColorMatrix()
+        briMatrix.setScale(finalBri, finalBri, finalBri, 1.0f)
+        finalMatrix.postConcat(briMatrix)
+    }
+
+    if (sepiaAmount > 0.001f) {
+        val inv = 1f - sepiaAmount
+        val sepiaMatrix = android.graphics.ColorMatrix(floatArrayOf(
+            inv + 0.393f * sepiaAmount, 0.769f * sepiaAmount, 0.189f * sepiaAmount, 0f, 0f,
+            0.349f * sepiaAmount, inv + 0.686f * sepiaAmount, 0.168f * sepiaAmount, 0f, 0f,
+            0.272f * sepiaAmount, 0.534f * sepiaAmount, inv + 0.131f * sepiaAmount, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        ))
+        finalMatrix.postConcat(sepiaMatrix)
+    }
+
+    return finalMatrix
+}
+
+fun findTextureView(root: View?): TextureView? {
+    if (root == null) return null
+    if (root is TextureView) return root
+    if (root is ViewGroup) {
+        for (i in 0 until root.childCount) {
+            val tv = findTextureView(root.getChildAt(i))
+            if (tv != null) return tv
+        }
+    }
+    return null
+}
+
+fun applyVideoEffects(
+    playerView: PlayerView?,
+    vfx: VideoFiltersState,
+    upscaler: UpscalerState
+) {
+    if (playerView == null) return
+    val tv = (playerView.videoSurfaceView as? TextureView) ?: findTextureView(playerView) ?: return
+    val matrix = computeVideoFilterColorMatrix(vfx, upscaler)
+    if (matrix == null) {
+        tv.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+    } else {
+        val paint = Paint().apply {
+            colorFilter = ColorMatrixColorFilter(matrix)
+        }
+        tv.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
+    }
+    tv.invalidate()
 }

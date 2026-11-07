@@ -161,6 +161,8 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
@@ -539,7 +541,9 @@ private enum class PlayerSettingsTab {
     SPEED,
     AUDIO,
     THEME_PACKS,
-    GESTURES
+    GESTURES,
+    UPSCALER,
+    PICTURE
 }
 
 @OptIn(UnstableApi::class)
@@ -633,6 +637,15 @@ fun CinePlayerView(
     var isUpNextCanceled by remember(episode, streamUrl) { mutableStateOf(false) }
     var showPlayerSettingsModal by remember { mutableStateOf(false) }
     var activeSettingsTab by remember { mutableStateOf(PlayerSettingsTab.MAIN) }
+    var videoFilters by remember { mutableStateOf(storageManager.getVideoFilters()) }
+    var upscalerSettings by remember { mutableStateOf(storageManager.getUpscalerSettings()) }
+    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+
+    LaunchedEffect(videoFilters, upscalerSettings, playerViewRef) {
+        playerViewRef?.let { pv ->
+            applyVideoEffects(pv, videoFilters, upscalerSettings)
+        }
+    }
 
     // Mini player handoff: start already in NATIVE_EXO with the parked stream so no loader flashes
     val handoff = remember(streamUrl) { MiniPlayerManager.peek(anilistId, episode, streamUrl) }
@@ -2222,6 +2235,7 @@ fun CinePlayerView(
                             .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier),
                         factory = { ctx ->
                             (LayoutInflater.from(ctx).inflate(com.nyyrox.aniverse.R.layout.cine_player_texture, null, false) as PlayerView).apply {
+                                playerViewRef = this
                                 useController = false
                                 this.resizeMode = resizeMode
                                 setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -2233,13 +2247,18 @@ fun CinePlayerView(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
+                                post {
+                                    applyVideoEffects(this, videoFilters, upscalerSettings)
+                                }
                             }
                         },
                         update = { view ->
+                            playerViewRef = view
                             if (view.player !== exoPlayer) {
                                 view.player = exoPlayer
                             }
                             view.resizeMode = resizeMode
+                            applyVideoEffects(view, videoFilters, upscalerSettings)
                             // Hide basic Android SubtitleView whenever player UI caption is shown
                             if (isCaptionsEnabled && activeCuesText != null) {
                                 view.subtitleView?.visibility = View.GONE
@@ -3061,6 +3080,30 @@ fun CinePlayerView(
                                             controlsTimeoutKey++
                                         }
                                     )
+                                    if (upscalerSettings.enabled) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0xFFE50914).copy(alpha = 0.25f))
+                                                .border(1.dp, Color(0xFFE50914), RoundedCornerShape(6.dp))
+                                                .clickable {
+                                                    morphAnchor = null
+                                                    activeSettingsTab = PlayerSettingsTab.UPSCALER
+                                                    showPlayerSettingsModal = true
+                                                    controlsTimeoutKey++
+                                                }
+                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "4K",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        }
+                                    }
                                     GlassPillIcon(
                                         icon = if (isScreenLocked) playerCustomization.themePack.lockIcon else playerCustomization.themePack.unlockIcon,
                                         contentDescription = "Lock Screen",
@@ -3668,7 +3711,17 @@ fun CinePlayerView(
             serverName = serverName,
             isDub = isDub,
             hasDubAvailable = hasDubAvailable,
-            onSwitchAudioStream = onSwitchAudioStream
+            onSwitchAudioStream = onSwitchAudioStream,
+            videoFilters = videoFilters,
+            onVideoFiltersChange = { newFilters ->
+                videoFilters = newFilters
+                storageManager.saveVideoFilters(newFilters)
+            },
+            upscalerSettings = upscalerSettings,
+            onUpscalerChange = { newSettings ->
+                upscalerSettings = newSettings
+                storageManager.saveUpscalerSettings(newSettings)
+            }
         )
     }
 
@@ -4352,6 +4405,10 @@ private fun PlayerSettingsModal(
     isDub: Boolean = false,
     hasDubAvailable: Boolean = true,
     onSwitchAudioStream: ((Boolean) -> Unit)? = null,
+    videoFilters: VideoFiltersState = VideoFiltersState(),
+    onVideoFiltersChange: (VideoFiltersState) -> Unit = {},
+    upscalerSettings: UpscalerState = UpscalerState(),
+    onUpscalerChange: (UpscalerState) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     GlassDialog(
@@ -4441,6 +4498,34 @@ private fun PlayerSettingsModal(
                             title = "Aspect Ratio",
                             subtitle = fitSubtitle,
                             onClick = { onTabChange(PlayerSettingsTab.ORIENTATION) }
+                        )
+
+                        // AI 4K Upscaler (Anime4K)
+                        val upscalerSubtitle = if (upscalerSettings.enabled) {
+                            val m = ANIME4K_MODES.find { it.id == upscalerSettings.mode }?.label ?: "Mode A"
+                            "ON · $m (${upscalerSettings.intensity}%)"
+                        } else {
+                            "Off"
+                        }
+                        SettingsItemRow(
+                            icon = Icons.Default.AutoAwesome,
+                            title = "AI 4K Upscaler (Anime4K)",
+                            subtitle = upscalerSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.UPSCALER) }
+                        )
+
+                        // Visual Enhancements & Shaders
+                        val vfxSubtitle = if (!videoFilters.isDefault) {
+                            val pName = VIDEO_FILTER_PRESETS.find { it.id == videoFilters.preset }?.label ?: "Custom"
+                            "$pName (B:${videoFilters.brightness}%, C:${videoFilters.contrast}%, S:${videoFilters.saturation}%)"
+                        } else {
+                            "Default"
+                        }
+                        SettingsItemRow(
+                            icon = Icons.Default.Tune,
+                            title = "Visual Enhancements & Shaders",
+                            subtitle = vfxSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.PICTURE) }
                         )
 
                         // Server (only when there is a choice)
@@ -5223,6 +5308,478 @@ private fun PlayerSettingsModal(
                         )
 
                         Spacer(Modifier.height(4.dp))
+                    }
+                }
+
+                PlayerSettingsTab.UPSCALER -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SubHeader(
+                            title = "AI 4K Upscaler",
+                            onBack = { onTabChange(PlayerSettingsTab.MAIN) },
+                            onClose = onDismiss
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .height(1.dp)
+                                .background(Color(0x1FFFFFFF))
+                        )
+
+                        // Master Toggle Card
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (upscalerSettings.enabled) Color(0xFFE50914).copy(alpha = 0.16f) else Color(0x15FFFFFF))
+                                .border(
+                                    1.dp,
+                                    if (upscalerSettings.enabled) Color(0xFFE50914).copy(alpha = 0.5f) else Color(0x22FFFFFF),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    onUpscalerChange(upscalerSettings.copy(enabled = !upscalerSettings.enabled))
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(if (upscalerSettings.enabled) Color(0xFFE50914) else Color(0x22FFFFFF)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Anime4K AI Upscaling",
+                                        color = Color.White,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (upscalerSettings.enabled) "Active · GPU Real-Time" else "Disabled · Tap to enable",
+                                        color = if (upscalerSettings.enabled) Color(0xFFFF5252) else OttTextMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = upscalerSettings.enabled,
+                                onCheckedChange = { isChecked ->
+                                    onUpscalerChange(upscalerSettings.copy(enabled = isChecked))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFFE50914),
+                                    uncheckedThumbColor = Color(0xFFAAAAAA),
+                                    uncheckedTrackColor = Color(0x33FFFFFF)
+                                )
+                            )
+                        }
+
+                        if (upscalerSettings.enabled) {
+                            Text(
+                                text = "Anime4K Model / Shader Preset",
+                                color = OttTextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+
+                            // Grid of 6 presets (2 columns x 3 rows)
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                ANIME4K_MODES.chunked(2).forEach { rowModes ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        rowModes.forEach { modeItem ->
+                                            val isSelected = upscalerSettings.mode == modeItem.id
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(38.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(
+                                                        if (isSelected) Color(0xFFE50914)
+                                                        else Color(0x1FFFFFFF)
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        if (isSelected) Color(0xFFFF4B4B)
+                                                        else Color(0x22FFFFFF),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .clickable {
+                                                        onUpscalerChange(upscalerSettings.copy(mode = modeItem.id))
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = modeItem.label,
+                                                    color = Color.White,
+                                                    fontSize = 12.5.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Descriptive note about selected preset
+                            val activeDesc = ANIME4K_MODES.find { it.id == upscalerSettings.mode }?.desc ?: ""
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0x12FFFFFF))
+                                    .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = Color(0xFF38BDF8),
+                                        modifier = Modifier.size(15.dp).padding(top = 1.dp)
+                                    )
+                                    Text(
+                                        text = activeDesc,
+                                        color = Color(0xFFD1D5DB),
+                                        fontSize = 11.5.sp,
+                                        lineHeight = 15.sp
+                                    )
+                                }
+                            }
+
+                            // Intensity slider
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Upscale Intensity",
+                                    color = OttTextMuted,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "${upscalerSettings.intensity}%",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Slider(
+                                value = upscalerSettings.intensity.toFloat(),
+                                onValueChange = { newVal ->
+                                    onUpscalerChange(upscalerSettings.copy(intensity = newVal.toInt()))
+                                },
+                                valueRange = 0f..100f,
+                                steps = 19,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color.White,
+                                    activeTrackColor = Color(0xFFE50914),
+                                    inactiveTrackColor = Color(0x28FFFFFF)
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(26.dp)
+                            )
+                        }
+
+                        // Info footer
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x0CFFFFFF))
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = "Runs in real-time on your GPU with neural shaders. Best on 720p-1080p anime.",
+                                color = OttTextMuted,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+
+                PlayerSettingsTab.PICTURE -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SubHeader(
+                            title = "Visual Enhancements & Shaders",
+                            onBack = { onTabChange(PlayerSettingsTab.MAIN) },
+                            onClose = onDismiss
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .height(1.dp)
+                                .background(Color(0x1FFFFFFF))
+                        )
+
+                        Text(
+                            text = "Presets",
+                            color = OttTextMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        // Preset chips
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(VIDEO_FILTER_PRESETS[0], VIDEO_FILTER_PRESETS[1]).forEach { p ->
+                                    val isSelected = videoFilters.preset == p.id
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) Color(0xFFE50914) else Color(0x1FFFFFFF))
+                                            .border(1.dp, if (isSelected) Color(0xFFFF4B4B) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                onVideoFiltersChange(videoFilters.copy(preset = p.id))
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = p.label,
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(VIDEO_FILTER_PRESETS[2], VIDEO_FILTER_PRESETS[3]).forEach { p ->
+                                    val isSelected = videoFilters.preset == p.id
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) Color(0xFFE50914) else Color(0x1FFFFFFF))
+                                            .border(1.dp, if (isSelected) Color(0xFFFF4B4B) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                onVideoFiltersChange(videoFilters.copy(preset = p.id))
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = p.label,
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            val warmPreset = VIDEO_FILTER_PRESETS[4]
+                            val isWarmSelected = videoFilters.preset == warmPreset.id
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isWarmSelected) Color(0xFFE50914) else Color(0x1FFFFFFF))
+                                    .border(1.dp, if (isWarmSelected) Color(0xFFFF4B4B) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onVideoFiltersChange(videoFilters.copy(preset = warmPreset.id))
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = warmPreset.label,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isWarmSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        // Brightness Slider
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Brightness",
+                                color = OttTextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${videoFilters.brightness}%",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = videoFilters.brightness.toFloat(),
+                            onValueChange = { newVal ->
+                                onVideoFiltersChange(videoFilters.copy(brightness = newVal.toInt()))
+                            },
+                            valueRange = 70f..130f,
+                            steps = 29,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color(0xFFE50914),
+                                inactiveTrackColor = Color(0x28FFFFFF)
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(26.dp)
+                        )
+
+                        // Contrast Slider
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Contrast",
+                                color = OttTextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${videoFilters.contrast}%",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = videoFilters.contrast.toFloat(),
+                            onValueChange = { newVal ->
+                                onVideoFiltersChange(videoFilters.copy(contrast = newVal.toInt()))
+                            },
+                            valueRange = 70f..140f,
+                            steps = 34,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color(0xFFE50914),
+                                inactiveTrackColor = Color(0x28FFFFFF)
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(26.dp)
+                        )
+
+                        // Color Saturation Slider
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Color Saturation",
+                                color = OttTextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${videoFilters.saturation}%",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = videoFilters.saturation.toFloat(),
+                            onValueChange = { newVal ->
+                                onVideoFiltersChange(videoFilters.copy(saturation = newVal.toInt()))
+                            },
+                            valueRange = 70f..160f,
+                            steps = 17,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color(0xFFE50914),
+                                inactiveTrackColor = Color(0x28FFFFFF)
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(26.dp)
+                        )
+
+                        // Reset visual shaders button
+                        if (!videoFilters.isDefault) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0x24FFFFFF))
+                                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onVideoFiltersChange(VideoFiltersState())
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.RestartAlt,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Reset visual shaders",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
