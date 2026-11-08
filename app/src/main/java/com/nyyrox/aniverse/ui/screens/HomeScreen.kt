@@ -261,11 +261,50 @@ private fun Modifier.pressable(onClick: () -> Unit): Modifier {
         .clickable(interactionSource = src, indication = null, onClick = onClick)
 }
 
-/** Clean, flat 2D layout matching Netflix/Crunchyroll - zero 3D warping or stutter on horizontal rows. */
-private fun Modifier.rowTilt(state: LazyListState, index: Int): Modifier = this
+/** 3D coverflow effect for horizontal rows: items fold away from the centre as they scroll. */
+private fun Modifier.rowTilt(state: LazyListState, index: Int): Modifier = this.graphicsLayer {
+    val info = state.layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return@graphicsLayer
+    val vw = (info.viewportEndOffset - info.viewportStartOffset).toFloat().coerceAtLeast(1f)
+    val x = ((item.offset + item.size / 2f - (info.viewportStartOffset + vw / 2f)) / (vw / 2f)).coerceIn(-1.2f, 1.2f)
+    val ax = abs(x)
+    rotationY = -x * 22f
+    val s = 1f - 0.08f * ax
+    scaleX = s
+    scaleY = s
+    alpha = (1f - 0.25f * ax * ax).coerceIn(0.4f, 1f)
+    cameraDistance = 14f * density
+}
 
-/** Flat, responsive gesture layout - does not hijack or fight horizontal scroll gestures. */
-private fun Modifier.dragTilt3d(): Modifier = this
+/** Drag sideways (either way) and the card tilts in 3D, then springs back. */
+@Composable
+private fun Modifier.dragTilt3d(): Modifier {
+    val x = remember { Animatable(0f) }
+    val w = remember { mutableFloatStateOf(1f) }
+    val scope = rememberCoroutineScope()
+    return this
+        .onSizeChanged { w.floatValue = it.width.toFloat().coerceAtLeast(1f) }
+        .pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragEnd = { scope.launch { x.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 220f)) } },
+                onDragCancel = { scope.launch { x.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 220f)) } },
+                onHorizontalDrag = { change, amount ->
+                    change.consume()
+                    scope.launch { x.snapTo((x.value + amount * 0.8f).coerceIn(-w.floatValue * 0.4f, w.floatValue * 0.4f)) }
+                }
+            )
+        }
+        .graphicsLayer {
+            val f = (x.value / w.floatValue).coerceIn(-0.5f, 0.5f)
+            translationX = x.value * 0.45f
+            rotationY = -f * 60f
+            rotationZ = f * 3f
+            val s = 1f - 0.06f * abs(f)
+            scaleX = s
+            scaleY = s
+            cameraDistance = 14f * density
+        }
+}
 
 @Composable
 internal fun Modifier.shimmer(p: HomePalette): Modifier {

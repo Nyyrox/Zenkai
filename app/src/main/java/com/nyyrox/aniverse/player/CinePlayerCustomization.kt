@@ -1404,21 +1404,23 @@ fun CineButtonContainer(
     val src = interactionSource ?: remember { MutableInteractionSource() }
     val isPressed by src.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
+        targetValue = if (isPressed) 0.92f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "glassPress"
     )
     val shape = if (isCircle) CircleShape else RoundedCornerShape(12.dp)
-    val bgColor = if (isHero) {
-        if (isPressed) Color(0x50FFFFFF) else Color(0x38000000)
-    } else {
-        if (isPressed) Color(0x40FFFFFF) else Color(0x28000000)
-    }
     Box(
         modifier = modifier
             .scale(pressScale)
-            .clip(shape)
-            .background(bgColor)
+            .glassSurface(
+                shape = shape,
+                tint = Color(0x280D111A),
+                wash = Color(0x06FFFFFF),
+                elevation = 0.dp,
+                pressed = isPressed,
+                borderWidth = 0.75.dp,
+                borderColor = Color(0x18FFFFFF)
+            )
             .then(if (isSelected && !isHero) Modifier.background(accentColor.copy(alpha = 0.25f)) else Modifier),
         contentAlignment = Alignment.Center
     ) { content() }

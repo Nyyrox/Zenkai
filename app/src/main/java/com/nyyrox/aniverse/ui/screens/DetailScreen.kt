@@ -2074,10 +2074,35 @@ private fun RichEpisodeCard(
                 hPx = c.size.height.toFloat()
             }
             .graphicsLayer {
-                val sc = (0.96f + 0.04f * enter) * pressScale
+                var sc = (0.92f + 0.08f * enter) * pressScale
+                var rx = (1f - enter) * 14f
+                var a = enter
+                var ty = (1f - enter) * 36.dp.toPx()
+                val h = hPx.coerceAtLeast(1f)
+                if (topPx < topLimitPx) {
+                    // Sliding away under the tabs
+                    val pr = ((topLimitPx - topPx) / (h * 0.7f)).coerceIn(0f, 1f)
+                    sc *= 1f - pr * 0.12f
+                    rx += pr * 15f
+                    a *= (1f - pr * 0.85f)
+                    ty -= pr * 22.dp.toPx()
+                } else {
+                    val zoomZone = topLimitPx + h * 0.9f
+                    if (topPx < zoomZone) {
+                        // Swiping up into focus
+                        val f = ((zoomZone - topPx) / (h * 0.9f)).coerceIn(0f, 1f)
+                        sc *= 0.95f + f * 0.05f
+                        rx -= (1f - f) * 4f
+                    } else {
+                        sc *= 0.95f
+                    }
+                }
                 scaleX = sc
                 scaleY = sc
-                alpha = enter.coerceIn(0f, 1f)
+                rotationX = rx
+                alpha = a.coerceIn(0f, 1f)
+                translationY = ty
+                cameraDistance = 12f * density
             }
             .clickable(interactionSource = source, indication = null) {
                 com.nyyrox.aniverse.util.AppHaptics.tick(context)
@@ -2101,11 +2126,18 @@ private fun RichEpisodeCard(
                     } else Modifier
                 )
         ) {
-            // Sharp, 1:1 pixel crisp thumbnail matching Netflix / Crunchyroll
+            // Thumbnail drifts slightly against the scroll for depth.
             SubcomposeAsyncImage(
                 model = thumb,
                 contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = 1.14f
+                        scaleY = 1.14f
+                        val pr = ((topPx - topLimitPx) / 1400f).coerceIn(0f, 1f)
+                        translationY = (pr - 0.5f) * size.height * 0.12f
+                    },
                 contentScale = ContentScale.Crop,
                 loading = { ShimmerBox(modifier = Modifier.fillMaxSize()) },
                 error = {
