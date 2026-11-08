@@ -13,8 +13,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.graphics.Bitmap
 import android.os.Build
-import dev.chrisbanes.haze.rememberHazeState
-import dev.chrisbanes.haze.hazeSource
+import androidx.compose.material.icons.filled.Add
 
 import android.view.LayoutInflater
 import android.os.Message
@@ -91,7 +90,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -422,7 +423,7 @@ private fun CinePillIndicator(
     modifier: Modifier = Modifier
 ) {
     val f = if (fraction.isNaN()) 0f else fraction.coerceIn(0f, 1f)
-    GlassPill(modifier = modifier) {
+    CxPill(modifier = modifier) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -633,6 +634,7 @@ fun CinePlayerView(
     // the player listener lives in a long-running effect; plain params would be stale there
     val hasNextNow by rememberUpdatedState(hasNextEpisode)
     val onNextNow by rememberUpdatedState(onNextEpisode)
+    val autoPlayNow by rememberUpdatedState(autoPlayNextEnabled)
     val initialAutoSkip = remember(isAutoSkipIntroOutro) {
         if (isAutoSkipIntroOutro) true else storageManager.isAutoSkipIntroOutro()
     }
@@ -819,9 +821,7 @@ fun CinePlayerView(
     var subtitleTracks by remember { mutableStateOf<List<SubtitleTrackInfo>>(emptyList()) }
     var showCaptionModal by remember { mutableStateOf(false) }
     var showCaptionSettingsModal by remember { mutableStateOf(false) }
-    val glassBackdrop = remember { GlassBackdrop() }
-    val useGlassBlur = Build.VERSION.SDK_INT >= 31      // Android 12+: TextureView + Haze backdrop blur
-    val hazeState = rememberHazeState()
+    val glassBackdrop = remember { CxHost() }
     val glassCompact = glassBackdrop.hostWidth > 0 && glassBackdrop.hostWidth / context.resources.displayMetrics.density < 560f
     var morphAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
@@ -1448,7 +1448,7 @@ fun CinePlayerView(
                         isPlaying = false
                         // Auto Play Next Episode: ensure playback actually reached end after real playback
                         val validEnded = (player.duration > 10_000L && player.currentPosition > 5_000L) || (durationMs > 10_000L && currentPositionMs > 5_000L)
-                        if (exoPlayer === player && hasNextNow && autoPlayNextEnabled && !isNextTriggered && !isUpNextCanceled && validEnded) {
+                        if (exoPlayer === player && hasNextNow && autoPlayNow && !isNextTriggered && validEnded) {
                             isNextTriggered = true
                             onNextNow()
                         }
@@ -1715,10 +1715,10 @@ fun CinePlayerView(
                                 "ed", "mixed-ed" -> "Outro"
                                 else -> "Recap"
                             }
-                            resumeToastText = "Auto-skipped $skipLabel ⚡"
+                            resumeToastText = "Skipped $skipLabel"
                             scope.launch {
                                 delay(2200)
-                                if (resumeToastText == "Auto-skipped $skipLabel ⚡") {
+                                if (resumeToastText == "Skipped $skipLabel") {
                                     resumeToastText = null
                                 }
                             }
@@ -1733,7 +1733,7 @@ fun CinePlayerView(
                         isSwipeSeeking -> swipeSeekTargetMs
                         else -> livePos
                     }
-                    val pos = (effectivePos - subSyncMs).coerceAtLeast(0L)
+                    val pos = effectivePos - subSyncMs
                     val activeCues = findActiveCuesAt(activeLoadedCues, pos)
                     val newCueText = if (activeCues.isNotEmpty()) {
                         activeCues.map { it.text }.distinct().joinToString("\n")
@@ -1766,7 +1766,7 @@ fun CinePlayerView(
             // High-frequency 20ms refresh tick when playing or seeking with captions enabled for zero-latency frame sync;
             // power-saving 100ms when paused without active scrubbing
             val isFastSync = isCaptionsEnabled && activeLoadedCues.isNotEmpty() && (exoPlayer?.isPlaying == true || isScrubbing || isSwipeSeeking)
-            delay(if (isFastSync) 20L else 100L)
+            if (isFastSync) androidx.compose.runtime.withFrameNanos { } else delay(100L)
         }
     }
 
@@ -1883,11 +1883,7 @@ fun CinePlayerView(
         }
     }
 
-    CompositionLocalProvider(
-        LocalGlassBackdrop provides glassBackdrop,
-        LocalGlassCompact provides glassCompact,
-        LocalGlassHaze provides (if (useGlassBlur) hazeState else null)
-    ) {
+    run {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1899,9 +1895,9 @@ fun CinePlayerView(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CineStreamLoader(
+                    CxLoader(
                         accentColor = playerCustomization.accentColor.color,
-                        subtitle = if (isDirectStream) "Direct · HD" else null
+                        subtitle = if (isDirectStream) "Direct HD" else null
                     )
                 }
             }
@@ -2260,8 +2256,7 @@ fun CinePlayerView(
                     AndroidView(
                         modifier = Modifier
                             .fillMaxSize()
-                            .onSizeChanged { glassBackdrop.hostWidth = it.width }
-                            .then(if (useGlassBlur) Modifier.hazeSource(hazeState) else Modifier),
+                            .onSizeChanged { glassBackdrop.hostWidth = it.width },
                         factory = { ctx ->
                             (LayoutInflater.from(ctx).inflate(com.nyyrox.aniverse.R.layout.cine_player_texture, null, false) as PlayerView).apply {
                                 playerViewRef = this
@@ -2373,136 +2368,117 @@ fun CinePlayerView(
                                scaleOut(targetScale = 0.95f, animationSpec = tween(250)),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(bottom = if (showControls) 120.dp else 40.dp, end = 32.dp)
+                            .padding(bottom = if (showControls) 120.dp else 32.dp, end = 24.dp)
                     ) {
                         Column(
                             modifier = Modifier
-                                .width(340.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xF010131E))
-                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(16.dp))
-                                .padding(18.dp)
+                                .widthIn(max = 300.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xE610131E))
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(OttPrimary)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (autoPlayNextEnabled) "UP NEXT IN ${timeLeftSeconds}s" else "UP NEXT",
-                                        color = OttSecondary,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp
-                                    )
-                                }
-                                androidx.compose.material3.IconButton(
-                                    onClick = { isUpNextCanceled = true },
-                                    modifier = Modifier.size(24.dp)
+                            Column(modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(16.dp))
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (nextEpisodeImage != null) {
-                                    AsyncImage(
-                                        model = nextEpisodeImage,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(86.dp, 54.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFF1E2230)),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                }
-                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Episode ${episode + 1}",
-                                        color = Color.LightGray,
-                                        fontSize = 12.sp,
+                                        text = if (autoPlayNextEnabled) "Up next in ${timeLeftSeconds}s" else "Up next",
+                                        color = Color(0x99FFFFFF),
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = nextEpisodeTitle ?: "Next Episode",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    androidx.compose.material3.IconButton(
+                                        onClick = { isUpNextCanceled = true },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0x99FFFFFF), modifier = Modifier.size(14.dp))
+                                    }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth().padding(end = 4.dp)
+                                ) {
+                                    if (nextEpisodeImage != null) {
+                                        AsyncImage(
+                                            model = nextEpisodeImage,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(80.dp, 45.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0xFF1E2230)),
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Episode ${episode + 1}",
+                                            color = Color(0x99FFFFFF),
+                                            fontSize = 11.sp
+                                        )
+                                        Text(
+                                            text = nextEpisodeTitle ?: "Next Episode",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
 
-                            if (autoPlayNextEnabled) {
-                                LinearProgressIndicator(
-                                    progress = smoothProgress,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(3.dp)
-                                        .clip(RoundedCornerShape(50)),
-                                    color = OttPrimary,
-                                    trackColor = Color(0x33FFFFFF)
-                                )
+                                Spacer(modifier = Modifier.height(10.dp))
 
-                                LaunchedEffect(remainingMs, isPlaying, isUpNextCanceled, isNextTriggered) {
-                                    if (!isNextTriggered && !isUpNextCanceled && isPlaying && currentPositionMs > 15_000L && remainingMs in 1L..1000L) {
-                                        isNextTriggered = true
-                                        onNextEpisode()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { isUpNextCanceled = true },
+                                        modifier = Modifier.weight(1f).height(34.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(0.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0x1AFFFFFF),
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Text("Dismiss", fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            if (!isNextTriggered) {
+                                                isNextTriggered = true
+                                                onNextEpisode()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f).height(34.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(0.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = OttPrimary,
+                                            contentColor = Color.Black
+                                        )
+                                    ) {
+                                        Text("Play now", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Button(
-                                    onClick = { isUpNextCanceled = true },
-                                    modifier = Modifier.weight(1f).height(40.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF222635),
-                                        contentColor = Color.White
-                                    )
-                                ) {
-                                    Text("Stay", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                                }
-                                Button(
-                                    onClick = {
-                                        if (!isNextTriggered) {
-                                            isNextTriggered = true
-                                            onNextEpisode()
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f).height(40.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = OttPrimary,
-                                        contentColor = Color.Black
-                                    )
-                                ) {
-                                    val btnText = if (autoPlayNextEnabled) "Play Now • ${timeLeftSeconds}s" else "Play Now"
-                                    Text(btnText, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            if (autoPlayNextEnabled) {
+                                LinearProgressIndicator(
+                                    progress = smoothProgress,
+                                    modifier = Modifier.fillMaxWidth().height(2.dp),
+                                    color = OttPrimary,
+                                    trackColor = Color(0x1AFFFFFF)
+                                )
+                                LaunchedEffect(remainingMs, isPlaying, isNextTriggered) {
+                                    if (!isNextTriggered && isPlaying && currentPositionMs > 15_000L && remainingMs in 1L..1000L) {
+                                        isNextTriggered = true
+                                        onNextEpisode()
+                                    }
                                 }
                             }
                         }
@@ -2538,49 +2514,43 @@ fun CinePlayerView(
                         )
                     }
 
-                    // 2X Speed Hold Indicator Badge (Appears at TopCenter)
+                    // 2X Speed Hold Indicator Badge
                     AnimatedVisibility(
                         visible = isHolding2x && !isInPip,
-                        enter = fadeIn(tween(120)) + scaleIn(initialScale = 0.9f, animationSpec = tween(120)),
-                        exit = fadeOut(tween(140)) + scaleOut(targetScale = 0.9f, animationSpec = tween(140)),
+                        enter = fadeIn(tween(120)) + scaleIn(initialScale = 0.92f, animationSpec = tween(120)),
+                        exit = fadeOut(tween(140)) + scaleOut(targetScale = 0.92f, animationSpec = tween(140)),
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 24.dp)
+                            .padding(top = 20.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xB3181D28))
-                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
-                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                                .background(Color(0x99000000))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
                                 text = "2x",
                                 color = Color.White,
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.3.sp
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
-                            Canvas(modifier = Modifier.size(15.dp)) {
-                                val sw = 1.6.dp.toPx()
+                            Canvas(modifier = Modifier.size(10.dp)) {
                                 val w = size.width
                                 val h = size.height
-                                val p1 = Path().apply {
-                                    moveTo(w * 0.10f, h * 0.20f)
-                                    lineTo(w * 0.48f, h * 0.50f)
-                                    lineTo(w * 0.10f, h * 0.80f)
-                                    close()
+                                for (x0 in floatArrayOf(0f, 0.5f)) {
+                                    drawPath(
+                                        Path().apply {
+                                            moveTo(w * (x0 + 0.04f), h * 0.1f)
+                                            lineTo(w * (x0 + 0.46f), h * 0.5f)
+                                            lineTo(w * (x0 + 0.04f), h * 0.9f)
+                                            close()
+                                        },
+                                        color = Color.White
+                                    )
                                 }
-                                val p2 = Path().apply {
-                                    moveTo(w * 0.50f, h * 0.20f)
-                                    lineTo(w * 0.88f, h * 0.50f)
-                                    lineTo(w * 0.50f, h * 0.80f)
-                                    close()
-                                }
-                                drawPath(p1, color = Color.White, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                drawPath(p2, color = Color.White, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
                             }
                         }
                     }
@@ -2719,7 +2689,7 @@ fun CinePlayerView(
                                 else -> "Skip"
                             }
 
-                            GlassPill(
+                            CxPill(
                                 onClick = {
                                     PlayerPlaybackPlugin.seekTo(exoPlayer, interval.endTimeMs + 200L)
                                 }
@@ -3010,10 +2980,10 @@ fun CinePlayerView(
                     // Buffering Spinner
                     if ((isBuffering || !hasStartedPlayback) && !isInPip) {
                         if (!hasStartedPlayback) {
-                            CineStreamLoader(
+                            CxLoader(
                                 modifier = Modifier.align(Alignment.Center),
                                 accentColor = playerCustomization.accentColor.color,
-                                subtitle = if (isDirectStream) "Direct · HD" else null
+                                subtitle = if (isDirectStream) "Direct HD" else null
                             )
                         } else {
                             CircularProgressIndicator(
@@ -3084,19 +3054,19 @@ fun CinePlayerView(
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     if (!isFullscreen && onCollapseToMiniPlayer != null) {
-                                        GlassPillIcon(
+                                        CxPillIcon(
                                             icon = Icons.Default.KeyboardArrowDown,
                                             contentDescription = "Collapse to Mini-player",
                                             onClick = { onCollapseToMiniPlayer() }
                                         )
                                     } else if (isFullscreen) {
-                                        GlassPillIcon(
+                                        CxPillIcon(
                                             icon = Icons.Default.ArrowBack,
                                             contentDescription = "Exit Fullscreen",
                                             onClick = { onToggleFullscreen() }
                                         )
                                     }
-                                    GlassPillIcon(
+                                    CxPillIcon(
                                         icon = Icons.Outlined.Settings,
                                         contentDescription = "Settings",
                                         onClick = { morphAnchor = it
@@ -3105,7 +3075,7 @@ fun CinePlayerView(
                                             controlsTimeoutKey++
                                         }
                                     )
-                                    GlassPillIcon(
+                                    CxPillIcon(
                                         icon = Icons.Outlined.PictureInPictureAlt,
                                         contentDescription = "Picture in Picture",
                                         onClick = {
@@ -3114,7 +3084,7 @@ fun CinePlayerView(
                                             }
                                         }
                                     )
-                                    GlassPillIcon(
+                                    CxPillIcon(
                                         icon = Icons.Outlined.HighQuality,
                                         contentDescription = "Quality",
                                         onClick = { morphAnchor = it
@@ -3145,7 +3115,7 @@ fun CinePlayerView(
                                             )
                                         }
                                     }
-                                    GlassPillIcon(
+                                    CxPillIcon(
                                         icon = if (isScreenLocked) playerCustomization.themePack.lockIcon else playerCustomization.themePack.unlockIcon,
                                         contentDescription = "Lock Screen",
                                         iconSize = 16.dp,
@@ -3191,7 +3161,7 @@ fun CinePlayerView(
                             horizontalArrangement = Arrangement.spacedBy(buttonSpacing)
                         ) {
                                 if (centerLayout == CenterControlsLayout.STANDARD_5 || centerLayout == CenterControlsLayout.WIDE_SPACED) {
-                                    GlassIconButton(
+                                    CxIconButton(
                                         onClick = {
                                             showControls = true
                                             isAutoHideTransition = false
@@ -3212,7 +3182,7 @@ fun CinePlayerView(
                                 }
 
                                 if (centerLayout != CenterControlsLayout.PLAY_ONLY) {
-                                    GlassIconButton(
+                                    CxIconButton(
                                         onClick = {
                                             showControls = true
                                             isAutoHideTransition = false
@@ -3239,7 +3209,7 @@ fun CinePlayerView(
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.rewindDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.rewindDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.rewindScale)
                                     ) {
                                         if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
-                                            IosSeek10Icon(
+                                            CxSeekIcon(
                                                 isForward = false,
                                                 modifier = Modifier.size(if (glassCompact) 22.dp else 28.dp),
                                                 tint = Color(0xE6FFFFFF),
@@ -3262,7 +3232,7 @@ fun CinePlayerView(
                                     }
                                 }
 
-                                GlassIconButton(
+                                CxIconButton(
                                     onClick = {
                                         showControls = true
                                         isAutoHideTransition = false
@@ -3281,7 +3251,7 @@ fun CinePlayerView(
                                         },
                                         label = "heroPlayPauseMorph"
                                     ) { playing ->
-                                        GlassPlayPauseGlyph(
+                                        CxPlayPause(
                                             isPlaying = playing,
                                             modifier = Modifier.size(if (glassCompact) 18.dp else 24.dp),
                                             tint = Color.White
@@ -3290,7 +3260,7 @@ fun CinePlayerView(
                                 }
 
                                 if (centerLayout != CenterControlsLayout.PLAY_ONLY) {
-                                    GlassIconButton(
+                                    CxIconButton(
                                         onClick = {
                                             showControls = true
                                             isAutoHideTransition = false
@@ -3317,7 +3287,7 @@ fun CinePlayerView(
                                         modifier = Modifier.offset { IntOffset((playerCustomization.hudLayout.forwardDeltaX * 800f).roundToInt(), (playerCustomization.hudLayout.forwardDeltaY * 400f).roundToInt()) }.scale(playerCustomization.hudLayout.forwardScale)
                                     ) {
                                         if (playerCustomization.icons.seekStyle == SeekIconStyle.DEFAULT) {
-                                            IosSeek10Icon(
+                                            CxSeekIcon(
                                                 isForward = true,
                                                 modifier = Modifier.size(if (glassCompact) 22.dp else 28.dp),
                                                 tint = Color(0xE6FFFFFF),
@@ -3341,7 +3311,7 @@ fun CinePlayerView(
                                 }
 
                                 if (centerLayout == CenterControlsLayout.STANDARD_5 || centerLayout == CenterControlsLayout.WIDE_SPACED) {
-                                    GlassIconButton(
+                                    CxIconButton(
                                         onClick = {
                                             showControls = true
                                             isAutoHideTransition = false
@@ -3384,7 +3354,7 @@ fun CinePlayerView(
                             val rightIconSize = if (glassCompact) 16.dp else 19.dp
 
                             // Fullscreen
-                            GlassIconButton(
+                            CxIconButton(
                                 size = rightBtnSize,
                                 onClick = {
                                     showControls = true
@@ -3402,7 +3372,7 @@ fun CinePlayerView(
 
                             // Audio Track Button
                             val isAudioSelected = audioTracks.any { it.isSelected } || isDub
-                            GlassIconButton(
+                            CxIconButton(
                                 size = rightBtnSize,
                                 onClick = {
                                     showControls = true
@@ -3421,7 +3391,7 @@ fun CinePlayerView(
 
                             // Subtitles Button
                             val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || activeLoadedSubtitleUrl != null || subtitleTracks.any { it.isSelected })
-                            GlassIconButton(
+                            CxIconButton(
                                 size = rightBtnSize,
                                 onClick = {
                                     showControls = true
@@ -3438,7 +3408,7 @@ fun CinePlayerView(
                             }
 
                             // Speed Button
-                            GlassIconButton(
+                            CxIconButton(
                                 size = rightBtnSize,
                                 onClick = {
                                     showControls = true
@@ -3547,7 +3517,7 @@ fun CinePlayerView(
                                 val bufferedFrac = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 
                                 // Custom Seekbar Track & Thumb Renderer
-                                CineSeekbarRenderer(
+                                CxSeekbar(
                                     style = playerCustomization.seekbarStyle,
                                     palette = themePalette,
                                     accentColor = playerCustomization.accentColor.color,
@@ -3836,7 +3806,7 @@ fun CinePlayerView(
 
     // Modern Subtitles Selector Modal (Image 1)
     if (showCaptionModal) {
-        SubtitlesModal(
+        CxSubtitlesModal(
             availableSubtitles = availableExternal,
             isCaptionsEnabled = isCaptionsEnabled,
             activeCaptionTitle = activeCaptionTitle,
@@ -3930,7 +3900,7 @@ fun CinePlayerView(
 
     // Full Subtitle / Caption Settings Modal (Images 2, 3, 4)
     if (showCaptionSettingsModal) {
-        CaptionSettingsModal(
+        CxCaptionSettings(
             captionConfig = captionConfig,
             onConfigChange = { newCfg -> captionConfig = newCfg },
             isCaptionsEnabled = isCaptionsEnabled,
@@ -4067,7 +4037,7 @@ private fun DialoguePanelModal(
                                     fontSize = 15.sp
                                 )
                                 Text(
-                                    text = "${cues.size} lines • Live Sync",
+                                    text = "${cues.size} lines",
                                     color = OttTextSecondary,
                                     fontSize = 10.sp
                                 )
@@ -4467,16 +4437,11 @@ private fun PlayerSettingsModal(
     val context = LocalContext.current
     var isAutoServer by remember { mutableStateOf(true) }
 
-    GlassDialog(
-        anchor = anchor,
-        onDismiss = onDismiss
-    ) {
+    PlayerPanel(onDismiss = onDismiss) {
         Box(
             modifier = modifier
-                .widthIn(max = 340.dp)
-                .wrapContentHeight()
-                .glassPanel()
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             when (activeTab) {
                 PlayerSettingsTab.MAIN -> {
@@ -4494,7 +4459,7 @@ private fun PlayerSettingsModal(
                             Text(
                                 text = "Settings",
                                 fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = Color.White,
                                 modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 6.dp)
                             )
@@ -4511,6 +4476,17 @@ private fun PlayerSettingsModal(
                             }
                         }
 
+                        // Quick actions
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            QuickTile(Icons.Outlined.Subtitles, "Captions", { onOpenCaptions() }, Modifier.weight(1f))
+                            QuickTile(Icons.Outlined.Speed, "${playbackSpeed}x", { onTabChange(PlayerSettingsTab.SPEED) }, Modifier.weight(1f))
+                            QuickTile(Icons.Outlined.GraphicEq, "Audio", { onTabChange(PlayerSettingsTab.AUDIO) }, Modifier.weight(1f))
+                            QuickTile(Icons.Outlined.HighQuality, "Quality", { onTabChange(PlayerSettingsTab.QUALITY) }, Modifier.weight(1f))
+                        }
+
                         // 1. Server & Audio Track (Always visible in CinePlayer)
                         val serverSubtitle = if (isAutoServer) {
                             if (serverName.isNotBlank()) "Auto ($serverName)" else "Auto (Best)"
@@ -4524,40 +4500,11 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.SERVER) }
                         )
 
-                        // 2. Audio Track details — Always visible across all servers
-                        val activeAudioSubtitle = when {
-                            audioTracks.size > 1 -> audioTracks.find { it.isSelected }?.label ?: (if (isDub) "English (Dub)" else "Japanese (Original)")
-                            serverName.contains("megaplay", ignoreCase = true) || serverName.contains("vidstream", ignoreCase = true) ->
-                                if (isDub) "English (Dub)" else "Japanese (Sub)"
-                            else -> if (isDub) "English (Dub)" else "Japanese (Native)"
-                        }
-                        SettingsItemRow(
-                            icon = Icons.Outlined.GraphicEq,
-                            title = "Audio Track",
-                            subtitle = activeAudioSubtitle,
-                            onClick = { onTabChange(PlayerSettingsTab.AUDIO) }
-                        )
-
-                        // 3. Captions
-                        SettingsItemRow(
-                            icon = Icons.Outlined.Subtitles,
-                            title = "Captions",
-                            onClick = onOpenCaptions
-                        )
-
-                        // 4. Playback Speed
-                        SettingsItemRow(
-                            icon = Icons.Outlined.Speed,
-                            title = "Playback Speed",
-                            subtitle = "${playbackSpeed}x",
-                            onClick = { onTabChange(PlayerSettingsTab.SPEED) }
-                        )
-
                         // 5. Aspect Ratio / Video Fit
                         val fitSubtitle = when (resizeMode) {
-                            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Crop to Fill / Zoom"
+                            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Fill"
                             AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Stretch"
-                            else -> "Fit to Screen"
+                            else -> "Fit"
                         }
                         SettingsItemRow(
                             icon = Icons.Default.AspectRatio,
@@ -4569,7 +4516,7 @@ private fun PlayerSettingsModal(
                         // 6. AI Upscaler (Clean standard row, subtitle shows mode)
                         val upscalerSubtitle = if (upscalerSettings.enabled) {
                             val m = ANIME4K_MODES.find { it.id == upscalerSettings.mode }?.label ?: "Mode A"
-                            "4K · $m"
+                            "4K $m"
                         } else {
                             "Off"
                         }
@@ -4605,9 +4552,9 @@ private fun PlayerSettingsModal(
                             g.pinchToZoomEnabled
                         ).count { it }
                         val gestureSubtitle = when {
-                            !g.masterEnabled || activeGesturesCount == 0 -> "Gestures disabled"
-                            activeGesturesCount == 6 -> "All gestures enabled"
-                            else -> "$activeGesturesCount of 6 enabled"
+                            !g.masterEnabled || activeGesturesCount == 0 -> "Off"
+                            activeGesturesCount == 6 -> "All on"
+                            else -> "$activeGesturesCount of 6 on"
                         }
                         SettingsItemRow(
                             icon = Icons.Default.TouchApp,
@@ -4619,7 +4566,7 @@ private fun PlayerSettingsModal(
                         // 9. Player Themes & Colors
                         SettingsItemRow(
                             icon = Icons.Default.DashboardCustomize,
-                            title = "Player Themes & Colors",
+                            title = "Themes",
                             subtitle = currentCustomization.themePack.displayName,
                             onClick = { onTabChange(PlayerSettingsTab.THEME_PACKS) }
                         )
@@ -4653,13 +4600,13 @@ private fun PlayerSettingsModal(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (autoPlayNextEnabled) "Plays next episode" else "Pause at end",
+                                        text = if (autoPlayNextEnabled) "On" else "Off",
                                         color = Color(0xFF94A3B8),
                                         fontSize = 11.5.sp
                                     )
                                 }
                             }
-                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                            CxSwitch(
                                 checked = autoPlayNextEnabled,
                                 onCheckedChange = { onToggleAutoPlayNext(it) }
                             )
@@ -4694,13 +4641,13 @@ private fun PlayerSettingsModal(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (autoSkipIntroOutroEnabled) "Auto skip theme songs" else "Manual skip button",
+                                        text = if (autoSkipIntroOutroEnabled) "On" else "Off",
                                         color = Color(0xFF94A3B8),
                                         fontSize = 11.5.sp
                                     )
                                 }
                             }
-                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                            CxSwitch(
                                 checked = autoSkipIntroOutroEnabled,
                                 onCheckedChange = { onToggleAutoSkipIntroOutro(it) }
                             )
@@ -4802,13 +4749,13 @@ private fun PlayerSettingsModal(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (isAutoServer) "Active · Auto-routes to lowest latency" else "Manual server selection enabled",
-                                        color = if (isAutoServer) Color(0xFF86EFAC) else Color(0xFF94A3B8),
+                                        text = if (isAutoServer) "Auto, lowest latency" else "Manual",
+                                        color = if (isAutoServer) Color(0xFFE2E8F0) else Color(0x80FFFFFF),
                                         fontSize = 11.5.sp
                                     )
                                 }
                             }
-                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                            CxSwitch(
                                 checked = isAutoServer,
                                 onCheckedChange = { isAutoServer = it }
                             )
@@ -4956,7 +4903,7 @@ private fun PlayerSettingsModal(
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
                                         Text(
-                                            text = if (srv.isHls) "Direct HLS Stream · Low Latency" else "Direct Video Stream",
+                                            text = if (srv.isHls) "HLS, low latency" else "Direct",
                                             color = Color(0xFF94A3B8),
                                             fontSize = 11.sp
                                         )
@@ -4978,13 +4925,13 @@ private fun PlayerSettingsModal(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        SubHeader(title = "Orientation / Video Fit", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
+                        SubHeader(title = "Aspect Ratio", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
                         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
                         val options = listOf(
-                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Fit to Screen", "Preserve original aspect ratio"),
-                            Triple(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Crop to Fill / Zoom", "Fill display by zooming"),
-                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Stretch", "Stretch video to edges")
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Fit", "Original aspect ratio"),
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Fill", "Crop to fill the screen"),
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Stretch", "Stretch to the edges")
                         )
 
                         options.forEach { (mode, title, sub) ->
@@ -5410,18 +5357,18 @@ private fun PlayerSettingsModal(
                         ) {
                             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
-                                    text = "Enable All Gestures",
+                                    text = "All Gestures",
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = if (g.masterEnabled) "All gestures enabled" else "Master switch: gestures off",
-                                    color = if (g.masterEnabled) Color(0xFF86EFAC) else Color(0xFF94A3B8),
+                                    text = if (g.masterEnabled) "On" else "Off",
+                                    color = if (g.masterEnabled) Color(0xFFE2E8F0) else Color(0x80FFFFFF),
                                     fontSize = 11.5.sp
                                 )
                             }
-                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                            CxSwitch(
                                 checked = g.masterEnabled,
                                 onCheckedChange = { isChecked ->
                                     val newGestures = if (isChecked) {
@@ -5451,18 +5398,17 @@ private fun PlayerSettingsModal(
                         )
 
                         Text(
-                            text = "INDIVIDUAL GESTURES",
-                            color = Color(0xFF94A3B8),
+                            text = "Gestures",
+                            color = Color(0x80FFFFFF),
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
 
                         GestureToggleRow(
                             icon = Icons.Default.VolumeUp,
-                            title = "Volume Gesture",
-                            subtitle = "Swipe right side vertically to adjust volume",
+                            title = "Volume",
+                            subtitle = "Swipe up or down on the right",
                             checked = g.masterEnabled && g.volumeEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
@@ -5476,8 +5422,8 @@ private fun PlayerSettingsModal(
 
                         GestureToggleRow(
                             icon = Icons.Default.BrightnessMedium,
-                            title = "Brightness Gesture",
-                            subtitle = "Swipe left side vertically to adjust brightness",
+                            title = "Brightness",
+                            subtitle = "Swipe up or down on the left",
                             checked = g.masterEnabled && g.brightnessEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
@@ -5492,7 +5438,7 @@ private fun PlayerSettingsModal(
                         GestureToggleRow(
                             icon = Icons.Default.FastForward,
                             title = "Swipe to Seek",
-                            subtitle = "Swipe horizontally to scrub forward or backward",
+                            subtitle = "Swipe sideways to scrub",
                             checked = g.masterEnabled && g.swipeSeekEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
@@ -5506,8 +5452,8 @@ private fun PlayerSettingsModal(
 
                         GestureToggleRow(
                             icon = Icons.Default.Speed,
-                            title = "Hold to 2x Speed",
-                            subtitle = "Long press anywhere during playback for 2x speed",
+                            title = "Hold for 2x",
+                            subtitle = "Press and hold to speed up",
                             checked = g.masterEnabled && g.holdTo2xEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
@@ -5521,8 +5467,8 @@ private fun PlayerSettingsModal(
 
                         GestureToggleRow(
                             icon = Icons.Default.Forward10,
-                            title = "Double Tap Gestures",
-                            subtitle = "Double tap sides to seek 10s, double tap center to play/pause",
+                            title = "Double Tap",
+                            subtitle = "Sides skip 10s, center pauses",
                             checked = g.masterEnabled && g.doubleTapSeekEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
@@ -5536,8 +5482,8 @@ private fun PlayerSettingsModal(
 
                         GestureToggleRow(
                             icon = Icons.Default.AspectRatio,
-                            title = "Pinch to Change Ratio",
-                            subtitle = "Pinch or drag with two fingers to adjust video aspect ratio",
+                            title = "Pinch to Fit",
+                            subtitle = "Pinch to change aspect ratio",
                             checked = g.masterEnabled && g.pinchToZoomEnabled,
                             masterEnabled = g.masterEnabled,
                             onCheckedChange = { isChecked ->
@@ -5604,13 +5550,13 @@ private fun PlayerSettingsModal(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (upscalerSettings.enabled) "Active · GPU Super-Resolution" else "Real-time edge & line clarity",
-                                        color = if (upscalerSettings.enabled) Color(0xFF86EFAC) else Color(0xFF94A3B8),
+                                        text = if (upscalerSettings.enabled) "On, GPU upscaling" else "Sharper lines and edges",
+                                        color = if (upscalerSettings.enabled) Color(0xFFE2E8F0) else Color(0x80FFFFFF),
                                         fontSize = 11.5.sp
                                     )
                                 }
                             }
-                            com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+                            CxSwitch(
                                 checked = upscalerSettings.enabled,
                                 onCheckedChange = { isChecked ->
                                     onUpscalerChange(upscalerSettings.copy(enabled = isChecked))
@@ -5965,9 +5911,9 @@ private fun GestureToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -5986,21 +5932,390 @@ private fun GestureToggleRow(
                 Text(
                     text = title,
                     color = if (masterEnabled) Color.White else Color(0x99FFFFFF),
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = subtitle,
-                    color = Color(0xFF94A3B8),
-                    fontSize = 10.5.sp,
-                    lineHeight = 13.sp
+                    color = Color(0x80FFFFFF),
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp
                 )
             }
         }
-        com.nyyrox.aniverse.ui.components.LiquidGlassSwitch(
+        CxSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange
         )
+    }
+}
+
+// ───────────────────────── Standalone UI kit (no external UI dependencies) ─────────────────────────
+
+private class CxHost { var hostWidth by mutableIntStateOf(0) }
+
+@Composable
+private fun CxPill(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(Color(0x66000000))
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    ) { content() }
+}
+
+@Composable
+private fun CxPillIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String?,
+    onClick: (Rect) -> Unit,
+    iconSize: androidx.compose.ui.unit.Dp = 19.dp
+) {
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .onGloballyPositioned { bounds = it.boundsInWindow() }
+            .clickable { onClick(bounds) },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = Color.White, modifier = Modifier.size(iconSize))
+    }
+}
+
+@Composable
+private fun CxIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    size: androidx.compose.ui.unit.Dp = 44.dp,
+    isHero: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.35f }
+            .clip(CircleShape)
+            .background(if (isHero) Color(0x40FFFFFF) else Color(0x4D000000))
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) { content() }
+}
+
+@Composable
+private fun CxPlayPause(isPlaying: Boolean, modifier: Modifier = Modifier, tint: Color = Color.White) {
+    Icon(
+        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+        contentDescription = if (isPlaying) "Pause" else "Play",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun CxSeekIcon(isForward: Boolean, modifier: Modifier = Modifier, tint: Color = Color.White, fontSize: androidx.compose.ui.unit.TextUnit = 9.sp) {
+    Icon(
+        imageVector = if (isForward) Icons.Default.Forward10 else Icons.Default.Replay10,
+        contentDescription = if (isForward) "Forward 10s" else "Rewind 10s",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun CxSeekbar(
+    style: Any?,
+    palette: Any?,
+    accentColor: Color,
+    playedFrac: Float,
+    bufferedFrac: Float,
+    isScrubbing: Boolean,
+    heightDp: Float,
+    modifier: Modifier = Modifier
+) {
+    val thumb by animateFloatAsState(if (isScrubbing) 8f else 5f, tween(120), label = "cxThumb")
+    Canvas(modifier = modifier.height(28.dp)) {
+        val h = heightDp.dp.toPx().coerceAtLeast(2.dp.toPx())
+        val y = (size.height - h) / 2f
+        val r = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
+        val w = size.width
+        drawRoundRect(Color(0x40FFFFFF), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Size(w, h), r)
+        if (bufferedFrac > 0f) drawRoundRect(Color(0x66FFFFFF), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Size(w * bufferedFrac.coerceIn(0f, 1f), h), r)
+        if (playedFrac > 0f) drawRoundRect(accentColor, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Size(w * playedFrac.coerceIn(0f, 1f), h), r)
+        drawCircle(accentColor, thumb.dp.toPx(), androidx.compose.ui.geometry.Offset((w * playedFrac.coerceIn(0f, 1f)), size.height / 2f))
+    }
+}
+
+@Composable
+private fun CxLoader(modifier: Modifier = Modifier, accentColor: Color = Color.White, subtitle: String? = null) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CircularProgressIndicator(modifier = Modifier.size(40.dp), color = accentColor, trackColor = Color(0x2EFFFFFF), strokeWidth = 3.dp)
+        if (subtitle != null) Text(subtitle, color = Color(0x99FFFFFF), fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun CxSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val t by animateFloatAsState(if (checked) 1f else 0f, tween(150), label = "cxSwitch")
+    Box(
+        modifier = Modifier
+            .size(width = 42.dp, height = 24.dp)
+            .clip(CircleShape)
+            .background(if (checked) OttPrimary else Color(0x33FFFFFF))
+            .clickable { onCheckedChange(!checked) }
+            .padding(3.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = (18f * t).dp)
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+        )
+    }
+}
+
+@Composable
+private fun CxStepper(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(30.dp).clip(CircleShape).background(Color(0x14FFFFFF)).clickable { onMinus() }, contentAlignment = Alignment.Center) {
+                Text("-", color = Color.White, fontSize = 16.sp)
+            }
+            Text(value, color = Color(0xCCFFFFFF), fontSize = 12.5.sp, modifier = Modifier.widthIn(min = 44.dp), textAlign = TextAlign.Center)
+            Box(Modifier.size(30.dp).clip(CircleShape).background(Color(0x14FFFFFF)).clickable { onPlus() }, contentAlignment = Alignment.Center) {
+                Text("+", color = Color.White, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CxToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onChange(!checked) }.padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        CxSwitch(checked, onChange)
+    }
+}
+
+@Composable
+private fun CxSubtitlesModal(
+    availableSubtitles: List<SubtitleTrack>,
+    isCaptionsEnabled: Boolean,
+    activeCaptionTitle: String,
+    activeSubtitleUrl: String?,
+    downloadingSubtitleId: String?,
+    onSelectSubtitle: (SubtitleTrack) -> Unit,
+    onTurnOffCaptions: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenDialoguePanel: () -> Unit,
+    onUploadClick: () -> Unit,
+    onDismiss: () -> Unit,
+    anchor: Rect? = null
+) {
+    PlayerPanel(onDismiss = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Captions", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickTile(Icons.Outlined.Settings, "Style", { onOpenSettings() }, Modifier.weight(1f))
+                QuickTile(Icons.Default.Search, "Transcript", { onOpenDialoguePanel() }, Modifier.weight(1f))
+                QuickTile(Icons.Default.Add, "Upload", { onUploadClick() }, Modifier.weight(1f))
+            }
+            LazyColumn(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item {
+                    CxSubtitleRow("Off", "", !isCaptionsEnabled, false) { onTurnOffCaptions() }
+                }
+                itemsIndexed(availableSubtitles) { _, sub ->
+                    val active = isCaptionsEnabled && activeSubtitleUrl == sub.url
+                    CxSubtitleRow(sub.label, "${sub.language}, ${sub.source}", active, downloadingSubtitleId == sub.id) { onSelectSubtitle(sub) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CxSubtitleRow(title: String, subtitle: String, active: Boolean, loading: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) Color(0x1FFFFFFF) else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotEmpty()) Text(subtitle, color = Color(0x80FFFFFF), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        when {
+            loading -> CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+            active -> Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun CxCaptionSettings(
+    captionConfig: CaptionCustomization,
+    onConfigChange: (CaptionCustomization) -> Unit,
+    isCaptionsEnabled: Boolean,
+    onToggleCaptions: (Boolean) -> Unit,
+    subSyncMs: Long,
+    onAdjustSync: (Long) -> Unit,
+    onResetSync: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val c = captionConfig
+    val swatches = listOf(Color.White, Color(0xFFFDE047), Color(0xFF67E8F9), Color(0xFF86EFAC))
+    PlayerPanel(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Caption Style", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+            CxToggleRow("Show captions", isCaptionsEnabled, onToggleCaptions)
+            CxStepper("Size", "${(c.sizeScale * 100).roundToInt()}%",
+                { onConfigChange(c.copy(sizeScale = (c.sizeScale - 0.1f).coerceAtLeast(0.6f), sizePreset = "Custom")) },
+                { onConfigChange(c.copy(sizeScale = (c.sizeScale + 0.1f).coerceAtMost(2f), sizePreset = "Custom")) })
+            CxStepper("Background", "${(c.bgAlpha * 100).roundToInt()}%",
+                { onConfigChange(c.copy(bgAlpha = (c.bgAlpha - 0.1f).coerceAtLeast(0f))) },
+                { onConfigChange(c.copy(bgAlpha = (c.bgAlpha + 0.1f).coerceAtMost(1f))) })
+            CxStepper("Height", "${c.bottomPaddingDp.roundToInt()}dp",
+                { onConfigChange(c.copy(bottomPaddingDp = (c.bottomPaddingDp - 6f).coerceAtLeast(0f))) },
+                { onConfigChange(c.copy(bottomPaddingDp = (c.bottomPaddingDp + 6f).coerceAtMost(120f))) })
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Color", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    swatches.forEach { col ->
+                        Box(
+                            Modifier.size(24.dp).clip(CircleShape).background(col)
+                                .border(if (c.textColor == col) 2.dp else 0.dp, Color(0x99FFFFFF), CircleShape)
+                                .clickable { onConfigChange(c.copy(textColor = col)) }
+                        )
+                    }
+                }
+            }
+            CxToggleRow("Background box", c.hasBgBox) { onConfigChange(c.copy(hasBgBox = it)) }
+            CxToggleRow("Bold", c.isBold) { onConfigChange(c.copy(isBold = it)) }
+            CxToggleRow("Outline", c.hasStroke) { onConfigChange(c.copy(hasStroke = it)) }
+            CxToggleRow("Shadow", c.hasShadow) { onConfigChange(c.copy(hasShadow = it)) }
+            CxStepper("Sync", "${if (subSyncMs > 0) "+" else ""}${"%.1f".format(Locale.US, subSyncMs / 1000f)}s",
+                { onAdjustSync(-100L) }, { onAdjustSync(100L) })
+            if (subSyncMs != 0L) {
+                Text(
+                    "Reset sync", color = Color(0xCCFFFFFF), fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp).clickable { onResetSync() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0x14FFFFFF))
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Text(label, color = Color(0xCCFFFFFF), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+    }
+}
+
+/**
+ * Adaptive settings popup: right-side panel above the control bar on wide landscape screens,
+ * bottom sheet on portrait/narrow screens. Positioned against the window, not an anchor.
+ */
+@Composable
+private fun PlayerPanel(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val wide = cfg.screenWidthDp >= 560 && cfg.screenWidthDp > cfg.screenHeightDp
+    val marginPx = with(density) { 12.dp.roundToPx() }
+    val bottomPx = with(density) { (if (wide) 72.dp else 8.dp).roundToPx() }
+    val provider = remember(wide, marginPx, bottomPx) {
+        object : androidx.compose.ui.window.PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: androidx.compose.ui.unit.IntRect,
+                windowSize: androidx.compose.ui.unit.IntSize,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                popupContentSize: androidx.compose.ui.unit.IntSize
+            ): androidx.compose.ui.unit.IntOffset {
+                val x = if (wide) windowSize.width - popupContentSize.width - marginPx
+                else (windowSize.width - popupContentSize.width) / 2
+                val y = (windowSize.height - popupContentSize.height - bottomPx).coerceAtLeast(marginPx)
+                return androidx.compose.ui.unit.IntOffset(x, y)
+            }
+        }
+    }
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    androidx.compose.ui.window.Popup(
+        popupPositionProvider = provider,
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true)
+    ) {
+        AnimatedVisibility(
+            visible = shown,
+            enter = fadeIn(tween(160)) + (if (wide) slideInHorizontally(tween(220)) { it / 8 } else slideInVertically(tween(240)) { it / 6 })
+        ) {
+            val shape = RoundedCornerShape(if (wide) 18.dp else 22.dp)
+            Column(
+                modifier = (if (wide) Modifier.width(320.dp) else Modifier.fillMaxWidth().padding(horizontal = 8.dp))
+                    .heightIn(max = (cfg.screenHeightDp * (if (wide) 0.82f else 0.68f)).dp)
+                    .clip(shape)
+                    .background(Color(0xF2121520))
+                    .border(1.dp, Color(0x1FFFFFFF), shape),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (!wide) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .size(width = 36.dp, height = 4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(0x40FFFFFF))
+                    )
+                }
+                content()
+            }
+        }
     }
 }
 
@@ -6014,9 +6329,9 @@ private fun SettingsItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -6027,7 +6342,7 @@ private fun SettingsItemRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.White,
+                tint = Color(0xCCFFFFFF),
                 modifier = Modifier.size(18.dp)
             )
             Column {
@@ -6035,12 +6350,12 @@ private fun SettingsItemRow(
                     text = title,
                     color = Color.White,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Medium
                 )
                 if (subtitle.isNotEmpty()) {
                     Text(
                         text = subtitle,
-                        color = Color(0xFF94A3B8),
+                        color = Color(0x80FFFFFF),
                         fontSize = 11.5.sp
                     )
                 }
@@ -6084,7 +6399,7 @@ private fun SubHeader(
             Text(
                 text = title,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = Color.White
             )
         }
