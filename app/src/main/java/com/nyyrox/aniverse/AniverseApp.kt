@@ -420,7 +420,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         } else null
                     }
                     deepLinkUri.startsWith("detail:") || deepLinkUri.startsWith("manga_detail:") ||
-                    deepLinkUri.startsWith("novel_detail:") || deepLinkUri.startsWith("direct_chat:") -> deepLinkUri
+                    deepLinkUri.startsWith("novel_detail:") || deepLinkUri.startsWith("direct_chat:") ||
+                    deepLinkUri.startsWith("player:") -> deepLinkUri
                     deepLinkUri == "community" || deepLinkUri == "notifications" || deepLinkUri == "downloads" -> deepLinkUri
                     deepLinkUri == "profile" -> {
                         switchTab("profile")

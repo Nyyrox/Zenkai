@@ -74,8 +74,10 @@ private data class AudioTrackEntry(
 
 class AnimeStreamDownloader(
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(25, TimeUnit.SECONDS)
-        .readTimeout(35, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .followRedirects(true)
         .build()
 ) {
@@ -634,7 +636,7 @@ class AnimeStreamDownloader(
         segment: HlsSegment,
         headers: Map<String, String>,
         isCancelled: () -> Boolean,
-        maxRetries: Int = 6
+        maxRetries: Int = 8
     ): ByteArray = withContext(Dispatchers.IO) {
         var lastErr: Exception? = null
         for (attempt in 1..maxRetries) {

@@ -201,6 +201,72 @@ class DownloadManager(private val context: Context) {
         }
     }
 
+    fun cancelAll() {
+        animeCancellationTokens.forEach { (_, token) -> token.set(true) }
+        animeCancellationTokens.clear()
+        exportTargets.clear()
+        _animeTasks.value = emptyMap()
+        _novelTasks.value = emptyMap()
+        _mangaTasks.value = emptyMap()
+        ZenkaiDownloadService.stop(context)
+    }
+
+    fun retryTask(type: DownloadType, itemId: String, chapterId: String) {
+        val taskKey = "$itemId:$chapterId"
+        when (type) {
+            DownloadType.ANIME -> {
+                val existing = _animeTasks.value[taskKey] ?: return
+                val ep = existing.episode
+                val anime = Anime(
+                    id = existing.animeId,
+                    title = existing.animeTitle,
+                    cover = existing.animeCover,
+                    banner = existing.animeCover
+                )
+                retryAnimeDownload(
+                    anime = anime,
+                    episode = ep,
+                    provider = null,
+                    episodeTitle = existing.episodeTitle,
+                    quality = existing.quality,
+                    audio = existing.audio
+                )
+            }
+            DownloadType.NOVEL -> {
+                val existing = _novelTasks.value[taskKey] ?: return
+                val chapter = NovelChapter(
+                    slug = existing.chapterSlug,
+                    title = existing.chapterTitle,
+                    number = existing.chapterNumber
+                )
+                val repo = com.nyyrox.aniverse.data.novel.UnifiedNovelRepository().getRepoForSource(
+                    com.nyyrox.aniverse.data.novel.NovelSource.fromId(existing.source)
+                )
+                downloadNovelChapter(
+                    novelSlug = existing.novelSlug,
+                    novelTitle = existing.novelTitle,
+                    novelCover = existing.novelCover,
+                    chapter = chapter,
+                    repo = repo
+                )
+            }
+            DownloadType.MANGA -> {
+                val existing = _mangaTasks.value[taskKey] ?: return
+                val chapter = MangaChapter(
+                    chapterId = existing.chapterId,
+                    number = existing.chapterNumber,
+                    title = existing.chapterTitle
+                )
+                downloadMangaChapter(
+                    mangaId = existing.mangaId,
+                    mangaTitle = existing.mangaTitle,
+                    mangaPoster = existing.mangaPoster,
+                    chapter = chapter
+                )
+            }
+        }
+    }
+
     fun clearCompletedTasks() {
         _animeTasks.value = _animeTasks.value.filterValues { it.status != DownloadStatus.COMPLETED && it.status != DownloadStatus.FAILED }
         _novelTasks.value = _novelTasks.value.filterValues { it.status != DownloadStatus.COMPLETED && it.status != DownloadStatus.FAILED }
@@ -435,6 +501,7 @@ class DownloadManager(private val context: Context) {
             progress = 0f
         )
         _animeTasks.value = _animeTasks.value + (taskKey to initialTask)
+        ZenkaiDownloadService.start(context)
         DownloadNotificationHelper.updateProgressNotification(context, initialTask)
 
         // Any error outside the retry loop (storage, resolver, etc.) marks the task FAILED instead of crashing
@@ -1028,6 +1095,7 @@ class DownloadManager(private val context: Context) {
             progress = 0.1f
         )
         _novelTasks.value = _novelTasks.value + (taskKey to initialTask)
+        ZenkaiDownloadService.start(context)
 
         scope.launch {
             try {
@@ -1275,6 +1343,7 @@ class DownloadManager(private val context: Context) {
             progress = 0.05f
         )
         _mangaTasks.value = _mangaTasks.value + (taskKey to initialTask)
+        ZenkaiDownloadService.start(context)
 
         scope.launch {
             try {

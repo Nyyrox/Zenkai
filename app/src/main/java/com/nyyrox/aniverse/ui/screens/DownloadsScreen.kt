@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -59,6 +60,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -89,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import com.nyyrox.aniverse.data.download.DownloadPreferences
 import com.nyyrox.aniverse.data.download.DownloadStatus
 import com.nyyrox.aniverse.data.download.DownloadTaskInfo
 import com.nyyrox.aniverse.data.download.DownloadType
@@ -160,6 +163,23 @@ fun DownloadsScreen(
     val glassLayer = rememberPrismalGlassLayer()
     val backdrop = if (glassOn) glassLayer else null // null = flat AMOLED controls
     val context = LocalContext.current
+    var isIgnoringBattery by remember {
+        mutableStateOf(DownloadPreferences.isIgnoringBatteryOptimizations(context))
+    }
+    var dismissedBatteryBanner by remember { mutableStateOf(false) }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isIgnoringBattery = DownloadPreferences.isIgnoringBatteryOptimizations(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     val ambient = when (selectedTab) {
         0 -> downloadedAnime.firstOrNull()?.cover
         1 -> downloadedManga.firstOrNull()?.poster
@@ -244,6 +264,22 @@ fun DownloadsScreen(
                     StorageCard(glassOn, animeBytes, mangaBytes, novelBytes, ItemPad)
                 }
 
+                if (!isIgnoringBattery && !dismissedBatteryBanner) {
+                    item(key = "battery_banner") {
+                        BatteryOptimizationBanner(
+                            glass = glassOn,
+                            onEnable = {
+                                DownloadPreferences.requestIgnoreBatteryOptimizations(context)
+                                isIgnoringBattery = DownloadPreferences.isIgnoringBatteryOptimizations(context)
+                            },
+                            onDismiss = {
+                                dismissedBatteryBanner = true
+                            },
+                            modifier = ItemPad
+                        )
+                    }
+                }
+
                 if (activeTasks.isNotEmpty()) {
                     item(key = "active") {
                         val avg = activeTasks.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
@@ -288,26 +324,7 @@ fun DownloadsScreen(
                                 FailedDownloadTaskRow(
                                     task = task,
                                     onRetrySameServer = {
-                                        if (task.type == DownloadType.ANIME) {
-                                            val ep = task.chapterId.toIntOrNull() ?: 1
-                                            val retryAnime = com.nyyrox.aniverse.data.Anime(
-                                                id = task.itemId.toIntOrNull() ?: 0,
-                                                title = task.itemTitle.ifBlank { task.title },
-                                                cover = task.cover ?: "",
-                                                banner = task.cover ?: "",
-                                                description = ""
-                                            )
-                                            vm.downloadManager.retryAnimeDownload(
-                                                anime = retryAnime,
-                                                episode = ep,
-                                                provider = null,
-                                                episodeTitle = task.title,
-                                                quality = task.quality ?: "Auto HD",
-                                                audio = task.audio ?: "Default"
-                                            )
-                                        } else {
-                                            vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId)
-                                        }
+                                        vm.downloadManager.retryTask(task.type, task.itemId, task.chapterId)
                                     },
                                     onChangeServer = {
                                         if (task.type == DownloadType.ANIME) {
@@ -445,6 +462,86 @@ private fun ProgressBar(progress: Float, modifier: Modifier = Modifier) {
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
                 .background(Brush.horizontalGradient(listOf(OttPrimary, Color.White)))
         )
+    }
+}
+
+@Composable
+private fun BatteryOptimizationBanner(
+    glass: Boolean,
+    onEnable: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .surface(glass, tint = if (glass) Color(0x18F59E0B) else Color(0xFF1E1708))
+            .padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x28F59E0B)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Bolt,
+                    contentDescription = null,
+                    tint = Color(0xFFFBBF24),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Background Downloads Optimization",
+                    color = Color.White,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Allow background activity so Android Battery Saver and Doze mode won't pause or interrupt downloads when the app is minimized or screen is locked.",
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF59E0B))
+                            .clickable(onClick = onEnable)
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            "Allow Background Activity",
+                            color = Color.Black,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }
 

@@ -156,4 +156,34 @@ object DownloadPreferences {
 
         return list
     }
+
+    /**
+     * Checks if the device has exempted Zenkai from Battery Optimization / Doze mode restrictions.
+     */
+    fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+        return try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+        } catch (_: Exception) { true }
+    }
+
+    /**
+     * Requests the system to exempt Zenkai from Battery Saver / Doze mode so downloads never stop in background.
+     */
+    fun requestIgnoreBatteryOptimizations(context: Context) {
+        try {
+            val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                val fallbackIntent = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(fallbackIntent)
+            } catch (_: Exception) {}
+        }
+    }
 }

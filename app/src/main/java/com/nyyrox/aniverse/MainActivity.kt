@@ -151,9 +151,12 @@ class MainActivity : ComponentActivity() {
         com.nyyrox.aniverse.player.StreamProxyServer.start()
 
         // Initialize AniBridge v3 Mapping Engine
-        com.nyyrox.aniverse.data.mapping.AniBridgeResolver.init(this)
-
-        // Initialize Anime Mapping from Zenkai Web GitHub
+        com.nyyrox.aniverse.data.mapping.AniBridgeResolver.init(this)
+
+
+
+        // Initialize Anime Mapping from Zenkai Web GitHub
+
         com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.init(this)
 
         // Initialize Discord Integration & Credentials
@@ -212,10 +215,15 @@ class MainActivity : ComponentActivity() {
             // Safe fallback if already initialized
         }
 
+        val initialAction = intent?.getStringExtra("action")
+        val initialAnimeId = intent?.getIntExtra("anime_id", -1) ?: -1
+        val initialEpisode = intent?.getIntExtra("episode", -1) ?: -1
         val initialActionUrl = intent?.getStringExtra("action_url")
         val initialRouteExtra = intent?.getStringExtra("route")
         val initialPartnerId = intent?.getStringExtra("partner_user_id") ?: intent?.getStringExtra("target_id")
-        deepLinkUriState.value = if (!initialActionUrl.isNullOrBlank()) {
+        deepLinkUriState.value = if (initialAction == "PLAY_OFFLINE" && initialAnimeId > 0 && initialEpisode > 0) {
+            "player:$initialAnimeId:$initialEpisode:"
+        } else if (!initialActionUrl.isNullOrBlank()) {
             initialActionUrl
         } else if (!initialRouteExtra.isNullOrBlank()) {
             if ((initialRouteExtra == "direct_chat" || initialRouteExtra == "dm") && !initialPartnerId.isNullOrBlank()) {
@@ -253,10 +261,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val action = intent.getStringExtra("action")
+        val animeId = intent.getIntExtra("anime_id", -1)
+        val episode = intent.getIntExtra("episode", -1)
         val actionUrlExtra = intent.getStringExtra("action_url")
         val routeExtra = intent.getStringExtra("route")
         val partnerId = intent.getStringExtra("partner_user_id") ?: intent.getStringExtra("target_id")
-        deepLinkUriState.value = if (!actionUrlExtra.isNullOrBlank()) {
+        deepLinkUriState.value = if (action == "PLAY_OFFLINE" && animeId > 0 && episode > 0) {
+            "player:$animeId:$episode:"
+        } else if (!actionUrlExtra.isNullOrBlank()) {
             actionUrlExtra
         } else if (!routeExtra.isNullOrBlank()) {
             if ((routeExtra == "direct_chat" || routeExtra == "dm") && !partnerId.isNullOrBlank()) {
