@@ -1883,6 +1883,7 @@ private const val CAS_AGSL = """
     uniform shader content;
     uniform float2 size;
     uniform float sharpness;
+    uniform float lineWeight;
     uniform float brightness;
     uniform float contrast;
     uniform float saturation;
@@ -1893,44 +1894,52 @@ private const val CAS_AGSL = """
         half3 rgb = center.rgb;
 
         if (sharpness > 0.001) {
-            // Adaptive sampling distance based on display resolution (so scaling works aggressively on high-DPI screens)
-            float stepX = clamp(size.x / 960.0, 1.25, 2.5);
-            float stepY = clamp(size.y / 540.0, 1.25, 2.5);
+            // Standard 1-pixel cardinal sampling in output pixel coordinates
+            half3 n = content.eval(coord + float2( 0.0, -1.0)).rgb;
+            half3 s = content.eval(coord + float2( 0.0,  1.0)).rgb;
+            half3 e = content.eval(coord + float2( 1.0,  0.0)).rgb;
+            half3 w = content.eval(coord + float2(-1.0,  0.0)).rgb;
 
-            // 8-tap directional sampling (cardinal + diagonal) for crisp contour & line reconstruction
-            half3 n  = content.eval(coord + float2(0.0, -stepY)).rgb;
-            half3 s  = content.eval(coord + float2(0.0,  stepY)).rgb;
-            half3 e  = content.eval(coord + float2( stepX, 0.0)).rgb;
-            half3 w  = content.eval(coord + float2(-stepX, 0.0)).rgb;
+            // Local bounding box
+            half3 minRGB = min(min(min(n, s), min(e, w)), rgb);
+            half3 maxRGB = max(max(max(n, s), max(e, w)), rgb);
 
-            half3 ne = content.eval(coord + float2( stepX * 0.7, -stepY * 0.7)).rgb;
-            half3 nw = content.eval(coord + float2(-stepX * 0.7, -stepY * 0.7)).rgb;
-            half3 se = content.eval(coord + float2( stepX * 0.7,  stepY * 0.7)).rgb;
-            half3 sw = content.eval(coord + float2(-stepX * 0.7,  stepY * 0.7)).rgb;
+            // AMD FidelityFX CAS adaptive shaping factor:
+            // High in detailed texture/contour areas, smooth/zero in flat patches
+            half3 ampRGB = clamp(min(minRGB, half3(1.0) - maxRGB) / (maxRGB + 0.0001), 0.0, 1.0);
 
-            // Cardinal neighbors and diagonal corners
-            half3 minCardinal = min(min(min(n, s), e), w);
-            half3 maxCardinal = max(max(max(n, s), e), w);
+            // Peak negative lobe weight is strictly bounded between [-0.19, 0.0]
+            // so denominator (1.0 + 4.0 * w) is ALWAYS >= 0.24 > 0. Absolutely ZERO singularities or color inversion!
+            half peak = -0.185 * clamp(sharpness, 0.0, 1.0);
+            half3 wRGB = clamp(sqrt(ampRGB) * peak, half3(-0.19), half3(0.0));
 
-            half3 minDiagonal = min(min(min(ne, nw), se), sw);
-            half3 maxDiagonal = max(max(max(ne, nw), se), sw);
-
-            half3 minRGB = min(min(minCardinal, minDiagonal), rgb);
-            half3 maxRGB = max(max(maxCardinal, maxDiagonal), rgb);
-
-            // Contrast-adaptive sharpening weight with increased sensitivity for anime line art
-            half3 ampRGB = clamp(min(minRGB, 1.0 - maxRGB) / (maxRGB + 0.0001), 0.0, 1.0);
-            half3 wRGB = sqrt(ampRGB) * (-0.26 * sharpness);
-
-            // Weighted blend: cardinal neighbors have major weight, diagonals provide anti-aliased cross clarity
-            half3 sumNeighbors = (n + s + e + w) * 0.75 + (ne + nw + se + sw) * 0.25;
+            // RCAS filter convolution
+            half3 sumNeighbors = n + s + e + w;
             half3 sharpened = (rgb + sumNeighbors * wRGB) / (half3(1.0) + half3(4.0) * wRGB);
 
-            // Controlled overshoot allowing crisp peak edge contrast without dark halo ringing
-            half3 range = maxRGB - minRGB;
-            half3 minAllowed = max(half3(0.0), minRGB - range * (0.12 * sharpness));
-            half3 maxAllowed = min(half3(1.0), maxRGB + range * (0.12 * sharpness));
-            rgb = clamp(sharpened, minAllowed, maxAllowed);
+            // Anime Line Art Contour Enhancement (Anime4K-inspired line thinning)
+            if (lineWeight > 0.001) {
+                // ITU-R BT.709 perceived luminance
+                half lumaC = dot(rgb, half3(0.2126, 0.7152, 0.0722));
+                half lumaN = dot(n,   half3(0.2126, 0.7152, 0.0722));
+                half lumaS = dot(s,   half3(0.2126, 0.7152, 0.0722));
+                half lumaE = dot(e,   half3(0.2126, 0.7152, 0.0722));
+                half lumaW = dot(w,   half3(0.2126, 0.7152, 0.0722));
+
+                // Edge gradient magnitude
+                half gradX = (lumaE - lumaW);
+                half gradY = (lumaS - lumaN);
+                half edgeMag = sqrt(gradX * gradX + gradY * gradY);
+
+                // Deepen dark line art contours while leaving bright areas untouched
+                if (edgeMag > 0.04 && lumaC < 0.65) {
+                    half lineDarken = clamp(edgeMag * lineWeight * 0.45, 0.0, 0.18);
+                    sharpened = mix(sharpened, minRGB, lineDarken);
+                }
+            }
+
+            // Anti-ringing clamp: guarantee no overshoot or ringing halo
+            rgb = clamp(sharpened, minRGB, maxRGB);
         }
 
         if (contrast != 1.0) {
@@ -2091,15 +2100,17 @@ fun applyVideoEffects(
                 cachedCasShader = shader
             }
 
-            val baseSharpness = when (upscaler.mode) {
-                "ultra4k" -> 2.65f
-                "modeC" -> 1.85f
-                "modeA" -> 1.30f
-                "fast" -> 0.70f
-                "modeB" -> 0.55f
-                else -> 1.30f
+            val (baseSharpness, baseLineWeight) = when (upscaler.mode) {
+                "ultra4k" -> 1.00f to 0.45f
+                "modeC"   -> 0.85f to 0.50f
+                "modeA"   -> 0.75f to 0.25f
+                "fast"    -> 0.45f to 0.00f
+                "modeB"   -> 0.35f to 0.10f
+                else      -> 0.75f to 0.25f
             }
-            val effSharpness = if (isUpscalerActive) baseSharpness * (upscaler.intensity / 100f) else 0f
+            val intensityFactor = upscaler.intensity / 100f
+            val effSharpness = if (isUpscalerActive) baseSharpness * intensityFactor else 0f
+            val effLineWeight = if (isUpscalerActive) baseLineWeight * intensityFactor else 0f
 
             var baseBri = 1.0f
             var baseCon = 1.0f
@@ -2120,6 +2131,7 @@ fun applyVideoEffects(
 
             shader.setFloatUniform("size", w, h)
             shader.setFloatUniform("sharpness", effSharpness)
+            shader.setFloatUniform("lineWeight", effLineWeight)
             shader.setFloatUniform("brightness", finBri)
             shader.setFloatUniform("contrast", finCon)
             shader.setFloatUniform("saturation", finSat)
