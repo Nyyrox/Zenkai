@@ -67,6 +67,9 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.nyyrox.aniverse.MainActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -2534,12 +2537,25 @@ fun CinePlayerView(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.3.sp
                             )
-                            Icon(
-                                imageVector = Icons.Default.FastForward,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(15.dp)
-                            )
+                            Canvas(modifier = Modifier.size(15.dp)) {
+                                val sw = 1.6.dp.toPx()
+                                val w = size.width
+                                val h = size.height
+                                val p1 = Path().apply {
+                                    moveTo(w * 0.10f, h * 0.20f)
+                                    lineTo(w * 0.48f, h * 0.50f)
+                                    lineTo(w * 0.10f, h * 0.80f)
+                                    close()
+                                }
+                                val p2 = Path().apply {
+                                    moveTo(w * 0.50f, h * 0.20f)
+                                    lineTo(w * 0.88f, h * 0.50f)
+                                    lineTo(w * 0.50f, h * 0.80f)
+                                    close()
+                                }
+                                drawPath(p1, color = Color.White, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                drawPath(p2, color = Color.White, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                            }
                         }
                     }
 
@@ -2706,7 +2722,7 @@ fun CinePlayerView(
 
                     // Floating Sleek Unobtrusive Lock Button (Draggable & Customizable)
                     AnimatedVisibility(
-                        visible = isScreenLocked && !isInPip,
+                        visible = isScreenLocked && showUnlockPrompt && !isInPip,
                         enter = fadeIn(tween(180)) + scaleIn(tween(180)),
                         exit = fadeOut(tween(200)) + scaleOut(tween(200)),
                         modifier = Modifier.fillMaxSize()
@@ -2745,6 +2761,7 @@ fun CinePlayerView(
                                     .clickable {
                                         isScreenLocked = false
                                         showControls = true
+                                        showUnlockPrompt = false
                                         controlsTimeoutKey++
                                     },
                                 contentAlignment = Alignment.Center
@@ -3083,22 +3100,20 @@ fun CinePlayerView(
                                     if (upscalerSettings.enabled) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0x22FFFFFF))
-                                                .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(8.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .clickable {
                                                     morphAnchor = null
                                                     activeSettingsTab = PlayerSettingsTab.UPSCALER
                                                     showPlayerSettingsModal = true
                                                     controlsTimeoutKey++
                                                 }
-                                                .padding(horizontal = 7.dp, vertical = 3.dp),
+                                                .padding(horizontal = 6.dp, vertical = 4.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = "4K",
                                                 color = Color.White,
-                                                fontSize = 10.5.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.5.sp
                                             )
@@ -3111,7 +3126,8 @@ fun CinePlayerView(
                                         onClick = {
                                             isScreenLocked = true
                                             showControls = false
-                                            showUnlockPrompt = false
+                                            showUnlockPrompt = true
+                                            unlockPromptTimerKey++
                                         }
                                     )
                                 }
