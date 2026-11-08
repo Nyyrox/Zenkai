@@ -1221,7 +1221,7 @@ private fun TextTabContent(
                     ) {
                         Text(
                             text = label,
-                            color = Color.White,
+                            color = if (isSelected) Color(0xFF0F1117) else Color.White,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
@@ -1281,7 +1281,7 @@ private fun TextTabContent(
                     ) {
                         Text(
                             text = w,
-                            color = Color.White,
+                            color = if (isSelected) Color(0xFF0F1117) else Color.White,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
@@ -1310,7 +1310,7 @@ private fun TextTabContent(
                     Text(
                         text = "Italic",
                         fontStyle = FontStyle.Italic,
-                        color = Color.White,
+                        color = if (captionConfig.isItalic) Color(0xFF0F1117) else Color.White,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1328,7 +1328,7 @@ private fun TextTabContent(
                 ) {
                     Text(
                         text = "UPPERCASE",
-                        color = Color.White,
+                        color = if (captionConfig.isUppercase) Color(0xFF0F1117) else Color.White,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1361,7 +1361,7 @@ private fun TextTabContent(
                     ) {
                         Text(
                             text = label,
-                            color = Color.White,
+                            color = if (isSelected) Color(0xFF0F1117) else Color.White,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
@@ -1512,7 +1512,7 @@ private fun BoxTabContent(
                     ) {
                         Text(
                             text = label,
-                            color = Color.White,
+                            color = if (isSelected) Color(0xFF0F1117) else Color.White,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
@@ -1607,7 +1607,7 @@ private fun SyncTabContent(
                 ) {
                     Text(
                         text = label,
-                        color = Color.White,
+                        color = if (label == "Reset") Color(0xFF0F1117) else Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )

@@ -254,23 +254,35 @@ object ReAnimeResolver {
             val finalPlayableUrl = DirectStreamResolver.buildProxiedStreamUrl(manifestUrl, "https://flixcloud.cc/")
 
             val skipObj = dataObj.optJSONObject("skip") ?: streamData.optJSONObject("skip") ?: decResult.optJSONObject("skip")
-            val introObj = skipObj?.optJSONObject("intro") ?: dataObj.optJSONObject("intro") ?: streamData.optJSONObject("intro") ?: decResult.optJSONObject("intro")
+            val introObj = skipObj?.optJSONObject("intro")
+                ?: dataObj.optJSONObject("intro")
+                ?: dataObj.optJSONObject("intro_chapter")
+                ?: streamData.optJSONObject("intro")
+                ?: streamData.optJSONObject("intro_chapter")
+                ?: decResult.optJSONObject("intro")
+                ?: decResult.optJSONObject("intro_chapter")
             var introSkip: SkipInterval? = null
             if (introObj != null) {
                 val start = introObj.optDouble("start", -1.0)
                 val end = introObj.optDouble("end", -1.0)
                 if (start >= 0 && end > start) {
-                    introSkip = SkipInterval((start * 1000).toLong(), (end * 1000).toLong(), "Intro (OP)")
+                    introSkip = SkipInterval(Math.round(start * 1000.0), Math.round(end * 1000.0), "Intro (OP)")
                 }
             }
 
-            val outroObj = skipObj?.optJSONObject("outro") ?: dataObj.optJSONObject("outro") ?: streamData.optJSONObject("outro") ?: decResult.optJSONObject("outro")
+            val outroObj = skipObj?.optJSONObject("outro")
+                ?: dataObj.optJSONObject("outro")
+                ?: dataObj.optJSONObject("outro_chapter")
+                ?: streamData.optJSONObject("outro")
+                ?: streamData.optJSONObject("outro_chapter")
+                ?: decResult.optJSONObject("outro")
+                ?: decResult.optJSONObject("outro_chapter")
             var outroSkip: SkipInterval? = null
             if (outroObj != null) {
                 val start = outroObj.optDouble("start", -1.0)
                 val end = outroObj.optDouble("end", -1.0)
                 if (start >= 0 && end > start) {
-                    outroSkip = SkipInterval((start * 1000).toLong(), (end * 1000).toLong(), "Outro (ED)")
+                    outroSkip = SkipInterval(Math.round(start * 1000.0), Math.round(end * 1000.0), "Outro (ED)")
                 }
             }
 

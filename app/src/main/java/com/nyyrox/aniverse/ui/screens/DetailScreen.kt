@@ -198,6 +198,7 @@ import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
 import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttHeroGradient
+import com.nyyrox.aniverse.ui.components.DownloadAnimeOptionsSheet
 import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
 import com.nyyrox.aniverse.ui.theme.OttSecondary
@@ -609,9 +610,13 @@ fun DetailScreen(
         label = "detailRevealAlpha"
     )
 
+    var showDownloadSheet by remember { mutableStateOf(false) }
+    var downloadEp by remember { mutableIntStateOf(1) }
+    var downloadRange by remember { mutableStateOf<IntRange?>(null) }
+
     // ---- Tabs ----
     val tabs = if (anime.isMovie) {
-        listOf("Characters", "Casts", "Videos", "How to Watch", "More Like This")
+        listOf("Movie", "Characters", "Casts", "Videos", "How to Watch", "More Like This")
     } else {
         listOf("Episodes", "Characters", "Casts", "Videos", "How to Watch", "More Like This")
     }
@@ -619,6 +624,7 @@ fun DetailScreen(
     val currentTabTitle = tabs[activeTabIndex]
     val tabLabels = tabs.map { title ->
         when (title) {
+            "Movie" -> "Movie"
             "Episodes" -> "$title ($maxEpisode)"
             "Characters" -> if (anime.characters.isNotEmpty()) "$title (${anime.characters.size})" else title
             "How to Watch" -> if (anime.relations.isNotEmpty()) "$title (${anime.relations.size})" else title
@@ -961,6 +967,30 @@ fun DetailScreen(
                                     )
                                 }
                             }
+                            if (anime.isMovie) {
+                                val isMovieDownloaded = vm.isAnimeEpisodeDownloaded(anime.id, 1)
+                                val isMovieDownloading = activeAnimeTasks.containsKey("${anime.id}:1")
+                                GlassCircleButton(p, 50.dp, onClick = {
+                                    downloadEp = 1
+                                    downloadRange = null
+                                    showDownloadSheet = true
+                                }) {
+                                    Icon(
+                                        imageVector = when {
+                                            isMovieDownloaded -> Icons.Default.DownloadDone
+                                            isMovieDownloading -> Icons.Default.Downloading
+                                            else -> Icons.Default.Download
+                                        },
+                                        contentDescription = "Download Movie",
+                                        tint = when {
+                                            isMovieDownloaded -> Color(0xFF34D399)
+                                            isMovieDownloading -> p.warm
+                                            else -> p.text
+                                        },
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
                             GlassCircleButton(p, 50.dp, onClick = shareAnime) {
                                 Icon(Icons.Default.Share, contentDescription = "Share", tint = p.text, modifier = Modifier.size(21.dp))
                             }
@@ -1079,6 +1109,61 @@ fun DetailScreen(
 
                 // === TAB CONTENTS ===
                 when (currentTabTitle) {
+                    "Movie" -> {
+                        item(key = "movie_content") {
+                            val isDownloaded = vm.isAnimeEpisodeDownloaded(anime.id, 1)
+                            val isDownloading = activeAnimeTasks.containsKey("${anime.id}:1")
+                            val savedPos = vm.getSavedPosition(anime.id, 1)
+                            val durMs = (anime.duration ?: 100) * 60 * 1000L
+                            val progressRatio = if (durMs > 0 && savedPos > 0) (savedPos.toFloat() / durMs.toFloat()).coerceIn(0f, 1f) else 0f
+                            val still = tmdbEpisodes[1]
+                            val movieTitle = still?.name?.takeIf { it.isNotBlank() } ?: anime.displayTitle
+                            val movieOverview = still?.overview?.takeIf { it.isNotBlank() } ?: anime.description ?: "Sit back and enjoy ${anime.displayTitle}."
+                            val thumb = still?.stillUrl?.takeIf { it.isNotBlank() } ?: anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                            ) {
+                                RichEpisodeCard(
+                                    index = 0,
+                                    seen = seen,
+                                    topLimitPx = episodeTopLimitPx,
+                                    fallbackThumb = anime.banner?.takeIf { it.isNotBlank() } ?: anime.cover,
+                                    epNum = 1,
+                                    title = movieTitle,
+                                    overview = movieOverview,
+                                    thumb = thumb,
+                                    runMin = tmdbDetails?.episodeRunTime ?: anime.duration ?: 100,
+                                    progress = progressRatio,
+                                    isSelected = true,
+                                    isDownloaded = isDownloaded,
+                                    isDownloading = isDownloading,
+                                    isFiller = false,
+                                    isMixed = false,
+                                    p = p,
+                                    onClick = {
+                                        if (anime.id <= 0) showMissingAnilistDialog = true
+                                        else onPlay(anime.id, 1, selectedProvider)
+                                    },
+                                    onShare = {
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, "Watch ${anime.displayTitle} on Zenkai: https://zenkai.app/watch/${anime.id}")
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, "Share Movie"))
+                                    },
+                                    onDownload = {
+                                        downloadEp = 1
+                                        downloadRange = null
+                                        showDownloadSheet = true
+                                    }
+                                )
+                            }
+                        }
+                    }
                     // --- EPISODES: cardless 16:9 rows with the swipe-up 3D scroll effect, lazily composed ---
                     "Episodes" -> {
                         item(key = "ep_controls") {
@@ -1188,20 +1273,9 @@ fun DetailScreen(
                                                 .height(34.dp)
                                                 .pressable(0.94f) {
                                                     val eps = (curStart..curEnd).toList()
-                                                    val dlQuality = vm.getLastDownloadQuality() ?: "Auto HD"
-                                                    val dlAudio = if (selectedAudioMode.equals("DUB", ignoreCase = true)) "English (Dub)" else "Japanese (Sub)"
-                                                    vm.downloadAnimeEpisodes(
-                                                        anime = anime,
-                                                        episodes = eps,
-                                                        provider = selectedProvider,
-                                                        quality = dlQuality,
-                                                        audio = dlAudio
-                                                    )
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        "Downloading ${eps.size} episodes (${curStart}–${curEnd})...",
-                                                        android.widget.Toast.LENGTH_SHORT
-                                                    ).show()
+                                                    downloadEp = curStart
+                                                    downloadRange = curStart..curEnd
+                                                    showDownloadSheet = true
                                                 }
                                                 .clip(CircleShape)
                                                 .background(if (p.dark) Color(0xCC161B26) else Color(0xEBFFFFFF))
@@ -1349,17 +1423,9 @@ fun DetailScreen(
                                     onDownload = {
                                         if (!isDownloaded && !isDownloading) {
                                             com.nyyrox.aniverse.util.AppHaptics.tick(context)
-                                            val dlQuality = vm.getLastDownloadQuality() ?: "Auto HD"
-                                            val dlAudio = if (selectedAudioMode.equals("DUB", ignoreCase = true)) "English (Dub)" else "Japanese (Sub)"
-                                            vm.downloadAnimeEpisode(
-                                                anime = anime,
-                                                episode = epNum,
-                                                provider = selectedProvider,
-                                                episodeTitle = still?.name ?: "Episode $epNum",
-                                                quality = dlQuality,
-                                                audio = dlAudio
-                                            )
-                                            android.widget.Toast.makeText(context, "Downloading Ep $epNum...", android.widget.Toast.LENGTH_SHORT).show()
+                                            downloadEp = epNum
+                                            downloadRange = null
+                                            showDownloadSheet = true
                                         }
                                     }
                                 )
@@ -1823,6 +1889,52 @@ fun DetailScreen(
             },
             containerColor = p.sheet,
             shape = RoundedCornerShape(22.dp)
+        )
+    }
+
+    if (showDownloadSheet) {
+        DownloadAnimeOptionsSheet(
+            anime = anime,
+            episode = downloadEp,
+            episodeTitle = if (anime.isMovie) anime.displayTitle else tmdbEpisodes[downloadEp]?.name,
+            episodesRange = downloadRange,
+            initialProvider = selectedProvider,
+            onDismiss = {
+                showDownloadSheet = false
+                downloadRange = null
+            },
+            onStartDownload = { provider, quality, audio ->
+                showDownloadSheet = false
+                downloadRange = null
+                vm.downloadAnimeEpisode(
+                    anime = anime,
+                    episode = downloadEp,
+                    provider = provider,
+                    quality = quality,
+                    audio = audio
+                )
+                android.widget.Toast.makeText(
+                    context,
+                    "Queued ${if (anime.isMovie) "Movie" else "Episode $downloadEp"} for download ($quality - $audio)",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            },
+            onStartBatchDownload = { eps, provider, quality, audio ->
+                showDownloadSheet = false
+                downloadRange = null
+                vm.downloadAnimeEpisodes(
+                    anime = anime,
+                    episodes = eps,
+                    provider = provider,
+                    quality = quality,
+                    audio = audio
+                )
+                android.widget.Toast.makeText(
+                    context,
+                    "Queued ${eps.size} episodes for download ($quality - $audio)",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
         )
     }
 }

@@ -1726,9 +1726,14 @@ fun CinePlayerView(
                     }
                 }
 
-                // Subtitle sync with parsed cues (adjusted by subSyncMs offset + 120ms lead compensation)
+                // Subtitle sync with parsed cues (strictly matching seekbar / playback timestamp)
                 if (isCaptionsEnabled && activeLoadedCues.isNotEmpty()) {
-                    val pos = (livePos - subSyncMs).coerceAtLeast(0L)
+                    val effectivePos = when {
+                        isScrubbing -> scrubPositionMs
+                        isSwipeSeeking -> swipeSeekTargetMs
+                        else -> livePos
+                    }
+                    val pos = (effectivePos - subSyncMs).coerceAtLeast(0L)
                     val activeCues = findActiveCuesAt(activeLoadedCues, pos)
                     val newCueText = if (activeCues.isNotEmpty()) {
                         activeCues.map { it.text }.distinct().joinToString("\n")
@@ -1758,9 +1763,9 @@ fun CinePlayerView(
                 }
             }
 
-            // High-frequency 20ms refresh tick when playing with captions enabled for zero-latency frame sync;
-            // power-saving 100ms when paused or without active captions
-            val isFastSync = isCaptionsEnabled && activeLoadedCues.isNotEmpty() && (exoPlayer?.isPlaying == true)
+            // High-frequency 20ms refresh tick when playing or seeking with captions enabled for zero-latency frame sync;
+            // power-saving 100ms when paused without active scrubbing
+            val isFastSync = isCaptionsEnabled && activeLoadedCues.isNotEmpty() && (exoPlayer?.isPlaying == true || isScrubbing || isSwipeSeeking)
             delay(if (isFastSync) 20L else 100L)
         }
     }
@@ -3602,13 +3607,24 @@ fun CinePlayerView(
                                     onValueChange = { frac ->
                                         controlsTimeoutKey++
                                         isScrubbing = true
-                                        scrubPositionMs = (frac * durationMs).toLong().coerceIn(0L, durationMs)
+                                        val newScrubMs = (frac * durationMs).toLong().coerceIn(0L, durationMs)
+                                        scrubPositionMs = newScrubMs
+                                        if (isCaptionsEnabled && activeLoadedCues.isNotEmpty()) {
+                                            val pos = (newScrubMs - subSyncMs).coerceAtLeast(0L)
+                                            val activeCues = findActiveCuesAt(activeLoadedCues, pos)
+                                            activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
+                                        }
                                     },
                                     onValueChangeFinished = {
                                         isScrubbing = false
                                         currentPositionMs = scrubPositionMs
                                         PlayerPlaybackPlugin.seekTo(exoPlayer, scrubPositionMs)
                                         controlsTimeoutKey++
+                                        if (isCaptionsEnabled && activeLoadedCues.isNotEmpty()) {
+                                            val pos = (scrubPositionMs - subSyncMs).coerceAtLeast(0L)
+                                            val activeCues = findActiveCuesAt(activeLoadedCues, pos)
+                                            activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
+                                        }
                                     },
                                     colors = SliderDefaults.colors(
                                         thumbColor = Color.Transparent,

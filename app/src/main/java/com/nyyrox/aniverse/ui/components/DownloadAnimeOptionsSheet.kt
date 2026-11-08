@@ -72,8 +72,8 @@ import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.Provider
 import com.nyyrox.aniverse.data.StorageManager
 
-private val Amoled = Color(0xFF050507)
-private val Muted = Color(0xFF8E94A3)
+private val Amoled = Color(0xFF0F131C)
+private val Muted = Color(0xFF94A3B8)
 private val Soft = Color(0xFFCBD5E1)
 
 data class QualityOption(
@@ -134,56 +134,31 @@ fun DownloadAnimeOptionsSheet(
         mutableStateOf(savedQuality ?: "720p")
     }
 
-    val availableProviders = remember(selectedAudio, availableDirectServers) {
+    val availableProviders = remember(selectedAudio, availableDirectServers, isAcdnMapped) {
         val isDubSelected = selectedAudio.equals("dub", ignoreCase = true)
-        val isMultiSelected = selectedAudio.equals("multi", ignoreCase = true)
+        val audioKey = if (isDubSelected) "dub" else "sub"
 
-        val directList = if (!availableDirectServers.isNullOrEmpty()) {
-            val matching = when {
-                isDubSelected -> availableDirectServers.filter { (it.isDub || it.isMulti) && (isAcdnMapped || !it.id.contains("animesalt")) }
-                isMultiSelected -> availableDirectServers.filter { it.isMulti && (isAcdnMapped || !it.id.contains("animesalt")) }
-                else -> availableDirectServers.filter { !it.isDub && !it.isMulti }
-            }
-            if (matching.isNotEmpty()) matching else {
-                com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio, anime.id)
-            }
-        } else {
-            com.nyyrox.aniverse.data.extractor.DirectStreamResolver.getDefaultDirectProviders(selectedAudio, anime.id)
+        val list = mutableListOf<Provider>()
+        if (isAcdnMapped) {
+            list.add(Provider("animesalt-direct-dub", "ACDN", "https://animesalt.cx", "Multi-Audio", isDirectStream = true, isMultiAudio = true))
         }
+        list.add(Provider("flixcloud-$audioKey", "FlixCloud", "https://reanime.to", "HD", isDirectStream = true))
+        list.add(Provider("vidstream-direct-$audioKey", "Vidstream", "https://anikoto.to", "HD", isDirectStream = true))
+        list.add(Provider("megaplay-direct-$audioKey", "MegaPlay", "https://anikoto.to", "HD", isDirectStream = true))
 
-        // Direct servers
-        val directServers = directList.filter { it.isDirectStream && !it.isEmbedOnly && (isAcdnMapped || !it.id.contains("animesalt")) }
-
-        // Embed mode servers supported via StreamSniffer (ACDN, MegaPlay, Vidstream)
-        val embedServers = ALL_PROVIDERS.filter { prov ->
-            prov.isEmbedOnly && (
-                (isAcdnMapped && prov.id.contains("animesalt", ignoreCase = true)) ||
-                prov.id.contains("megaplay", ignoreCase = true) ||
-                prov.id.contains("vidstream", ignoreCase = true)
-            ) && when {
-                isDubSelected -> prov.isDub || prov.isMulti
-                isMultiSelected -> prov.isMulti
-                else -> !prov.isDub && !prov.isMulti
-            }
-        }
-
-        (directServers + embedServers).distinctBy { it.id }
+        list
     }
 
     var selectedProvider by remember(selectedAudio, initialProvider, availableProviders) {
-        // Priority 1: Match the current active provider by exact ID
         val matchingInit = initialProvider?.let { init ->
             availableProviders.firstOrNull { it.id == init.id }
         }
-        // Priority 2: Match current active provider by name (e.g. if audio was switched from SUB to DUB)
         val matchingInitByName = initialProvider?.let { init ->
             availableProviders.firstOrNull { it.name.equals(init.name, ignoreCase = true) }
         }
-        // Priority 3: Previously saved server from storage, if it exists in available direct servers
         val matchingSaved = savedServerId?.let { sId ->
             availableProviders.firstOrNull { it.id == sId }
         }
-        // Priority 4: First available direct server
         val firstDirect = availableProviders.firstOrNull { it.isDirectStream }
         mutableStateOf(
             matchingInit
@@ -195,7 +170,6 @@ fun DownloadAnimeOptionsSheet(
         )
     }
 
-    // Sheet drag distance in px (0 when fully open). Read only inside graphicsLayer lambdas, so no recomposition per frame.
     val density = LocalDensity.current
     val base = remember { floatArrayOf(Float.NaN) }
     val dragPx: () -> Float = {
@@ -219,11 +193,10 @@ fun DownloadAnimeOptionsSheet(
                     .width(36.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(Color(0x40FFFFFF))
+                    .background(Color(0x33FFFFFF))
             )
         }
     ) {
-        // Stretch overscroll fights the sheet's own drag (the down-up-down-up jitter), so it is off inside the sheet.
         CompositionLocalProvider(LocalOverscrollFactory provides null) {
         Column(
             modifier = Modifier
@@ -236,7 +209,7 @@ fun DownloadAnimeOptionsSheet(
                 }
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
@@ -248,6 +221,11 @@ fun DownloadAnimeOptionsSheet(
                 animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
                 label = "bobY"
             )
+            val headerTitle = when {
+                anime.isMovie -> "Download Movie"
+                episodesRange != null -> "Download Episodes ${episodesRange.first}–${episodesRange.last}"
+                else -> "Download Episode $episode"
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().floatIn(0, dragPx),
                 verticalAlignment = Alignment.CenterVertically,
@@ -266,14 +244,14 @@ fun DownloadAnimeOptionsSheet(
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = if (episodesRange != null) "Download Episodes ${episodesRange.first}–${episodesRange.last}"
-                        else "Download Episode $episode",
+                        text = headerTitle,
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = when {
+                            anime.isMovie -> "${anime.title} • Movie"
                             episodesRange != null -> "${episodesRange.count()} episodes • ${anime.title}"
                             !episodeTitle.isNullOrBlank() -> episodeTitle
                             else -> anime.title
@@ -297,7 +275,7 @@ fun DownloadAnimeOptionsSheet(
                 }
             }
 
-            // Audio
+            // Audio track selection
             Column(Modifier.floatIn(1, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("AUDIO TRACK")
                 val audioOptions = if (hasDubAvailable) {
@@ -323,7 +301,7 @@ fun DownloadAnimeOptionsSheet(
                 }
             }
 
-            // Quality
+            // Video Quality selection
             Column(Modifier.floatIn(2, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("VIDEO QUALITY")
                 LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -347,22 +325,19 @@ fun DownloadAnimeOptionsSheet(
                 }
             }
 
-            // Servers (outer column already scrolls, so no nested fixed-height scroller)
+            // Server selection
             Column(Modifier.floatIn(3, dragPx), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("DOWNLOAD SERVER · ${availableProviders.size} AVAILABLE")
+                SectionLabel("DOWNLOAD SERVER · CHOOSE SOURCE")
                 availableProviders.forEach { prov ->
                     val sel = selectedProvider.id == prov.id
-                    val isMulti = prov.isMultiAudio || prov.isMulti
+                    val isAcdn = prov.name.contains("ACDN", ignoreCase = true)
+                    val isDub = prov.isDub || selectedAudio.equals("DUB", ignoreCase = true)
                     val badgeText = when {
-                        isMulti -> "MULTI-AUDIO"
-                        prov.isEmbedOnly -> "SNIFFER"
-                        prov.serverBadge.isNotBlank() -> prov.serverBadge.uppercase()
+                        isAcdn -> "MULTI-AUDIO (SUB + DUB)"
+                        prov.name.contains("Flix", ignoreCase = true) -> if (isDub) "ENGLISH DUB" else "JAPANESE SUB"
+                        prov.name.contains("Vidstream", ignoreCase = true) -> if (isDub) "ENGLISH DUB" else "JAPANESE SUB"
+                        prov.name.contains("Megaplay", ignoreCase = true) -> if (isDub) "ENGLISH DUB" else "JAPANESE SUB"
                         else -> "DIRECT HD"
-                    }
-                    val badgeColor = when {
-                        isMulti -> Color(0xFF38BDF8)
-                        prov.isEmbedOnly -> Color(0xFFA78BFA)
-                        else -> Color(0xFF34D399)
                     }
                     GlassOption(
                         selected = sel,
@@ -387,11 +362,11 @@ fun DownloadAnimeOptionsSheet(
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(badgeColor.copy(alpha = 0.14f))
-                                    .border(0.8.dp, badgeColor.copy(alpha = 0.6f), CircleShape)
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.8.dp, Color(0x33FFFFFF), CircleShape)
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
-                                Text(badgeText, color = badgeColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                                Text(badgeText, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                             }
                             Spacer(Modifier.weight(1f))
                             Icon(
@@ -405,7 +380,7 @@ fun DownloadAnimeOptionsSheet(
                 }
             }
 
-            // Captions banner
+            // Captions notice
             Row(
                 modifier = Modifier
                     .floatIn(4, dragPx)
@@ -419,12 +394,12 @@ fun DownloadAnimeOptionsSheet(
             ) {
                 Icon(Icons.Default.Subtitles, null, tint = Soft, modifier = Modifier.size(18.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text("Offline captions included", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Matching subtitles download automatically for offline playback", color = Muted, fontSize = 10.5.sp, lineHeight = 14.sp)
+                    Text("Offline subtitles included", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Synchronized subtitle cues download automatically for offline viewing", color = Muted, fontSize = 10.5.sp, lineHeight = 14.sp)
                 }
             }
 
-            // Action
+            // Action button
             val source = remember { MutableInteractionSource() }
             val pressed by source.collectIsPressedAsState()
             val scale by animateFloatAsState(
@@ -432,6 +407,11 @@ fun DownloadAnimeOptionsSheet(
                 animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
                 label = "dlPress"
             )
+            val actionLabel = when {
+                anime.isMovie -> "Download Movie (${selectedProvider.name} • $selectedQuality • $selectedAudio)"
+                episodesRange != null -> "Download ${episodesRange.count()} Episodes (${selectedProvider.name} • $selectedQuality • $selectedAudio)"
+                else -> "Download Episode $episode (${selectedProvider.name} • $selectedQuality • $selectedAudio)"
+            }
             Row(
                 modifier = Modifier
                     .floatIn(5, dragPx)
@@ -454,12 +434,12 @@ fun DownloadAnimeOptionsSheet(
             ) {
                 Icon(Icons.Default.Download, null, tint = Color.Black, modifier = Modifier.size(19.dp))
                 Text(
-                    text = if (episodesRange != null) "Download ${episodesRange.count()} Episodes ($selectedQuality • $selectedAudio)"
-                    else "Download ($selectedQuality • $selectedAudio)",
+                    text = actionLabel,
                     color = Color.Black,
-                    fontSize = 14.5.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -479,7 +459,6 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** Selectable glass tile: lit gradient + bright edge when selected, spring press depth. */
 @Composable
 private fun GlassOption(
     selected: Boolean,
@@ -499,7 +478,7 @@ private fun GlassOption(
         label = "optPress"
     )
     val pop by animateFloatAsState(
-        targetValue = if (selected) 1.03f else 1f,
+        targetValue = if (selected) 1.02f else 1f,
         animationSpec = spring(dampingRatio = 0.45f, stiffness = 380f),
         label = "optPop"
     )
@@ -520,7 +499,6 @@ private fun GlassOption(
     )
 }
 
-/** Staggered spring entrance; lower sections also trail slightly behind while the sheet is dragged down. */
 @Composable
 private fun Modifier.floatIn(index: Int, dragPx: () -> Float): Modifier {
     val p = remember { Animatable(0f) }

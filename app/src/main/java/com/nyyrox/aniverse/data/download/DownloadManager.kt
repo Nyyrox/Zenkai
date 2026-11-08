@@ -553,10 +553,18 @@ class DownloadManager(private val context: Context) {
                     if (cancelToken.get()) break
 
                     try {
+                        val targetServerType = when {
+                            activeProvider.name.contains("vidstream", ignoreCase = true) || activeProvider.id.contains("vidstream", ignoreCase = true) -> ServerType.VIDSTREAM
+                            activeProvider.name.contains("megaplay", ignoreCase = true) || activeProvider.id.contains("megaplay", ignoreCase = true) -> ServerType.MEGAPLAY
+                            activeProvider.name.contains("flix", ignoreCase = true) || activeProvider.id.contains("flix", ignoreCase = true) -> ServerType.FLIXCLOUD
+                            activeProvider.name.contains("acdn", ignoreCase = true) || activeProvider.name.contains("animesalt", ignoreCase = true) || activeProvider.id.contains("acdn", ignoreCase = true) -> ServerType.ACDN
+                            else -> null
+                        }
+
                         val priorityServerTarget = when (attempt) {
-                            1 -> null // Natural priority: 1st ACDN -> 2nd FlixCloud -> 3rd VidStream -> 4th MegaPlay
-                            2 -> ServerType.FLIXCLOUD
-                            3 -> ServerType.VIDSTREAM
+                            1 -> targetServerType
+                            2 -> if (targetServerType == ServerType.FLIXCLOUD) ServerType.ACDN else ServerType.FLIXCLOUD
+                            3 -> if (targetServerType == ServerType.VIDSTREAM) ServerType.MEGAPLAY else ServerType.VIDSTREAM
                             4 -> ServerType.MEGAPLAY
                             else -> null
                         }

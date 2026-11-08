@@ -785,7 +785,7 @@ object SubtitleRepository {
 }
 
 /**
- * High-performance parser for SRT, WebVTT, and ASS subtitles into memory cues.
+ * High-performance parser for JSON, SRT, WebVTT, and ASS subtitles into memory cues.
  */
 object SubtitleParser {
     private fun parseTimestamp(str: String?): Long {
@@ -794,25 +794,118 @@ object SubtitleParser {
         val parts = clean.split(':')
         return try {
             val seconds = when (parts.size) {
-                3 -> parts[0].toDouble() * 3600.0 + parts[1].toDouble() * 60.0 + parts[2].toDouble()
-                2 -> parts[0].toDouble() * 60.0 + parts[1].toDouble()
+                3 -> parts[0].trim().toDouble() * 3600.0 + parts[1].trim().toDouble() * 60.0 + parts[2].trim().toDouble()
+                2 -> parts[0].trim().toDouble() * 60.0 + parts[1].trim().toDouble()
+                1 -> parts[0].trim().toDouble()
                 else -> return -1L
             }
-            (seconds * 1000.0).toLong()
+            Math.round(seconds * 1000.0)
         } catch (_: Exception) {
             -1L
         }
     }
 
+    private fun parseJsonTime(obj: JSONObject, vararg keys: String): Long {
+        for (k in keys) {
+            if (obj.has(k) && !obj.isNull(k)) {
+                val value = obj.get(k)
+                if (value is Number) {
+                    val d = value.toDouble()
+                    return if (k.contains("ms", ignoreCase = true) || d > 10_000.0) {
+                        d.toLong()
+                    } else {
+                        Math.round(d * 1000.0)
+                    }
+                } else if (value is String) {
+                    val s = value.trim()
+                    if (s.contains(":")) {
+                        val parsed = parseTimestamp(s)
+                        if (parsed >= 0) return parsed
+                    } else {
+                        val d = s.toDoubleOrNull()
+                        if (d != null) {
+                            return if (k.contains("ms", ignoreCase = true) || d > 10_000.0) {
+                                d.toLong()
+                            } else {
+                                Math.round(d * 1000.0)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return -1L
+    }
+
+    private fun cleanCueText(rawText: String): String {
+        return rawText
+            .replace(Regex("""<[^>]+>"""), "")
+            .replace(Regex("""\{[^}]*\}"""), "")
+            .replace("\\N", "\n")
+            .replace("\\n", "\n")
+            .replace("\\h", " ")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .trim()
+    }
+
     /**
-     * Exact replica of Web's parseSubtitleText (c:/zenkai web/src/lib/subtitles.ts)
+     * Exact replica of Web's parseSubtitleText with added native support for JSON subtitle formats.
      */
     fun parse(content: String): List<SubtitleCue> {
         if (content.isBlank()) return emptyList()
+        val trimmed = content.trim()
         val cues = mutableListOf<SubtitleCue>()
+
+        // 1. JSON format subtitles (e.g. [{"start": 12.3, "end": 15.0, "text": "..."}] or {"cues": [...]})
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            try {
+                val array: JSONArray? = if (trimmed.startsWith("[")) {
+                    JSONArray(trimmed)
+                } else {
+                    val obj = JSONObject(trimmed)
+                    obj.optJSONArray("cues")
+                        ?: obj.optJSONArray("subtitles")
+                        ?: obj.optJSONArray("events")
+                        ?: obj.optJSONArray("tracks")
+                        ?: obj.optJSONArray("dialogue")
+                }
+
+                if (array != null) {
+                    for (i in 0 until array.length()) {
+                        val item = array.optJSONObject(i) ?: continue
+                        val start = parseJsonTime(item, "start", "startTime", "startMs", "from", "Start")
+                        val end = parseJsonTime(item, "end", "endTime", "endMs", "to", "End")
+                        if (start < 0 || end <= start) continue
+
+                        val rawText = item.optString("text").takeIf { it.isNotBlank() }
+                            ?: item.optString("line").takeIf { it.isNotBlank() }
+                            ?: item.optString("content").takeIf { it.isNotBlank() }
+                            ?: item.optString("dialogue").takeIf { it.isNotBlank() }
+                            ?: item.optString("Text").takeIf { it.isNotBlank() }
+                            ?: run {
+                                val linesArr = item.optJSONArray("lines")
+                                if (linesArr != null) {
+                                    (0 until linesArr.length()).mapNotNull { linesArr.optString(it).takeIf { l -> l.isNotBlank() } }.joinToString("\n")
+                                } else ""
+                            }
+
+                        val clean = cleanCueText(rawText)
+                        if (clean.isNotBlank()) {
+                            cues.add(SubtitleCue(startMs = start, endMs = end, text = clean))
+                        }
+                    }
+                    if (cues.isNotEmpty()) return cues.sortedBy { it.startMs }
+                }
+            } catch (_: Exception) {}
+        }
+
         val normalized = content.replace("\r\n", "\n").replace("\r", "\n")
 
-        // 1. ASS / SSA format
+        // 2. ASS / SSA format
         if (normalized.contains("Dialogue:", ignoreCase = true)) {
             val lines = normalized.split('\n')
             for (raw in lines) {
@@ -824,21 +917,16 @@ object SubtitleParser {
                 val start = parseTimestamp(parts[1])
                 val end = parseTimestamp(parts[2])
                 if (start < 0 || end <= start) continue
-                val text = parts.subList(9, parts.size)
-                    .joinToString(",")
-                    .replace(Regex("""\{[^}]*\}"""), "")
-                    .replace("\\N", "\n")
-                    .replace("\\n", "\n")
-                    .replace("\\h", " ")
-                    .trim()
-                if (text.isNotBlank()) {
-                    cues.add(SubtitleCue(startMs = start, endMs = end, text = text))
+                val rawText = parts.subList(9, parts.size).joinToString(",")
+                val clean = cleanCueText(rawText)
+                if (clean.isNotBlank()) {
+                    cues.add(SubtitleCue(startMs = start, endMs = end, text = clean))
                 }
             }
             if (cues.isNotEmpty()) return cues.sortedBy { it.startMs }
         }
 
-        // 2. SRT / WebVTT format (exact Web block split)
+        // 3. SRT / WebVTT format
         val blocks = normalized.split(Regex("""\n\s*\n"""))
         for (block in blocks) {
             val lines = block.trim().split('\n')
@@ -851,14 +939,10 @@ object SubtitleParser {
             val start = parseTimestamp(a)
             val end = parseTimestamp(b)
             if (start < 0 || end <= start) continue
-            val text = lines.subList(at + 1, lines.size)
-                .joinToString("\n")
-                .replace(Regex("""<[^>]+>"""), "")
-                .replace(Regex("""\{[^}]*\}"""), "")
-                .replace("&nbsp;", " ")
-                .trim()
-            if (text.isNotBlank()) {
-                cues.add(SubtitleCue(startMs = start, endMs = end, text = text))
+            val rawText = lines.subList(at + 1, lines.size).joinToString("\n")
+            val clean = cleanCueText(rawText)
+            if (clean.isNotBlank()) {
+                cues.add(SubtitleCue(startMs = start, endMs = end, text = clean))
             }
         }
         return cues.sortedBy { it.startMs }
