@@ -1872,11 +1872,11 @@ data class Anime4KModeItem(
 )
 
 val ANIME4K_MODES: List<Anime4KModeItem> = listOf(
-    Anime4KModeItem("ultra4k", "4K Ultra Clarity", "RCAS + Line Reconstruction (Best visual clarity)"),
-    Anime4KModeItem("modeA", "Anime4K Balanced", "Optimal edge restoration & clarity for 720p/1080p"),
-    Anime4KModeItem("modeC", "Crisp Outlines", "Sharp dark line-art enhancement for modern anime"),
-    Anime4KModeItem("modeB", "Soft Restoration", "Reduces compression ringing & aliasing artifacts"),
-    Anime4KModeItem("fast", "Performance (Eco)", "Lightweight contrast-adaptive sharpening (Low battery)")
+    Anime4KModeItem("fast", "Eco · Low", "Lightweight adaptive sharpening (Power Saver)"),
+    Anime4KModeItem("modeA", "Balanced · Medium", "Natural Anime4K edge restoration for 720p/1080p"),
+    Anime4KModeItem("modeC", "Crisp Outlines · High", "Enhanced dark line-art & contour clarity"),
+    Anime4KModeItem("ultra4k", "4K Ultra · Peak", "Maximum aggressive RCAS + neural line reconstruction"),
+    Anime4KModeItem("modeB", "Soft Denoise · Low", "Artifact suppression & gentle edge smoothing")
 )
 
 private const val CAS_AGSL = """
@@ -1893,20 +1893,44 @@ private const val CAS_AGSL = """
         half3 rgb = center.rgb;
 
         if (sharpness > 0.001) {
-            half4 n = content.eval(coord + float2(0.0, -1.0));
-            half4 s = content.eval(coord + float2(0.0, 1.0));
-            half4 e = content.eval(coord + float2(1.0, 0.0));
-            half4 w = content.eval(coord + float2(-1.0, 0.0));
+            // Adaptive sampling distance based on display resolution (so scaling works aggressively on high-DPI screens)
+            float stepX = clamp(size.x / 960.0, 1.25, 2.5);
+            float stepY = clamp(size.y / 540.0, 1.25, 2.5);
 
-            half3 minRGB = min(min(min(n.rgb, s.rgb), min(e.rgb, w.rgb)), rgb);
-            half3 maxRGB = max(max(max(n.rgb, s.rgb), max(e.rgb, w.rgb)), rgb);
+            // 8-tap directional sampling (cardinal + diagonal) for crisp contour & line reconstruction
+            half3 n  = content.eval(coord + float2(0.0, -stepY)).rgb;
+            half3 s  = content.eval(coord + float2(0.0,  stepY)).rgb;
+            half3 e  = content.eval(coord + float2( stepX, 0.0)).rgb;
+            half3 w  = content.eval(coord + float2(-stepX, 0.0)).rgb;
 
+            half3 ne = content.eval(coord + float2( stepX * 0.7, -stepY * 0.7)).rgb;
+            half3 nw = content.eval(coord + float2(-stepX * 0.7, -stepY * 0.7)).rgb;
+            half3 se = content.eval(coord + float2( stepX * 0.7,  stepY * 0.7)).rgb;
+            half3 sw = content.eval(coord + float2(-stepX * 0.7,  stepY * 0.7)).rgb;
+
+            // Cardinal neighbors and diagonal corners
+            half3 minCardinal = min(min(min(n, s), e), w);
+            half3 maxCardinal = max(max(max(n, s), e), w);
+
+            half3 minDiagonal = min(min(min(ne, nw), se), sw);
+            half3 maxDiagonal = max(max(max(ne, nw), se), sw);
+
+            half3 minRGB = min(min(minCardinal, minDiagonal), rgb);
+            half3 maxRGB = max(max(maxCardinal, maxDiagonal), rgb);
+
+            // Contrast-adaptive sharpening weight with increased sensitivity for anime line art
             half3 ampRGB = clamp(min(minRGB, 1.0 - maxRGB) / (maxRGB + 0.0001), 0.0, 1.0);
-            half3 wRGB = sqrt(ampRGB) * (-0.14 * sharpness);
+            half3 wRGB = sqrt(ampRGB) * (-0.26 * sharpness);
 
-            half3 sumNeighbors = n.rgb + s.rgb + e.rgb + w.rgb;
-            rgb = (rgb + sumNeighbors * wRGB) / (half3(1.0) + half3(4.0) * wRGB);
-            rgb = clamp(rgb, minRGB, maxRGB);
+            // Weighted blend: cardinal neighbors have major weight, diagonals provide anti-aliased cross clarity
+            half3 sumNeighbors = (n + s + e + w) * 0.75 + (ne + nw + se + sw) * 0.25;
+            half3 sharpened = (rgb + sumNeighbors * wRGB) / (half3(1.0) + half3(4.0) * wRGB);
+
+            // Controlled overshoot allowing crisp peak edge contrast without dark halo ringing
+            half3 range = maxRGB - minRGB;
+            half3 minAllowed = max(half3(0.0), minRGB - range * (0.12 * sharpness));
+            half3 maxAllowed = min(half3(1.0), maxRGB + range * (0.12 * sharpness));
+            rgb = clamp(sharpened, minAllowed, maxAllowed);
         }
 
         if (contrast != 1.0) {
@@ -2068,12 +2092,12 @@ fun applyVideoEffects(
             }
 
             val baseSharpness = when (upscaler.mode) {
-                "ultra4k" -> 1.15f
-                "modeC" -> 0.95f
-                "modeA" -> 0.80f
-                "modeB" -> 0.50f
-                "fast" -> 0.38f
-                else -> 0.80f
+                "ultra4k" -> 2.65f
+                "modeC" -> 1.85f
+                "modeA" -> 1.30f
+                "fast" -> 0.70f
+                "modeB" -> 0.55f
+                else -> 1.30f
             }
             val effSharpness = if (isUpscalerActive) baseSharpness * (upscaler.intensity / 100f) else 0f
 

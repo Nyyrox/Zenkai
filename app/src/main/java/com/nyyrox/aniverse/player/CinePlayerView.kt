@@ -4411,6 +4411,7 @@ private fun PlayerSettingsModal(
     onUpscalerChange: (UpscalerState) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var isAutoServer by remember { mutableStateOf(true) }
 
     GlassDialog(
@@ -4470,16 +4471,19 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.SERVER) }
                         )
 
-                        // 2. Audio Track details (if multi audio available)
-                        if (audioTracks.size > 1) {
-                            val activeAudio = audioTracks.find { it.isSelected }?.label ?: "${audioTracks.size} Available"
-                            SettingsItemRow(
-                                icon = Icons.Outlined.GraphicEq,
-                                title = "Audio Track",
-                                subtitle = activeAudio,
-                                onClick = { onTabChange(PlayerSettingsTab.AUDIO) }
-                            )
+                        // 2. Audio Track details — Always visible across all servers
+                        val activeAudioSubtitle = when {
+                            audioTracks.size > 1 -> audioTracks.find { it.isSelected }?.label ?: (if (isDub) "English (Dub)" else "Japanese (Original)")
+                            serverName.contains("megaplay", ignoreCase = true) || serverName.contains("vidstream", ignoreCase = true) ->
+                                if (isDub) "English (Dub)" else "Japanese (Sub)"
+                            else -> if (isDub) "English (Dub)" else "Japanese (Native)"
                         }
+                        SettingsItemRow(
+                            icon = Icons.Outlined.GraphicEq,
+                            title = "Audio Track",
+                            subtitle = activeAudioSubtitle,
+                            onClick = { onTabChange(PlayerSettingsTab.AUDIO) }
+                        )
 
                         // 3. Captions
                         SettingsItemRow(
@@ -5013,14 +5017,66 @@ private fun PlayerSettingsModal(
                         SubHeader(title = "Audio Track", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
                         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
-                        if (audioTracks.isEmpty()) {
-                            Text(
-                                text = "Native Stream Audio (Default)",
-                                color = OttSecondary,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp)
+                        val isSingleAudioServer = serverName.contains("megaplay", ignoreCase = true) ||
+                                serverName.contains("vidstream", ignoreCase = true)
+
+                        if (isSingleAudioServer) {
+                            // MegaPlay & Vidstream: single audio stream output (separate Sub and Dub streams)
+                            val options = listOf(
+                                Triple(false, "Japanese (Sub)", true),
+                                Triple(true, "English (Dub)", hasDubAvailable)
                             )
-                        } else {
+                            options.forEach { (targetDub, label, isAvailable) ->
+                                val isSelected = (isDub == targetDub)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
+                                        .clickable {
+                                            if (!isAvailable) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Dub is not available for this episode",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                if (isDub != targetDub) {
+                                                    onSwitchAudioStream?.invoke(targetDub)
+                                                }
+                                                onDismiss()
+                                            }
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = label,
+                                            color = when {
+                                                !isAvailable -> Color.White.copy(alpha = 0.38f)
+                                                isSelected -> OttPrimary
+                                                else -> Color.White
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        if (!isAvailable) {
+                                            Text(
+                                                text = "Unavailable on this server for this episode",
+                                                color = Color.White.copy(alpha = 0.30f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        } else if (audioTracks.size > 1) {
+                            // ACDN & FlixCloud: multi-audio HLS streams, list all available audio tracks
                             audioTracks.forEach { track ->
                                 val isSelected = track.isSelected
                                 Row(
@@ -5042,6 +5098,61 @@ private fun PlayerSettingsModal(
                                         fontSize = 14.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        } else {
+                            // Single track / fallback for ACDN/FlixCloud
+                            val options = listOf(
+                                Triple(false, "Japanese (Native)", true),
+                                Triple(true, "English (Dub)", hasDubAvailable)
+                            )
+                            options.forEach { (targetDub, label, isAvailable) ->
+                                val isSelected = (isDub == targetDub)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
+                                        .clickable {
+                                            if (!isAvailable) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Dub is not available for this episode",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                if (isDub != targetDub) {
+                                                    onSwitchAudioStream?.invoke(targetDub)
+                                                }
+                                                onDismiss()
+                                            }
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = label,
+                                            color = when {
+                                                !isAvailable -> Color.White.copy(alpha = 0.38f)
+                                                isSelected -> OttPrimary
+                                                else -> Color.White
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        if (!isAvailable) {
+                                            Text(
+                                                text = "Unavailable on this server for this episode",
+                                                color = Color.White.copy(alpha = 0.30f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
                                     if (isSelected) {
                                         Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
                                     }
@@ -5545,7 +5656,6 @@ private fun PlayerSettingsModal(
                                     onUpscalerChange(upscalerSettings.copy(intensity = newVal.toInt()))
                                 },
                                 valueRange = 0f..100f,
-                                steps = 19,
                                 colors = SliderDefaults.colors(
                                     thumbColor = Color.White,
                                     activeTrackColor = Color(0x99FFFFFF),
@@ -5670,7 +5780,6 @@ private fun PlayerSettingsModal(
                                 onVideoFiltersChange(videoFilters.copy(brightness = newVal.toInt()))
                             },
                             valueRange = 70f..130f,
-                            steps = 29,
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
                                 activeTrackColor = Color(0x99FFFFFF),
@@ -5706,7 +5815,6 @@ private fun PlayerSettingsModal(
                                 onVideoFiltersChange(videoFilters.copy(contrast = newVal.toInt()))
                             },
                             valueRange = 70f..140f,
-                            steps = 34,
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
                                 activeTrackColor = Color(0x99FFFFFF),
@@ -5742,7 +5850,6 @@ private fun PlayerSettingsModal(
                                 onVideoFiltersChange(videoFilters.copy(saturation = newVal.toInt()))
                             },
                             valueRange = 70f..160f,
-                            steps = 17,
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
                                 activeTrackColor = Color(0x99FFFFFF),
