@@ -1416,6 +1416,64 @@ fun MangaDetailScreen(
                                 }
                             }
                         }
+
+                        // Batch Download Controls Row
+                        item("manga_batch_downloads") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val effectivePoster = info?.poster ?: vm.pendingMangaPosterHint.orEmpty()
+                                val effectiveTitle = info?.title ?: vm.pendingMangaTitleHint ?: "Manga"
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (p.dark) Color(0x18FFFFFF) else p.flatFill)
+                                        .border(BorderStroke(1.dp, if (p.dark) Color(0x22FFFFFF) else p.glassBorder), RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            val targetChapters = filteredChapters.filter { ch ->
+                                                !vm.downloadManager.isMangaChapterDownloaded(currentMangaId, ch.chapterId)
+                                            }.take(10)
+                                            if (targetChapters.isNotEmpty()) {
+                                                vm.downloadMangaChaptersBatch(currentMangaId, effectiveTitle, effectivePoster, targetChapters)
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = p.text, modifier = Modifier.size(13.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Download 10", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = p.text)
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (p.dark) Color(0x18FFFFFF) else p.flatFill)
+                                        .border(BorderStroke(1.dp, if (p.dark) Color(0x22FFFFFF) else p.glassBorder), RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            val targetChapters = filteredChapters.filter { ch ->
+                                                !vm.downloadManager.isMangaChapterDownloaded(currentMangaId, ch.chapterId)
+                                            }
+                                            if (targetChapters.isNotEmpty()) {
+                                                vm.downloadMangaChaptersBatch(currentMangaId, effectiveTitle, effectivePoster, targetChapters)
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.DownloadDone, contentDescription = null, tint = p.text, modifier = Modifier.size(13.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Download All (${filteredChapters.size})", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = p.text)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // 6. CHAPTERS LIST (2-Column Grid matching zenkai web Image 1)
@@ -1444,8 +1502,18 @@ fun MangaDetailScreen(
                             ) {
                                 for (chapter in pair) {
                                     val isRead = historyItem != null && historyItem.chapterId == chapter.chapterId
-                                    val task = downloadTasks.find { it.chapterId == chapter.chapterId }
-                                    val isDownloaded = task?.status == DownloadStatus.COMPLETED
+                                    val isDownloaded = remember(downloadTasks, chapter.chapterId) {
+                                        vm.downloadManager.isMangaChapterDownloaded(currentMangaId, chapter.chapterId)
+                                    }
+                                    val cleanM = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(currentMangaId)
+                                    val cleanCh = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chapter.chapterId)
+                                    val isDownloading = remember(downloadTasks, chapter.chapterId) {
+                                        downloadTasks.any {
+                                            (it.itemId == currentMangaId || it.itemId == cleanM) &&
+                                            (it.chapterId == chapter.chapterId || it.chapterId == cleanCh) &&
+                                            it.status == DownloadStatus.DOWNLOADING
+                                        }
+                                    }
 
                                     val cardBg = if (p.dark) Color(0xFF14161E) else p.flatFill
                                     val cardBorder = if (p.dark) Color(0x18FFFFFF) else p.glassBorder
@@ -1498,25 +1566,33 @@ fun MangaDetailScreen(
                                             }
 
                                             // Compact download button
-                                            IconButton(
-                                                onClick = {
-                                                    if (!isDownloaded && task == null) {
-                                                        vm.downloadMangaChapter(
-                                                            mangaId = currentMangaId,
-                                                            mangaTitle = info?.title ?: "Manga",
-                                                            mangaPoster = info?.poster,
-                                                            chapter = chapter
-                                                        )
-                                                    }
-                                                },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.FileDownload,
-                                                    contentDescription = "Download",
-                                                    tint = if (isDownloaded) p.rating else p.textMuted.copy(alpha = 0.5f),
-                                                    modifier = Modifier.size(15.dp)
+                                            if (isDownloading) {
+                                                CircularProgressIndicator(
+                                                    color = p.accentA,
+                                                    strokeWidth = 2.dp,
+                                                    modifier = Modifier.size(16.dp).padding(1.dp)
                                                 )
+                                            } else {
+                                                IconButton(
+                                                    onClick = {
+                                                        if (!isDownloaded) {
+                                                            vm.downloadMangaChapter(
+                                                                mangaId = currentMangaId,
+                                                                mangaTitle = info?.title ?: vm.pendingMangaTitleHint ?: "Manga",
+                                                                mangaPoster = info?.poster ?: vm.pendingMangaPosterHint,
+                                                                chapter = chapter
+                                                            )
+                                                        }
+                                                    },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.FileDownload,
+                                                        contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                                                        tint = if (isDownloaded) p.rating else p.textMuted.copy(alpha = 0.5f),
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }

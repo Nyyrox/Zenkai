@@ -18,6 +18,8 @@ import java.util.concurrent.ConcurrentHashMap
 class DownloadNotificationReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_CANCEL_DOWNLOAD = "com.nyyrox.aniverse.ACTION_CANCEL_DOWNLOAD"
+        const val ACTION_PAUSE_DOWNLOAD  = "com.nyyrox.aniverse.ACTION_PAUSE_DOWNLOAD"
+        const val ACTION_RESUME_DOWNLOAD = "com.nyyrox.aniverse.ACTION_RESUME_DOWNLOAD"
         const val ACTION_RETRY_DOWNLOAD  = "com.nyyrox.aniverse.ACTION_RETRY_DOWNLOAD"
         const val ACTION_CANCEL_ALL      = "com.nyyrox.aniverse.ACTION_CANCEL_ALL"
 
@@ -36,6 +38,20 @@ class DownloadNotificationReceiver : BroadcastReceiver() {
                 val taskKey = "$itemId:$chapterId"
                 DownloadManager.instance?.cancelTask(type, itemId, chapterId)
                 DownloadNotificationHelper.cancelNotification(context, taskKey)
+            }
+            ACTION_PAUSE_DOWNLOAD -> {
+                val typeStr = intent.getStringExtra(EXTRA_TYPE) ?: DownloadType.ANIME.name
+                val itemId = intent.getStringExtra(EXTRA_ITEM_ID) ?: return
+                val chapterId = intent.getStringExtra(EXTRA_CHAPTER_ID) ?: return
+                val type = try { DownloadType.valueOf(typeStr) } catch (_: Exception) { DownloadType.ANIME }
+                DownloadManager.instance?.pauseTask(type, itemId, chapterId)
+            }
+            ACTION_RESUME_DOWNLOAD -> {
+                val typeStr = intent.getStringExtra(EXTRA_TYPE) ?: DownloadType.ANIME.name
+                val itemId = intent.getStringExtra(EXTRA_ITEM_ID) ?: return
+                val chapterId = intent.getStringExtra(EXTRA_CHAPTER_ID) ?: return
+                val type = try { DownloadType.valueOf(typeStr) } catch (_: Exception) { DownloadType.ANIME }
+                DownloadManager.instance?.resumeTask(type, itemId, chapterId)
             }
             ACTION_RETRY_DOWNLOAD -> {
                 val typeStr = intent.getStringExtra(EXTRA_TYPE) ?: DownloadType.ANIME.name
@@ -57,11 +73,13 @@ class DownloadNotificationReceiver : BroadcastReceiver() {
 object DownloadNotificationHelper {
     const val CHANNEL_PROGRESS_ID = "zenkai_anime_downloads"
     const val CHANNEL_PROGRESS_NAME = "Active Downloads"
-    const val CHANNEL_PROGRESS_DESC = "Shows ongoing download progress and network speed"
+    const val CHANNEL_PROGRESS_DESC = "Shows ongoing download progress, speeds, and pause/resume controls"
 
     const val CHANNEL_COMPLETE_ID = "zenkai_anime_downloads_complete"
     const val CHANNEL_COMPLETE_NAME = "Completed Downloads"
-    const val CHANNEL_COMPLETE_DESC = "Notifies when anime downloads finish successfully or fail"
+    const val CHANNEL_COMPLETE_DESC = "Notifies when downloads finish successfully, fail, or complete cleanups"
+
+    const val NOTIFICATION_ID_DELETION = 2002
 
     private val lastUpdateTimes = ConcurrentHashMap<String, Long>()
     private var lastUnifiedProgressUpdate = 0L
@@ -85,7 +103,7 @@ object DownloadNotificationHelper {
                 notificationManager.createNotificationChannel(progressChannel)
             }
 
-            // Channel 2: Completed / Failed (default importance)
+            // Channel 2: Completed / Failed / Cleanup (default importance)
             if (notificationManager.getNotificationChannel(CHANNEL_COMPLETE_ID) == null) {
                 val completeChannel = NotificationChannel(
                     CHANNEL_COMPLETE_ID,
@@ -160,25 +178,29 @@ object DownloadNotificationHelper {
             )
 
             val primaryTask = activeTasks.firstOrNull { it.status == DownloadStatus.DOWNLOADING }
+                ?: activeTasks.firstOrNull { it.status == DownloadStatus.PAUSED }
                 ?: activeTasks.first()
 
+            val isAllPaused = activeTasks.all { it.status == DownloadStatus.PAUSED }
             val totalActive = activeTasks.size
             val primaryProgressPct = (primaryTask.progress.coerceIn(0f, 1f) * 100).toInt()
 
-            val titleText = if (totalActive == 1) {
-                primaryTask.itemTitle
-            } else {
-                "Downloading $totalActive Items • ${primaryTask.itemTitle}"
+            val titleText = when {
+                isAllPaused && totalActive == 1 -> "Paused • ${primaryTask.itemTitle}"
+                isAllPaused -> "Paused ($totalActive Items)"
+                totalActive == 1 -> primaryTask.itemTitle
+                else -> "Downloading $totalActive Items • ${primaryTask.itemTitle}"
             }
 
-            val speedText = if (primaryTask.speed.isNotBlank()) " • ${primaryTask.speed}" else ""
+            val speedText = if (primaryTask.speed.isNotBlank() && primaryTask.status != DownloadStatus.PAUSED) " • ${primaryTask.speed}" else ""
             val sizeText = if (primaryTask.totalBytes > 0L) {
                 val dlMb = primaryTask.downloadedBytes / (1024.0 * 1024.0)
                 val totMb = primaryTask.totalBytes / (1024.0 * 1024.0)
                 " • %.1f/%.1f MB".format(Locale.US, dlMb, totMb)
             } else ""
 
-            val contentText = "${primaryTask.title}: $primaryProgressPct%$speedText$sizeText"
+            val stateSuffix = if (primaryTask.status == DownloadStatus.PAUSED) " (Paused)" else ""
+            val contentText = "${primaryTask.title}: $primaryProgressPct%$speedText$sizeText$stateSuffix"
 
             val bigStyle = NotificationCompat.BigTextStyle().bigText(
                 buildString {
@@ -188,6 +210,7 @@ object DownloadNotificationHelper {
                         activeTasks.drop(1).take(4).forEach { other ->
                             val statusDesc = when (other.status) {
                                 DownloadStatus.QUEUED -> "Queued"
+                                DownloadStatus.PAUSED -> "Paused"
                                 DownloadStatus.DOWNLOADING -> "${(other.progress * 100).toInt()}%"
                                 else -> other.status.name
                             }
@@ -198,6 +221,24 @@ object DownloadNotificationHelper {
                         }
                     }
                 }
+            )
+
+            // Pause / Resume action for the primary task
+            val toggleActionIntent = Intent(context, DownloadNotificationReceiver::class.java).apply {
+                action = if (primaryTask.status == DownloadStatus.PAUSED) {
+                    DownloadNotificationReceiver.ACTION_RESUME_DOWNLOAD
+                } else {
+                    DownloadNotificationReceiver.ACTION_PAUSE_DOWNLOAD
+                }
+                putExtra(DownloadNotificationReceiver.EXTRA_TYPE, primaryTask.type.name)
+                putExtra(DownloadNotificationReceiver.EXTRA_ITEM_ID, primaryTask.itemId)
+                putExtra(DownloadNotificationReceiver.EXTRA_CHAPTER_ID, primaryTask.chapterId)
+            }
+            val pendingToggleIntent = PendingIntent.getBroadcast(
+                context,
+                ZenkaiDownloadService.NOTIFICATION_ID + 400,
+                toggleActionIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
             // Cancel action for the currently downloading item
@@ -219,7 +260,7 @@ object DownloadNotificationHelper {
 
             val builder = NotificationCompat.Builder(context, CHANNEL_PROGRESS_ID)
                 .setSmallIcon(R.drawable.ic_zenkai_notification)
-                .setColor(0xFFE11D48.toInt())
+                .setColor(if (isAllPaused) 0xFFF59E0B.toInt() else 0xFFE11D48.toInt())
                 .setContentTitle(titleText)
                 .setContentText(contentText)
                 .setStyle(bigStyle)
@@ -228,6 +269,11 @@ object DownloadNotificationHelper {
                 .setOnlyAlertOnce(true)
                 .setProgress(100, primaryProgressPct, isIndeterminate)
                 .setContentIntent(pendingContentIntent)
+                .addAction(
+                    if (primaryTask.status == DownloadStatus.PAUSED) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
+                    if (primaryTask.status == DownloadStatus.PAUSED) "Resume" else "Pause",
+                    pendingToggleIntent
+                )
                 .addAction(
                     android.R.drawable.ic_menu_close_clear_cancel,
                     if (totalActive > 1) "Cancel Item" else "Cancel",
@@ -239,12 +285,11 @@ object DownloadNotificationHelper {
     }
 
     fun updateProgressNotification(context: Context, task: AnimeDownloadTask) {
-        // Automatically wake foreground service if not already running
         ZenkaiDownloadService.start(context)
 
         val dm = DownloadManager.instance ?: return
         val activeTasks = dm.tasks.value.filter {
-            it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED
+            it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED
         }
         if (activeTasks.isNotEmpty()) {
             updateUnifiedForegroundNotification(context, activeTasks)
@@ -294,7 +339,6 @@ object DownloadNotificationHelper {
                 .setAutoCancel(true)
                 .setContentIntent(pendingContentIntent)
 
-            // Play Now Action Button: Launches directly to watch offline
             val playIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("route", "downloads")
@@ -362,7 +406,6 @@ object DownloadNotificationHelper {
                 .setAutoCancel(true)
                 .setContentIntent(pendingContentIntent)
 
-            // Retry action button
             val retryIntent = Intent(context, DownloadNotificationReceiver::class.java).apply {
                 action = DownloadNotificationReceiver.ACTION_RETRY_DOWNLOAD
                 putExtra(DownloadNotificationReceiver.EXTRA_TYPE, DownloadType.ANIME.name)
@@ -382,6 +425,87 @@ object DownloadNotificationHelper {
             )
 
             notificationManager.notify(notifId, builder.build())
+        } catch (_: Exception) {}
+    }
+
+    fun showDeletionNotification(
+        context: Context,
+        title: String,
+        deletedCount: Int,
+        totalCount: Int,
+        isFinished: Boolean
+    ) {
+        try {
+            createNotificationChannels(context)
+            val notificationManager = NotificationManagerCompat.from(context)
+            if (!notificationManager.areNotificationsEnabled()) return
+
+            if (isFinished) {
+                val finishNotif = NotificationCompat.Builder(context, CHANNEL_COMPLETE_ID)
+                    .setSmallIcon(R.drawable.ic_zenkai_notification)
+                    .setColor(0xFF10B981.toInt())
+                    .setContentTitle("Deleted All: $title")
+                    .setContentText("Successfully deleted $totalCount items and freed up storage.")
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setAutoCancel(true)
+                    .setTimeoutAfter(4000L)
+                    .build()
+                notificationManager.notify(NOTIFICATION_ID_DELETION, finishNotif)
+                return
+            }
+
+            val progressPct = if (totalCount > 0) ((deletedCount.toFloat() / totalCount.toFloat()) * 100).toInt() else 0
+            val builder = NotificationCompat.Builder(context, CHANNEL_PROGRESS_ID)
+                .setSmallIcon(R.drawable.ic_zenkai_notification)
+                .setColor(0xFFEF4444.toInt())
+                .setContentTitle("Deleting $title")
+                .setContentText("Deleted $deletedCount/$totalCount ($progressPct%)")
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setProgress(totalCount, deletedCount, false)
+
+            notificationManager.notify(NOTIFICATION_ID_DELETION, builder.build())
+        } catch (_: Exception) {}
+    }
+
+    fun cancelDeletionNotification(context: Context) {
+        try {
+            val notificationManager = NotificationManagerCompat.from(context)
+            notificationManager.cancel(NOTIFICATION_ID_DELETION)
+        } catch (_: Exception) {}
+    }
+
+    fun cancelAllNotificationsForAnime(context: Context, animeId: Int, episodes: List<Int> = emptyList()) {
+        try {
+            val notificationManager = NotificationManagerCompat.from(context)
+            episodes.forEach { ep ->
+                val taskKey = "$animeId:$ep"
+                lastUpdateTimes.remove(taskKey)
+                notificationManager.cancel(getNotificationId(taskKey))
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun cancelAllNotificationsForManga(context: Context, mangaId: String, chapters: List<String> = emptyList()) {
+        try {
+            val notificationManager = NotificationManagerCompat.from(context)
+            chapters.forEach { ch ->
+                val taskKey = "$mangaId:$ch"
+                lastUpdateTimes.remove(taskKey)
+                notificationManager.cancel(getNotificationId(taskKey))
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun cancelAllNotificationsForNovel(context: Context, novelSlug: String, chapters: List<String> = emptyList()) {
+        try {
+            val notificationManager = NotificationManagerCompat.from(context)
+            chapters.forEach { ch ->
+                val taskKey = "$novelSlug:$ch"
+                lastUpdateTimes.remove(taskKey)
+                notificationManager.cancel(getNotificationId(taskKey))
+            }
         } catch (_: Exception) {}
     }
 

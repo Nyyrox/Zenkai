@@ -57,6 +57,36 @@ class DownloadManager(private val context: Context) {
         .build()
 
     private val animeDownloader = AnimeStreamDownloader(client)
+
+    suspend fun downloadImageToDisk(imageUrl: String?, destFile: File): String? = withContext(Dispatchers.IO) {
+        if (imageUrl.isNullOrBlank()) return@withContext null
+        if (destFile.exists() && destFile.length() > 500L) {
+            return@withContext destFile.absolutePath
+        }
+        try {
+            val req = Request.Builder()
+                .url(imageUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body
+                    if (body != null) {
+                        destFile.parentFile?.mkdirs()
+                        destFile.outputStream().use { out ->
+                            body.byteStream().copyTo(out)
+                        }
+                        if (destFile.exists() && destFile.length() > 0) {
+                            return@withContext destFile.absolutePath
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("DownloadManager", "Failed to cache image locally from $imageUrl: ${e.message}")
+        }
+        return@withContext null
+    }
     private val animeCancellationTokens = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
     // Folder the user picked for this exact download (kept across Retry, dropped on cancel/success)
     private val exportTargets = ConcurrentHashMap<String, Uri>()
@@ -211,6 +241,103 @@ class DownloadManager(private val context: Context) {
         ZenkaiDownloadService.stop(context)
     }
 
+    fun pauseTask(type: DownloadType, itemId: String, chapterId: String) {
+        val taskKey = "$itemId:$chapterId"
+        when (type) {
+            DownloadType.ANIME -> {
+                animeCancellationTokens[taskKey]?.set(true)
+                animeCancellationTokens.remove(taskKey)
+                val current = _animeTasks.value[taskKey] ?: return
+                _animeTasks.value = _animeTasks.value + (taskKey to current.copy(
+                    status = DownloadStatus.PAUSED,
+                    speedFormatted = "Paused"
+                ))
+            }
+            DownloadType.NOVEL -> {
+                val current = _novelTasks.value[taskKey] ?: return
+                _novelTasks.value = _novelTasks.value + (taskKey to current.copy(
+                    status = DownloadStatus.PAUSED
+                ))
+            }
+            DownloadType.MANGA -> {
+                val current = _mangaTasks.value[taskKey] ?: return
+                _mangaTasks.value = _mangaTasks.value + (taskKey to current.copy(
+                    status = DownloadStatus.PAUSED
+                ))
+            }
+        }
+        val active = tasks.value.filter {
+            it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED
+        }
+        DownloadNotificationHelper.updateUnifiedForegroundNotification(context, active)
+    }
+
+    fun resumeTask(type: DownloadType, itemId: String, chapterId: String) {
+        val taskKey = "$itemId:$chapterId"
+        when (type) {
+            DownloadType.ANIME -> {
+                val current = _animeTasks.value[taskKey] ?: return
+                val ep = current.episode
+                val anime = getOfflineAnimeDetails(current.animeId) ?: Anime(
+                    id = current.animeId,
+                    title = current.animeTitle,
+                    cover = current.animeCover,
+                    banner = current.animeCover
+                )
+                downloadAnimeEpisode(
+                    anime = anime,
+                    episode = ep,
+                    provider = null,
+                    episodeTitle = current.episodeTitle,
+                    quality = current.quality,
+                    audio = current.audio
+                )
+            }
+            DownloadType.NOVEL -> {
+                val current = _novelTasks.value[taskKey] ?: return
+                val chapter = NovelChapter(
+                    slug = current.chapterSlug,
+                    title = current.chapterTitle,
+                    number = current.chapterNumber
+                )
+                val repo = com.nyyrox.aniverse.data.novel.UnifiedNovelRepository().getRepoForSource(
+                    com.nyyrox.aniverse.data.novel.NovelSource.fromId(current.source)
+                )
+                downloadNovelChapter(
+                    novelSlug = current.novelSlug,
+                    novelTitle = current.novelTitle,
+                    novelCover = current.novelCover,
+                    chapter = chapter,
+                    repo = repo
+                )
+            }
+            DownloadType.MANGA -> {
+                val current = _mangaTasks.value[taskKey] ?: return
+                val chapter = MangaChapter(
+                    chapterId = current.chapterId,
+                    number = current.chapterNumber,
+                    title = current.chapterTitle
+                )
+                downloadMangaChapter(
+                    mangaId = current.mangaId,
+                    mangaTitle = current.mangaTitle,
+                    mangaPoster = current.mangaPoster,
+                    chapter = chapter
+                )
+            }
+        }
+    }
+
+    fun pauseAll() {
+        val active = tasks.value.filter { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
+        active.forEach { pauseTask(it.type, it.itemId, it.chapterId) }
+    }
+
+    fun resumeAll() {
+        val paused = tasks.value.filter { it.status == DownloadStatus.PAUSED }
+        paused.forEach { resumeTask(it.type, it.itemId, it.chapterId) }
+    }
+
     fun retryTask(type: DownloadType, itemId: String, chapterId: String) {
         val taskKey = "$itemId:$chapterId"
         when (type) {
@@ -329,6 +456,8 @@ class DownloadManager(private val context: Context) {
             var provName = ""
             var downloadedAt = videoFile.lastModified()
             var metaFileSize = 0L
+            var epStill: String? = File(epDir, "thumbnail.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+            var epOverview: String? = null
 
             val parsedSubtitles = mutableListOf<com.nyyrox.aniverse.data.subtitles.SubtitleTrack>()
             if (metaFile.exists()) {
@@ -337,6 +466,10 @@ class DownloadManager(private val context: Context) {
                     epTitle = json.optString("episodeTitle").takeIf { it.isNotBlank() }
                     animeTitle = json.optString("animeTitle", "")
                     animeCover = json.optString("animeCover", "")
+                    if (epStill == null) {
+                        epStill = json.optString("episodeStill").takeIf { it.isNotBlank() }
+                    }
+                    epOverview = json.optString("episodeOverview").takeIf { it.isNotBlank() }
                     provId = json.optString("providerId", "")
                     provName = json.optString("providerName", "")
                     downloadedAt = json.optLong("downloadedAt", downloadedAt)
@@ -402,6 +535,8 @@ class DownloadManager(private val context: Context) {
                 episodeTitle = epTitle,
                 animeTitle = animeTitle,
                 animeCover = animeCover,
+                episodeStill = epStill,
+                episodeOverview = epOverview,
                 providerId = provId,
                 providerName = provName,
                 filePath = videoFile.absolutePath,
@@ -457,6 +592,8 @@ class DownloadManager(private val context: Context) {
         episode: Int,
         provider: Provider? = null,
         episodeTitle: String? = null,
+        episodeStill: String? = null,
+        episodeOverview: String? = null,
         quality: String = "Auto HD",
         audio: String = "Default",
         exportTo: Uri? = null
@@ -538,15 +675,33 @@ class DownloadManager(private val context: Context) {
                 val epFolder = File(animeFolder, episode.toString())
                 check(epFolder.exists() || epFolder.mkdirs()) { "Can't create download folder: ${epFolder.absolutePath}" }
 
-                // Save anime-level meta.json
+                // Cache anime cover, banner, and episode still locally on disk for 100% offline parity
+                val localCover = downloadImageToDisk(anime.cover, File(animeFolder, "cover.jpg")) ?: anime.cover
+                val localBanner = downloadImageToDisk(anime.banner ?: anime.cover, File(animeFolder, "banner.jpg")) ?: (anime.banner ?: anime.cover)
+                val localStill = downloadImageToDisk(episodeStill, File(epFolder, "thumbnail.jpg")) ?: episodeStill
+
+                // Save anime-level meta.json and details.json with full metadata
                 val animeMeta = File(animeFolder, "meta.json")
                 val aJson = JSONObject().apply {
                     put("animeId", anime.id)
                     put("title", anime.title)
-                    put("cover", anime.banner ?: anime.cover)
+                    put("romajiTitle", anime.romajiTitle.orEmpty())
+                    put("cover", localCover)
+                    put("banner", localBanner)
+                    put("description", anime.description)
+                    if (anime.score != null) put("score", anime.score)
+                    put("format", anime.format.orEmpty())
+                    put("status", anime.status)
+                    val gArr = JSONArray()
+                    anime.genres.forEach { gArr.put(it) }
+                    put("genres", gArr)
+                    put("season", anime.season.orEmpty())
+                    if (anime.seasonYear != null) put("year", anime.seasonYear)
+                    if (anime.episodes != null) put("episodes", anime.episodes)
                     put("lastDownloadedAt", System.currentTimeMillis())
                 }
                 animeMeta.writeText(aJson.toString())
+                try { File(animeFolder, "details.json").writeText(aJson.toString()) } catch (_: Exception) {}
 
                 while (attempt < maxAttempts && !downloadSucceeded) {
                     attempt++
@@ -797,8 +952,10 @@ class DownloadManager(private val context: Context) {
                         put("animeId", anime.id)
                         put("episode", episode)
                         put("episodeTitle", episodeTitle.orEmpty())
+                        put("episodeStill", localStill.orEmpty())
+                        put("episodeOverview", episodeOverview.orEmpty())
                         put("animeTitle", anime.title)
-                        put("animeCover", anime.banner ?: anime.cover)
+                        put("animeCover", localCover)
                         put("providerId", activeProvider.id)
                         put("providerName", activeProvider.name)
                         put("quality", quality)
@@ -966,14 +1123,143 @@ class DownloadManager(private val context: Context) {
         }
     }
 
-    fun deleteDownloadedAnime(animeId: Int) {
+    fun getOfflineAnimeDetails(animeId: Int): Anime? {
+        for (baseDir in allAnimeDirs) {
+            val dir = File(baseDir, animeId.toString())
+            if (!dir.exists() || !dir.isDirectory) continue
+            val detailsFile = File(dir, "details.json").takeIf { it.exists() }
+                ?: File(dir, "meta.json").takeIf { it.exists() } ?: continue
+            try {
+                val j = JSONObject(detailsFile.readText())
+                val localCover = File(dir, "cover.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+                    ?: j.optString("cover", "")
+                val localBanner = File(dir, "banner.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+                    ?: j.optString("banner").takeIf { it.isNotBlank() } ?: localCover
+                val gArr = j.optJSONArray("genres")
+                val genres = mutableListOf<String>()
+                if (gArr != null) {
+                    for (i in 0 until gArr.length()) {
+                        genres.add(gArr.getString(i))
+                    }
+                }
+                val eps = getDownloadedEpisodesForAnime(animeId)
+                return Anime(
+                    id = animeId,
+                    title = j.optString("title", "Anime #$animeId"),
+                    romajiTitle = j.optString("romajiTitle").takeIf { it.isNotBlank() },
+                    cover = localCover,
+                    banner = localBanner,
+                    description = j.optString("description", ""),
+                    score = if (j.has("score") && !j.isNull("score")) j.optInt("score") else null,
+                    format = j.optString("format").takeIf { it.isNotBlank() },
+                    status = j.optString("status", "COMPLETED"),
+                    genres = genres,
+                    season = j.optString("season").takeIf { it.isNotBlank() },
+                    seasonYear = if (j.has("year") && !j.isNull("year")) j.optInt("year") else null,
+                    episodes = if (j.has("episodes") && !j.isNull("episodes")) j.optInt("episodes") else eps.size
+                )
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    fun deleteDownloadedAnimeWithProgress(animeId: Int, onProgress: ((deleted: Int, total: Int) -> Unit)? = null) {
         scope.launch {
+            val episodes = getDownloadedEpisodesForAnime(animeId)
+            val total = episodes.size
+            var deleted = 0
+            val animeTitle = episodes.firstOrNull()?.animeTitle?.takeIf { it.isNotBlank() }
+                ?: _downloadedAnime.value.find { it.animeId == animeId }?.title
+                ?: "Anime #$animeId"
+
+            DownloadNotificationHelper.cancelAllNotificationsForAnime(context, animeId, episodes.map { it.episode })
+            DownloadNotificationHelper.showDeletionNotification(context, animeTitle, 0, total, isFinished = false)
+
+            for (ep in episodes) {
+                cancelTask(DownloadType.ANIME, animeId.toString(), ep.episode.toString())
+                for (baseDir in allAnimeDirs) {
+                    val epDir = File(baseDir, "$animeId/${ep.episode}")
+                    if (epDir.exists()) epDir.deleteRecursively()
+                }
+                deleted++
+                onProgress?.invoke(deleted, total)
+                DownloadNotificationHelper.showDeletionNotification(context, animeTitle, deleted, total, isFinished = false)
+            }
+
             for (baseDir in allAnimeDirs) {
                 val aDir = File(baseDir, animeId.toString())
                 if (aDir.exists()) aDir.deleteRecursively()
             }
+
+            DownloadNotificationHelper.showDeletionNotification(context, animeTitle, total, total, isFinished = true)
             refreshDownloadedLists()
         }
+    }
+
+    fun deleteDownloadedMangaWithProgress(mangaId: String, onProgress: ((deleted: Int, total: Int) -> Unit)? = null) {
+        scope.launch {
+            val chapters = getDownloadedChaptersForManga(mangaId)
+            val total = chapters.size
+            var deleted = 0
+            val cleanManga = MangaRepository.cleanWeebId(mangaId)
+            val mangaTitle = _downloadedManga.value.find { it.mangaId == mangaId || it.mangaId == cleanManga }?.title ?: mangaId
+
+            DownloadNotificationHelper.cancelAllNotificationsForManga(context, mangaId, chapters.map { it.chapterId })
+            DownloadNotificationHelper.showDeletionNotification(context, mangaTitle, 0, total, isFinished = false)
+
+            for (ch in chapters) {
+                cancelTask(DownloadType.MANGA, mangaId, ch.chapterId)
+                val candidates = listOf(
+                    File(baseMangaDir, "$cleanManga/${ch.chapterId}"),
+                    File(baseMangaDir, "$mangaId/${ch.chapterId}"),
+                    File(baseMangaDir, "wc_$cleanManga/${ch.chapterId}")
+                )
+                candidates.forEach { if (it.exists()) it.deleteRecursively() }
+                deleted++
+                onProgress?.invoke(deleted, total)
+                DownloadNotificationHelper.showDeletionNotification(context, mangaTitle, deleted, total, isFinished = false)
+            }
+
+            listOf(
+                File(baseMangaDir, mangaId),
+                File(baseMangaDir, cleanManga),
+                File(baseMangaDir, "wc_$cleanManga")
+            ).forEach { if (it.exists()) it.deleteRecursively() }
+
+            DownloadNotificationHelper.showDeletionNotification(context, mangaTitle, total, total, isFinished = true)
+            refreshDownloadedLists()
+        }
+    }
+
+    fun deleteDownloadedNovelWithProgress(novelSlug: String, onProgress: ((deleted: Int, total: Int) -> Unit)? = null) {
+        scope.launch {
+            val chapters = getDownloadedChaptersForNovel(novelSlug)
+            val total = chapters.size
+            var deleted = 0
+            val novelTitle = _downloadedNovels.value.find { it.novelSlug == novelSlug }?.title ?: novelSlug
+
+            DownloadNotificationHelper.cancelAllNotificationsForNovel(context, novelSlug, chapters.map { it.chapterSlug })
+            DownloadNotificationHelper.showDeletionNotification(context, novelTitle, 0, total, isFinished = false)
+
+            val novelFolder = File(baseNovelDir, novelSlug)
+            for (ch in chapters) {
+                cancelTask(DownloadType.NOVEL, novelSlug, ch.chapterSlug)
+                val chFile = File(novelFolder, "${ch.chapterSlug}.json")
+                if (chFile.exists()) chFile.delete()
+                deleted++
+                onProgress?.invoke(deleted, total)
+                DownloadNotificationHelper.showDeletionNotification(context, novelTitle, deleted, total, isFinished = false)
+            }
+
+            if (novelFolder.exists()) novelFolder.deleteRecursively()
+
+            DownloadNotificationHelper.showDeletionNotification(context, novelTitle, total, total, isFinished = true)
+            refreshDownloadedLists()
+        }
+    }
+
+    fun deleteDownloadedAnime(animeId: Int) {
+        deleteDownloadedAnimeWithProgress(animeId)
     }
 
     fun getDownloadedEpisodesForAnime(animeId: Int): List<DownloadedAnimeEpisode> {
@@ -1002,16 +1288,37 @@ class DownloadManager(private val context: Context) {
             for (dir in dirs) {
                 if (dir.isDirectory) {
                     val animeId = dir.name.toIntOrNull() ?: continue
-                    val metaFile = File(dir, "meta.json")
+                    val metaFile = File(dir, "details.json").takeIf { it.exists() } ?: File(dir, "meta.json")
                     var title = "Anime #$animeId"
-                    var cover = ""
+                    var cover = File(dir, "cover.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath ?: ""
+                    var banner: String? = File(dir, "banner.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+                    var description: String? = null
+                    var score: Double? = null
+                    var format: String? = null
+                    var genres: List<String> = emptyList()
+                    var status: String? = null
+                    var season: String? = null
+                    var year: Int? = null
                     var lastDownloaded = dir.lastModified()
 
                     if (metaFile.exists()) {
                         try {
                             val mJson = JSONObject(metaFile.readText())
                             title = mJson.optString("title", title)
-                            cover = mJson.optString("cover", cover)
+                            if (cover.isBlank()) cover = mJson.optString("cover", cover)
+                            if (banner == null) banner = mJson.optString("banner").takeIf { it.isNotBlank() }
+                            description = mJson.optString("description").takeIf { it.isNotBlank() }
+                            if (mJson.has("score") && !mJson.isNull("score")) score = mJson.optDouble("score")
+                            format = mJson.optString("format").takeIf { it.isNotBlank() }
+                            status = mJson.optString("status").takeIf { it.isNotBlank() }
+                            season = mJson.optString("season").takeIf { it.isNotBlank() }
+                            if (mJson.has("year") && !mJson.isNull("year")) year = mJson.optInt("year")
+                            val gArr = mJson.optJSONArray("genres")
+                            if (gArr != null) {
+                                val gList = mutableListOf<String>()
+                                for (i in 0 until gArr.length()) gList.add(gArr.getString(i))
+                                genres = gList
+                            }
                             lastDownloaded = mJson.optLong("lastDownloadedAt", lastDownloaded)
                         } catch (_: Exception) {}
                     }
@@ -1029,13 +1336,29 @@ class DownloadManager(private val context: Context) {
                                 totalSizeBytes = existing.totalSizeBytes + totalSize,
                                 lastDownloadedAt = maxOf(existing.lastDownloadedAt, lastDownloaded),
                                 title = if (existing.title.startsWith("Anime #") && !title.startsWith("Anime #")) title else existing.title,
-                                cover = existing.cover.ifBlank { cover }
+                                cover = existing.cover.ifBlank { cover },
+                                banner = existing.banner ?: banner,
+                                description = existing.description ?: description,
+                                score = existing.score ?: score,
+                                format = existing.format ?: format,
+                                genres = if (existing.genres.isEmpty()) genres else existing.genres,
+                                status = existing.status ?: status,
+                                season = existing.season ?: season,
+                                year = existing.year ?: year
                             )
                         } else {
                             animeMap[animeId] = DownloadedAnime(
                                 animeId = animeId,
                                 title = title,
                                 cover = cover,
+                                banner = banner,
+                                description = description,
+                                score = score,
+                                format = format,
+                                genres = genres,
+                                status = status,
+                                season = season,
+                                year = year,
                                 episodesCount = epDirs.size,
                                 totalSizeBytes = totalSize,
                                 lastDownloadedAt = lastDownloaded
@@ -1114,11 +1437,14 @@ class DownloadManager(private val context: Context) {
 
                 val novelFolder = File(baseNovelDir, novelSlug).apply { if (!exists()) mkdirs() }
                 
+                // Cache cover locally for offline display
+                val localCover = downloadImageToDisk(novelCover, File(novelFolder, "cover.jpg")) ?: novelCover
+
                 // Save meta.json
                 val metaFile = File(novelFolder, "meta.json")
                 val metaObj = JSONObject().apply {
                     put("title", novelTitle)
-                    put("cover", novelCover)
+                    put("cover", localCover)
                     put("source", repo.source.id)
                     put("lastDownloadedAt", System.currentTimeMillis())
                 }
@@ -1199,11 +1525,7 @@ class DownloadManager(private val context: Context) {
     }
 
     fun deleteDownloadedNovel(novelSlug: String) {
-        scope.launch {
-            val dir = File(baseNovelDir, novelSlug)
-            if (dir.exists()) dir.deleteRecursively()
-            refreshDownloadedLists()
-        }
+        deleteDownloadedNovelWithProgress(novelSlug)
     }
 
     private fun loadDownloadedNovelsFromDisk(): List<DownloadedNovel> {
@@ -1218,11 +1540,15 @@ class DownloadManager(private val context: Context) {
                 var source = "novelfire"
                 var lastDownloaded = dir.lastModified()
 
+                val localCoverFile = File(dir, "cover.jpg")
+                if (localCoverFile.exists() && localCoverFile.length() > 0) {
+                    cover = localCoverFile.absolutePath
+                }
                 if (metaFile.exists()) {
                     try {
                         val mJson = JSONObject(metaFile.readText())
                         title = mJson.optString("title", title)
-                        cover = mJson.optString("cover", cover)
+                        if (cover.isBlank()) cover = mJson.optString("cover", cover)
                         source = mJson.optString("source", source)
                         lastDownloaded = mJson.optLong("lastDownloadedAt", lastDownloaded)
                     } catch (_: Exception) {}
@@ -1362,11 +1688,14 @@ class DownloadManager(private val context: Context) {
 
                 val mangaFolder = File(baseMangaDir, cleanManga).apply { if (!exists()) mkdirs() }
                 
+                // Cache poster locally for offline display
+                val localPoster = downloadImageToDisk(mangaPoster, File(mangaFolder, "poster.jpg")) ?: mangaPoster.orEmpty()
+
                 // Save meta.json for manga
                 val metaFile = File(mangaFolder, "meta.json")
                 val metaObj = JSONObject().apply {
                     put("title", mangaTitle)
-                    put("poster", mangaPoster.orEmpty())
+                    put("poster", localPoster)
                     put("lastDownloadedAt", System.currentTimeMillis())
                 }
                 metaFile.writeText(metaObj.toString())
@@ -1502,11 +1831,7 @@ class DownloadManager(private val context: Context) {
     }
 
     fun deleteDownloadedManga(mangaId: String) {
-        scope.launch {
-            val dir = File(baseMangaDir, mangaId)
-            if (dir.exists()) dir.deleteRecursively()
-            refreshDownloadedLists()
-        }
+        deleteDownloadedMangaWithProgress(mangaId)
     }
 
     private fun loadDownloadedMangaFromDisk(): List<DownloadedManga> {
@@ -1520,11 +1845,15 @@ class DownloadManager(private val context: Context) {
                 var poster: String? = null
                 var lastDownloaded = dir.lastModified()
 
+                val localPosterFile = File(dir, "poster.jpg")
+                if (localPosterFile.exists() && localPosterFile.length() > 0) {
+                    poster = localPosterFile.absolutePath
+                }
                 if (metaFile.exists()) {
                     try {
                         val mJson = JSONObject(metaFile.readText())
                         title = mJson.optString("title", title)
-                        poster = mJson.optString("poster").takeIf { it.isNotBlank() }
+                        if (poster == null) poster = mJson.optString("poster").takeIf { it.isNotBlank() }
                         lastDownloaded = mJson.optLong("lastDownloadedAt", lastDownloaded)
                     } catch (_: Exception) {}
                 }

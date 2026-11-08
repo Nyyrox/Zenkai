@@ -131,7 +131,7 @@ class ZenkaiDownloadService : Service() {
             val dm = DownloadManager.instance ?: return@launch
             dm.tasks.collectLatest { taskList ->
                 val activeTasks = taskList.filter {
-                    it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED
+                    it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED
                 }
                 if (activeTasks.isEmpty()) {
                     // No active downloads remain: release locks and stop service cleanly
@@ -139,7 +139,13 @@ class ZenkaiDownloadService : Service() {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 } else {
-                    acquireLocks()
+                    val anyActive = activeTasks.any { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
+                    if (anyActive) {
+                        acquireLocks()
+                    } else {
+                        // When all downloads are paused, release wakelocks to save battery while keeping notification alive
+                        releaseLocks()
+                    }
                     DownloadNotificationHelper.updateUnifiedForegroundNotification(this@ZenkaiDownloadService, activeTasks)
                 }
             }

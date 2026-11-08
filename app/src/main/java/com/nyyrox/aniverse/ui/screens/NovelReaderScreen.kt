@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Refresh
@@ -775,10 +776,12 @@ fun NovelReaderScreen(
                             IconButton(
                                 onClick = {
                                     if (!isChapterDownloaded) {
+                                        val novelCover = vm.selectedNovel?.cover ?: vm.pendingNovelPosterHint.orEmpty()
+                                        val novelTitle = vm.selectedNovel?.title ?: vm.pendingNovelTitleHint ?: novelSlug.replace("-", " ")
                                         vm.downloadNovelChapter(
                                             novelSlug,
-                                            novelSlug.replace("-", " "),
-                                            "",
+                                            novelTitle,
+                                            novelCover,
                                             chapterSlug,
                                             content.title
                                         )
@@ -786,7 +789,7 @@ fun NovelReaderScreen(
                                 }
                             ) {
                                 Icon(
-                                    Icons.Default.DownloadDone,
+                                    if (isChapterDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
                                     contentDescription = if (isChapterDownloaded) "Downloaded" else "Download Chapter",
                                     tint = if (isChapterDownloaded) OttAccentGold else Color.White
                                 )

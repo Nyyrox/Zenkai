@@ -1906,10 +1906,14 @@ fun DetailScreen(
             onStartDownload = { provider, quality, audio ->
                 showDownloadSheet = false
                 downloadRange = null
+                val epData = tmdbEpisodes[downloadEp]
                 vm.downloadAnimeEpisode(
                     anime = anime,
                     episode = downloadEp,
                     provider = provider,
+                    episodeTitle = epData?.name,
+                    episodeStill = epData?.stillUrl,
+                    episodeOverview = epData?.overview,
                     quality = quality,
                     audio = audio
                 )

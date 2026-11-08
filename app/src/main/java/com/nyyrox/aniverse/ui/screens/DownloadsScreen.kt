@@ -48,7 +48,9 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
@@ -146,7 +148,9 @@ fun DownloadsScreen(
     val downloadedNovels by vm.downloadManager.downloadedNovels.collectAsState()
     val allTasks by vm.downloadManager.tasks.collectAsState()
     val activeTasks = remember(allTasks) {
-        allTasks.filter { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
+        allTasks.filter {
+            it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED
+        }
     }
     val failedTasks = remember(allTasks) { allTasks.filter { it.status == DownloadStatus.FAILED } }
     var deleteConfirmation by remember { mutableStateOf<DeleteConfirmationTarget?>(null) }
@@ -281,26 +285,69 @@ fun DownloadsScreen(
                 }
 
                 if (activeTasks.isNotEmpty()) {
+                    val anyDownloading = activeTasks.any { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
                     item(key = "active") {
                         val avg = activeTasks.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
                         TaskGroupCard(
                             glass = glassOn,
-                            title = "Downloading (${activeTasks.size})",
-                            icon = Icons.Default.Downloading,
-                            accent = OttPrimary,
+                            title = if (anyDownloading) "Downloading (${activeTasks.size})" else "Paused (${activeTasks.size})",
+                            icon = if (anyDownloading) Icons.Default.Downloading else Icons.Default.Pause,
+                            accent = if (anyDownloading) OttPrimary else Color(0xFFFBBF24),
                             expanded = isDownloadingExpanded,
                             onToggle = { isDownloadingExpanded = !isDownloadingExpanded },
                             modifier = ItemPad,
                             collapsedHint = {
-                                ProgressBar(avg, Modifier.width(70.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("${(avg * 100).toInt()}%", color = OttTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0x22FFFFFF))
+                                        .clickable {
+                                            if (anyDownloading) vm.pauseAllDownloads() else vm.resumeAllDownloads()
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        if (anyDownloading) "Pause All" else "Resume All",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Spacer(Modifier.width(6.dp))
                             }
                         ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (anyDownloading) "Downloading queue" else "Queue paused",
+                                    color = OttTextSecondary,
+                                    fontSize = 11.5.sp
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0x22FFFFFF))
+                                        .clickable {
+                                            if (anyDownloading) vm.pauseAllDownloads() else vm.resumeAllDownloads()
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        if (anyDownloading) "Pause All" else "Resume All",
+                                        color = Color.White,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                             activeTasks.forEach { task ->
                                 ActiveDownloadTaskRow(
                                     task = task,
+                                    onPause = { vm.pauseDownloadTask(task.type, task.itemId, task.chapterId) },
+                                    onResume = { vm.resumeDownloadTask(task.type, task.itemId, task.chapterId) },
                                     onCancel = { vm.downloadManager.cancelTask(task.type, task.itemId, task.chapterId) }
                                 )
                             }
@@ -747,33 +794,51 @@ private fun ChildRow(
     subtitle: String,
     action: String,
     actionIcon: ImageVector,
+    thumbnail: String? = null,
     onOpen: () -> Unit,
     onDelete: () -> Unit
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0x0DFFFFFF))
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0x0EFFFFFF))
+            .border(BorderStroke(1.dp, Color(0x12FFFFFF)), RoundedCornerShape(10.dp))
             .clickable(onClick = onOpen)
-            .padding(start = 10.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+            .padding(start = 8.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (!thumbnail.isNullOrBlank()) {
+            AsyncImage(
+                model = thumbnail,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(width = 56.dp, height = 36.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x20FFFFFF))
+            )
+            Spacer(Modifier.width(10.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(subtitle, color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(
-            Modifier.padding(horizontal = 6.dp).clip(OttPillShape).background(Color.White).padding(horizontal = 11.dp, vertical = 6.dp),
+            Modifier
+                .padding(horizontal = 4.dp)
+                .clip(OttPillShape)
+                .background(Color.White)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(actionIcon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(15.dp))
+            Icon(actionIcon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(4.dp))
-            Text(action, color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(action, color = Color.Black, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
-            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = DangerRed, modifier = Modifier.size(18.dp))
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = DangerRed, modifier = Modifier.size(17.dp))
         }
     }
 }
@@ -787,6 +852,7 @@ private fun DownloadedAnimeCard(
     onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     LibraryItemCard(
         glass = glass,
         cover = anime.cover,
@@ -802,12 +868,14 @@ private fun DownloadedAnimeCard(
                     subtitle = "This will permanently delete all ${anime.episodesCount} downloaded episode(s) and free up storage on your device.",
                     itemType = "Anime",
                     sizeFormatted = formatBytes(anime.totalSizeBytes),
-                    onConfirm = { vm.deleteDownloadedAnime(anime.animeId) }
+                    onConfirm = {
+                        vm.deleteDownloadedAnimeWithProgress(anime.animeId)
+                        android.widget.Toast.makeText(context, "Deleting ${anime.title}...", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 )
             )
         }
     ) {
-        // Keyed on the counts: deleting an episode refreshes the open list instead of leaving a stale row.
         val episodes = remember(anime.animeId, anime.episodesCount, anime.totalSizeBytes) {
             vm.downloadManager.getDownloadedEpisodesForAnime(anime.animeId)
         }
@@ -817,6 +885,7 @@ private fun DownloadedAnimeCard(
                 subtitle = "${formatBytes(ep.sizeBytes)}${if (ep.providerName.isNotBlank()) " • ${ep.providerName}" else ""}",
                 action = "Play",
                 actionIcon = Icons.Default.PlayArrow,
+                thumbnail = ep.episodeStill,
                 onOpen = { onPlayEpisode(ep.episode) },
                 onDelete = {
                     onDeleteRequest(
@@ -825,7 +894,11 @@ private fun DownloadedAnimeCard(
                             subtitle = "Remove '${ep.episodeTitle?.ifBlank { "Episode ${ep.episode}" } ?: "Episode ${ep.episode}"}' from offline storage?",
                             itemType = "Episode",
                             sizeFormatted = formatBytes(ep.sizeBytes),
-                            onConfirm = { vm.deleteDownloadedAnimeEpisode(anime.animeId, ep.episode) }
+                            onConfirm = {
+                                vm.downloadManager.deleteDownloadedAnimeEpisode(anime.animeId, ep.episode)
+                                com.nyyrox.aniverse.data.download.DownloadNotificationHelper.cancelNotification(context, "${anime.animeId}:${ep.episode}")
+                                android.widget.Toast.makeText(context, "Deleted Episode ${ep.episode}", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                         )
                     )
                 }
@@ -843,6 +916,7 @@ private fun DownloadedNovelCard(
     onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     LibraryItemCard(
         glass = glass,
         cover = novel.cover,
@@ -858,7 +932,10 @@ private fun DownloadedNovelCard(
                     subtitle = "This will permanently remove all ${novel.chaptersCount} downloaded chapter(s) from offline storage.",
                     itemType = "Novel",
                     sizeFormatted = formatBytes(novel.totalSizeBytes),
-                    onConfirm = { vm.downloadManager.deleteDownloadedNovel(novel.novelSlug) }
+                    onConfirm = {
+                        vm.deleteDownloadedNovelWithProgress(novel.novelSlug)
+                        android.widget.Toast.makeText(context, "Deleting ${novel.title}...", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 )
             )
         }
@@ -898,6 +975,7 @@ private fun DownloadedMangaCard(
     onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     LibraryItemCard(
         glass = glass,
         cover = manga.poster,
@@ -913,7 +991,10 @@ private fun DownloadedMangaCard(
                     subtitle = "This will permanently remove all ${manga.chaptersCount} downloaded chapter(s) from offline storage.",
                     itemType = "Manga",
                     sizeFormatted = formatBytes(manga.totalSizeBytes),
-                    onConfirm = { vm.downloadManager.deleteDownloadedManga(manga.mangaId) }
+                    onConfirm = {
+                        vm.deleteDownloadedMangaWithProgress(manga.mangaId)
+                        android.widget.Toast.makeText(context, "Deleting ${manga.title}...", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 )
             )
         }
@@ -949,14 +1030,21 @@ private fun DownloadedMangaCard(
 private val TaskRowShape = RoundedCornerShape(14.dp)
 
 @Composable
-private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) {
+private fun ActiveDownloadTaskRow(
+    task: DownloadTaskInfo,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit
+) {
     val progress by animateFloatAsState(task.progress.coerceIn(0f, 1f), tween(400), label = "dlProgress")
+    val isPaused = task.status == DownloadStatus.PAUSED
+
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(TaskRowShape)
-            .background(Color(0x26000000))
-            .border(1.dp, Color(0x14FFFFFF), TaskRowShape)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isPaused) Color(0x18F59E0B) else Color(0x26000000))
+            .border(1.dp, if (isPaused) Color(0x35F59E0B) else Color(0x14FFFFFF), RoundedCornerShape(12.dp))
             .padding(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -979,7 +1067,9 @@ private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) 
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
-                val statusText = if (task.type == DownloadType.ANIME) {
+                val statusText = if (isPaused) {
+                    "Download paused"
+                } else if (task.type == DownloadType.ANIME) {
                     val sizeInfo = if (task.totalBytes > 0L) " • ${formatBytes(task.downloadedBytes)} / ${formatBytes(task.totalBytes)}" else if (task.downloadedBytes > 0L) " • ${formatBytes(task.downloadedBytes)}" else ""
                     if (task.speed.isNotBlank()) "${task.speed}$sizeInfo" else "Downloading...$sizeInfo"
                 } else if (task.type == DownloadType.MANGA && task.totalCount > 0) {
@@ -990,9 +1080,19 @@ private fun ActiveDownloadTaskRow(task: DownloadTaskInfo, onCancel: () -> Unit) 
                     "Downloading..."
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(statusText, color = OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(statusText, color = if (isPaused) Color(0xFFFBBF24) else OttTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
-                    Text("${task.percentage}%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isPaused) "PAUSED" else "${task.percentage}%", color = if (isPaused) Color(0xFFFBBF24) else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+            if (isPaused) {
+                IconButton(onClick = onResume, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Resume", tint = Color(0xFF34D399), modifier = Modifier.size(18.dp))
+                }
+            } else {
+                IconButton(onClick = onPause, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.Pause, contentDescription = "Pause", tint = Color(0xFFFBBF24), modifier = Modifier.size(18.dp))
                 }
             }
             IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
