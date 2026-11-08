@@ -447,12 +447,13 @@ fun ProfileScreen(
                             )
                     )
 
-                    // Top Bar: Back button on left (top-right edit option removed)
+                    // Top Bar: Back button on left, Log In button on right when not logged in
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (onBack != null) {
@@ -469,6 +470,34 @@ fun ProfileScreen(
                                     contentDescription = "Back",
                                     tint = textPrimary,
                                     modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else {
+                            Spacer(Modifier.size(38.dp))
+                        }
+
+                        if (!isLoggedIn) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isDark) Color(0xB310141D) else Color(0xCCFFFFFF))
+                                    .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                                    .clickable { onLogin?.invoke() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudUpload,
+                                    contentDescription = null,
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Log In",
+                                    color = Color(0xFF38BDF8),
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
@@ -571,14 +600,89 @@ fun ProfileScreen(
 
                     // Display Name
                     Text(
-                        text = userProfile.displayName.ifBlank { "Zenkai User" },
+                        text = if (!isLoggedIn && userProfile.displayName.isBlank()) "Guest User" else userProfile.displayName.ifBlank { "Zenkai User" },
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Black,
                         color = textPrimary
                     )
 
-                    // Username
-                    if (userProfile.username.isNotBlank()) {
+                    if (!isLoggedIn) {
+                        Spacer(Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFF59E0B))
+                            )
+                            Text(
+                                text = "Guest Mode • Not synced to cloud",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textMuted
+                            )
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Cloud Sync Login Banner (Top Guest Option for Cloud Sync)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color(0x1F38BDF8) else Color(0x140284C7))
+                                .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                .clickable { onLogin?.invoke() }
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF38BDF8).copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudUpload,
+                                        contentDescription = null,
+                                        tint = Color(0xFF38BDF8),
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Log In for Cloud Sync",
+                                        color = textPrimary,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Sync anime watch progress, history & preferences",
+                                        color = textSecondary,
+                                        fontSize = 11.5.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Log in",
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    } else if (userProfile.username.isNotBlank()) {
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = "@${userProfile.username.removePrefix("@")}",

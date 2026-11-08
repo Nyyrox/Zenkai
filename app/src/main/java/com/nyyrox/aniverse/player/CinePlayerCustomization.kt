@@ -1894,52 +1894,43 @@ private const val CAS_AGSL = """
         half3 rgb = center.rgb;
 
         if (sharpness > 0.001) {
-            // Standard 1-pixel cardinal sampling in output pixel coordinates
+            // Cardinal 4-neighbor cross taps for clean, halo-free RCAS
             half3 n = content.eval(coord + float2( 0.0, -1.0)).rgb;
             half3 s = content.eval(coord + float2( 0.0,  1.0)).rgb;
             half3 e = content.eval(coord + float2( 1.0,  0.0)).rgb;
             half3 w = content.eval(coord + float2(-1.0,  0.0)).rgb;
 
-            // Local bounding box
-            half3 minRGB = min(min(min(n, s), min(e, w)), rgb);
-            half3 maxRGB = max(max(max(n, s), max(e, w)), rgb);
+            half3 mn = min(min(n, s), min(e, w));
+            half3 mx = max(max(n, s), max(e, w));
 
-            // AMD FidelityFX CAS adaptive shaping factor:
-            // High in detailed texture/contour areas, smooth/zero in flat patches
-            half3 ampRGB = clamp(min(minRGB, half3(1.0) - maxRGB) / (maxRGB + 0.0001), 0.0, 1.0);
+            // AMD FidelityFX RCAS attenuation factor
+            half3 hitMin = mn / (4.0 * mx + 0.0001);
+            half3 hitMax = (half3(1.0) - mx) / (half3(4.0) - 4.0 * mn + 0.0001);
+            half3 lobe = -min(hitMin, hitMax);
 
-            // Peak negative lobe weight is strictly bounded between [-0.19, 0.0]
-            // so denominator (1.0 + 4.0 * w) is ALWAYS >= 0.24 > 0. Absolutely ZERO singularities or color inversion!
-            half peak = -0.185 * clamp(sharpness, 0.0, 1.0);
-            half3 wRGB = clamp(sqrt(ampRGB) * peak, half3(-0.19), half3(0.0));
+            // Compute scalar weight to completely eliminate chromatic RGB specks
+            half scalarLobe = min(lobe.r, min(lobe.g, lobe.b));
+            half weight = clamp(scalarLobe * sharpness, -0.175, 0.0);
+            half totalWeight = 4.0 * weight + 1.0;
 
-            // RCAS filter convolution
-            half3 sumNeighbors = n + s + e + w;
-            half3 sharpened = (rgb + sumNeighbors * wRGB) / (half3(1.0) + half3(4.0) * wRGB);
+            half3 sharpened = (weight * (n + s + e + w) + rgb) / totalWeight;
 
-            // Anime Line Art Contour Enhancement (Anime4K-inspired line thinning)
+            // Anti-ringing clamp: strictly bound within local neighborhood
+            sharpened = clamp(sharpened, min(mn, rgb), max(mx, rgb));
+
+            // Clean edge contour darkening
             if (lineWeight > 0.001) {
-                // ITU-R BT.709 perceived luminance
-                half lumaC = dot(rgb, half3(0.2126, 0.7152, 0.0722));
-                half lumaN = dot(n,   half3(0.2126, 0.7152, 0.0722));
-                half lumaS = dot(s,   half3(0.2126, 0.7152, 0.0722));
-                half lumaE = dot(e,   half3(0.2126, 0.7152, 0.0722));
-                half lumaW = dot(w,   half3(0.2126, 0.7152, 0.0722));
-
-                // Edge gradient magnitude
-                half gradX = (lumaE - lumaW);
-                half gradY = (lumaS - lumaN);
-                half edgeMag = sqrt(gradX * gradX + gradY * gradY);
-
-                // Deepen dark line art contours while leaving bright areas untouched
-                if (edgeMag > 0.04 && lumaC < 0.65) {
-                    half lineDarken = clamp(edgeMag * lineWeight * 0.45, 0.0, 0.18);
-                    sharpened = mix(sharpened, minRGB, lineDarken);
-                }
+                half lumaE = dot(e, half3(0.299, 0.587, 0.114));
+                half lumaW = dot(w, half3(0.299, 0.587, 0.114));
+                half lumaS = dot(s, half3(0.299, 0.587, 0.114));
+                half lumaN = dot(n, half3(0.299, 0.587, 0.114));
+                half gx = lumaE - lumaW;
+                half gy = lumaS - lumaN;
+                half edge = clamp(length(float2(gx, gy)) * 2.0, 0.0, 1.0);
+                sharpened = clamp(sharpened * (1.0 - lineWeight * edge), 0.0, 1.0);
             }
 
-            // Anti-ringing clamp: guarantee no overshoot or ringing halo
-            rgb = clamp(sharpened, minRGB, maxRGB);
+            rgb = sharpened;
         }
 
         if (contrast != 1.0) {
@@ -1951,7 +1942,7 @@ private const val CAS_AGSL = """
         }
 
         if (saturation != 1.0) {
-            half luma = dot(rgb, half3(0.2126, 0.7152, 0.0722));
+            half luma = dot(rgb, half3(0.299, 0.587, 0.114));
             rgb = mix(half3(luma), rgb, saturation);
         }
 
@@ -2101,12 +2092,12 @@ fun applyVideoEffects(
             }
 
             val (baseSharpness, baseLineWeight) = when (upscaler.mode) {
-                "ultra4k" -> 1.00f to 0.45f
-                "modeC"   -> 0.85f to 0.50f
-                "modeA"   -> 0.75f to 0.25f
-                "fast"    -> 0.45f to 0.00f
-                "modeB"   -> 0.35f to 0.10f
-                else      -> 0.75f to 0.25f
+                "ultra4k" -> 0.95f to 0.25f // Peak 4K Ultra Quality Enhanced (Pristine Clarity, Zero Dots)
+                "modeC"   -> 0.95f to 0.50f
+                "modeA"   -> 0.80f to 0.30f
+                "fast"    -> 0.50f to 0.05f
+                "modeB"   -> 0.40f to 0.15f
+                else      -> 0.80f to 0.30f
             }
             val intensityFactor = upscaler.intensity / 100f
             val effSharpness = if (isUpscalerActive) baseSharpness * intensityFactor else 0f

@@ -1058,15 +1058,24 @@ fun PlayerScreen(
                     val combinedSubtitles = if (isPlayingOffline) {
                         (downloadedEpInfo?.subtitles ?: emptyList()).ifEmpty { externalSubtitles }
                     } else {
-                        val activeServer = currentProvider.name.lowercase(java.util.Locale.US)
-                        ((if (playInZenkaiPlayer && sniffedStreamSubs.isNotEmpty()) sniffedStreamSubs else activeDirectSubs) + externalSubtitles)
+                        val activeServer = (directStreamResult?.serverName ?: currentProvider.name).lowercase(java.util.Locale.US)
+                        val directSubsList = (if (playInZenkaiPlayer && sniffedStreamSubs.isNotEmpty()) sniffedStreamSubs else activeDirectSubs)
+                        (directSubsList + externalSubtitles)
                             .distinctBy { it.url }
                             .sortedWith(
-                                compareByDescending<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> {
-                                    val s = it.source.lowercase(java.util.Locale.US)
-                                    if (activeServer.isNotBlank() && s.contains(activeServer)) 3
-                                    else if (s.contains("flixcloud") || s.contains("megaplay") || s.contains("vidstream") || s.contains("acdn") || s.startsWith("direct")) 2
-                                    else 1
+                                compareByDescending<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> { track ->
+                                    val s = track.source.lowercase(java.util.Locale.US)
+                                    val isDirectTrack = directSubsList.any { it.url == track.url }
+                                    when {
+                                        isDirectTrack -> 100
+                                        activeServer.isNotBlank() && (s.contains(activeServer) || activeServer.contains(s)) -> 50
+                                        (activeServer.contains("acdn") || activeServer.contains("animesalt")) && s.contains("acdn") -> 50
+                                        (activeServer.contains("flix") || activeServer.contains("reanime")) && s.contains("flix") -> 50
+                                        activeServer.contains("megaplay") && s.contains("megaplay") -> 50
+                                        activeServer.contains("vidstream") && s.contains("vidstream") -> 50
+                                        s.contains("flixcloud") || s.contains("megaplay") || s.contains("vidstream") || s.contains("acdn") || s.startsWith("direct") -> 10
+                                        else -> 1
+                                    }
                                 }.thenByDescending {
                                     it.isDefault
                                 }.thenByDescending {
@@ -1123,9 +1132,12 @@ fun PlayerScreen(
                         modifier = Modifier.fillMaxSize(),
                         initialTimeMs = savedPos,
                         startPaused = false,
-                        malId = anime.idMal,
+                        malId = malIdState ?: anime.idMal,
                         anilistId = anime.id,
                         season = season,
+                        serverSkipIntervals = remember(directStreamResult) {
+                            listOfNotNull(directStreamResult?.introSkip, directStreamResult?.outroSkip)
+                        },
                         maxEpisode = maxEpisode,
                         onSelectEpisode = { newEp ->
                             currentEpisode = newEp

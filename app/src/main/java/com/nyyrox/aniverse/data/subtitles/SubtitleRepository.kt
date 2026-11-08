@@ -641,7 +641,11 @@ object SubtitleRepository {
                 compareByDescending<SubtitleTrack> { track ->
                     val src = track.source.lowercase(Locale.US)
                     when {
-                        serverKey.isNotBlank() && src.contains(serverKey) -> 3
+                        serverKey.isNotBlank() && (src.contains(serverKey) || serverKey.contains(src)) -> 10
+                        (serverKey.contains("acdn") || serverKey.contains("animesalt") || serverKey.contains("dekho")) && src.contains("acdn") -> 10
+                        (serverKey.contains("flix") || serverKey.contains("reanime")) && src.contains("flix") -> 10
+                        serverKey.contains("megaplay") && src.contains("megaplay") -> 10
+                        serverKey.contains("vidstream") && src.contains("vidstream") -> 10
                         src.contains("flixcloud") || src.contains("megaplay") || src.contains("vidstream") || src.contains("acdn") || src.startsWith("direct") -> 2
                         else -> 1
                     }
@@ -784,124 +788,94 @@ object SubtitleRepository {
  * High-performance parser for SRT, WebVTT, and ASS subtitles into memory cues.
  */
 object SubtitleParser {
-    private val HTML_TAG_REGEX = Regex("""<[^>]*>""")
-    private val ASS_DIALOGUE_REGEX = Regex("""^Dialogue:\s*[^,]*,([^,]+),([^,]+),[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,(.*)$""", RegexOption.IGNORE_CASE)
-    private val VTT_TIMESTAMP_TAG = Regex("""<\d{2}:\d{2}:\d{2}\.\d{3}>""")
+    private fun parseTimestamp(str: String?): Long {
+        if (str.isNullOrBlank()) return -1L
+        val clean = str.replace(',', '.').trim()
+        val parts = clean.split(':')
+        return try {
+            val seconds = when (parts.size) {
+                3 -> parts[0].toDouble() * 3600.0 + parts[1].toDouble() * 60.0 + parts[2].toDouble()
+                2 -> parts[0].toDouble() * 60.0 + parts[1].toDouble()
+                else -> return -1L
+            }
+            (seconds * 1000.0).toLong()
+        } catch (_: Exception) {
+            -1L
+        }
+    }
 
+    /**
+     * Exact replica of Web's parseSubtitleText (c:/zenkai web/src/lib/subtitles.ts)
+     */
     fun parse(content: String): List<SubtitleCue> {
         if (content.isBlank()) return emptyList()
         val cues = mutableListOf<SubtitleCue>()
-        val lines = content.replace("\r\n", "\n").replace("\r", "\n").lines()
-        var i = 0
-        val n = lines.size
+        val normalized = content.replace("\r\n", "\n").replace("\r", "\n")
 
-        while (i < n) {
-            val line = lines[i].trim()
-
-            // 1. ASS Dialogue line
-            val assMatch = ASS_DIALOGUE_REGEX.find(line)
-            if (assMatch != null) {
-                val startMs = parseAssTimestamp(assMatch.groupValues[1])
-                val endMs = parseAssTimestamp(assMatch.groupValues[2])
-                val rawText = assMatch.groupValues[3]
-                val cleanText = rawText
+        // 1. ASS / SSA format
+        if (normalized.contains("Dialogue:", ignoreCase = true)) {
+            val lines = normalized.split('\n')
+            for (raw in lines) {
+                val line = raw.trim()
+                if (!line.startsWith("Dialogue:", ignoreCase = true)) continue
+                val rest = line.substringAfter(':').trim()
+                val parts = rest.split(',')
+                if (parts.size < 10) continue
+                val start = parseTimestamp(parts[1])
+                val end = parseTimestamp(parts[2])
+                if (start < 0 || end <= start) continue
+                val text = parts.subList(9, parts.size)
+                    .joinToString(",")
                     .replace(Regex("""\{[^}]*\}"""), "")
                     .replace("\\N", "\n")
                     .replace("\\n", "\n")
                     .replace("\\h", " ")
                     .trim()
-                if (cleanText.isNotBlank() && endMs > startMs) {
-                    cues.add(SubtitleCue(startMs = startMs, endMs = endMs, text = cleanText))
-                }
-                i++
-                continue
-            }
-
-            // 2. WebVTT / SRT timestamp line (supports hh:mm:ss.ttt, mm:ss.ttt, and cue positioning tags)
-            if (line.contains("-->")) {
-                val arrowParts = line.split("-->")
-                if (arrowParts.size >= 2) {
-                    val rawStart = arrowParts[0].trim()
-                    val rawEnd = arrowParts[1].trim().split(Regex("""\s+""")).firstOrNull().orEmpty()
-
-                    val startMs = parseTimestampString(rawStart)
-                    val endMs = parseTimestampString(rawEnd)
-
-                    i++
-                    val textLines = mutableListOf<String>()
-                    while (i < n && lines[i].trim().isNotBlank() && !lines[i].contains("-->")) {
-                        val rawL = lines[i]
-                            .replace(VTT_TIMESTAMP_TAG, "")
-                            .replace(HTML_TAG_REGEX, "")
-                            .replace(Regex("""\{[^}]*\}"""), "")
-                            .trim()
-                        if (rawL.isNotBlank() && !rawL.startsWith("WEBVTT") && !rawL.startsWith("NOTE")) {
-                            textLines.add(rawL)
-                        }
-                        i++
-                    }
-
-                    // If the last line is solely digits (e.g. next cue index without a blank separator line), remove it
-                    if (textLines.isNotEmpty() && textLines.last().all { it.isDigit() }) {
-                        textLines.removeAt(textLines.lastIndex)
-                    }
-
-                    val cueText = textLines.joinToString("\n").trim()
-                    if (cueText.isNotBlank() && endMs > startMs) {
-                        cues.add(SubtitleCue(startMs = startMs, endMs = endMs, text = cueText))
-                    }
-                    continue
+                if (text.isNotBlank()) {
+                    cues.add(SubtitleCue(startMs = start, endMs = end, text = text))
                 }
             }
-
-            i++
+            if (cues.isNotEmpty()) return cues.sortedBy { it.startMs }
         }
 
+        // 2. SRT / WebVTT format (exact Web block split)
+        val blocks = normalized.split(Regex("""\n\s*\n"""))
+        for (block in blocks) {
+            val lines = block.trim().split('\n')
+            val at = lines.indexOfFirst { it.contains("-->") }
+            if (at < 0) continue
+            val arrowParts = lines[at].split("-->")
+            if (arrowParts.size < 2) continue
+            val a = arrowParts[0].trim().split(Regex("""\s+""")).firstOrNull() ?: ""
+            val b = arrowParts[1].trim().split(Regex("""\s+""")).firstOrNull() ?: ""
+            val start = parseTimestamp(a)
+            val end = parseTimestamp(b)
+            if (start < 0 || end <= start) continue
+            val text = lines.subList(at + 1, lines.size)
+                .joinToString("\n")
+                .replace(Regex("""<[^>]+>"""), "")
+                .replace(Regex("""\{[^}]*\}"""), "")
+                .replace("&nbsp;", " ")
+                .trim()
+            if (text.isNotBlank()) {
+                cues.add(SubtitleCue(startMs = start, endMs = end, text = text))
+            }
+        }
         return cues.sortedBy { it.startMs }
-    }
-
-    private fun parseTimestampString(str: String): Long {
-        if (str.isBlank()) return 0L
-        val clean = str.trim().replace(',', '.')
-        val parts = clean.split(':')
-        return try {
-            if (parts.size == 3) {
-                val h = parts[0].toLongOrNull() ?: 0L
-                val m = parts[1].toLongOrNull() ?: 0L
-                val secParts = parts[2].split('.')
-                val s = secParts[0].toLongOrNull() ?: 0L
-                val ms = if (secParts.size > 1) secParts[1].padEnd(3, '0').take(3).toLongOrNull() ?: 0L else 0L
-                (h * 3600 + m * 60 + s) * 1000 + ms
-            } else if (parts.size == 2) {
-                val m = parts[0].toLongOrNull() ?: 0L
-                val secParts = parts[1].split('.')
-                val s = secParts[0].toLongOrNull() ?: 0L
-                val ms = if (secParts.size > 1) secParts[1].padEnd(3, '0').take(3).toLongOrNull() ?: 0L else 0L
-                (m * 60 + s) * 1000 + ms
-            } else {
-                0L
-            }
-        } catch (_: Exception) {
-            0L
-        }
-    }
-
-    private fun parseAssTimestamp(ts: String): Long {
-        val parts = ts.split(":")
-        if (parts.size < 3) return 0L
-        val hours = parts[0].toLongOrNull() ?: 0L
-        val minutes = parts[1].toLongOrNull() ?: 0L
-        val secParts = parts[2].split(".")
-        val seconds = secParts[0].toLongOrNull() ?: 0L
-        val centis = if (secParts.size > 1) secParts[1].padEnd(2, '0').take(2).toLongOrNull() ?: 0L else 0L
-        return (hours * 3600 + minutes * 60 + seconds) * 1000 + (centis * 10)
     }
 }
 
 /**
- * Binary-search lookup for all subtitle cues active at [positionMs].
- * Handles overlapping dialogue lines, signs, and multi-speaker cues.
+ * Exact replica of Web findActiveCue: finds active cue with timing offset.
  */
+fun findActiveCue(cues: List<SubtitleCue>, timeMs: Long, offsetMs: Long = 0L): String? {
+    val t = timeMs + offsetMs
+    for (c in cues) {
+        if (t >= c.startMs && t <= c.endMs) return c.text
+    }
+    return null
+}
+
 fun findActiveCuesAt(cues: List<SubtitleCue>, positionMs: Long): List<SubtitleCue> {
     if (cues.isEmpty()) return emptyList()
     var lo = 0
@@ -917,13 +891,16 @@ fun findActiveCuesAt(cues: List<SubtitleCue>, positionMs: Long): List<SubtitleCu
         }
     }
     if (candidate < 0) return emptyList()
-    val active = ArrayList<SubtitleCue>(2)
-    val checkRange = (candidate downTo (candidate - 10).coerceAtLeast(0))
-    for (back in checkRange) {
+    val active = ArrayList<SubtitleCue>(4)
+    var back = candidate
+    while (back >= 0) {
         val c = cues[back]
         if (positionMs in c.startMs..c.endMs) {
             active.add(c)
+        } else if (positionMs - c.startMs > 60_000L && back < candidate - 5) {
+            break
         }
+        back--
     }
     return active.reversed()
 }

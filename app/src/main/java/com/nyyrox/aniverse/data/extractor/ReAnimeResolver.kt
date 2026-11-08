@@ -253,6 +253,27 @@ object ReAnimeResolver {
 
             val finalPlayableUrl = DirectStreamResolver.buildProxiedStreamUrl(manifestUrl, "https://flixcloud.cc/")
 
+            val skipObj = dataObj.optJSONObject("skip") ?: streamData.optJSONObject("skip") ?: decResult.optJSONObject("skip")
+            val introObj = skipObj?.optJSONObject("intro") ?: dataObj.optJSONObject("intro") ?: streamData.optJSONObject("intro") ?: decResult.optJSONObject("intro")
+            var introSkip: SkipInterval? = null
+            if (introObj != null) {
+                val start = introObj.optDouble("start", -1.0)
+                val end = introObj.optDouble("end", -1.0)
+                if (start >= 0 && end > start) {
+                    introSkip = SkipInterval((start * 1000).toLong(), (end * 1000).toLong(), "Intro (OP)")
+                }
+            }
+
+            val outroObj = skipObj?.optJSONObject("outro") ?: dataObj.optJSONObject("outro") ?: streamData.optJSONObject("outro") ?: decResult.optJSONObject("outro")
+            var outroSkip: SkipInterval? = null
+            if (outroObj != null) {
+                val start = outroObj.optDouble("start", -1.0)
+                val end = outroObj.optDouble("end", -1.0)
+                if (start >= 0 && end > start) {
+                    outroSkip = SkipInterval((start * 1000).toLong(), (end * 1000).toLong(), "Outro (ED)")
+                }
+            }
+
             DirectStreamResult(
                 serverId = "flixcloud-$audio",
                 serverName = "FlixCloud",
@@ -264,6 +285,8 @@ object ReAnimeResolver {
                     "Referer" to "https://flixcloud.cc/"
                 ),
                 subtitles = subtitles,
+                introSkip = introSkip,
+                outroSkip = outroSkip,
                 isDirect = true
             )
         } catch (_: Exception) {

@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -388,7 +389,7 @@ fun SubtitlesModal(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Normal
                                 ),
-                                cursorBrush = SolidColor(Color(0xFFE50914)),
+                                cursorBrush = SolidColor(Color.White),
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -418,24 +419,26 @@ fun SubtitlesModal(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isOff) Color(0x18FFFFFF) else Color.Transparent)
                                 .clickable { onTurnOffCaptions() }
-                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                                .padding(horizontal = 10.dp, vertical = 9.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Off",
-                                color = if (isOff) Color(0xFFE50914) else Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = if (isOff) FontWeight.Bold else FontWeight.Medium
+                                color = if (isOff) Color.White else Color(0xD9FFFFFF),
+                                fontSize = 13.5.sp,
+                                fontWeight = if (isOff) FontWeight.SemiBold else FontWeight.Normal
                             )
                             if (isOff) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFE50914))
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                         }
@@ -476,7 +479,7 @@ fun SubtitlesModal(
                                             modifier = Modifier
                                                 .size(6.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFFE50914))
+                                                .background(Color.White)
                                         )
                                     }
                                 }
@@ -498,59 +501,43 @@ fun SubtitlesModal(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x28FFFFFF) else Color(0x0CFFFFFF))
-                                        .border(
-                                            1.dp,
-                                            if (isSelected) Color(0x40FFFFFF) else Color(0x12FFFFFF),
-                                            RoundedCornerShape(10.dp)
-                                        )
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Color(0x18FFFFFF) else Color.Transparent)
                                         .clickable(enabled = !isDownloading) {
                                             onSelectSubtitle(track)
                                         }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        .padding(horizontal = 10.dp, vertical = 9.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = track.label.ifBlank { "Default" },
-                                                color = Color.White,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                            )
-                                            if (isSelected) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(5.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color(0xFFE50914))
-                                                )
-                                            }
-                                        }
                                         Text(
-                                            text = track.source.ifBlank { "Stream" },
-                                            color = Color(0xFF868C9E),
-                                            fontSize = 11.sp
+                                            text = track.label.ifBlank { "Default" },
+                                            color = if (isSelected) Color.White else Color(0xD9FFFFFF),
+                                            fontSize = 13.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                         )
+                                        if (track.source.isNotBlank() && track.source != "Stream") {
+                                            Text(
+                                                text = track.source,
+                                                color = Color(0xFF868C9E),
+                                                fontSize = 11.sp
+                                            )
+                                        }
                                     }
 
                                     if (isDownloading) {
                                         CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
+                                            modifier = Modifier.size(15.dp),
                                             strokeWidth = 2.dp,
-                                            color = Color(0xFFE50914)
+                                            color = Color.White
                                         )
                                     } else if (isSelected) {
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Selected",
-                                            tint = Color(0xFFE50914),
+                                            tint = Color.White,
                                             modifier = Modifier.size(17.dp)
                                         )
                                     }
@@ -625,6 +612,132 @@ fun SubtitlesModal(
 // =========================================================================
 
 @Composable
+private fun CaptionLivePreviewBox(
+    captionConfig: CaptionCustomization,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF090B0F))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        val fontFam = resolveFontFamily(captionConfig.fontFamilyName)
+        val baseSize = 13.5.sp * captionConfig.sizeScale
+
+        Box(
+            modifier = Modifier
+                .then(
+                    if (captionConfig.hasBgBox && captionConfig.bgAlpha > 0f) {
+                        Modifier
+                            .clip(RoundedCornerShape(captionConfig.boxCornerRadiusDp.dp))
+                            .background(captionConfig.bgColor.copy(alpha = captionConfig.bgAlpha))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    } else Modifier
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            val displayText = if (captionConfig.isUppercase) {
+                "I'M GONNA BE KING OF THE PIRATES!"
+            } else {
+                "I'm gonna be King of the Pirates!"
+            }
+
+            // Optional text stroke
+            if (captionConfig.hasStroke && captionConfig.strokeWidth > 0f) {
+                Text(
+                    text = displayText,
+                    fontFamily = fontFam,
+                    fontSize = baseSize,
+                    fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
+                    fontStyle = if (captionConfig.isItalic) FontStyle.Italic else FontStyle.Normal,
+                    letterSpacing = captionConfig.letterSpacingSp.sp,
+                    textAlign = TextAlign.Center,
+                    style = TextStyle.Default.copy(
+                        color = captionConfig.strokeColor,
+                        drawStyle = Stroke(width = captionConfig.strokeWidth * 0.9f)
+                    )
+                )
+            }
+
+            // Main text
+            Text(
+                text = displayText,
+                fontFamily = fontFam,
+                fontSize = baseSize,
+                fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
+                fontStyle = if (captionConfig.isItalic) FontStyle.Italic else FontStyle.Normal,
+                letterSpacing = captionConfig.letterSpacingSp.sp,
+                color = captionConfig.textColor.copy(alpha = captionConfig.textAlpha),
+                textAlign = TextAlign.Center,
+                style = if (captionConfig.hasShadow) {
+                    TextStyle.Default.copy(
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.85f),
+                            blurRadius = 4f
+                        )
+                    )
+                } else TextStyle.Default
+            )
+        }
+    }
+}
+
+@Composable
+private fun RenderCaptionTabContent(
+    activeTab: CaptionSettingsTab,
+    captionConfig: CaptionCustomization,
+    onConfigChange: (CaptionCustomization) -> Unit,
+    isCaptionsEnabled: Boolean,
+    onToggleCaptions: (Boolean) -> Unit,
+    selectedFontCategory: String,
+    onSelectFontCategory: (String) -> Unit,
+    subSyncMs: Long,
+    onAdjustSync: (Long) -> Unit,
+    onResetSync: () -> Unit
+) {
+    when (activeTab) {
+        CaptionSettingsTab.PRESETS -> {
+            PresetsTabContent(
+                captionConfig = captionConfig,
+                onConfigChange = onConfigChange,
+                isCaptionsEnabled = isCaptionsEnabled,
+                onToggleCaptions = onToggleCaptions
+            )
+        }
+        CaptionSettingsTab.FONT -> {
+            FontTabContent(
+                captionConfig = captionConfig,
+                onConfigChange = onConfigChange,
+                selectedCategory = selectedFontCategory,
+                onSelectCategory = onSelectFontCategory
+            )
+        }
+        CaptionSettingsTab.TEXT -> {
+            TextTabContent(
+                captionConfig = captionConfig,
+                onConfigChange = onConfigChange
+            )
+        }
+        CaptionSettingsTab.BOX -> {
+            BoxTabContent(
+                captionConfig = captionConfig,
+                onConfigChange = onConfigChange
+            )
+        }
+        CaptionSettingsTab.SYNC -> {
+            SyncTabContent(
+                subSyncMs = subSyncMs,
+                onAdjustSync = onAdjustSync,
+                onResetSync = onResetSync
+            )
+        }
+    }
+}
+
+@Composable
 fun CaptionSettingsModal(
     captionConfig: CaptionCustomization,
     onConfigChange: (CaptionCustomization) -> Unit,
@@ -643,27 +756,29 @@ fun CaptionSettingsModal(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
+            val isWide = maxWidth >= 580.dp
+
             Box(
                 modifier = modifier
-                    .fillMaxWidth(0.94f)
-                    .widthIn(max = 720.dp)
-                    .fillMaxHeight(0.88f)
-                    .heightIn(max = 500.dp)
+                    .fillMaxWidth(if (isWide) 0.88f else 0.96f)
+                    .widthIn(max = 740.dp)
+                    .fillMaxHeight(if (isWide) 0.88f else 0.94f)
+                    .heightIn(max = 560.dp)
                     .glassPanel(24.dp)
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Header: "Caption settings" + Close button (Images 2-4)
+                    // Header: "Caption settings" + Close button
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp),
+                            .padding(bottom = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -686,175 +801,147 @@ fun CaptionSettingsModal(
                         }
                     }
 
-                    // Two-Pane Content
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Left Pane: Live Preview + Tab Menu
-                        Column(
+                    if (isWide) {
+                        // Two-Pane Content for Landscape / Tablets
+                        Row(
                             modifier = Modifier
-                                .width(180.dp)
-                                .fillMaxHeight(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Live Preview Box: "I'm gonna be King of the Pirates!"
-                            Box(
+                            // Left Pane: Live Preview + Tab Menu
+                            Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(115.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF090B0F))
-                                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
+                                    .width(200.dp)
+                                    .fillMaxHeight(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                val fontFam = resolveFontFamily(captionConfig.fontFamilyName)
-                                val baseSize = 14.sp * captionConfig.sizeScale
-
-                                Box(
+                                CaptionLivePreviewBox(
+                                    captionConfig = captionConfig,
                                     modifier = Modifier
-                                        .then(
-                                            if (captionConfig.hasBgBox && captionConfig.bgAlpha > 0f) {
-                                                Modifier
-                                                    .clip(RoundedCornerShape(captionConfig.boxCornerRadiusDp.dp))
-                                                    .background(captionConfig.bgColor.copy(alpha = captionConfig.bgAlpha))
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            } else Modifier
-                                        ),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .height(115.dp)
+                                )
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    val displayText = if (captionConfig.isUppercase) {
-                                        "I'M GONNA BE\nKING OF THE\nPIRATES!"
-                                    } else {
-                                        "I'm gonna be\nKing of the\nPirates!"
-                                    }
-
-                                    // Optional text stroke
-                                    if (captionConfig.hasStroke && captionConfig.strokeWidth > 0f) {
-                                        Text(
-                                            text = displayText,
-                                            fontFamily = fontFam,
-                                            fontSize = baseSize,
-                                            fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
-                                            fontStyle = if (captionConfig.isItalic) FontStyle.Italic else FontStyle.Normal,
-                                            letterSpacing = captionConfig.letterSpacingSp.sp,
-                                            textAlign = TextAlign.Center,
-                                            style = TextStyle.Default.copy(
-                                                color = captionConfig.strokeColor,
-                                                drawStyle = Stroke(width = captionConfig.strokeWidth * 0.9f)
-                                            )
-                                        )
-                                    }
-
-                                    // Main text
-                                    Text(
-                                        text = displayText,
-                                        fontFamily = fontFam,
-                                        fontSize = baseSize,
-                                        fontWeight = if (captionConfig.isBold) FontWeight.Bold else FontWeight.Normal,
-                                        fontStyle = if (captionConfig.isItalic) FontStyle.Italic else FontStyle.Normal,
-                                        letterSpacing = captionConfig.letterSpacingSp.sp,
-                                        color = captionConfig.textColor.copy(alpha = captionConfig.textAlpha),
-                                        textAlign = TextAlign.Center,
-                                        style = if (captionConfig.hasShadow) {
-                                            TextStyle.Default.copy(
-                                                shadow = Shadow(
-                                                    color = Color.Black.copy(alpha = 0.85f),
-                                                    blurRadius = 4f
+                                    CaptionSettingsTab.values().forEach { tab ->
+                                        val isSelected = activeTab == tab
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(38.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
+                                                .clickable { activeTab = tab }
+                                                .padding(horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(3.5.dp)
+                                                        .height(18.dp)
+                                                        .clip(RoundedCornerShape(2.dp))
+                                                        .background(Color.White)
                                                 )
+                                                Spacer(Modifier.width(8.dp))
+                                            }
+                                            Text(
+                                                text = tab.title,
+                                                color = if (isSelected) Color.White else Color(0xFF9EA3B2),
+                                                fontSize = 13.5.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                             )
-                                        } else TextStyle.Default
-                                    )
+                                        }
+                                    }
                                 }
                             }
 
-                            // Vertical Tab Selector
-                            Column(
+                            // Right Pane: Active Tab Controls
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())
                             ) {
-                                CaptionSettingsTab.values().forEach { tab ->
-                                    val isSelected = activeTab == tab
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(38.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) Color(0x22FFFFFF) else Color.Transparent)
-                                            .clickable { activeTab = tab }
-                                            .padding(horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        if (isSelected) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .width(3.5.dp)
-                                                    .height(18.dp)
-                                                    .clip(RoundedCornerShape(2.dp))
-                                                    .background(Color(0xFFE50914))
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                        }
-                                        Text(
-                                            text = tab.title,
-                                            color = if (isSelected) Color.White else Color(0xFF9EA3B2),
-                                            fontSize = 13.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        )
-                                    }
+                                RenderCaptionTabContent(
+                                    activeTab = activeTab,
+                                    captionConfig = captionConfig,
+                                    onConfigChange = onConfigChange,
+                                    isCaptionsEnabled = isCaptionsEnabled,
+                                    onToggleCaptions = onToggleCaptions,
+                                    selectedFontCategory = selectedFontCategory,
+                                    onSelectFontCategory = { selectedFontCategory = it },
+                                    subSyncMs = subSyncMs,
+                                    onAdjustSync = onAdjustSync,
+                                    onResetSync = onResetSync
+                                )
+                            }
+                        }
+                    } else {
+                        // Portrait / Compact Phone Layout (Full-Width Responsive!)
+                        CaptionLivePreviewBox(
+                            captionConfig = captionConfig,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(76.dp)
+                        )
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Horizontal Scrollable Tab Bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            CaptionSettingsTab.values().forEach { tab ->
+                                val isSelected = activeTab == tab
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Color(0x26FFFFFF) else Color(0x0CFFFFFF))
+                                        .clickable { activeTab = tab }
+                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = tab.title,
+                                        color = if (isSelected) Color.White else Color(0xFF9EA3B2),
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
                                 }
                             }
                         }
 
-                        // Right Pane: Active Tab Controls
+                        Spacer(Modifier.height(10.dp))
+
+                        // Full-Width Tab Content Area
                         Box(
                             modifier = Modifier
+                                .fillMaxWidth()
                                 .weight(1f)
-                                .fillMaxHeight()
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            when (activeTab) {
-                                CaptionSettingsTab.PRESETS -> {
-                                    PresetsTabContent(
-                                        captionConfig = captionConfig,
-                                        onConfigChange = onConfigChange,
-                                        isCaptionsEnabled = isCaptionsEnabled,
-                                        onToggleCaptions = onToggleCaptions
-                                    )
-                                }
-                                CaptionSettingsTab.FONT -> {
-                                    FontTabContent(
-                                        captionConfig = captionConfig,
-                                        onConfigChange = onConfigChange,
-                                        selectedCategory = selectedFontCategory,
-                                        onSelectCategory = { selectedFontCategory = it }
-                                    )
-                                }
-                                CaptionSettingsTab.TEXT -> {
-                                    TextTabContent(
-                                        captionConfig = captionConfig,
-                                        onConfigChange = onConfigChange
-                                    )
-                                }
-                                CaptionSettingsTab.BOX -> {
-                                    BoxTabContent(
-                                        captionConfig = captionConfig,
-                                        onConfigChange = onConfigChange
-                                    )
-                                }
-                                CaptionSettingsTab.SYNC -> {
-                                    SyncTabContent(
-                                        subSyncMs = subSyncMs,
-                                        onAdjustSync = onAdjustSync,
-                                        onResetSync = onResetSync
-                                    )
-                                }
-                            }
+                            RenderCaptionTabContent(
+                                activeTab = activeTab,
+                                captionConfig = captionConfig,
+                                onConfigChange = onConfigChange,
+                                isCaptionsEnabled = isCaptionsEnabled,
+                                onToggleCaptions = onToggleCaptions,
+                                selectedFontCategory = selectedFontCategory,
+                                onSelectFontCategory = { selectedFontCategory = it },
+                                subSyncMs = subSyncMs,
+                                onAdjustSync = onAdjustSync,
+                                onResetSync = onResetSync
+                            )
                         }
                     }
                 }
@@ -899,7 +986,7 @@ private fun PresetsTabContent(
                 onCheckedChange = onToggleCaptions,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = Color(0xFFE50914),
+                    checkedTrackColor = Color.White.copy(alpha = 0.5f),
                     uncheckedThumbColor = Color(0xFFAAAAAA),
                     uncheckedTrackColor = Color(0x33FFFFFF)
                 )
@@ -935,7 +1022,7 @@ private fun PresetsTabContent(
                             )
                             .border(
                                 1.5.dp,
-                                if (isSelected) Color(0xFFE50914) else Color(0x22FFFFFF),
+                                if (isSelected) Color(0x40FFFFFF) else Color.Transparent,
                                 RoundedCornerShape(12.dp)
                             )
                             .clickable {
@@ -1008,11 +1095,13 @@ private fun FontTabContent(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Category Pills (Image 3)
+        // Category Pills (Smooth horizontal scrollable row with single-line chips - never wraps Serif!)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             categories.forEach { cat ->
@@ -1020,19 +1109,14 @@ private fun FontTabContent(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1B1E26))
-                        .border(
-                            1.dp,
-                            if (isSelected) Color(0xFFE50914) else Color(0x22FFFFFF),
-                            RoundedCornerShape(8.dp)
-                        )
+                        .background(if (isSelected) Color(0x28FFFFFF) else Color(0x0EFFFFFF))
                         .clickable { onSelectCategory(cat) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = cat,
-                        color = Color.White,
+                        color = if (isSelected) Color.White else Color(0xB3FFFFFF),
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
@@ -1042,10 +1126,10 @@ private fun FontTabContent(
 
         Spacer(Modifier.height(4.dp))
 
-        // Font Rows (Image 3)
+        // Font Rows (Clean list items: NO cards, NO heavy borders, selected with subtle highlight only)
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             filteredFonts.forEach { font ->
                 val isSelected = captionConfig.fontFamilyName.equals(font.name, ignoreCase = true)
@@ -1053,32 +1137,41 @@ private fun FontTabContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1B1E26))
-                        .border(
-                            1.dp,
-                            if (isSelected) Color(0xFFE50914) else Color(0x18FFFFFF),
-                            RoundedCornerShape(8.dp)
-                        )
+                        .background(if (isSelected) Color(0x18FFFFFF) else Color.Transparent)
                         .clickable {
                             onConfigChange(captionConfig.copy(fontFamilyName = font.name))
                         }
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = font.name,
                         fontFamily = font.fontFamily,
-                        color = Color.White,
-                        fontSize = 13.5.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        color = if (isSelected) Color.White else Color(0xD9FFFFFF),
+                        fontSize = 14.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                     )
-                    Text(
-                        text = "The quick brown fox",
-                        fontFamily = font.fontFamily,
-                        color = if (isSelected) Color.White else Color(0xFFB0B5C4),
-                        fontSize = 13.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "The quick brown fox",
+                            fontFamily = font.fontFamily,
+                            color = if (isSelected) Color.White.copy(alpha = 0.9f) else Color(0xFF888E9E),
+                            fontSize = 12.5.sp,
+                            maxLines = 1
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1118,8 +1211,8 @@ private fun TextTabContent(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1B1E26))
-                            .border(1.dp, if (isSelected) Color(0xFFE50914) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color(0xFF1B1E26))
+                            .border(1.dp, if (isSelected) Color(0x40FFFFFF) else Color.Transparent, RoundedCornerShape(8.dp))
                             .clickable {
                                 onConfigChange(captionConfig.copy(fontSizeSp = spVal, sizePreset = label))
                             }
@@ -1153,7 +1246,7 @@ private fun TextTabContent(
                 valueRange = 0.5f..2.0f,
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
-                    activeTrackColor = Color(0xFFE50914),
+                    activeTrackColor = Color.White,
                     inactiveTrackColor = Color(0x33FFFFFF)
                 ),
                 modifier = Modifier.fillMaxWidth()
@@ -1173,8 +1266,8 @@ private fun TextTabContent(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1B1E26))
-                            .border(1.dp, if (isSelected) Color(0xFFE50914) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color(0xFF1B1E26))
+                            .border(1.dp, if (isSelected) Color(0x40FFFFFF) else Color.Transparent, RoundedCornerShape(8.dp))
                             .clickable {
                                 onConfigChange(
                                     captionConfig.copy(
@@ -1208,8 +1301,8 @@ private fun TextTabContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (captionConfig.isItalic) Color(0xFFE50914) else Color(0xFF1B1E26))
-                        .border(1.dp, if (captionConfig.isItalic) Color(0xFFE50914) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                        .background(if (captionConfig.isItalic) Color.White else Color(0xFF1B1E26))
+                        .border(1.dp, if (captionConfig.isItalic) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                         .clickable { onConfigChange(captionConfig.copy(isItalic = !captionConfig.isItalic)) }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
@@ -1227,8 +1320,8 @@ private fun TextTabContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (captionConfig.isUppercase) Color(0xFFE50914) else Color(0xFF1B1E26))
-                        .border(1.dp, if (captionConfig.isUppercase) Color(0xFFE50914) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                        .background(if (captionConfig.isUppercase) Color.White else Color(0xFF1B1E26))
+                        .border(1.dp, if (captionConfig.isUppercase) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                         .clickable { onConfigChange(captionConfig.copy(isUppercase = !captionConfig.isUppercase)) }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
@@ -1260,8 +1353,8 @@ private fun TextTabContent(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1B1E26))
-                            .border(1.dp, if (isSelected) Color(0xFFE50914) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color(0xFF1B1E26))
+                            .border(1.dp, if (isSelected) Color(0x40FFFFFF) else Color.Transparent, RoundedCornerShape(8.dp))
                             .clickable { onConfigChange(captionConfig.copy(letterSpacingSp = spVal)) }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -1300,7 +1393,7 @@ private fun TextTabContent(
                             .background(col)
                             .border(
                                 width = if (isSelected) 2.5.dp else 1.dp,
-                                color = if (isSelected) Color(0xFFE50914) else Color(0x40FFFFFF),
+                                color = if (isSelected) Color.White else Color(0x40FFFFFF),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .clickable { onConfigChange(captionConfig.copy(textColor = col)) },
@@ -1369,7 +1462,7 @@ private fun BoxTabContent(
                 onCheckedChange = { onConfigChange(captionConfig.copy(hasBgBox = it)) },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = Color(0xFFE50914),
+                    checkedTrackColor = Color.White.copy(alpha = 0.5f),
                     uncheckedThumbColor = Color(0xFFAAAAAA),
                     uncheckedTrackColor = Color(0x33FFFFFF)
                 )
@@ -1386,7 +1479,7 @@ private fun BoxTabContent(
                 valueRange = 0f..1f,
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
-                    activeTrackColor = Color(0xFFE50914),
+                    activeTrackColor = Color.White,
                     inactiveTrackColor = Color(0x33FFFFFF)
                 ),
                 modifier = Modifier.fillMaxWidth()
@@ -1411,8 +1504,8 @@ private fun BoxTabContent(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1B1E26))
-                            .border(1.dp, if (isSelected) Color(0xFFE50914) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color(0xFF1B1E26))
+                            .border(1.dp, if (isSelected) Color(0x40FFFFFF) else Color.Transparent, RoundedCornerShape(8.dp))
                             .clickable { onConfigChange(captionConfig.copy(boxCornerRadiusDp = r)) }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -1438,7 +1531,7 @@ private fun BoxTabContent(
                 valueRange = 4f..60f,
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
-                    activeTrackColor = Color(0xFFE50914),
+                    activeTrackColor = Color.White,
                     inactiveTrackColor = Color(0x33FFFFFF)
                 ),
                 modifier = Modifier.fillMaxWidth()
@@ -1504,7 +1597,7 @@ private fun SyncTabContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (label == "Reset") Color(0xFFE50914) else Color(0xFF1B1E26))
+                        .background(if (label == "Reset") Color.White else Color(0xFF1B1E26))
                         .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                         .clickable {
                             if (label == "Reset") onResetSync() else onAdjustSync(delta)

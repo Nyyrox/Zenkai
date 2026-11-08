@@ -523,6 +523,10 @@ object DirectStreamResolver {
             // 1. Extract servers via AnimeSaltResolver (options-0 / options-1)
             val extractedServers = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.extractServers(slug, isMovie)
 
+            val acdnSubs = kotlinx.coroutines.withTimeoutOrNull(4000L) {
+                com.nyyrox.aniverse.data.subtitles.SubtitleRepository.fetchAcdnSubtitles(anilistId, episode, animeTitle)
+            } ?: emptyList()
+
             // Primary: options-0 (myStreamUrl on ravok.buzz / as-cdn) which contains native multi-audio master HLS (including English Dub)
             val myStreamIframe = extractedServers.myStreamUrl
             if (!myStreamIframe.isNullOrBlank()) {
@@ -540,6 +544,7 @@ object DirectStreamResolver {
                         isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
                         audio = "dub",
                         headers = direct.headers,
+                        subtitles = acdnSubs,
                         isDirect = true
                     )
                 }
@@ -563,6 +568,7 @@ object DirectStreamResolver {
                         isHls = direct.streamUrl.contains(".m3u8", ignoreCase = true),
                         audio = "dub",
                         headers = direct.headers,
+                        subtitles = acdnSubs,
                         isDirect = true
                     )
                 }
@@ -579,6 +585,7 @@ object DirectStreamResolver {
                     isHls = first.streamUrl.contains(".m3u8", ignoreCase = true),
                     audio = "dub",
                     headers = first.headers,
+                    subtitles = acdnSubs,
                     isDirect = true
                 )
             }

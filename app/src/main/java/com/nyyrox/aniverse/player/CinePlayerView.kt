@@ -590,7 +590,8 @@ fun CinePlayerView(
     onSelectServer: ((StreamServerOption) -> Unit)? = null,
     serverName: String = "",
     hasDubAvailable: Boolean = true,
-    onSwitchAudioStream: ((Boolean) -> Unit)? = null
+    onSwitchAudioStream: ((Boolean) -> Unit)? = null,
+    serverSkipIntervals: List<SkipInterval> = emptyList()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -758,15 +759,36 @@ fun CinePlayerView(
         }
     }
 
-    // AniSkip: Skip Intro & Outro intervals
-    var skipIntervals by remember(malId, episode) { mutableStateOf<List<SkipInterval>>(emptyList()) }
-    LaunchedEffect(malId, episode, durationMs) {
+    // AniSkip & Server-Supplied Skip: Skip Intro & Outro intervals
+    var skipIntervals by remember(malId, episode, serverSkipIntervals) {
+        mutableStateOf<List<SkipInterval>>(serverSkipIntervals)
+    }
+    LaunchedEffect(malId, episode, durationMs, serverSkipIntervals) {
+        val hasServerIntro = serverSkipIntervals.any { it.skipType.contains("intro", ignoreCase = true) || it.skipType.equals("op", ignoreCase = true) }
+        val hasServerOutro = serverSkipIntervals.any { it.skipType.contains("outro", ignoreCase = true) || it.skipType.equals("ed", ignoreCase = true) }
+
+        if (hasServerIntro && hasServerOutro) {
+            skipIntervals = serverSkipIntervals
+            return@LaunchedEffect
+        }
+
         if (malId != null && malId > 0 && episode > 0) {
             val epSec = if (durationMs > 0L) durationMs / 1000L else 0L
             val intervals = AniSkipRepository.getSkipTimes(malId, episode, epSec)
-            skipIntervals = intervals
+
+            // Merge serverSkipIntervals with AniSkip: stream server skip takes precedence for matching type
+            val merged = mutableListOf<SkipInterval>()
+            merged.addAll(serverSkipIntervals)
+            for (interval in intervals) {
+                val isIntro = interval.skipType.contains("op", ignoreCase = true)
+                val isOutro = interval.skipType.contains("ed", ignoreCase = true)
+                if (isIntro && hasServerIntro) continue
+                if (isOutro && hasServerOutro) continue
+                merged.add(interval)
+            }
+            skipIntervals = merged.sortedBy { it.startTimeMs }
         } else {
-            skipIntervals = emptyList()
+            skipIntervals = serverSkipIntervals
         }
     }
     val activeSkipInterval = remember(currentPositionMs, skipIntervals) {
@@ -855,7 +877,7 @@ fun CinePlayerView(
                         captionPlayStatus = CaptionPlayStatus.PLAYING
                         activeCaptionTitle = "Uploaded File"
                         captionErrorText = null
-                        val pos = (currentPositionMs - subSyncMs + 120L).coerceAtLeast(0L)
+                        val pos = (currentPositionMs - subSyncMs).coerceAtLeast(0L)
                         val activeCues = findActiveCuesAt(cues, pos)
                         activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
                     }
@@ -1056,7 +1078,7 @@ fun CinePlayerView(
                         activeCaptionTitle = candidateTrack.label
                         captionPlayStatus = CaptionPlayStatus.PLAYING
                         captionErrorText = null
-                        val pos = (currentPositionMs - subSyncMs + 120L).coerceAtLeast(0L)
+                        val pos = (currentPositionMs - subSyncMs).coerceAtLeast(0L)
                         val activeCues = findActiveCuesAt(cues, pos)
                         activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
                     } else {
@@ -1706,8 +1728,7 @@ fun CinePlayerView(
 
                 // Subtitle sync with parsed cues (adjusted by subSyncMs offset + 120ms lead compensation)
                 if (isCaptionsEnabled && activeLoadedCues.isNotEmpty()) {
-                    // 120ms audio-visual lead aligns spoken audio onset with visual text presentation, matching web player
-                    val pos = (livePos - subSyncMs + 120L).coerceAtLeast(0L)
+                    val pos = (livePos - subSyncMs).coerceAtLeast(0L)
                     val activeCues = findActiveCuesAt(activeLoadedCues, pos)
                     val newCueText = if (activeCues.isNotEmpty()) {
                         activeCues.map { it.text }.distinct().joinToString("\n")
@@ -3829,7 +3850,7 @@ fun CinePlayerView(
                                     captionErrorText = null
                                     downloadingSubtitleId = null
 
-                                    val pos = (currentPositionMs - subSyncMs + 120L).coerceAtLeast(0L)
+                                    val pos = (currentPositionMs - subSyncMs).coerceAtLeast(0L)
                                     val activeCues = findActiveCuesAt(cues, pos)
                                     activeCuesText = if (activeCues.isNotEmpty()) activeCues.map { it.text }.distinct().joinToString("\n") else null
                                 } else {
