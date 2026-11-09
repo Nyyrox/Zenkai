@@ -1092,7 +1092,8 @@ fun PlayerScreen(
                             )
                     }
                     com.nyyrox.aniverse.player.CinePlayerView(
-                        title = anime.title,
+                        props = com.nyyrox.aniverse.player.CinePlayerProps(
+                            title = anime.title,
                         episode = playingEpisode,
                         episodeTitle = tmdbEpisodes[playingEpisode]?.name,
                         nextEpisodeTitle = tmdbEpisodes[playingEpisode + 1]?.name,
@@ -1135,7 +1136,6 @@ fun PlayerScreen(
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxSize(),
                         initialTimeMs = savedPos,
                         startPaused = false,
                         malId = malIdState ?: anime.idMal,
@@ -1276,6 +1276,8 @@ fun PlayerScreen(
                         serverName = directStreamResult?.serverName?.ifBlank { currentProvider.name } ?: currentProvider.name,
                         hasDubAvailable = audioAvailability.hasDub,
                         onSwitchAudioStream = onSwitchAudioStream
+                        ),
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }

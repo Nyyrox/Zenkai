@@ -230,8 +230,7 @@ fun DetailScreen(
     vm: MainViewModel,
     animeId: Int,
     onBack: () -> Unit,
-    onPlay: (animeId: Int, episode: Int, provider: Provider) -> Unit,
-    onWatchTogether: ((anime: Anime, episode: Int) -> Unit)? = null
+    onPlay: (animeId: Int, episode: Int, provider: Provider) -> Unit
 ) {
     val context = LocalContext.current
     val coordinator = LocalSharedPosterCoordinator.current

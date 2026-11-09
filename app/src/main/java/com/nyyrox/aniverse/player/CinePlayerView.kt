@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
 import com.nyyrox.aniverse.data.SkipInterval
 import com.nyyrox.aniverse.data.SubtitleCue
@@ -546,54 +547,97 @@ private enum class PlayerSettingsTab {
     AUDIO,
     THEME_PACKS,
     GESTURES,
-    UPSCALER,
     PICTURE
 }
+
+data class CinePlayerProps(
+    val title: String,
+    val episode: Int,
+    val episodeTitle: String? = null,
+    val nextEpisodeTitle: String? = null,
+    val nextEpisodeImage: String? = null,
+    val streamUrl: String,
+    val isDirectStream: Boolean,
+    val isDub: Boolean = false,
+    val isFullscreen: Boolean = false,
+    val onToggleFullscreen: () -> Unit = {},
+    val onBack: () -> Unit = {},
+    val onCollapseToMiniPlayer: (() -> Unit)? = null,
+    val onDragDownDelta: ((Float) -> Unit)? = null,
+    val onDragDownRelease: ((Float) -> Unit)? = null,
+    val modifier: Modifier = Modifier,
+    val initialTimeMs: Long = 0L,
+    val startPaused: Boolean = false,
+    val externalSubtitles: List<SubtitleTrack> = emptyList(),
+    val headers: Map<String, String> = emptyMap(),
+    val malId: Int? = null,
+    val anilistId: Int = 0,
+    val season: Int = 1,
+    val maxEpisode: Int = 1,
+    val onSelectEpisode: ((Int) -> Unit)? = null,
+    val hasPreviousEpisode: Boolean = false,
+    val onPreviousEpisode: () -> Unit = {},
+    val hasNextEpisode: Boolean = false,
+    val onNextEpisode: () -> Unit = {},
+    val isAutoPlayNext: Boolean = true,
+    val onToggleAutoPlayNext: (Boolean) -> Unit = {},
+    val isAutoSkipIntroOutro: Boolean = false,
+    val onToggleAutoSkipIntroOutro: (Boolean) -> Unit = {},
+    val onProgressUpdate: (currentMs: Long, durationMs: Long) -> Unit = { _, _ -> },
+    val onPlaybackFailed: () -> Unit = {},
+    val availableServers: List<StreamServerOption> = emptyList(),
+    val onSelectServer: ((StreamServerOption) -> Unit)? = null,
+    val serverName: String = "",
+    val hasDubAvailable: Boolean = true,
+    val onSwitchAudioStream: ((Boolean) -> Unit)? = null,
+    val serverSkipIntervals: List<SkipInterval> = emptyList()
+)
 
 @OptIn(UnstableApi::class)
 @Composable
 fun CinePlayerView(
-    title: String,
-    episode: Int,
-    episodeTitle: String? = null,
-    nextEpisodeTitle: String? = null,
-    nextEpisodeImage: String? = null,
-    streamUrl: String,
-    isDirectStream: Boolean,
-    isDub: Boolean = false,
-    isFullscreen: Boolean = false,
-    onToggleFullscreen: () -> Unit = {},
-    onBack: () -> Unit = {},
-    onCollapseToMiniPlayer: (() -> Unit)? = null,
-    onDragDownDelta: ((Float) -> Unit)? = null,
-    onDragDownRelease: ((Float) -> Unit)? = null,
-    modifier: Modifier = Modifier,
-    initialTimeMs: Long = 0L,
-    startPaused: Boolean = false,
-    externalSubtitles: List<SubtitleTrack> = emptyList(),
-    headers: Map<String, String> = emptyMap(),
-    malId: Int? = null,
-    anilistId: Int = 0,
-    season: Int = 1,
-    maxEpisode: Int = 1,
-    onSelectEpisode: ((Int) -> Unit)? = null,
-    hasPreviousEpisode: Boolean = false,
-    onPreviousEpisode: () -> Unit = {},
-    hasNextEpisode: Boolean = false,
-    onNextEpisode: () -> Unit = {},
-    isAutoPlayNext: Boolean = true,
-    onToggleAutoPlayNext: (Boolean) -> Unit = {},
-    isAutoSkipIntroOutro: Boolean = false,
-    onToggleAutoSkipIntroOutro: (Boolean) -> Unit = {},
-    onProgressUpdate: (currentMs: Long, durationMs: Long) -> Unit = { _, _ -> },
-    onPlaybackFailed: () -> Unit = {},
-    availableServers: List<StreamServerOption> = emptyList(),
-    onSelectServer: ((StreamServerOption) -> Unit)? = null,
-    serverName: String = "",
-    hasDubAvailable: Boolean = true,
-    onSwitchAudioStream: ((Boolean) -> Unit)? = null,
-    serverSkipIntervals: List<SkipInterval> = emptyList()
+    props: CinePlayerProps,
+    modifier: Modifier = Modifier
 ) {
+    val title = props.title
+    val episode = props.episode
+    val episodeTitle = props.episodeTitle
+    val nextEpisodeTitle = props.nextEpisodeTitle
+    val nextEpisodeImage = props.nextEpisodeImage
+    val streamUrl = props.streamUrl
+    val isDirectStream = props.isDirectStream
+    val isDub = props.isDub
+    val isFullscreen = props.isFullscreen
+    val onToggleFullscreen = props.onToggleFullscreen
+    val onBack = props.onBack
+    val onCollapseToMiniPlayer = props.onCollapseToMiniPlayer
+    val onDragDownDelta = props.onDragDownDelta
+    val onDragDownRelease = props.onDragDownRelease
+    val initialTimeMs = props.initialTimeMs
+    val startPaused = props.startPaused
+    val externalSubtitles = props.externalSubtitles
+    val headers = props.headers
+    val malId = props.malId
+    val anilistId = props.anilistId
+    val season = props.season
+    val maxEpisode = props.maxEpisode
+    val onSelectEpisode = props.onSelectEpisode
+    val hasPreviousEpisode = props.hasPreviousEpisode
+    val onPreviousEpisode = props.onPreviousEpisode
+    val hasNextEpisode = props.hasNextEpisode
+    val onNextEpisode = props.onNextEpisode
+    val isAutoPlayNext = props.isAutoPlayNext
+    val onToggleAutoPlayNext = props.onToggleAutoPlayNext
+    val isAutoSkipIntroOutro = props.isAutoSkipIntroOutro
+    val onToggleAutoSkipIntroOutro = props.onToggleAutoSkipIntroOutro
+    val onProgressUpdate = props.onProgressUpdate
+    val onPlaybackFailed = props.onPlaybackFailed
+    val availableServers = props.availableServers
+    val onSelectServer = props.onSelectServer
+    val serverName = props.serverName
+    val hasDubAvailable = props.hasDubAvailable
+    val onSwitchAudioStream = props.onSwitchAudioStream
+    val serverSkipIntervals = props.serverSkipIntervals
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val storageManager = remember { com.nyyrox.aniverse.data.StorageManager(context) }
@@ -644,12 +688,11 @@ fun CinePlayerView(
     var showPlayerSettingsModal by remember { mutableStateOf(false) }
     var activeSettingsTab by remember { mutableStateOf(PlayerSettingsTab.MAIN) }
     var videoFilters by remember { mutableStateOf(storageManager.getVideoFilters()) }
-    var upscalerSettings by remember { mutableStateOf(storageManager.getUpscalerSettings()) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
 
-    LaunchedEffect(videoFilters, upscalerSettings, playerViewRef) {
+    LaunchedEffect(videoFilters, playerViewRef) {
         playerViewRef?.let { pv ->
-            applyVideoEffects(pv, videoFilters, upscalerSettings)
+            applyVideoEffects(pv, videoFilters)
         }
     }
 
@@ -824,6 +867,8 @@ fun CinePlayerView(
     val glassBackdrop = remember { CxHost() }
     val glassCompact = glassBackdrop.hostWidth > 0 && glassBackdrop.hostWidth / context.resources.displayMetrics.density < 560f
     var morphAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var bottomBarHeightPx by remember { mutableIntStateOf(0) }
+    var lastSelectedSubId by remember { mutableStateOf<String?>(null) }
 
     // Caption State & Customization
     var activeLoadedCues by remember(episode, season) { mutableStateOf<List<SubtitleCue>>(emptyList()) }
@@ -1702,6 +1747,13 @@ fun CinePlayerView(
                     }
                 }
 
+                // Fallback: reached/passed declared duration without STATE_ENDED
+                val durEnd = p.duration
+                if (durEnd > 10_000L && livePos >= durEnd - 300L && livePos > 15_000L && hasNextNow && autoPlayNow && !isNextTriggered && !isScrubbing && !isSwipeSeeking) {
+                    isNextTriggered = true
+                    onNextNow()
+                }
+
                 // Auto-skip Intro / Outro when enabled
                 if (autoSkipIntroOutroEnabled && skipIntervals.isNotEmpty() && !isScrubbing && !isSwipeSeeking) {
                     val matchingInterval = skipIntervals.firstOrNull { livePos in it.startTimeMs until it.endTimeMs }
@@ -2272,7 +2324,7 @@ fun CinePlayerView(
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
                                 post {
-                                    applyVideoEffects(this, videoFilters, upscalerSettings)
+                                    applyVideoEffects(this, videoFilters)
                                 }
                             }
                         },
@@ -2282,7 +2334,7 @@ fun CinePlayerView(
                                 view.player = exoPlayer
                             }
                             view.resizeMode = resizeMode
-                            applyVideoEffects(view, videoFilters, upscalerSettings)
+                            applyVideoEffects(view, videoFilters)
                             // Hide basic Android SubtitleView whenever player UI caption is shown
                             if (isCaptionsEnabled && activeCuesText != null) {
                                 view.subtitleView?.visibility = View.GONE
@@ -2621,7 +2673,7 @@ fun CinePlayerView(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = if (isInPip) 6.dp else if (showControls) (captionConfig.bottomPaddingDp + 48f).dp else captionConfig.bottomPaddingDp.dp)
+                                .padding(bottom = if (isInPip) 6.dp else if (showControls) maxOf(captionConfig.bottomPaddingDp.dp, with(androidx.compose.ui.platform.LocalDensity.current) { bottomBarHeightPx.toDp() } + 8.dp) else captionConfig.bottomPaddingDp.dp)
                                 .padding(horizontal = if (isInPip) 8.dp else 24.dp)
                                 .then(
                                     if (captionConfig.hasBgBox && captionConfig.bgAlpha > 0f) {
@@ -3093,29 +3145,7 @@ fun CinePlayerView(
                                             controlsTimeoutKey++
                                         }
                                     )
-                                    if (upscalerSettings.enabled) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable {
-                                                    morphAnchor = null
-                                                    activeSettingsTab = PlayerSettingsTab.UPSCALER
-                                                    showPlayerSettingsModal = true
-                                                    controlsTimeoutKey++
-                                                }
-                                                .padding(horizontal = 6.dp, vertical = 4.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "4K",
-                                                color = Color.White,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        }
-                                    }
-                                    CxPillIcon(
+CxPillIcon(
                                         icon = if (isScreenLocked) playerCustomization.themePack.lockIcon else playerCustomization.themePack.unlockIcon,
                                         contentDescription = "Lock Screen",
                                         iconSize = 16.dp,
@@ -3333,100 +3363,6 @@ fun CinePlayerView(
                         }
                     }
 
-                    // 3b. Right-Side Unified Vertical Control Group
-                    AnimatedVisibility(
-                        visible = showControls && !isScreenLocked && !isInPip,
-                        enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.92f, animationSpec = tween(140)),
-                        exit = if (isAutoHideTransition) {
-                            fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(180))
-                        } else {
-                            fadeOut(tween(110))
-                        },
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = if (glassCompact) 12.dp else 24.dp)
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(if (glassCompact) 8.dp else 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            val rightBtnSize = if (glassCompact) 34.dp else 40.dp
-                            val rightIconSize = if (glassCompact) 16.dp else 19.dp
-
-                            // Fullscreen
-                            CxIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    onToggleFullscreen()
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
-                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-
-                            // Audio Track Button
-                            val isAudioSelected = audioTracks.any { it.isSelected } || isDub
-                            CxIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    activeSettingsTab = PlayerSettingsTab.AUDIO
-                                    showPlayerSettingsModal = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.GraphicEq,
-                                    contentDescription = "Audio Tracks",
-                                    tint = if (isAudioSelected) playerCustomization.accentColor.color else Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-
-                            // Subtitles Button
-                            val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || activeLoadedSubtitleUrl != null || subtitleTracks.any { it.isSelected })
-                            CxIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    showCaptionModal = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Subtitles,
-                                    contentDescription = "Subtitles",
-                                    tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-
-                            // Speed Button
-                            CxIconButton(
-                                size = rightBtnSize,
-                                onClick = {
-                                    showControls = true
-                                    controlsTimeoutKey++
-                                    activeSettingsTab = PlayerSettingsTab.SPEED
-                                    showPlayerSettingsModal = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Speed,
-                                    contentDescription = "Playback Speed",
-                                    tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
-                                    modifier = Modifier.size(rightIconSize)
-                                )
-                            }
-                        }
-                    }
-
                     // 4. Bottom Bar: Scrubber & Time (YouTube fade & morphing timeline)
                     AnimatedVisibility(
                         visible = showControls && !isScreenLocked && !isInPip,
@@ -3451,6 +3387,7 @@ fun CinePlayerView(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .onSizeChanged { bottomBarHeightPx = it.height }
                                 .padding(start = if (glassCompact) 12.dp else 20.dp, end = if (glassCompact) 12.dp else 20.dp, top = 4.dp, bottom = if (glassCompact) 4.dp else 8.dp)
                         ) {
                             val timeTextAlpha by animateFloatAsState(
@@ -3465,9 +3402,10 @@ fun CinePlayerView(
                             )
                             // Episode info hierarchy (full width with generous breathing room)
                             val hasCustomEpName = !episodeTitle.isNullOrBlank() && !episodeTitle.equals("Episode $episode", ignoreCase = true)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                             Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .weight(1f)
                                     .padding(horizontal = 4.dp)
                             ) {
                                 Text(
@@ -3487,6 +3425,82 @@ fun CinePlayerView(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                            }
+                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    val rightBtnSize = if (glassCompact) 36.dp else 42.dp
+                                    val rightIconSize = if (glassCompact) 18.dp else 21.dp
+                            // Fullscreen
+                            CxActionButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    onToggleFullscreen()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
+                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+
+                            // Audio Track Button
+                            val isAudioSelected = audioTracks.any { it.isSelected } || isDub
+                            CxActionButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    activeSettingsTab = PlayerSettingsTab.AUDIO
+                                    showPlayerSettingsModal = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.GraphicEq,
+                                    contentDescription = "Audio Tracks",
+                                    tint = if (isAudioSelected) playerCustomization.accentColor.color else Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+
+                            // Subtitles Button
+                            val isCaptionActive = isCaptionsEnabled && (activeCuesText != null || activeLoadedSubtitleUrl != null || subtitleTracks.any { it.isSelected })
+                            CxActionButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    showCaptionModal = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Subtitles,
+                                    contentDescription = "Subtitles",
+                                    tint = if (isCaptionActive) playerCustomization.accentColor.color else Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+
+                            // Speed Button
+                            CxActionButton(
+                                size = rightBtnSize,
+                                onClick = {
+                                    showControls = true
+                                    controlsTimeoutKey++
+                                    activeSettingsTab = PlayerSettingsTab.SPEED
+                                    showPlayerSettingsModal = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Speed,
+                                    contentDescription = "Playback Speed",
+                                    tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
+                                    modifier = Modifier.size(rightIconSize)
+                                )
+                            }
+                                }
                             }
 
                             Spacer(Modifier.height(10.dp))
@@ -3739,11 +3753,6 @@ fun CinePlayerView(
             onVideoFiltersChange = { newFilters ->
                 videoFilters = newFilters
                 storageManager.saveVideoFilters(newFilters)
-            },
-            upscalerSettings = upscalerSettings,
-            onUpscalerChange = { newSettings ->
-                upscalerSettings = newSettings
-                storageManager.saveUpscalerSettings(newSettings)
             }
         )
     }
@@ -3812,7 +3821,11 @@ fun CinePlayerView(
             activeCaptionTitle = activeCaptionTitle,
             activeSubtitleUrl = activeLoadedSubtitleUrl,
             downloadingSubtitleId = downloadingSubtitleId,
+            playStatus = captionPlayStatus,
+            errorText = captionErrorText,
+            selectedSubtitleId = lastSelectedSubId,
             onSelectSubtitle = { sub ->
+                lastSelectedSubId = sub.id
                 val previousTitle = activeCaptionTitle
                 val previousUrl = activeLoadedSubtitleUrl
                 captionPlayStatus = CaptionPlayStatus.DOWNLOADING
@@ -4430,8 +4443,6 @@ private fun PlayerSettingsModal(
     onSwitchAudioStream: ((Boolean) -> Unit)? = null,
     videoFilters: VideoFiltersState = VideoFiltersState(),
     onVideoFiltersChange: (VideoFiltersState) -> Unit = {},
-    upscalerSettings: UpscalerState = UpscalerState(),
-    onUpscalerChange: (UpscalerState) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -4513,21 +4524,7 @@ private fun PlayerSettingsModal(
                             onClick = { onTabChange(PlayerSettingsTab.ORIENTATION) }
                         )
 
-                        // 6. AI Upscaler (Clean standard row, subtitle shows mode)
-                        val upscalerSubtitle = if (upscalerSettings.enabled) {
-                            val m = ANIME4K_MODES.find { it.id == upscalerSettings.mode }?.label ?: "Mode A"
-                            "4K $m"
-                        } else {
-                            "Off"
-                        }
-                        SettingsItemRow(
-                            icon = Icons.Default.AutoAwesome,
-                            title = "AI Upscaler",
-                            subtitle = upscalerSubtitle,
-                            onClick = { onTabChange(PlayerSettingsTab.UPSCALER) }
-                        )
-
-                        // 7. Visual Enhancements & Shaders
+// 7. Visual Enhancements & Shaders
                         val vfxSubtitle = if (!videoFilters.isDefault) {
                             val pName = VIDEO_FILTER_PRESETS.find { it.id == videoFilters.preset }?.label ?: "Custom"
                             pName
@@ -5499,176 +5496,7 @@ private fun PlayerSettingsModal(
                     }
                 }
 
-                PlayerSettingsTab.UPSCALER -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        SubHeader(
-                            title = "AI Upscaler",
-                            onBack = { onTabChange(PlayerSettingsTab.MAIN) },
-                            onClose = onDismiss
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                                .height(1.dp)
-                                .background(Color(0x14FFFFFF))
-                        )
-
-                        // Master Switch with LiquidGlassSwitch
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    onUpscalerChange(upscalerSettings.copy(enabled = !upscalerSettings.enabled))
-                                }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Column {
-                                    Text(
-                                        text = "Enable GPU 4K Upscaler",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = if (upscalerSettings.enabled) "On, GPU upscaling" else "Sharper lines and edges",
-                                        color = if (upscalerSettings.enabled) Color(0xFFE2E8F0) else Color(0x80FFFFFF),
-                                        fontSize = 11.5.sp
-                                    )
-                                }
-                            }
-                            CxSwitch(
-                                checked = upscalerSettings.enabled,
-                                onCheckedChange = { isChecked ->
-                                    onUpscalerChange(upscalerSettings.copy(enabled = isChecked))
-                                }
-                            )
-                        }
-
-                        if (upscalerSettings.enabled) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
-                                    .height(1.dp)
-                                    .background(Color(0x14FFFFFF))
-                            )
-
-                            Text(
-                                text = "QUALITY PRESET",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-
-                            ANIME4K_MODES.forEach { modeItem ->
-                                val isSelected = upscalerSettings.mode == modeItem.id
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
-                                        .clickable {
-                                            onUpscalerChange(upscalerSettings.copy(mode = modeItem.id))
-                                        }
-                                        .padding(vertical = 10.dp, horizontal = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                        Text(
-                                            text = modeItem.label,
-                                            color = if (isSelected) OttPrimary else Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                        Text(
-                                            text = modeItem.desc,
-                                            color = OttSecondary,
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = OttPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
-                                    .height(1.dp)
-                                    .background(Color(0x14FFFFFF))
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Upscale Intensity",
-                                    color = Color.White,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "${upscalerSettings.intensity}%",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            Slider(
-                                value = upscalerSettings.intensity.toFloat(),
-                                onValueChange = { newVal ->
-                                    onUpscalerChange(upscalerSettings.copy(intensity = newVal.toInt()))
-                                },
-                                valueRange = 0f..100f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = Color(0x99FFFFFF),
-                                    inactiveTrackColor = Color(0x28FFFFFF)
-                                ),
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(24.dp)
-                            )
-                        }
-
-                        Spacer(Modifier.height(4.dp))
-                    }
-                }
-
-                PlayerSettingsTab.PICTURE -> {
+PlayerSettingsTab.PICTURE -> {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -6058,20 +5886,36 @@ private fun CxLoader(modifier: Modifier = Modifier, accentColor: Color = Color.W
 }
 
 @Composable
+private fun CxActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 40.dp,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier.size(size).clip(CircleShape).clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) { content() }
+}
+
+@Composable
 private fun CxSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val t by animateFloatAsState(if (checked) 1f else 0f, tween(150), label = "cxSwitch")
+    val t by animateFloatAsState(if (checked) 1f else 0f, tween(180), label = "cxSwitch")
+    val track by androidx.compose.animation.animateColorAsState(
+        if (checked) Color(0xFF30D158) else Color(0x40FFFFFF), tween(180), label = "cxSwitchTrack"
+    )
     Box(
         modifier = Modifier
-            .size(width = 42.dp, height = 24.dp)
+            .size(width = 48.dp, height = 28.dp)
             .clip(CircleShape)
-            .background(if (checked) OttPrimary else Color(0x33FFFFFF))
-            .clickable { onCheckedChange(!checked) }
+            .background(track)
+            .toggleable(value = checked, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onCheckedChange)
             .padding(3.dp)
     ) {
         Box(
             modifier = Modifier
-                .offset(x = (18f * t).dp)
-                .size(18.dp)
+                .offset(x = (20f * t).dp)
+                .size(22.dp)
                 .clip(CircleShape)
                 .background(Color.White)
         )
@@ -6117,6 +5961,9 @@ private fun CxSubtitlesModal(
     activeCaptionTitle: String,
     activeSubtitleUrl: String?,
     downloadingSubtitleId: String?,
+    playStatus: CaptionPlayStatus,
+    errorText: String?,
+    selectedSubtitleId: String?,
     onSelectSubtitle: (SubtitleTrack) -> Unit,
     onTurnOffCaptions: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -6125,6 +5972,20 @@ private fun CxSubtitlesModal(
     onDismiss: () -> Unit,
     anchor: Rect? = null
 ) {
+    val groups = remember(availableSubtitles) {
+        availableSubtitles
+            .groupBy { SubtitleRepository.normalizeLanguage(it.language) }
+            .toList()
+            .sortedWith(compareByDescending<Pair<String, List<SubtitleTrack>>> { it.first == "English" }.thenBy { it.first })
+    }
+    val activeLang = availableSubtitles
+        .firstOrNull { isCaptionsEnabled && it.url == activeSubtitleUrl }
+        ?.let { SubtitleRepository.normalizeLanguage(it.language) }
+    var expanded by remember(groups.size) {
+        mutableStateOf(setOfNotNull(activeLang ?: if (groups.size == 1) groups[0].first else null))
+    }
+    val loadingLabel = availableSubtitles.firstOrNull { it.id == downloadingSubtitleId }?.label
+
     PlayerPanel(onDismiss = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -6139,13 +6000,46 @@ private fun CxSubtitlesModal(
                 QuickTile(Icons.Default.Search, "Transcript", { onOpenDialoguePanel() }, Modifier.weight(1f))
                 QuickTile(Icons.Default.Add, "Upload", { onUploadClick() }, Modifier.weight(1f))
             }
+
+            // Status banner: downloading / error / active
+            when {
+                downloadingSubtitleId != null -> CxStatusBanner("Downloading ${loadingLabel ?: "subtitle"}...", loading = true, error = false)
+                playStatus == CaptionPlayStatus.ERROR -> CxStatusBanner(errorText ?: "Subtitle failed to load", loading = false, error = true)
+                playStatus == CaptionPlayStatus.PLAYING && isCaptionsEnabled -> CxStatusBanner("Showing $activeCaptionTitle", loading = false, error = false)
+            }
+
             LazyColumn(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                item {
-                    CxSubtitleRow("Off", "", !isCaptionsEnabled, false) { onTurnOffCaptions() }
-                }
-                itemsIndexed(availableSubtitles) { _, sub ->
-                    val active = isCaptionsEnabled && activeSubtitleUrl == sub.url
-                    CxSubtitleRow(sub.label, "${sub.language}, ${sub.source}", active, downloadingSubtitleId == sub.id) { onSelectSubtitle(sub) }
+                item { CxSubtitleRow("Off", "", active = !isCaptionsEnabled, loading = false, error = false) { onTurnOffCaptions() } }
+                groups.forEach { (lang, subs) ->
+                    val open = lang in expanded
+                    item(key = "g_$lang") {
+                        CxLangHeader(
+                            name = lang,
+                            count = subs.size,
+                            open = open,
+                            hasActive = subs.any { isCaptionsEnabled && it.url == activeSubtitleUrl },
+                            loading = subs.any { it.id == downloadingSubtitleId }
+                        ) { expanded = if (open) expanded - lang else expanded + lang }
+                    }
+                    if (open) {
+                        itemsIndexed(subs) { _, sub ->
+                            val isLoading = downloadingSubtitleId == sub.id
+                            val isError = !isLoading && playStatus == CaptionPlayStatus.ERROR && selectedSubtitleId == sub.id
+                            val isActive = !isLoading && isCaptionsEnabled && activeSubtitleUrl == sub.url
+                            CxSubtitleRow(
+                                title = sub.label,
+                                subtitle = when {
+                                    isLoading -> "Downloading..."
+                                    isError -> "${errorText ?: "Failed"}. Tap to retry"
+                                    else -> sub.source
+                                },
+                                active = isActive,
+                                loading = isLoading,
+                                error = isError,
+                                modifier = Modifier.padding(start = 12.dp)
+                            ) { if (!isLoading) onSelectSubtitle(sub) }
+                        }
+                    }
                 }
             }
         }
@@ -6153,12 +6047,70 @@ private fun CxSubtitlesModal(
 }
 
 @Composable
-private fun CxSubtitleRow(title: String, subtitle: String, active: Boolean, loading: Boolean, onClick: () -> Unit) {
+private fun CxStatusBanner(text: String, loading: Boolean, error: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (error) Color(0x26F87171) else Color(0x14FFFFFF))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (loading) CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+            else Icon(
+                if (error) Icons.Default.Close else Icons.Default.Check,
+                contentDescription = null,
+                tint = if (error) Color(0xFFF87171) else Color(0xFF30D158),
+                modifier = Modifier.size(16.dp)
+            )
+            Text(text, color = if (error) Color(0xFFFCA5A5) else Color(0xE6FFFFFF), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp), color = Color.White, trackColor = Color(0x1AFFFFFF))
+    }
+}
+
+@Composable
+private fun CxLangHeader(name: String, count: Int, open: Boolean, hasActive: Boolean, loading: Boolean, onClick: () -> Unit) {
+    val rot by animateFloatAsState(if (open) 180f else 0f, tween(160), label = "cxChevron")
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (active) Color(0x1FFFFFFF) else Color.Transparent)
+            .background(Color(0x0FFFFFFF))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(8.dp))
+        Text("$count", color = Color(0x80FFFFFF), fontSize = 12.sp)
+        Spacer(Modifier.weight(1f))
+        if (loading) CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+        else if (hasActive) Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF30D158), modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rot })
+    }
+}
+
+@Composable
+private fun CxSubtitleRow(
+    title: String,
+    subtitle: String,
+    active: Boolean,
+    loading: Boolean,
+    error: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (error) Color(0x1AF87171) else if (active) Color(0x1FFFFFFF) else Color.Transparent)
             .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -6166,11 +6118,16 @@ private fun CxSubtitleRow(title: String, subtitle: String, active: Boolean, load
     ) {
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle.isNotEmpty()) Text(subtitle, color = Color(0x80FFFFFF), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotEmpty()) Text(
+                subtitle,
+                color = if (error) Color(0xFFFCA5A5) else Color(0x80FFFFFF),
+                fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
         }
         when {
             loading -> CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-            active -> Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            error -> Icon(Icons.Default.Close, contentDescription = "Failed", tint = Color(0xFFF87171), modifier = Modifier.size(18.dp))
+            active -> Icon(Icons.Default.Check, contentDescription = "Active", tint = Color(0xFF30D158), modifier = Modifier.size(18.dp))
         }
     }
 }
