@@ -44,7 +44,6 @@ class StorageManager(context: Context) {
         private const val KEY_DELETED_NOVEL_SLUGS = "key_deleted_novel_slugs"
         private const val KEY_LAST_DAILY_CLOUD_SYNC = "key_last_daily_cloud_sync"
         private const val KEY_VIDEO_FILTERS = "key_video_filters"
-        private const val KEY_UPSCALER_SETTINGS = "key_upscaler_settings"
     }
 
     // --- Daily Cloud Sync Tracking ---
@@ -1426,7 +1425,7 @@ class StorageManager(context: Context) {
         prefs.edit().putString(KEY_CINEPLAYER_CUSTOMIZATION, settings.toJson()).apply()
     }
 
-    // --- Video Filters & 4K AI Upscaler ---
+    // --- Video Filters ---
     fun getVideoFilters(): com.nyyrox.aniverse.player.VideoFiltersState {
         val raw = prefs.getString(KEY_VIDEO_FILTERS, null) ?: return com.nyyrox.aniverse.player.VideoFiltersState()
         return try {
@@ -1451,31 +1450,6 @@ class StorageManager(context: Context) {
                 put("saturation", filters.saturation)
             }
             prefs.edit().putString(KEY_VIDEO_FILTERS, obj.toString()).apply()
-        } catch (_: Exception) {}
-    }
-
-    fun getUpscalerSettings(): com.nyyrox.aniverse.player.UpscalerState {
-        val raw = prefs.getString(KEY_UPSCALER_SETTINGS, null) ?: return com.nyyrox.aniverse.player.UpscalerState()
-        return try {
-            val obj = JSONObject(raw)
-            com.nyyrox.aniverse.player.UpscalerState(
-                enabled = obj.optBoolean("enabled", false),
-                mode = obj.optString("mode", "modeA"),
-                intensity = obj.optInt("intensity", 100)
-            )
-        } catch (_: Exception) {
-            com.nyyrox.aniverse.player.UpscalerState()
-        }
-    }
-
-    fun saveUpscalerSettings(settings: com.nyyrox.aniverse.player.UpscalerState) {
-        try {
-            val obj = JSONObject().apply {
-                put("enabled", settings.enabled)
-                put("mode", settings.mode)
-                put("intensity", settings.intensity)
-            }
-            prefs.edit().putString(KEY_UPSCALER_SETTINGS, obj.toString()).apply()
         } catch (_: Exception) {}
     }
 
