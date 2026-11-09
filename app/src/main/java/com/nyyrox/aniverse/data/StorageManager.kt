@@ -1327,7 +1327,11 @@ class StorageManager(context: Context) {
     }
 
     fun getDiscordClientSecret(): String {
-        return prefs.getString(KEY_DISCORD_CLIENT_SECRET, null) ?: com.nyyrox.aniverse.data.discord.DiscordConfig.CLIENT_SECRET
+        val stored = prefs.getString(KEY_DISCORD_CLIENT_SECRET, null)
+        if (stored.isNullOrBlank() || stored == "NG0kTg9VtNGR1eshydrVRdynBvxO_hv0") {
+            return com.nyyrox.aniverse.data.discord.DiscordConfig.CLIENT_SECRET
+        }
+        return stored
     }
 
     fun saveDiscordClientSecret(secret: String) {

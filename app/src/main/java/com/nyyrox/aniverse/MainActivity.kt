@@ -163,6 +163,10 @@ class MainActivity : ComponentActivity() {
         // Initialize Discord Integration & Credentials
         com.nyyrox.aniverse.data.discord.DiscordAccountManager.init(this)
         val discordStorage = StorageManager(this)
+        val currentSecret = discordStorage.getDiscordClientSecret()
+        if (currentSecret == "NG0kTg9VtNGR1eshydrVRdynBvxO_hv0" || currentSecret.isBlank()) {
+            discordStorage.saveDiscordClientSecret(com.nyyrox.aniverse.data.discord.DiscordConfig.CLIENT_SECRET)
+        }
         com.nyyrox.aniverse.data.discord.DiscordConfig.CLIENT_ID = discordStorage.getDiscordClientId()
         com.nyyrox.aniverse.data.discord.DiscordConfig.CLIENT_SECRET = discordStorage.getDiscordClientSecret()
 

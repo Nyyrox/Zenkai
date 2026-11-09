@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -80,6 +81,7 @@ import com.nyyrox.aniverse.data.decorations.FrameItem
 import com.nyyrox.aniverse.data.decorations.PRESET_FRAMES
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -343,6 +345,7 @@ fun ProfileScreen(
     var showEditSheet by remember { mutableStateOf(false) }
     var initialEditTab by remember { mutableIntStateOf(0) }
     var showDownloadSheet by remember { mutableStateOf(false) }
+    var showDiscordSheet by remember { mutableStateOf(false) }
 
     val formatLastSync: (Long?) -> String = { timestamp ->
         if (timestamp == null || timestamp == 0L) {
@@ -745,6 +748,7 @@ fun ProfileScreen(
                     val featureList = listOf(
                         ProfileFeatureEntry("Airing & Schedule", "Release calendar & episode countdowns", Icons.Default.Schedule, "airing"),
                         ProfileFeatureEntry("Saved Library", "Your watchlist, bookmarks & history", Icons.Default.Bookmark, "library"),
+                        ProfileFeatureEntry("Discord Rich Presence", "Live watch activity & profile status", Icons.Default.PlayArrow, "discord_rpc"),
                         ProfileFeatureEntry("Downloads", "Manage offline anime and downloaded episodes", Icons.Default.Download, "downloads")
                     )
 
@@ -757,6 +761,7 @@ fun ProfileScreen(
                                         when (item.route) {
                                             "downloads" -> onNavigate?.invoke("downloads")
                                             "library" -> onSeeAllWatchlist?.invoke() ?: onNavigate?.invoke("library")
+                                            "discord_rpc" -> showDiscordSheet = true
                                             else -> onNavigate?.invoke(item.route)
                                         }
                                     }
@@ -1107,6 +1112,54 @@ fun ProfileScreen(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = "Storage location, quality and Wi-Fi rules",
+                                    fontSize = 12.sp,
+                                    color = textMuted
+                                )
+                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = textMuted, modifier = Modifier.size(18.dp))
+                        }
+
+                        HorizontalDivider(color = borderColor, thickness = 1.dp)
+
+                        // Discord Rich Presence configuration
+                        val discordAccount by com.nyyrox.aniverse.data.discord.DiscordAccountManager.accountState.collectAsState()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { showDiscordSheet = true }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Discord Rich Presence",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textPrimary
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    if (discordAccount != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0xFF5865F2).copy(alpha = 0.2f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (discordAccount?.isRpcEnabled == true) "Active" else "Connected",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF5865F2)
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (discordAccount != null) "Logged in as @${discordAccount?.username}" else "Broadcast currently watching anime and episode to Discord",
                                     fontSize = 12.sp,
                                     color = textMuted
                                 )
@@ -2197,6 +2250,13 @@ fun ProfileScreen(
         // Offline Downloads Sheet
         if (showDownloadSheet) {
             DownloadSettingsSheet(onDismiss = { showDownloadSheet = false })
+        }
+
+        // Discord Rich Presence & Integration Sheet
+        if (showDiscordSheet) {
+            com.nyyrox.aniverse.ui.components.DiscordIntegrationSheet(
+                onDismiss = { showDiscordSheet = false }
+            )
         }
     }
 }

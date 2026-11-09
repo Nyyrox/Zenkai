@@ -8,7 +8,7 @@ object DiscordConfig {
     var CLIENT_ID: String = "1553084962943672390"
 
     @Volatile
-    var CLIENT_SECRET: String = "NG0kTg9VtNGR1eshydrVRdynBvxO_hv0"
+    var CLIENT_SECRET: String = "XwmSTSS9Y8nSrEmHcUqM4hv3FwkgX-hV"
 
     @Volatile
     var BOT_TOKEN: String = "MTU1MzA4NDk2Mjk0MzY3MjM5MA.GP9OAQ.cmEDQjvJiZtLY-Kxw7mbF7V7rdmozT7tuTpMzw"
