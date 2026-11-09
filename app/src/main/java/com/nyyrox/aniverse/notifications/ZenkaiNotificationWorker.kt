@@ -25,8 +25,7 @@ class ZenkaiNotificationWorker(
     override suspend fun doWork(): Result {
         return try {
             val client = SupabaseManager.client
-            val currentUserId = client.auth.currentUserOrNull()?.id
-                ?: com.nyyrox.aniverse.data.StorageManager(applicationContext).getUserProfile().id
+            val currentUserId = client.auth.currentUserOrNull()?.id ?: return Result.success()
 
             val notifications = repository.fetchNotifications(currentUserId)
             if (notifications.isEmpty()) {
@@ -34,26 +33,19 @@ class ZenkaiNotificationWorker(
             }
 
             val prefs = applicationContext.getSharedPreferences("zenkai_notifs_cache", Context.MODE_PRIVATE)
-            val notifiedIds = prefs.getStringSet("notified_ids", emptySet()) ?: emptySet()
-            val newNotifiedIds = notifiedIds.toMutableSet()
-
             var newlyShown = 0
             for (notif in notifications) {
                 val forMe = notif.userId == null || notif.userId == currentUserId
-                // Only notify for unread notifications that have not yet been posted to status bar
-                if (forMe && !notif.isRead && !notifiedIds.contains(notif.id)) {
-                    // Don't notify if the notification is from the user themselves
+                val isAlreadyNotified = prefs.getBoolean("notified_${notif.id}", false)
+                if (forMe && !notif.isRead && !isAlreadyNotified) {
                     if (currentUserId.isNullOrBlank() || notif.senderId != currentUserId) {
+                        prefs.edit().putBoolean("notified_${notif.id}", true).commit()
                         ZenkaiNotificationHelper.showNotification(applicationContext, notif)
-                        newNotifiedIds.add(notif.id)
                         newlyShown++
                         if (newlyShown >= 5) break // Cap per background cycle
                     }
                 }
             }
-
-            // Save updated set
-            prefs.edit().putStringSet("notified_ids", newNotifiedIds).apply()
 
             Result.success()
         } catch (e: Exception) {

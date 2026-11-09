@@ -22,14 +22,6 @@
           }
         },
         {
-          "client_id": "291033138118-1in0dcf3tbn4qvlrpau5n3ftgcqjcf0b.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.nyyrox.aniverse",
-            "certificate_hash": "95ecf845d0fc07d7351d914f77fbee5bd369757c"
-          }
-        },
-        {
           "client_id": "762562909877-ensgo6bk5nhjn8l8alp8sdn6b2h56k6p.apps.googleusercontent.com",
           "client_type": 3
         }

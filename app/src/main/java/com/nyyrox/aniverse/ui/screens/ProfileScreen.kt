@@ -46,7 +46,6 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Forum
@@ -744,7 +743,6 @@ fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
 
                     val featureList = listOf(
-                        ProfileFeatureEntry("Movies & TV", "Browse anime movies, series, OVAs & specials", Icons.Default.Movie, "movies"),
                         ProfileFeatureEntry("Airing & Schedule", "Release calendar & episode countdowns", Icons.Default.Schedule, "airing"),
                         ProfileFeatureEntry("Saved Library", "Your watchlist, bookmarks & history", Icons.Default.Bookmark, "library"),
                         ProfileFeatureEntry("Downloads", "Manage offline anime and downloaded episodes", Icons.Default.Download, "downloads")

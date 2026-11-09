@@ -46,6 +46,15 @@ object ZenkaiNotificationHelper {
 
     suspend fun showNotification(context: Context, notification: AppNotification) {
         try {
+            // Strictly enforce show-once per notification ID across APK restarts
+            if (notification.id.isNotBlank() && !notification.id.startsWith("test_")) {
+                val prefs = context.getSharedPreferences("zenkai_notifs_cache", Context.MODE_PRIVATE)
+                if (prefs.getBoolean("notified_${notification.id}", false)) {
+                    return
+                }
+                prefs.edit().putBoolean("notified_${notification.id}", true).commit()
+            }
+
             createNotificationChannel(context)
 
             val notificationManagerCompat = NotificationManagerCompat.from(context)

@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
     var keepSplash = true
     splashScreen.setKeepOnScreenCondition { keepSplash }
     super.onCreate(savedInstanceState)
+    com.nyyrox.aniverse.data.supabase.SupabaseManager.init(this)
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     window.decorView.postDelayed({ keepSplash = false }, 250)
     enableEdgeToEdge()
@@ -228,6 +229,8 @@ class MainActivity : ComponentActivity() {
         } else if (!initialRouteExtra.isNullOrBlank()) {
             if ((initialRouteExtra == "direct_chat" || initialRouteExtra == "dm") && !initialPartnerId.isNullOrBlank()) {
                 "zenkai://direct_chat/$initialPartnerId"
+            } else if (initialRouteExtra == "notifications" && !intent?.getStringExtra("notification_id").isNullOrBlank()) {
+                "zenkai://notifications:${intent?.getStringExtra("notification_id")}"
             } else {
                 "zenkai://$initialRouteExtra"
             }
@@ -274,6 +277,8 @@ class MainActivity : ComponentActivity() {
         } else if (!routeExtra.isNullOrBlank()) {
             if ((routeExtra == "direct_chat" || routeExtra == "dm") && !partnerId.isNullOrBlank()) {
                 "zenkai://direct_chat/$partnerId"
+            } else if (routeExtra == "notifications" && !intent.getStringExtra("notification_id").isNullOrBlank()) {
+                "zenkai://notifications:${intent.getStringExtra("notification_id")}"
             } else {
                 "zenkai://$routeExtra"
             }

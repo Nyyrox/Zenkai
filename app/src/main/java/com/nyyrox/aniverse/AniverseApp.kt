@@ -1,5 +1,34 @@
 package com.nyyrox.aniverse
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -422,7 +451,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     deepLinkUri.startsWith("detail:") || deepLinkUri.startsWith("manga_detail:") ||
                     deepLinkUri.startsWith("novel_detail:") || deepLinkUri.startsWith("direct_chat:") ||
                     deepLinkUri.startsWith("player:") -> deepLinkUri
-                    deepLinkUri == "community" || deepLinkUri == "notifications" || deepLinkUri == "downloads" -> deepLinkUri
+                    deepLinkUri == "community" || deepLinkUri == "notifications" || deepLinkUri.startsWith("notifications:") || deepLinkUri == "downloads" -> deepLinkUri
                     deepLinkUri == "profile" -> {
                         switchTab("profile")
                         null
@@ -578,9 +607,11 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
-                                screen == "notifications" -> {
+                                screen == "notifications" || screen.startsWith("notifications:") -> {
+                                    val notifId = screen.removePrefix("notifications:").takeIf { it != "notifications" && it.isNotBlank() }
                                     NotificationScreen(
                                         vm = vm,
+                                        initialNotificationId = notifId,
                                         onBack = { pop() },
                                         onNavigateToCommunity = { _ ->
                                             push("discord_hub")
@@ -962,20 +993,35 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                         )
                     }
 
-                    // Dedicated Circular Profile Button pinned at top-right
+                    // Dedicated Circular Notification and Profile Buttons pinned at top-right
                     if (isRootRoute && currentRoute != "profile" && currentRoute != "browse") {
-                        OttProfileBubble(
-                            p = rememberHomePalette(),
-                            avatarUrl = vm.userProfile.avatarUrl,
-                            decorationId = vm.userProfile.avatarDecorationId,
-                            frameId = vm.userProfile.avatarFrameId,
-                            onClick = { switchTab("profile") },
-                            size = 40.dp,
+                        Row(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .statusBarsPadding()
-                                .padding(end = 16.dp, top = 8.dp)
-                        )
+                                .padding(end = 16.dp, top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OttDownloadBubble(
+                                vm = vm,
+                                p = rememberHomePalette(),
+                                onClick = { push("downloads") }
+                            )
+                            OttNotificationBubble(
+                                p = rememberHomePalette(),
+                                unreadCount = vm.unreadNotificationsCount,
+                                onClick = { push("notifications") }
+                            )
+                            OttProfileBubble(
+                                p = rememberHomePalette(),
+                                avatarUrl = vm.userProfile.avatarUrl,
+                                decorationId = vm.userProfile.avatarDecorationId,
+                                frameId = vm.userProfile.avatarFrameId,
+                                onClick = { switchTab("profile") },
+                                size = 40.dp
+                            )
+                        }
                     }
 
                     // Compulsory username setup overlay for logged in users who do not have a username yet
@@ -998,4 +1044,199 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
         }
     }
 }
+}
+
+
+@Composable
+private fun OttNotificationBubble(
+    p: com.nyyrox.aniverse.ui.screens.HomePalette,
+    unreadCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 40.dp
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "notifBubblePress"
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(p.flatFill)
+                .border(1.dp, p.glassBorder, androidx.compose.foundation.shape.CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Notifications,
+                contentDescription = "Notifications",
+                tint = if (unreadCount > 0) Color.White else p.textMuted,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        if (unreadCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(16.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Color(0xFFE11D48)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (unreadCount > 9) "9+" else unreadCount.toString(),
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun OttDownloadBubble(
+    vm: MainViewModel,
+    p: com.nyyrox.aniverse.ui.screens.HomePalette,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val allTasks by vm.downloadManager.tasks.collectAsState()
+    val activeTasks = remember(allTasks) {
+        allTasks.filter {
+            it.status == com.nyyrox.aniverse.data.download.DownloadStatus.DOWNLOADING ||
+            it.status == com.nyyrox.aniverse.data.download.DownloadStatus.QUEUED
+        }
+    }
+    val isDownloading = activeTasks.isNotEmpty()
+
+    val rawProgress = remember(activeTasks) {
+        if (activeTasks.isEmpty()) 0f
+        else {
+            val downloading = activeTasks.filter { it.status == com.nyyrox.aniverse.data.download.DownloadStatus.DOWNLOADING }
+            if (downloading.isNotEmpty()) {
+                downloading.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
+            } else {
+                activeTasks.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
+            }
+        }
+    }
+
+    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = rawProgress,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "dlBubbleProgress"
+    )
+    val percent = (animatedProgress * 100).toInt().coerceIn(0, 100)
+
+    val targetWidth = if (isDownloading) 72.dp else 40.dp
+    val animatedWidth by androidx.compose.animation.core.animateDpAsState(
+        targetValue = targetWidth,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "dlBubbleWidth"
+    )
+
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "dlPulse")
+    val pulseY by infiniteTransition.animateFloat(
+        initialValue = -2.5f,
+        targetValue = 2.5f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "dlArrowPulse"
+    )
+
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "dlBubblePress"
+    )
+
+    Box(
+        modifier = modifier
+            .height(40.dp)
+            .width(animatedWidth)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(p.flatFill)
+            .border(
+                width = 1.dp,
+                color = if (isDownloading) Color(0xFF38BDF8).copy(alpha = 0.6f) else p.glassBorder,
+                shape = androidx.compose.foundation.shape.CircleShape
+            )
+            .clickable(interactionSource = source, indication = null) {
+                com.nyyrox.aniverse.util.AppHaptics.tick(context)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (isDownloading) {
+            Row(
+                modifier = Modifier.padding(horizontal = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        progress = { animatedProgress.coerceIn(0.05f, 1f) },
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color(0xFF38BDF8),
+                        strokeWidth = 2.dp,
+                        trackColor = Color(0x3338BDF8)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDownward,
+                        contentDescription = null,
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier
+                            .size(11.dp)
+                            .graphicsLayer { translationY = pulseY }
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "$percent%",
+                    color = Color(0xFF38BDF8),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Default.Download,
+                contentDescription = "Downloads",
+                tint = p.textMuted,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
 }

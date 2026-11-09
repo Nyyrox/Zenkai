@@ -151,7 +151,12 @@ fun LoginScreen(
         } catch (e: ApiException) {
             isGoogleSigningIn = false
             if (e.statusCode != 12501 && e.statusCode != 12502) {
-                vm.handleGoogleSignInError("Google sign in failed (code ${e.statusCode})")
+                if (e.statusCode == 10) {
+                    android.util.Log.d("LoginScreen", "Google Play Services code 10. Direct browser fallback.")
+                    vm.signInWithGoogle()
+                } else {
+                    vm.handleGoogleSignInError("Google sign in failed (code ${e.statusCode})")
+                }
             }
         } catch (e: Exception) {
             isGoogleSigningIn = false
@@ -433,7 +438,20 @@ fun LoginScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Or Sign In via Browser (Direct Google OAuth)",
+                        color = Color(0xFF60A5FA),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clickable {
+                                isGoogleSigningIn = true
+                                vm.signInWithGoogle()
+                            }
+                            .padding(vertical = 4.dp, horizontal = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Discord OAuth Button: Frosted Glass with Loading Animation
                     val isDiscordLoading = showDiscordLoginModal

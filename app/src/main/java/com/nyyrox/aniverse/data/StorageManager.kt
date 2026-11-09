@@ -555,7 +555,7 @@ class StorageManager(context: Context) {
         durationMs: Long,
         episodeStill: String? = null
     ) {
-        if (isHistoryDeleted(animeId)) return
+        unmarkHistoryDeleted(animeId)
         val history = getHistory().toMutableList()
         val index = history.indexOfFirst { it.animeId == animeId }
         val existingItem = if (index >= 0) history[index] else null
@@ -1041,40 +1041,47 @@ class StorageManager(context: Context) {
     }
 
     // --- User Profile ---
+    private fun JSONObject.optNonEmptyString(key: String): String? {
+        if (!has(key) || isNull(key)) return null
+        val s = optString(key)
+        return if (s.isBlank() || s.equals("null", ignoreCase = true) || s.equals("undefined", ignoreCase = true)) null else s
+    }
+
     fun getUserProfile(): UserProfile {
         val raw = prefs.getString(KEY_USER_PROFILE, null) ?: return UserProfile()
         return try {
             val obj = JSONObject(raw)
+            val loadedId = obj.optNonEmptyString("id")?.takeIf { it != "guest" }
             UserProfile(
-                id = obj.optString("id").takeIf { it.isNotBlank() },
-                email = obj.optString("email").takeIf { it.isNotBlank() },
-                avatarUrl = obj.optString("avatarUrl", ""),
-                bannerUrl = obj.optString("bannerUrl", ""),
-                displayName = obj.optString("displayName", "Guest"),
-                username = obj.optString("username", ""),
-                bio = obj.optString("bio", ""),
-                bioFont = obj.optString("bioFont", "default"),
-                favoriteAnime = obj.optString("favoriteAnime", ""),
-                otakuRank = obj.optString("otakuRank", "Genin"),
+                id = loadedId,
+                email = obj.optNonEmptyString("email"),
+                avatarUrl = obj.optNonEmptyString("avatarUrl") ?: "",
+                bannerUrl = obj.optNonEmptyString("bannerUrl") ?: "",
+                displayName = obj.optNonEmptyString("displayName") ?: "Guest",
+                username = obj.optNonEmptyString("username") ?: "",
+                bio = obj.optNonEmptyString("bio") ?: "",
+                bioFont = obj.optNonEmptyString("bioFont") ?: "default",
+                favoriteAnime = obj.optNonEmptyString("favoriteAnime") ?: "",
+                otakuRank = obj.optNonEmptyString("otakuRank") ?: "Genin",
                 isAdmin = obj.optBoolean("isAdmin", false),
-                role = obj.optString("role", "USER").takeIf { it.isNotBlank() },
+                role = obj.optNonEmptyString("role") ?: "USER",
                 roles = obj.optJSONArray("roles")?.let { arr ->
-                    (0 until arr.length()).mapNotNull { idx -> arr.optString(idx).takeIf { it.isNotBlank() } }
+                    (0 until arr.length()).mapNotNull { idx -> arr.optString(idx).takeIf { it.isNotBlank() && it != "null" } }
                 } ?: (if (obj.optBoolean("isAdmin", false)) listOf("ADMIN") else emptyList()),
-                customTag = obj.optString("customTag", "").takeIf { it.isNotBlank() },
-                avatarDecorationId = obj.optString("avatarDecorationId", "").takeIf { it.isNotBlank() },
-                avatarFrameId = obj.optString("avatarFrameId", "").takeIf { it.isNotBlank() },
-                textEffectId = obj.optString("textEffectId", "").takeIf { it.isNotBlank() },
-                profileEffectId = obj.optString("profileEffectId", "").takeIf { it.isNotBlank() },
-                bannerThemeId = obj.optString("bannerThemeId", "").takeIf { it.isNotBlank() },
-                nameplateId = obj.optString("nameplateId", "").takeIf { it.isNotBlank() },
-                nameplateEmoji = obj.optString("nameplateEmoji", "").takeIf { it.isNotBlank() },
+                customTag = obj.optNonEmptyString("customTag"),
+                avatarDecorationId = obj.optNonEmptyString("avatarDecorationId"),
+                avatarFrameId = obj.optNonEmptyString("avatarFrameId"),
+                textEffectId = obj.optNonEmptyString("textEffectId"),
+                profileEffectId = obj.optNonEmptyString("profileEffectId"),
+                bannerThemeId = obj.optNonEmptyString("bannerThemeId"),
+                nameplateId = obj.optNonEmptyString("nameplateId"),
+                nameplateEmoji = obj.optNonEmptyString("nameplateEmoji"),
                 exp = obj.optLong("exp", 0L),
                 level = obj.optInt("level", 1).coerceAtLeast(1),
                 streakCount = obj.optInt("streakCount", 1).coerceAtLeast(1),
                 longestStreak = obj.optInt("longestStreak", 1).coerceAtLeast(1),
-                lastActiveDate = obj.optString("lastActiveDate", "").takeIf { it.isNotBlank() },
-                bannerEffectId = obj.optString("bannerEffectId", "none"),
+                lastActiveDate = obj.optNonEmptyString("lastActiveDate"),
+                bannerEffectId = obj.optNonEmptyString("bannerEffectId") ?: "none",
                 isWatchlistPrivate = obj.optBoolean("isWatchlistPrivate", false),
                 isWatchHistoryPrivate = obj.optBoolean("isWatchHistoryPrivate", false),
                 isMangaPrivate = obj.optBoolean("isMangaPrivate", false),
@@ -1087,8 +1094,12 @@ class StorageManager(context: Context) {
 
     fun saveUserProfile(profile: UserProfile) {
         val obj = JSONObject().apply {
-            put("id", profile.id ?: JSONObject.NULL)
-            put("email", profile.email ?: JSONObject.NULL)
+            if (!profile.id.isNullOrBlank() && profile.id != "null" && profile.id != "guest") {
+                put("id", profile.id)
+            }
+            if (!profile.email.isNullOrBlank() && profile.email != "null") {
+                put("email", profile.email)
+            }
             put("avatarUrl", profile.avatarUrl)
             put("bannerUrl", profile.bannerUrl)
             put("displayName", profile.displayName)
@@ -1098,21 +1109,21 @@ class StorageManager(context: Context) {
             put("favoriteAnime", profile.favoriteAnime)
             put("otakuRank", profile.otakuRank)
             put("isAdmin", profile.isAdmin)
-            put("role", profile.role ?: JSONObject.NULL)
+            profile.role?.takeIf { it.isNotBlank() && it != "null" }?.let { put("role", it) }
             put("roles", org.json.JSONArray(profile.roles))
-            put("customTag", profile.customTag ?: JSONObject.NULL)
-            put("avatarDecorationId", profile.avatarDecorationId ?: JSONObject.NULL)
-            put("avatarFrameId", profile.avatarFrameId ?: JSONObject.NULL)
-            put("textEffectId", profile.textEffectId ?: JSONObject.NULL)
-            put("profileEffectId", profile.profileEffectId ?: JSONObject.NULL)
-            put("bannerThemeId", profile.bannerThemeId ?: JSONObject.NULL)
-            put("nameplateId", profile.nameplateId ?: JSONObject.NULL)
-            put("nameplateEmoji", profile.nameplateEmoji ?: JSONObject.NULL)
+            profile.customTag?.takeIf { it.isNotBlank() && it != "null" }?.let { put("customTag", it) }
+            profile.avatarDecorationId?.takeIf { it.isNotBlank() && it != "null" }?.let { put("avatarDecorationId", it) }
+            profile.avatarFrameId?.takeIf { it.isNotBlank() && it != "null" }?.let { put("avatarFrameId", it) }
+            profile.textEffectId?.takeIf { it.isNotBlank() && it != "null" }?.let { put("textEffectId", it) }
+            profile.profileEffectId?.takeIf { it.isNotBlank() && it != "null" }?.let { put("profileEffectId", it) }
+            profile.bannerThemeId?.takeIf { it.isNotBlank() && it != "null" }?.let { put("bannerThemeId", it) }
+            profile.nameplateId?.takeIf { it.isNotBlank() && it != "null" }?.let { put("nameplateId", it) }
+            profile.nameplateEmoji?.takeIf { it.isNotBlank() && it != "null" }?.let { put("nameplateEmoji", it) }
             put("exp", profile.exp)
             put("level", profile.level)
             put("streakCount", profile.streakCount)
             put("longestStreak", profile.longestStreak)
-            put("lastActiveDate", profile.lastActiveDate ?: JSONObject.NULL)
+            profile.lastActiveDate?.takeIf { it.isNotBlank() && it != "null" }?.let { put("lastActiveDate", it) }
             put("bannerEffectId", profile.bannerEffectId)
             put("isWatchlistPrivate", profile.isWatchlistPrivate)
             put("isWatchHistoryPrivate", profile.isWatchHistoryPrivate)

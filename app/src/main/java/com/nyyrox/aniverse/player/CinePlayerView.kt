@@ -3445,19 +3445,20 @@ CxPillIcon(
                                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                                     val rightBtnSize = if (glassCompact) 36.dp else 42.dp
                                     val rightIconSize = if (glassCompact) 18.dp else 21.dp
-                            // Fullscreen
+                            // Speed Button
                             CxActionButton(
                                 size = rightBtnSize,
                                 onClick = {
                                     showControls = true
                                     controlsTimeoutKey++
-                                    onToggleFullscreen()
+                                    activeSettingsTab = PlayerSettingsTab.SPEED
+                                    showPlayerSettingsModal = true
                                 }
                             ) {
                                 Icon(
-                                    imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
-                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
-                                    tint = Color.White,
+                                    imageVector = Icons.Outlined.Speed,
+                                    contentDescription = "Playback Speed",
+                                    tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
                                     modifier = Modifier.size(rightIconSize)
                                 )
                             }
@@ -3499,20 +3500,19 @@ CxPillIcon(
                                 )
                             }
 
-                            // Speed Button
+                            // Fullscreen
                             CxActionButton(
                                 size = rightBtnSize,
                                 onClick = {
                                     showControls = true
                                     controlsTimeoutKey++
-                                    activeSettingsTab = PlayerSettingsTab.SPEED
-                                    showPlayerSettingsModal = true
+                                    onToggleFullscreen()
                                 }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Speed,
-                                    contentDescription = "Playback Speed",
-                                    tint = if (playbackSpeed != 1.0f) playerCustomization.accentColor.color else Color.White,
+                                    imageVector = if (isFullscreen) playerCustomization.themePack.exitFullscreenIcon else playerCustomization.themePack.fullscreenIcon,
+                                    contentDescription = if (isFullscreen) "Exit Fullscreen" else "Fullscreen",
+                                    tint = Color.White,
                                     modifier = Modifier.size(rightIconSize)
                                 )
                             }

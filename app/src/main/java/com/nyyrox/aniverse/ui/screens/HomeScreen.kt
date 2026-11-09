@@ -1,5 +1,7 @@
 package com.nyyrox.aniverse.ui.screens
 
+import com.nyyrox.aniverse.data.supabase.AuthState
+
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.Orientation
@@ -85,6 +87,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -1218,12 +1222,30 @@ fun HomeScreen(
     onNovelReadClick: (novelSlug: String, chapterSlug: String) -> Unit = { _, _ -> },
     onDownloadsClick: () -> Unit = {}
 ) {
+    val isOnline = com.nyyrox.aniverse.util.rememberIsNetworkConnected()
+
+    LaunchedEffect(isOnline) {
+        if (isOnline && (vm.trending.isEmpty() || vm.homeError != null)) {
+            vm.loadHome()
+        }
+    }
+
     LaunchedEffect(Unit) {
+        if (vm.authState is AuthState.LoggedIn) {
+            vm.pullFromCloud()
+        }
         if (vm.mangaHome.trending.isEmpty() && vm.mangaHome.latest.isEmpty()) {
             vm.loadMangaHome()
         }
         if (vm.novelPopular.isEmpty() && vm.novelRankings.isEmpty()) {
             vm.loadNovelHome()
+        }
+    }
+
+    LaunchedEffect(vm.authState) {
+        if (vm.authState is AuthState.LoggedIn) {
+            vm.pullFromCloud()
+            vm.loadNotifications(isSilent = true)
         }
     }
 
@@ -1235,7 +1257,7 @@ fun HomeScreen(
             return@Box
         }
 
-        if (vm.trending.isEmpty() && vm.popular.isEmpty() && (vm.homeError != null || !vm.homeLoading)) {
+        if (!isOnline || (vm.trending.isEmpty() && vm.popular.isEmpty() && (vm.homeError != null || !vm.homeLoading))) {
             OfflineHomeScreenContent(
                 vm = vm,
                 onAnimeClick = onAnimeClick,
@@ -1601,21 +1623,46 @@ fun OfflineHomeScreenContent(
 
             item(key = "offline_status") {
                 Column(Modifier.fillMaxWidth().padding(horizontal = OfflineMargin)) {
-                    Text("OFFLINE", color = p.accentText, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
-                    Spacer(Modifier.height(6.dp))
-                    Text("You're offline", color = p.text, fontSize = 30.sp, fontWeight = FontWeight.Black)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x22F43F5E)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.WifiOff,
+                                contentDescription = null,
+                                tint = Color(0xFFF43F5E),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Text("OFFLINE MODE", color = Color(0xFFF43F5E), fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.3.sp)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text("No Internet Connection", color = p.text, fontSize = 28.sp, fontWeight = FontWeight.Black)
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = if (totalDownloadsCount > 0) {
-                            "No connection, but your library is ready. Everything below plays and reads without internet."
+                            "Your data or Wi-Fi is currently off. Let's move to your Downloads to watch your saved anime offline!"
                         } else {
-                            "No internet connection detected. Connect to Wi-Fi or mobile data to explore trending shows, or browse your downloaded library."
+                            "Your data or Wi-Fi is currently off. Connect to Wi-Fi or mobile data to explore trending shows, or browse your downloaded library."
                         },
-                        color = p.textSub, fontSize = 14.sp, lineHeight = 20.sp
+                        color = p.textSub, fontSize = 14.sp, lineHeight = 21.sp
                     )
 
+                    Spacer(Modifier.height(20.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        GradientPill("Let's Move to Downloads", Icons.Default.Download, p, onDownloadsClick)
+                        GlassPill("Retry", Icons.Default.Refresh, p, { vm.loadHome() })
+                    }
+
                     if (totalDownloadsCount > 0) {
-                        Spacer(Modifier.height(20.dp))
+                        Spacer(Modifier.height(24.dp))
                         Row(Modifier.fillMaxWidth()) {
                             OfflineStat(downloadedAnime.size.toString(), "Anime", p)
                             OfflineStat(downloadedManga.size.toString(), "Manga", p)
@@ -1641,12 +1688,6 @@ fun OfflineHomeScreenContent(
                                 if (novelBytes > 0L) Box(Modifier.weight(novelBytes.toFloat()).fillMaxHeight().background(p.text.copy(alpha = 0.3f)))
                             }
                         }
-                    }
-
-                    Spacer(Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        GradientPill("Open Downloads", Icons.Default.Storage, p, onDownloadsClick)
-                        GlassPill("Retry", Icons.Default.Refresh, p, { vm.loadHome() })
                     }
                 }
             }

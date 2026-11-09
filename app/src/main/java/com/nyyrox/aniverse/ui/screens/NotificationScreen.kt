@@ -1,5 +1,9 @@
 package com.nyyrox.aniverse.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,60 +25,33 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Forum
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,34 +61,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
-import com.nyyrox.aniverse.data.supabase.AdminUserSearchResult
 import com.nyyrox.aniverse.data.supabase.AppNotification
 import com.nyyrox.aniverse.data.supabase.AuthState
 import com.nyyrox.aniverse.ui.components.decorations.AvatarDecorationRenderer
-import com.nyyrox.aniverse.ui.components.decorations.RoleBadgeRow
-import com.nyyrox.aniverse.ui.theme.OttAccentGold
 import com.nyyrox.aniverse.ui.theme.OttBg
-import com.nyyrox.aniverse.ui.theme.OttCardShape
 import com.nyyrox.aniverse.ui.theme.OttPillShape
 import com.nyyrox.aniverse.ui.theme.OttPrimary
-import com.nyyrox.aniverse.ui.theme.OttSurface
-import com.nyyrox.aniverse.ui.theme.OttSurfaceBorder
 import com.nyyrox.aniverse.ui.theme.OttTextMuted
-import com.nyyrox.aniverse.ui.theme.OttTextSecondary
 import com.nyyrox.aniverse.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
 fun handleNotificationUrl(
-    context: android.content.Context,
+    context: Context,
     rawUrl: String,
     onNavigate: (String) -> Unit,
     onNavigateToCommunity: (String) -> Unit,
@@ -151,7 +123,7 @@ fun handleNotificationUrl(
 
     // 3. Raw route names
     when {
-        trimmed.startsWith("detail:") || trimmed.startsWith("manga_detail:") || 
+        trimmed.startsWith("detail:") || trimmed.startsWith("manga_detail:") ||
         trimmed.startsWith("novel_detail:") || trimmed.startsWith("direct_chat:") -> {
             onNavigate(trimmed)
             return
@@ -189,14 +161,15 @@ fun handleNotificationUrl(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
-    } catch (e: Exception) {
-        android.widget.Toast.makeText(context, "Cannot open link: $trimmed", android.widget.Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {
+        Toast.makeText(context, "Cannot open link: $trimmed", Toast.LENGTH_SHORT).show()
     }
 }
 
 @Composable
 fun NotificationScreen(
     vm: MainViewModel,
+    initialNotificationId: String? = null,
     onBack: () -> Unit,
     onNavigateToCommunity: (String) -> Unit = {},
     onNavigateToDirectChat: (String) -> Unit = {},
@@ -205,31 +178,24 @@ fun NotificationScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val myProfile = vm.userProfile
     val isLoggedIn = vm.authState is AuthState.LoggedIn
-    val currentUserId = (vm.authState as? AuthState.LoggedIn)?.userId
 
-    val isCurrentUserAdmin = myProfile?.role == "ADMIN" || myProfile?.role == "OWNER" ||
-            myProfile?.roles?.contains("ADMIN") == true || myProfile?.roles?.contains("OWNER") == true ||
-            myProfile?.roles?.contains("MODERATOR") == true ||
-            myProfile?.isAdmin == true
-
-    var selectedTab by remember { mutableIntStateOf(0) }
     var selectedNotificationForDetails by remember { mutableStateOf<AppNotification?>(null) }
-    val tabTitles = remember(isCurrentUserAdmin) {
-        if (isCurrentUserAdmin) listOf("Personal", "Global", "Admin Dispatch") else listOf("Personal", "Global")
-    }
 
     LaunchedEffect(Unit) {
         vm.loadNotifications()
     }
 
     val allNotifs = vm.notifications
-    val personalNotifs = remember(allNotifs, currentUserId) {
-        allNotifs.filter { it.userId != null && it.userId == currentUserId }
-    }
-    val globalNotifs = remember(allNotifs) {
-        allNotifs.filter { it.userId == null }
+
+    LaunchedEffect(initialNotificationId, allNotifs) {
+        if (!initialNotificationId.isNullOrBlank() && selectedNotificationForDetails == null) {
+            val match = allNotifs.firstOrNull { it.id == initialNotificationId }
+            if (match != null) {
+                if (!match.isRead) vm.markNotificationAsRead(match.id)
+                selectedNotificationForDetails = match
+            }
+        }
     }
 
     val unreadCount = vm.unreadNotificationsCount
@@ -262,7 +228,11 @@ fun NotificationScreen(
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 4.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "NOTIFICATIONS",
@@ -291,7 +261,7 @@ fun NotificationScreen(
                         }
                     }
                     Text(
-                        text = "Mentions, replies & ZENKAI updates",
+                        text = "System updates & community announcements",
                         color = OttTextMuted,
                         fontSize = 11.sp,
                         maxLines = 1,
@@ -328,178 +298,64 @@ fun NotificationScreen(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-
-
-                    IconButton(
-                        onClick = { vm.testPushNotification() },
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.NotificationsActive,
-                            contentDescription = "Test Push Notification",
-                            tint = Color(0xFFFB7185),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                 }
             }
 
-            // ── Tabs Row ────────────────────────────────────────────────
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                contentColor = Color.White,
-                indicator = { tabPositions ->
-                    if (selectedTab < tabPositions.size) {
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = if (selectedTab == 2) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                            height = 2.5.dp
-                        )
-                    }
-                },
-                divider = {
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            ) {
-                tabTitles.forEachIndexed { index, title ->
-                    val isSelected = selectedTab == index
-                    val tabUnread = when (index) {
-                        0 -> personalNotifs.count { !it.isRead }
-                        1 -> globalNotifs.count { !it.isRead }
-                        else -> 0
-                    }
-                    Tab(
-                        selected = isSelected,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (index == 2) {
-                                    Icon(
-                                        imageVector = Icons.Default.AdminPanelSettings,
-                                        contentDescription = null,
-                                        tint = if (isSelected) Color(0xFFE11D48) else OttTextMuted,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(5.dp))
-                                }
-                                Text(
-                                    text = title,
-                                    color = if (isSelected) Color.White else OttTextMuted,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                                if (tabUnread > 0) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(7.dp)
-                                            .clip(CircleShape)
-                                            .background(OttPrimary)
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-            }
+            // Divider below header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color(0x18FFFFFF))
+            )
 
-            // ── Tab Content ─────────────────────────────────────────────
+            // ── Single Unified Feed Content ──────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                when (selectedTab) {
-                    0 -> {
-                        // Personal Notifications
-                        if (!isLoggedIn) {
-                            GuestNotificationPrompt(onNavigateToLogin = onNavigateToLogin)
-                        } else if (personalNotifs.isEmpty() && !vm.isNotificationsLoading) {
-                            EmptyNotificationState(
-                                icon = Icons.Default.NotificationsActive,
-                                title = "No Personal Notifications",
-                                subtitle = "When someone replies to your messages or mentions you in the community chat, it'll appear here."
-                            )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                items(personalNotifs, key = { it.id }) { notif ->
-                                    NotificationCard(
-                                        notification = notif,
-                                        onCardClick = {
-                                            if (!notif.isRead) vm.markNotificationAsRead(notif.id)
-                                            selectedNotificationForDetails = notif
-                                        },
-                                        onDelete = { vm.deleteNotification(notif.id) },
-                                        onClaimReward = { vm.claimNotificationReward(notif) },
-                                        onOpenUrl = { url ->
-                                            handleNotificationUrl(
-                                                context = context,
-                                                rawUrl = url,
-                                                onNavigate = onNavigate,
-                                                onNavigateToCommunity = onNavigateToCommunity,
-                                                onNavigateToDirectChat = onNavigateToDirectChat,
-                                                onClaimReward = { vm.claimNotificationReward(notif) }
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    1 -> {
-                        // Global Notifications / Announcements
-                        if (globalNotifs.isEmpty() && !vm.isNotificationsLoading) {
-                            EmptyNotificationState(
-                                icon = Icons.Default.Campaign,
-                                title = "No Global Announcements",
-                                subtitle = "System broadcasts, major releases, and community announcements will be posted here."
-                            )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                items(globalNotifs, key = { it.id }) { notif ->
-                                    NotificationCard(
-                                        notification = notif,
-                                        onCardClick = {
-                                            if (!notif.isRead) vm.markNotificationAsRead(notif.id)
-                                            selectedNotificationForDetails = notif
-                                        },
-                                        onDelete = { vm.deleteNotification(notif.id) },
-                                        onClaimReward = { vm.claimNotificationReward(notif) },
-                                        onOpenUrl = { url ->
-                                            handleNotificationUrl(
-                                                context = context,
-                                                rawUrl = url,
-                                                onNavigate = onNavigate,
-                                                onNavigateToCommunity = onNavigateToCommunity,
-                                                onNavigateToDirectChat = onNavigateToDirectChat,
-                                                onClaimReward = { vm.claimNotificationReward(notif) }
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    2 -> {
-                        // Admin Dispatch Center (Admin Only)
-                        AdminNotificationDispatchPanel(
-                            vm = vm,
-                            onNavigateToProfile = { onNavigate("public_profile:$it") }
+                if (allNotifs.isEmpty() && !vm.isNotificationsLoading) {
+                    if (!isLoggedIn) {
+                        GuestNotificationPrompt(onNavigateToLogin = onNavigateToLogin)
+                    } else {
+                        EmptyNotificationState(
+                            icon = Icons.Default.Campaign,
+                            title = "No Notifications",
+                            subtitle = "You're all caught up! System broadcasts and updates will appear here."
                         )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(allNotifs, key = { it.id }) { notif ->
+                            NotificationCard(
+                                notification = notif,
+                                onCardClick = {
+                                    if (!notif.isRead) vm.markNotificationAsRead(notif.id)
+                                    selectedNotificationForDetails = notif
+                                },
+                                onDelete = { vm.deleteNotification(notif.id) },
+                                onClaimReward = { vm.claimNotificationReward(notif) },
+                                onOpenUrl = { url ->
+                                    handleNotificationUrl(
+                                        context = context,
+                                        rawUrl = url,
+                                        onNavigate = onNavigate,
+                                        onNavigateToCommunity = onNavigateToCommunity,
+                                        onNavigateToDirectChat = onNavigateToDirectChat,
+                                        onClaimReward = { vm.claimNotificationReward(notif) }
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
 
-                if (vm.isNotificationsLoading) {
+                if (vm.isNotificationsLoading && allNotifs.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -563,7 +419,7 @@ fun NotificationCard(
 
     val typeBadgeColor = when (notification.type) {
         "mention", "reply" -> Color(0xFF38BDF8)
-        "global", "announcement" -> Color(0xFFF59E0B)
+        "global", "announcement", "broadcast" -> Color(0xFFF59E0B)
         "admin" -> Color(0xFFE11D48)
         "system" -> Color(0xFF10B981)
         "reward" -> Color(0xFF10B981)
@@ -599,8 +455,7 @@ fun NotificationCard(
         ) {
             // Sender Avatar
             Box(
-                modifier = Modifier
-                    .size(42.dp),
+                modifier = Modifier.size(42.dp),
                 contentAlignment = Alignment.Center
             ) {
                 AvatarDecorationRenderer(
@@ -632,7 +487,7 @@ fun NotificationCard(
                         ) {
                             Icon(
                                 imageVector = when (notification.type) {
-                                    "global", "announcement" -> Icons.Default.Campaign
+                                    "global", "announcement", "broadcast" -> Icons.Default.Campaign
                                     "reward" -> Icons.Default.CardGiftcard
                                     else -> Icons.Default.Person
                                 },
@@ -691,8 +546,7 @@ fun NotificationCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         IconButton(
                             onClick = onDelete,
-                            modifier = Modifier
-                                .size(26.dp)
+                            modifier = Modifier.size(26.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
@@ -888,7 +742,6 @@ fun NotificationDetailsDialog(
     onNavigateToCommunity: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
-    val isRead = notification.isRead
     val isClaimed = notification.isClaimed
     val timeAgo = remember(notification.createdAt) {
         formatNotificationTimestamp(notification.createdAt)
@@ -896,7 +749,7 @@ fun NotificationDetailsDialog(
 
     val typeBadgeColor = when (notification.type) {
         "mention", "reply" -> Color(0xFF38BDF8)
-        "global", "announcement" -> Color(0xFFF59E0B)
+        "global", "announcement", "broadcast" -> Color(0xFFF59E0B)
         "admin" -> Color(0xFFE11D48)
         "system" -> Color(0xFF10B981)
         "reward" -> Color(0xFF10B981)
@@ -1012,7 +865,7 @@ fun NotificationDetailsDialog(
                                     ) {
                                         Icon(
                                             imageVector = when (notification.type) {
-                                                "global", "announcement" -> Icons.Default.Campaign
+                                                "global", "announcement", "broadcast" -> Icons.Default.Campaign
                                                 "reward" -> Icons.Default.CardGiftcard
                                                 else -> Icons.Default.Person
                                             },
@@ -1199,946 +1052,6 @@ fun NotificationDetailsDialog(
 }
 
 @Composable
-fun AdminNotificationDispatchPanel(
-    vm: MainViewModel,
-    modifier: Modifier = Modifier,
-    onNavigateToProfile: ((String) -> Unit)? = null
-) {
-    val context = LocalContext.current
-    var dispatchMode by remember { mutableIntStateOf(0) } // 0: Broadcast Global, 1: Direct User, 2: Welcome Template
-    var titleText by remember { mutableStateOf("") }
-    var messageText by remember { mutableStateOf("") }
-    var imageUrlText by remember { mutableStateOf("") }
-    var actionUrlText by remember { mutableStateOf("") }
-    var actionLabelText by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf("global") }
-
-    val defaultBananaArt = "android.resource://${context.packageName}/drawable/welcome_nano_banana"
-
-    // Welcome Template Form State
-    var welcomeTitleText by remember(vm.welcomeConfig) { mutableStateOf(vm.welcomeConfig.title) }
-    var welcomeMessageText by remember(vm.welcomeConfig) { mutableStateOf(vm.welcomeConfig.message) }
-    var welcomeImageUrlText by remember(vm.welcomeConfig) { mutableStateOf(vm.welcomeConfig.imageUrl) }
-    var welcomeActionUrlText by remember(vm.welcomeConfig) { mutableStateOf(vm.welcomeConfig.actionUrl) }
-    var welcomeActionLabelText by remember(vm.welcomeConfig) { mutableStateOf(vm.welcomeConfig.actionLabel) }
-
-    val categories = remember {
-        listOf(
-            "global" to "Global",
-            "announcement" to "Announcement",
-            "update" to "Update",
-            "alert" to "Alert",
-            "reward" to "Gift / Reward",
-            "admin" to "Admin Notice",
-            "system" to "System"
-        )
-    }
-
-    // User search state
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedTargetUser by remember { mutableStateOf<AdminUserSearchResult?>(null) }
-    var statusFeedback by remember { mutableStateOf<String?>(null) }
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Mode Selector Pills
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF141722))
-                    .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (dispatchMode == 0) Color(0xFFE11D48) else Color.Transparent)
-                        .clickable {
-                            dispatchMode = 0
-                            if (selectedType == "admin") selectedType = "global"
-                        }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Broadcast",
-                        color = Color.White,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (dispatchMode == 1) Color(0xFF38BDF8) else Color.Transparent)
-                        .clickable {
-                            dispatchMode = 1
-                        }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Direct User",
-                        color = if (dispatchMode == 1) Color(0xFF090B10) else Color.White,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (dispatchMode == 2) Color(0xFFF59E0B) else Color.Transparent)
-                        .clickable {
-                            dispatchMode = 2
-                        }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Welcome Setup",
-                        color = if (dispatchMode == 2) Color(0xFF090B10) else Color.White,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        // ── MODE 2: WELCOME NOTIFICATION TEMPLATE SETUP ─────────────────────
-        if (dispatchMode == 2) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141722))
-                        .border(1.dp, Color(0x30F59E0B), RoundedCornerShape(14.dp))
-                        .padding(14.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🍌", fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "WELCOME NOTIFICATION SETTINGS",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFFF59E0B)
-                            )
-                            Text(
-                                text = "Triggered when a new user registers for the first time. Edit the greeting text, image, action button, and test it.",
-                                fontSize = 10.5.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "WELCOME TITLE",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = welcomeTitleText,
-                        onValueChange = { welcomeTitleText = it },
-                        placeholder = { Text("Welcome to Zenkai", color = OttTextMuted, fontSize = 12.5.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "WELCOME MESSAGE BODY",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = welcomeMessageText,
-                        onValueChange = { welcomeMessageText = it },
-                        placeholder = { Text("Welcome to Zenkai\nWatch Read Explore\nHave a happy journey", color = OttTextMuted, fontSize = 12.5.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        maxLines = 6,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        )
-                    )
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "WELCOME NOTIFICATION IMAGE (CUSTOM URL OR PRESET)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    OutlinedTextField(
-                        value = welcomeImageUrlText,
-                        onValueChange = { welcomeImageUrlText = it },
-                        placeholder = { Text("Leave blank for default or paste custom URL...", color = OttTextMuted, fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Image, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { welcomeImageUrlText = defaultBananaArt },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x22F59E0B), contentColor = Color(0xFFF59E0B)),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Text("Nano Banana Art 🍌", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        if (welcomeImageUrlText.isNotBlank()) {
-                            Button(
-                                onClick = { welcomeImageUrlText = "" },
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0x22EF4444), contentColor = Color(0xFFEF4444)),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                modifier = Modifier.height(34.dp)
-                            ) {
-                                Text("Clear Image", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    val effectivePreviewImg = welcomeImageUrlText.ifBlank { defaultBananaArt }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF090B10))
-                            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AsyncImage(
-                            model = effectivePreviewImg,
-                            contentDescription = "Welcome Preview Image",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "ACTION BUTTON & REDIRECT LINK",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-
-                    OutlinedTextField(
-                        value = welcomeActionLabelText,
-                        onValueChange = { welcomeActionLabelText = it },
-                        placeholder = { Text("Claim +100 Starter EXP", color = OttTextMuted, fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = welcomeActionUrlText,
-                        onValueChange = { welcomeActionUrlText = it },
-                        placeholder = { Text("zenkai://rewards/welcome", color = OttTextMuted, fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Link, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
-
-            // Live Notification Mockup Preview
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF141722))
-                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "LIVE NOTIFICATION PREVIEW",
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF94A3B8)
-                    )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(
-                            model = welcomeImageUrlText.ifBlank { defaultBananaArt },
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = welcomeTitleText.ifBlank { "Welcome to Zenkai" },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "From: Nano Banana 🍌",
-                                fontSize = 10.sp,
-                                color = Color(0xFF38BDF8)
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = welcomeMessageText.ifBlank { "Welcome to Zenkai\nWatch Read Explore\nHave a happy journey" },
-                        fontSize = 12.sp,
-                        color = Color(0xFFE2E8F0),
-                        lineHeight = 16.sp
-                    )
-
-                    if (welcomeImageUrlText.isNotBlank()) {
-                        AsyncImage(
-                            model = welcomeImageUrlText,
-                            contentDescription = "Welcome Media Banner",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(110.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF1E2333)),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-
-                    if (welcomeActionLabelText.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF10B981))
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = welcomeActionLabelText,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (statusFeedback != null) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x2210B981))
-                            .border(1.dp, Color(0xFF10B981), RoundedCornerShape(8.dp))
-                            .padding(10.dp)
-                    ) {
-                        Text(text = statusFeedback!!, color = Color(0xFF6EE7B7), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            // Save & Test Buttons
-            item {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = {
-                            val updated = com.nyyrox.aniverse.data.WelcomeNotificationConfig(
-                                title = welcomeTitleText.trim().ifBlank { "Welcome to Zenkai" },
-                                message = welcomeMessageText.trim().ifBlank { "Welcome to Zenkai\nWatch Read Explore\nHave a happy journey" },
-                                imageUrl = welcomeImageUrlText.trim(),
-                                actionLabel = welcomeActionLabelText.trim().ifBlank { "Claim +100 Starter EXP" },
-                                actionUrl = welcomeActionUrlText.trim().ifBlank { "zenkai://rewards/welcome" }
-                            )
-                            vm.saveWelcomeTemplateConfig(updated) { success ->
-                                statusFeedback = if (success) "Welcome template saved to cloud & device!" else "Welcome template saved locally."
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B), contentColor = Color(0xFF090B10))
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save Welcome Template", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Button(
-                        onClick = {
-                            val updated = com.nyyrox.aniverse.data.WelcomeNotificationConfig(
-                                title = welcomeTitleText.trim().ifBlank { "Welcome to Zenkai" },
-                                message = welcomeMessageText.trim().ifBlank { "Welcome to Zenkai\nWatch Read Explore\nHave a happy journey" },
-                                imageUrl = welcomeImageUrlText.trim(),
-                                actionLabel = welcomeActionLabelText.trim().ifBlank { "Claim +100 Starter EXP" },
-                                actionUrl = welcomeActionUrlText.trim().ifBlank { "zenkai://rewards/welcome" }
-                            )
-                            vm.saveWelcomeTemplateConfig(updated)
-                            vm.testWelcomeNotification()
-                            statusFeedback = "Test Welcome notification dispatched to your account!"
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x2038BDF8), contentColor = Color(0xFF38BDF8)),
-                        border = BorderStroke(1.dp, Color(0xFF38BDF8))
-                    ) {
-                        Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Send Test Welcome Notification", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        } else {
-            // ── MODES 0 & 1: BROADCAST / DIRECT NOTIFICATION ─────────────────
-            // Category Type Selector Pills
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "NOTIFICATION CATEGORY & STYLE",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    androidx.compose.foundation.lazy.LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(categories) { (key, label) ->
-                            val isSel = selectedType == key
-                            val catColor = when (key) {
-                                "reward" -> Color(0xFF10B981)
-                                "alert" -> Color(0xFFEF4444)
-                                "update" -> Color(0xFF8B5CF6)
-                                "announcement", "global" -> Color(0xFFF59E0B)
-                                "admin" -> Color(0xFFE11D48)
-                                else -> Color(0xFF38BDF8)
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSel) catColor else Color(0x18FFFFFF))
-                                    .border(1.dp, if (isSel) catColor else Color(0x28FFFFFF), RoundedCornerShape(20.dp))
-                                    .clickable { selectedType = key }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSel) (if (key == "admin" || key == "reward" || key == "alert" || key == "update") Color.White else Color(0xFF090B10)) else Color(0xFFCBD5E1)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Direct User Search Box (if mode == 1)
-            if (dispatchMode == 1) {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "SELECT RECIPIENT USER",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF38BDF8)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        if (selectedTargetUser == null) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = {
-                                    searchQuery = it
-                                    vm.adminSearchUsers(it)
-                                },
-                                placeholder = {
-                                    Text("Search user by Username, Display Name or Email...", color = OttTextMuted, fontSize = 12.5.sp)
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                                },
-                                trailingIcon = {
-                                    if (searchQuery.isNotBlank()) {
-                                        IconButton(onClick = {
-                                            searchQuery = ""
-                                            vm.adminSearchUsers("")
-                                        }) {
-                                            Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color(0xFF141722),
-                                    unfocusedContainerColor = Color(0xFF10131B),
-                                    focusedBorderColor = Color(0xFF38BDF8),
-                                    unfocusedBorderColor = Color(0x28FFFFFF),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
-                                singleLine = true
-                            )
-
-                            // Search Results List
-                            if (vm.isAdminSearching) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    CircularProgressIndicator(color = Color(0xFF38BDF8), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                }
-                            } else if (vm.adminSearchResults.isNotEmpty()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 6.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFF161A26))
-                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
-                                        .padding(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    vm.adminSearchResults.forEach { u ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .clickable {
-                                                    selectedTargetUser = u
-                                                    searchQuery = ""
-                                                }
-                                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            AsyncImage(
-                                                model = u.avatarUrl,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = u.displayName ?: u.username ?: "Otaku",
-                                                    color = Color.White,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                val subtitle = listOfNotNull(
-                                                    u.username?.let { "@$it" },
-                                                    u.email
-                                                ).joinToString(" • ")
-                                                if (subtitle.isNotBlank()) {
-                                                    Text(text = subtitle, color = Color(0xFF94A3B8), fontSize = 10.sp)
-                                                }
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(Color(0x2238BDF8))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text("Select", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            // Selected User Card with Profile View Shortcut
-                            val target = selectedTargetUser!!
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF152238))
-                                    .border(1.dp, Color(0xFF38BDF8), RoundedCornerShape(12.dp))
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AsyncImage(
-                                    model = target.avatarUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0x22FFFFFF)),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = target.displayName ?: target.username ?: "Otaku",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = listOfNotNull(target.username?.let { "@$it" }, target.email).joinToString(" • "),
-                                        color = Color(0xFF38BDF8),
-                                        fontSize = 11.sp
-                                    )
-                                }
-                                if (onNavigateToProfile != null) {
-                                    Button(
-                                        onClick = { onNavigateToProfile(target.id) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x3038BDF8), contentColor = Color(0xFF38BDF8)),
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(30.dp)
-                                    ) {
-                                        Text(if (vm.isCurrentUserOwner()) "👑 Roles" else "Profile", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                }
-                                IconButton(onClick = { selectedTargetUser = null }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Deselect", tint = Color(0xFFFF6B6B), modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Title Input
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "NOTIFICATION TITLE",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = titleText,
-                        onValueChange = { titleText = it },
-                        placeholder = {
-                            Text(if (dispatchMode == 0) "e.g. Major Zenkai Update v2.5 is live!" else "e.g. Account Notice / Reward Alert", color = OttTextMuted, fontSize = 12.5.sp)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = if (dispatchMode == 0) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
-
-            // Message Body Input
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "NOTIFICATION BODY / CONTENT",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = messageText,
-                        onValueChange = { messageText = it },
-                        placeholder = {
-                            Text("Write message details to send directly to recipient's notification tray and app...", color = OttTextMuted, fontSize = 12.5.sp)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        maxLines = 6,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = if (dispatchMode == 0) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        )
-                    )
-                }
-            }
-
-            // Optional Media Image URL Input
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "ATTACH MEDIA IMAGE URL (OPTIONAL)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = imageUrlText,
-                        onValueChange = { imageUrlText = it },
-                        placeholder = {
-                            Text("https://images.unsplash.com/... or poster URL", color = OttTextMuted, fontSize = 12.sp)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Image, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
-
-            // Optional Action Link & Action Button Label
-            item {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "ACTION BUTTON & LINK (OPTIONAL)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFCBD5E1)
-                    )
-
-                    OutlinedTextField(
-                        value = actionUrlText,
-                        onValueChange = { actionUrlText = it },
-                        placeholder = {
-                            Text("Action URL: https://... or zenkai://rewards/...", color = OttTextMuted, fontSize = 12.sp)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Link, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = actionLabelText,
-                        onValueChange = { actionLabelText = it },
-                        placeholder = {
-                            Text("Action Button Label: e.g. Claim 500 EXP / Open Stream / View Event", color = OttTextMuted, fontSize = 12.sp)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF141722),
-                            unfocusedContainerColor = Color(0xFF10131B),
-                            focusedBorderColor = Color(0xFFF59E0B),
-                            unfocusedBorderColor = Color(0x28FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
-
-            // Feedback message
-            if (statusFeedback != null) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x2210B981))
-                            .border(1.dp, Color(0xFF10B981), RoundedCornerShape(8.dp))
-                            .padding(10.dp)
-                    ) {
-                        Text(text = statusFeedback!!, color = Color(0xFF6EE7B7), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            // Submit Button
-            item {
-                val canSend = (dispatchMode == 0 || selectedTargetUser != null) &&
-                        titleText.isNotBlank() && messageText.isNotBlank() && !vm.isSendingAdminNotification
-
-                Button(
-                    onClick = {
-                        if (dispatchMode == 0) {
-                            vm.sendAdminBroadcast(
-                                title = titleText,
-                                message = messageText,
-                                type = selectedType,
-                                imageUrl = imageUrlText.ifBlank { null },
-                                actionUrl = actionUrlText.ifBlank { null },
-                                actionLabel = actionLabelText.ifBlank { null },
-                                onComplete = { success ->
-                                    if (success) {
-                                        statusFeedback = "Global Broadcast notification sent successfully!"
-                                        titleText = ""
-                                        messageText = ""
-                                        imageUrlText = ""
-                                        actionUrlText = ""
-                                        actionLabelText = ""
-                                    } else {
-                                        statusFeedback = "Failed to send broadcast notification. Check permissions."
-                                    }
-                                }
-                            )
-                        } else {
-                            val target = selectedTargetUser ?: return@Button
-                            vm.sendAdminDirectNotification(
-                                targetUserId = target.id,
-                                title = titleText,
-                                message = messageText,
-                                type = selectedType,
-                                imageUrl = imageUrlText.ifBlank { null },
-                                actionUrl = actionUrlText.ifBlank { null },
-                                actionLabel = actionLabelText.ifBlank { null },
-                                onComplete = { success ->
-                                    if (success) {
-                                        statusFeedback = "Direct Notification sent successfully to @${target.displayName ?: target.username}!"
-                                        titleText = ""
-                                        messageText = ""
-                                        imageUrlText = ""
-                                        actionUrlText = ""
-                                        actionLabelText = ""
-                                        selectedTargetUser = null
-                                    } else {
-                                        statusFeedback = "Failed to send direct notification."
-                                    }
-                                }
-                            )
-                        }
-                    },
-                    enabled = canSend,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (dispatchMode == 0) Color(0xFFE11D48) else Color(0xFF38BDF8),
-                        disabledContainerColor = Color(0x22FFFFFF)
-                    )
-                ) {
-                    if (vm.isSendingAdminNotification) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                            tint = if (dispatchMode == 1) Color(0xFF090B10) else Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (dispatchMode == 0) "SEND BROADCAST NOTIFICATION" else "SEND DIRECT NOTIFICATION",
-                            color = if (dispatchMode == 1) Color(0xFF090B10) else Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun EmptyNotificationState(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
@@ -2179,7 +1092,7 @@ fun EmptyNotificationState(
             color = OttTextMuted,
             fontSize = 12.5.sp,
             lineHeight = 17.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -2222,7 +1135,7 @@ fun GuestNotificationPrompt(
             text = "Sign in to receive community mentions, replies, and direct alerts sent to your profile.",
             color = OttTextMuted,
             fontSize = 12.5.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
