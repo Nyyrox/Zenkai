@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -59,13 +60,193 @@ enum class CaptionSettingsTab(val title: String) {
 data class CaptionStylePreset(
     val name: String,
     val previewLabel: String,
+    val description: String = "",
+    val sampleText: String = "Subtitle Style",
     val config: CaptionCustomization
 )
 
 val CaptionPresetsList: List<CaptionStylePreset> = listOf(
     CaptionStylePreset(
+        name = "Crunchyroll",
+        previewLabel = "Crunchyroll",
+        description = "Official anime style · Bold black outline",
+        sampleText = "I'll become the greatest hero!",
+        config = CaptionCustomization(
+            fontFamilyName = "Roboto",
+            textColor = Color.White,
+            bgAlpha = 0f,
+            hasBgBox = false,
+            isBold = true,
+            weightPreset = "Bold",
+            hasStroke = true,
+            strokeColor = Color.Black,
+            strokeWidth = 3.8f,
+            hasShadow = true,
+            activePreset = "Crunchyroll"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Netflix",
+        previewLabel = "Netflix",
+        description = "Proportional sans · Clean drop shadow",
+        sampleText = "Never give up on your dreams!",
+        config = CaptionCustomization(
+            fontFamilyName = "Inter",
+            textColor = Color.White,
+            bgAlpha = 0f,
+            hasBgBox = false,
+            isBold = true,
+            weightPreset = "Bold",
+            hasStroke = true,
+            strokeColor = Color(0xB3000000),
+            strokeWidth = 2.0f,
+            hasShadow = true,
+            activePreset = "Netflix"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Fansub Best",
+        previewLabel = "Fansub Best",
+        description = "Golden anime fansub · Heavy dark stroke",
+        sampleText = "Omae wa mou shindeiru.",
+        config = CaptionCustomization(
+            fontFamilyName = "Outfit",
+            textColor = Color(0xFFFFDD00),
+            bgAlpha = 0f,
+            hasBgBox = false,
+            isBold = true,
+            weightPreset = "Heavy",
+            hasStroke = true,
+            strokeColor = Color.Black,
+            strokeWidth = 4.2f,
+            hasShadow = true,
+            activePreset = "Fansub Best"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Crunchy Amber",
+        previewLabel = "Crunchy Amber",
+        description = "Warm canary yellow · Solid black stroke",
+        sampleText = "Believe it! Dattebayo!",
+        config = CaptionCustomization(
+            fontFamilyName = "Roboto",
+            textColor = Color(0xFFFFEE55),
+            bgAlpha = 0f,
+            hasBgBox = false,
+            isBold = true,
+            weightPreset = "Bold",
+            hasStroke = true,
+            strokeColor = Color.Black,
+            strokeWidth = 3.8f,
+            hasShadow = true,
+            activePreset = "Crunchy Amber"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Cinema",
+        previewLabel = "Cinema",
+        description = "Warm serif italic · Translucent backing box",
+        sampleText = "In a world of silence...",
+        config = CaptionCustomization(
+            fontFamilyName = "Merriweather",
+            textColor = Color(0xFFF3EFE0),
+            bgAlpha = 0.50f,
+            bgColor = Color(0xFF0F1117),
+            hasBgBox = true,
+            boxCornerRadiusDp = 6f,
+            isItalic = true,
+            isBold = false,
+            letterSpacingSp = 0.8f,
+            hasStroke = false,
+            strokeWidth = 0f,
+            hasShadow = true,
+            activePreset = "Cinema"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Cyber Neon",
+        previewLabel = "Cyber Neon",
+        description = "Electric cyan · Futuristic anime glow",
+        sampleText = "System override initialized.",
+        config = CaptionCustomization(
+            fontFamilyName = "Outfit",
+            textColor = Color(0xFF38BDF8),
+            bgAlpha = 0.45f,
+            bgColor = Color(0xFF030712),
+            hasBgBox = true,
+            boxCornerRadiusDp = 8f,
+            isBold = true,
+            hasStroke = true,
+            strokeColor = Color(0xFF0C4A6E),
+            strokeWidth = 2.4f,
+            hasShadow = true,
+            activePreset = "Cyber Neon"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Modern Glass",
+        previewLabel = "Modern Glass",
+        description = "Frosted glass capsule · High legibility",
+        sampleText = "Clear, crisp and centered.",
+        config = CaptionCustomization(
+            fontFamilyName = "Inter",
+            textColor = Color.White,
+            bgAlpha = 0.70f,
+            bgColor = Color(0xFF1E2430),
+            hasBgBox = true,
+            boxCornerRadiusDp = 10f,
+            isBold = true,
+            hasStroke = false,
+            strokeWidth = 0f,
+            hasShadow = false,
+            activePreset = "Modern Glass"
+        )
+    ),
+    CaptionStylePreset(
+        name = "High Contrast",
+        previewLabel = "High Contrast",
+        description = "Accessible bright yellow on solid black",
+        sampleText = "MAXIMUM VISIBILITY",
+        config = CaptionCustomization(
+            fontFamilyName = "Roboto",
+            textColor = Color(0xFFFFFF00),
+            bgAlpha = 0.95f,
+            bgColor = Color.Black,
+            hasBgBox = true,
+            boxCornerRadiusDp = 4f,
+            isBold = true,
+            weightPreset = "Heavy",
+            hasStroke = false,
+            strokeWidth = 0f,
+            hasShadow = false,
+            activePreset = "High Contrast"
+        )
+    ),
+    CaptionStylePreset(
+        name = "Retro VHS",
+        previewLabel = "Retro VHS",
+        description = "Monospace anime tape · Retro arcade feel",
+        sampleText = "EPISODE 01 // PLAY [SP]",
+        config = CaptionCustomization(
+            fontFamilyName = "JetBrains Mono",
+            textColor = Color(0xFFFACC15),
+            bgAlpha = 0f,
+            hasBgBox = false,
+            isBold = true,
+            isUppercase = true,
+            letterSpacingSp = 1.0f,
+            hasStroke = true,
+            strokeColor = Color.Black,
+            strokeWidth = 3.0f,
+            hasShadow = true,
+            activePreset = "Retro VHS"
+        )
+    ),
+    CaptionStylePreset(
         name = "Default",
         previewLabel = "Default",
+        description = "Classic anime subtitles with subtle box",
+        sampleText = "I will protect my friends!",
         config = CaptionCustomization(
             fontFamilyName = "Roboto",
             textColor = Color.White,
@@ -78,107 +259,6 @@ val CaptionPresetsList: List<CaptionStylePreset> = listOf(
             strokeColor = Color.Black,
             strokeWidth = 2.0f,
             activePreset = "Default"
-        )
-    ),
-    CaptionStylePreset(
-        name = "Netflix",
-        previewLabel = "Netflix",
-        config = CaptionCustomization(
-            fontFamilyName = "Inter",
-            textColor = Color.White,
-            bgAlpha = 0f,
-            hasBgBox = false,
-            isBold = true,
-            weightPreset = "Bold",
-            hasStroke = false,
-            strokeWidth = 0f,
-            hasShadow = true,
-            activePreset = "Netflix"
-        )
-    ),
-    CaptionStylePreset(
-        name = "Fansub",
-        previewLabel = "Fansub",
-        config = CaptionCustomization(
-            fontFamilyName = "Outfit",
-            textColor = Color(0xFFFFDD00),
-            bgAlpha = 0f,
-            hasBgBox = false,
-            isBold = true,
-            weightPreset = "Heavy",
-            hasStroke = true,
-            strokeColor = Color.Black,
-            strokeWidth = 3.5f,
-            hasShadow = true,
-            activePreset = "Fansub"
-        )
-    ),
-    CaptionStylePreset(
-        name = "Cinema",
-        previewLabel = "Cinema",
-        config = CaptionCustomization(
-            fontFamilyName = "Merriweather",
-            textColor = Color(0xFFEEEEEE),
-            bgAlpha = 0.35f,
-            bgColor = Color.Black,
-            hasBgBox = true,
-            boxCornerRadiusDp = 4f,
-            isItalic = true,
-            letterSpacingSp = 1.0f,
-            hasStroke = false,
-            hasShadow = true,
-            activePreset = "Cinema"
-        )
-    ),
-    CaptionStylePreset(
-        name = "Comic",
-        previewLabel = "Comic",
-        config = CaptionCustomization(
-            fontFamilyName = "Poppins",
-            textColor = Color.White,
-            bgAlpha = 0f,
-            hasBgBox = false,
-            isBold = true,
-            isUppercase = true,
-            weightPreset = "Heavy",
-            hasStroke = true,
-            strokeColor = Color.Black,
-            strokeWidth = 3.2f,
-            hasShadow = true,
-            activePreset = "Comic"
-        )
-    ),
-    CaptionStylePreset(
-        name = "Glass",
-        previewLabel = "Glass",
-        config = CaptionCustomization(
-            fontFamilyName = "Inter",
-            textColor = Color.White,
-            bgAlpha = 0.30f,
-            bgColor = Color(0xFF1E232E),
-            hasBgBox = true,
-            boxCornerRadiusDp = 10f,
-            isBold = false,
-            hasStroke = false,
-            hasShadow = false,
-            activePreset = "Glass"
-        )
-    ),
-    CaptionStylePreset(
-        name = "Accessible",
-        previewLabel = "Accessible",
-        config = CaptionCustomization(
-            fontFamilyName = "Roboto",
-            textColor = Color(0xFFFFEE55),
-            bgAlpha = 0.95f,
-            bgColor = Color.Black,
-            hasBgBox = true,
-            boxCornerRadiusDp = 4f,
-            isBold = true,
-            weightPreset = "Heavy",
-            hasStroke = false,
-            hasShadow = false,
-            activePreset = "Accessible"
         )
     )
 )
@@ -329,7 +409,7 @@ fun SubtitlesModal(
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "Settings",
+                                text = "Style & Presets",
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -618,14 +698,34 @@ private fun CaptionLivePreviewBox(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF090B0F))
-            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0A0D14), Color(0xFF141924))
+                )
+            )
+            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(0x33FFFFFF))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "LIVE PREVIEW",
+                color = Color(0xCCFFFFFF),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp
+            )
+        }
+
         val fontFam = resolveFontFamily(captionConfig.fontFamilyName)
-        val baseSize = 13.5.sp * captionConfig.sizeScale
+        val baseSize = (13.5f * captionConfig.sizeScale).coerceAtLeast(11f).sp
 
         Box(
             modifier = Modifier
@@ -634,7 +734,7 @@ private fun CaptionLivePreviewBox(
                         Modifier
                             .clip(RoundedCornerShape(captionConfig.boxCornerRadiusDp.dp))
                             .background(captionConfig.bgColor.copy(alpha = captionConfig.bgAlpha))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     } else Modifier
                 ),
             contentAlignment = Alignment.Center
@@ -657,7 +757,10 @@ private fun CaptionLivePreviewBox(
                     textAlign = TextAlign.Center,
                     style = TextStyle.Default.copy(
                         color = captionConfig.strokeColor,
-                        drawStyle = Stroke(width = captionConfig.strokeWidth * 0.9f)
+                        drawStyle = Stroke(
+                            width = captionConfig.strokeWidth * 0.85f,
+                            join = StrokeJoin.Round
+                        )
                     )
                 )
             }
@@ -759,6 +862,10 @@ fun CaptionSettingsModal(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() }
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -767,14 +874,18 @@ fun CaptionSettingsModal(
             Box(
                 modifier = modifier
                     .fillMaxWidth(if (isWide) 0.88f else 0.96f)
-                    .widthIn(max = 740.dp)
+                    .widthIn(max = 760.dp)
                     .fillMaxHeight(if (isWide) 0.88f else 0.94f)
-                    .heightIn(max = 560.dp)
+                    .heightIn(max = 580.dp)
                     .glassPanel(24.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { /* prevent dismiss on modal click */ }
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Header: "Caption settings" + Close button
+                    // Header: "Subtitle Style & Presets" + Close button
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -783,7 +894,7 @@ fun CaptionSettingsModal(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Caption settings",
+                            text = "Subtitle Style & Presets",
                             color = Color.White,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
@@ -965,43 +1076,62 @@ private fun PresetsTabContent(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // "Show subtitles" toggle (Image 2)
+        // "Show subtitles" toggle
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0x14FFFFFF))
                 .clickable { onToggleCaptions(!isCaptionsEnabled) }
-                .padding(vertical = 4.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Show subtitles",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            Column {
+                Text(
+                    text = "Show subtitles",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (isCaptionsEnabled) "Captions currently visible" else "Captions turned off",
+                    color = Color(0xFF888E9E),
+                    fontSize = 11.5.sp
+                )
+            }
             Switch(
                 checked = isCaptionsEnabled,
                 onCheckedChange = onToggleCaptions,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = Color.White.copy(alpha = 0.5f),
+                    checkedTrackColor = Color(0xFF10B981),
                     uncheckedThumbColor = Color(0xFFAAAAAA),
                     uncheckedTrackColor = Color(0x33FFFFFF)
                 )
             )
         }
 
-        Text(
-            text = "STYLE PRESETS",
-            color = Color(0xFF888E9E),
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "STYLE PRESETS",
+                color = Color(0xFF888E9E),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = "Tap any style to apply",
+                color = Color(0xFF6B7280),
+                fontSize = 11.sp
+            )
+        }
 
-        // 2-Column Grid of Style Presets (Image 2)
+        // 2-Column Grid of Style Presets
         val chunked = remember { CaptionPresetsList.chunked(2) }
         chunked.forEach { pair ->
             Row(
@@ -1010,67 +1140,178 @@ private fun PresetsTabContent(
             ) {
                 pair.forEach { preset ->
                     val isSelected = captionConfig.activePreset == preset.name
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(72.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color(0xFF262C38), Color(0xFF181C24))
-                                )
-                            )
-                            .border(
-                                1.5.dp,
-                                if (isSelected) Color(0x40FFFFFF) else Color.Transparent,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable {
-                                onConfigChange(preset.config)
-                            }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            // Subtitle sample in that style
-                            Box(
-                                modifier = Modifier
-                                    .then(
-                                        if (preset.config.hasBgBox && preset.config.bgAlpha > 0f) {
-                                            Modifier
-                                                .clip(RoundedCornerShape(preset.config.boxCornerRadiusDp.dp))
-                                                .background(preset.config.bgColor.copy(alpha = preset.config.bgAlpha))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        } else Modifier
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val fontFam = resolveFontFamily(preset.config.fontFamilyName)
-                                Text(
-                                    text = if (preset.config.isUppercase) "SUBTITLE" else "Subtitle",
-                                    fontFamily = fontFam,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = if (preset.config.isBold) FontWeight.Bold else FontWeight.Normal,
-                                    fontStyle = if (preset.config.isItalic) FontStyle.Italic else FontStyle.Normal,
-                                    color = preset.config.textColor
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = preset.name,
-                                color = if (isSelected) Color.White else Color(0xFF9499A8),
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
+                    PresetCardItem(
+                        preset = preset,
+                        isSelected = isSelected,
+                        onClick = {
+                            onConfigChange(preset.config)
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 if (pair.size == 1) {
                     Spacer(Modifier.weight(1f))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PresetCardItem(
+    preset: CaptionStylePreset,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cfg = preset.config
+    val fontFam = resolveFontFamily(cfg.fontFamilyName)
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        if (isSelected) Color(0xFF263348) else Color(0xFF1D222E),
+                        if (isSelected) Color(0xFF17202F) else Color(0xFF13161F)
+                    )
+                )
+            )
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) Color(0xFF38BDF8) else Color(0x22FFFFFF),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .clickable(onClick = onClick)
+    ) {
+        // Mini Simulated Video Viewport
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF090B10), Color(0xFF141822))
+                    )
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val sample = if (cfg.isUppercase) preset.sampleText.uppercase() else preset.sampleText
+
+            Box(
+                modifier = Modifier
+                    .then(
+                        if (cfg.hasBgBox && cfg.bgAlpha > 0f) {
+                            Modifier
+                                .clip(RoundedCornerShape(cfg.boxCornerRadiusDp.dp))
+                                .background(cfg.bgColor.copy(alpha = cfg.bgAlpha))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        } else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                // Stroke outline layer
+                if (cfg.hasStroke && cfg.strokeWidth > 0f) {
+                    Text(
+                        text = sample,
+                        fontFamily = fontFam,
+                        fontSize = 11.5.sp,
+                        fontWeight = if (cfg.isBold) FontWeight.Bold else FontWeight.Normal,
+                        fontStyle = if (cfg.isItalic) FontStyle.Italic else FontStyle.Normal,
+                        letterSpacing = cfg.letterSpacingSp.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle.Default.copy(
+                            color = cfg.strokeColor,
+                            drawStyle = Stroke(
+                                width = cfg.strokeWidth * 0.75f,
+                                join = StrokeJoin.Round
+                            )
+                        )
+                    )
+                }
+
+                // Fill text layer
+                Text(
+                    text = sample,
+                    fontFamily = fontFam,
+                    fontSize = 11.5.sp,
+                    fontWeight = if (cfg.isBold) FontWeight.Bold else FontWeight.Normal,
+                    fontStyle = if (cfg.isItalic) FontStyle.Italic else FontStyle.Normal,
+                    letterSpacing = cfg.letterSpacingSp.sp,
+                    color = cfg.textColor.copy(alpha = cfg.textAlpha),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = if (cfg.hasShadow) {
+                        TextStyle.Default.copy(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.85f),
+                                blurRadius = 3f
+                            )
+                        )
+                    } else TextStyle.Default
+                )
+            }
+        }
+
+        // Preset Details Label
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = preset.name,
+                    color = if (isSelected) Color.White else Color(0xFFD6DBE7),
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                )
+
+                if (isSelected) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF10B981).copy(alpha = 0.22f))
+                            .border(0.5.dp, Color(0xFF10B981), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color(0xFF34D399),
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Text(
+                            text = "ACTIVE",
+                            color = Color(0xFF34D399),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            if (preset.description.isNotBlank()) {
+                Text(
+                    text = preset.description,
+                    color = if (isSelected) Color(0xFF93C5FD) else Color(0xFF7F8697),
+                    fontSize = 10.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

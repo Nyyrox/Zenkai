@@ -25,7 +25,15 @@ data class SavedCaptionConfig(
     val isBold: Boolean = true,
     val hasStroke: Boolean = true,
     val strokeColorArgb: Int = 0xFF000000.toInt(),
-    val strokeWidth: Float = 3.0f
+    val strokeWidth: Float = 3.0f,
+    val fontFamilyName: String = "Roboto",
+    val activePreset: String = "Crunchyroll",
+    val hasBgBox: Boolean = false,
+    val bgColorArgb: Int = 0xFF000000.toInt(),
+    val isItalic: Boolean = false,
+    val isUppercase: Boolean = false,
+    val letterSpacingSp: Float = 0f,
+    val bottomPaddingDp: Float = 18f
 ) {
     val textColorLong: Long get() = textColorArgb.toLong() and 0xFFFFFFFFL
     val strokeColorLong: Long get() = strokeColorArgb.toLong() and 0xFFFFFFFFL
@@ -46,6 +54,14 @@ object UserPreferences {
     private val CAPTION_HAS_STROKE = booleanPreferencesKey("caption_has_stroke")
     private val CAPTION_STROKE_COLOR = intPreferencesKey("caption_stroke_color_argb")
     private val CAPTION_STROKE_WIDTH = floatPreferencesKey("caption_stroke_width")
+    private val CAPTION_FONT_FAMILY = stringPreferencesKey("caption_font_family")
+    private val CAPTION_ACTIVE_PRESET = stringPreferencesKey("caption_active_preset")
+    private val CAPTION_HAS_BG_BOX = booleanPreferencesKey("caption_has_bg_box")
+    private val CAPTION_BG_COLOR = intPreferencesKey("caption_bg_color_argb")
+    private val CAPTION_IS_ITALIC = booleanPreferencesKey("caption_is_italic")
+    private val CAPTION_IS_UPPERCASE = booleanPreferencesKey("caption_is_uppercase")
+    private val CAPTION_LETTER_SPACING = floatPreferencesKey("caption_letter_spacing")
+    private val CAPTION_BOTTOM_PADDING = floatPreferencesKey("caption_bottom_padding")
 
     // --- Audio Language ---
     suspend fun saveAudioLanguage(context: Context, language: String) {
@@ -110,7 +126,15 @@ object UserPreferences {
                 isBold = prefs[CAPTION_IS_BOLD] ?: true,
                 hasStroke = prefs[CAPTION_HAS_STROKE] ?: true,
                 strokeColorArgb = prefs[CAPTION_STROKE_COLOR] ?: 0xFF000000.toInt(),
-                strokeWidth = prefs[CAPTION_STROKE_WIDTH] ?: 3.0f
+                strokeWidth = prefs[CAPTION_STROKE_WIDTH] ?: 3.0f,
+                fontFamilyName = prefs[CAPTION_FONT_FAMILY] ?: "Roboto",
+                activePreset = prefs[CAPTION_ACTIVE_PRESET] ?: "Crunchyroll",
+                hasBgBox = prefs[CAPTION_HAS_BG_BOX] ?: false,
+                bgColorArgb = prefs[CAPTION_BG_COLOR] ?: 0xFF000000.toInt(),
+                isItalic = prefs[CAPTION_IS_ITALIC] ?: false,
+                isUppercase = prefs[CAPTION_IS_UPPERCASE] ?: false,
+                letterSpacingSp = prefs[CAPTION_LETTER_SPACING] ?: 0f,
+                bottomPaddingDp = prefs[CAPTION_BOTTOM_PADDING] ?: 18f
             )
         }
 
@@ -123,7 +147,15 @@ object UserPreferences {
         isBold: Boolean,
         hasStroke: Boolean = true,
         strokeColorArgb: Int = 0xFF000000.toInt(),
-        strokeWidth: Float = 3.0f
+        strokeWidth: Float = 3.0f,
+        fontFamilyName: String = "Roboto",
+        activePreset: String = "Crunchyroll",
+        hasBgBox: Boolean = false,
+        bgColorArgb: Int = 0xFF000000.toInt(),
+        isItalic: Boolean = false,
+        isUppercase: Boolean = false,
+        letterSpacingSp: Float = 0f,
+        bottomPaddingDp: Float = 18f
     ) {
         context.userPrefsDataStore.edit { prefs ->
             prefs[CAPTION_FONT_SIZE] = fontSizeSp
@@ -134,6 +166,14 @@ object UserPreferences {
             prefs[CAPTION_HAS_STROKE] = hasStroke
             prefs[CAPTION_STROKE_COLOR] = strokeColorArgb
             prefs[CAPTION_STROKE_WIDTH] = strokeWidth
+            prefs[CAPTION_FONT_FAMILY] = fontFamilyName
+            prefs[CAPTION_ACTIVE_PRESET] = activePreset
+            prefs[CAPTION_HAS_BG_BOX] = hasBgBox
+            prefs[CAPTION_BG_COLOR] = bgColorArgb
+            prefs[CAPTION_IS_ITALIC] = isItalic
+            prefs[CAPTION_IS_UPPERCASE] = isUppercase
+            prefs[CAPTION_LETTER_SPACING] = letterSpacingSp
+            prefs[CAPTION_BOTTOM_PADDING] = bottomPaddingDp
         }
     }
 

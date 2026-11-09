@@ -955,7 +955,15 @@ fun CinePlayerView(
                 isBold = savedConfig.isBold,
                 hasStroke = savedConfig.hasStroke,
                 strokeColor = Color(savedConfig.strokeColorArgb),
-                strokeWidth = savedConfig.strokeWidth
+                strokeWidth = savedConfig.strokeWidth,
+                fontFamilyName = savedConfig.fontFamilyName,
+                activePreset = savedConfig.activePreset,
+                hasBgBox = savedConfig.hasBgBox,
+                bgColor = Color(savedConfig.bgColorArgb),
+                isItalic = savedConfig.isItalic,
+                isUppercase = savedConfig.isUppercase,
+                letterSpacingSp = savedConfig.letterSpacingSp,
+                bottomPaddingDp = savedConfig.bottomPaddingDp
             )
             isCaptionsEnabled = UserPreferences.getCaptionsEnabled(context).first()
             hasLoadedPreferences = true
@@ -978,7 +986,15 @@ fun CinePlayerView(
                     isBold = captionConfig.isBold,
                     hasStroke = captionConfig.hasStroke,
                     strokeColorArgb = captionConfig.strokeColor.toArgb(),
-                    strokeWidth = captionConfig.strokeWidth
+                    strokeWidth = captionConfig.strokeWidth,
+                    fontFamilyName = captionConfig.fontFamilyName,
+                    activePreset = captionConfig.activePreset,
+                    hasBgBox = captionConfig.hasBgBox,
+                    bgColorArgb = captionConfig.bgColor.toArgb(),
+                    isItalic = captionConfig.isItalic,
+                    isUppercase = captionConfig.isUppercase,
+                    letterSpacingSp = captionConfig.letterSpacingSp,
+                    bottomPaddingDp = captionConfig.bottomPaddingDp
                 )
             } catch (_: Exception) {}
         }
@@ -3911,9 +3927,9 @@ CxPillIcon(
         )
     }
 
-    // Full Subtitle / Caption Settings Modal (Images 2, 3, 4)
+    // Full Subtitle / Caption Settings Modal with Presets & Live Design Preview
     if (showCaptionSettingsModal) {
-        CxCaptionSettings(
+        CaptionSettingsModal(
             captionConfig = captionConfig,
             onConfigChange = { newCfg -> captionConfig = newCfg },
             isCaptionsEnabled = isCaptionsEnabled,
@@ -5827,7 +5843,8 @@ private fun CxIconButton(
             .size(size)
             .graphicsLayer { alpha = if (enabled) 1f else 0.35f }
             .clip(CircleShape)
-            .background(if (isHero) Color(0x40FFFFFF) else Color(0x4D000000))
+            .background(Color(0x4D000000))
+            .border(0.5.dp, Color(0x1AFFFFFF), CircleShape)
             .clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center
     ) { content() }
