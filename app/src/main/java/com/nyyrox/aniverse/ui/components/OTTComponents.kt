@@ -80,6 +80,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -731,7 +732,7 @@ private data class NavTabItem(
 
 private val DockTabs = listOf(
     NavTabItem("home", Icons.Default.Home, "Anime"),
-    NavTabItem("airing", Icons.Default.CalendarMonth, "Schedule"),
+    NavTabItem("movies", Icons.Default.Movie, "Movies"),
     NavTabItem("manga", Icons.Default.AutoStories, "Manga"),
     NavTabItem("novel", Icons.AutoMirrored.Filled.MenuBook, "Novel")
 )

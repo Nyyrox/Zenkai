@@ -176,6 +176,7 @@ private data class DrawerEntry(
 
 private val DrawerEntries = listOf(
     DrawerEntry(Icons.Default.Explore, "Browse Catalog", "Genres, seasons & year", "browse"),
+    DrawerEntry(Icons.Default.Movie, "Movies & TV Series", "Films, shows & MovieBox", "movies"),
     DrawerEntry(Icons.Default.Schedule, "Airing Schedule", "Weekly release calendar", "airing"),
     DrawerEntry(Icons.Default.Bookmark, "My Library", "Saved anime, manga & novels", "library"),
     DrawerEntry(Icons.Default.DownloadDone, "Offline Downloads", "Read and watch offline", "downloads"),

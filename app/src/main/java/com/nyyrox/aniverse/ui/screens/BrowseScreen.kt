@@ -1,7 +1,13 @@
 package com.nyyrox.aniverse.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -38,6 +45,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,8 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -82,7 +92,20 @@ private val BROWSE_ALL_GENRES = listOf(
 
 private val BROWSE_ALL_YEARS = listOf("Any year") + (2026 downTo 1990).map { it.toString() }
 
-private val BROWSE_ALL_SORTS = listOf("Trending", "Popular", "Top Rated", "Recently Updated", "Newest")
+private val BROWSE_ALL_SORTS = listOf(
+    "Trending" to "🔥 Trending",
+    "Popular" to "⭐ Popular",
+    "Top Rated" to "🏆 Top Rated",
+    "Recently Updated" to "🕒 Updated",
+    "Newest" to "✨ Newest"
+)
+
+private val BROWSE_FORMATS = listOf(
+    "ALL" to ("All" to null),
+    "TV" to ("Series" to Icons.Default.Tv),
+    "MOVIE" to ("Movies" to Icons.Default.Movie),
+    "OVA" to ("OVA" to Icons.Default.VideoLibrary)
+)
 
 @Composable
 fun BrowseScreen(
@@ -95,13 +118,11 @@ fun BrowseScreen(
     var selectedGenre by remember { mutableStateOf("All genres") }
     var selectedYear by remember { mutableStateOf("Any year") }
     var selectedSort by remember { mutableStateOf("Trending") }
-    var selectedFormat by remember { mutableStateOf("ALL") } // "ALL", "TV", "MOVIE"
-    var selectedSource by remember { mutableStateOf("AniList") } // "AniList", "TMDB"
+    var selectedFormat by remember { mutableStateOf("ALL") }
+    var selectedSource by remember { mutableStateOf("AniList") }
     var isGridView by remember { mutableStateOf(true) }
 
-    var genreDropdownExpanded by remember { mutableStateOf(false) }
     var yearDropdownExpanded by remember { mutableStateOf(false) }
-    var sortDropdownExpanded by remember { mutableStateOf(false) }
 
     fun triggerSearch(page: Int = 1) {
         val parsedYear = selectedYear.takeIf { it != "Any year" }?.toIntOrNull()
@@ -109,6 +130,7 @@ fun BrowseScreen(
         val formatParam = when (selectedFormat) {
             "TV" -> "TV"
             "MOVIE" -> "MOVIE"
+            "OVA" -> "OVA"
             else -> null
         }
         val isTmdb = selectedSource.equals("TMDB", ignoreCase = true)
@@ -141,11 +163,10 @@ fun BrowseScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // ── TOP NAVIGATION BAR (Back, Brand, Source Toggle [AniList | TMDB], Grid/List Toggle) ──
+            // ── TOP NAVIGATION BAR (Liquid Glass Header) ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .staggeredEntrance(index = 0)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -158,7 +179,7 @@ fun BrowseScreen(
                         IconButton(
                             onClick = onBack,
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(p.chipBg)
                         ) {
@@ -174,7 +195,7 @@ fun BrowseScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "ZENKAI ",
-                            fontSize = 19.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             color = p.text
                         )
@@ -182,7 +203,7 @@ fun BrowseScreen(
                             text = "BROWSE",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.4.sp,
+                            letterSpacing = 1.3.sp,
                             color = p.rating
                         )
                     }
@@ -192,7 +213,7 @@ fun BrowseScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Source Selector 2D Pill [AniList | TMDB]
+                    // Source Toggle Pill: [AniList | TMDB]
                     Row(
                         modifier = Modifier
                             .height(34.dp)
@@ -245,7 +266,7 @@ fun BrowseScreen(
                         }
                     }
 
-                    // Grid / List View Toggle Button
+                    // Grid / List Toggle
                     IconButton(
                         onClick = { isGridView = !isGridView },
                         modifier = Modifier
@@ -263,194 +284,145 @@ fun BrowseScreen(
                 }
             }
 
-            // ── 2D FILTERS (Flat format pills, flat search row, flat dropdowns) ──
-            Column(
+            // ── MODERN SEARCH BAR (Glass Glow Border) ──
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .staggeredEntrance(index = 1)
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = 16.dp, vertical = 3.dp)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(p.chipBg)
+                    .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
-                // Row 1: Flat Format Selector Pills: [All] [Series] [Movies]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Format2DPill(
-                        label = "All",
-                        icon = null,
-                        isSelected = selectedFormat == "ALL",
-                        p = p,
-                        onClick = {
-                            if (selectedFormat != "ALL") {
-                                selectedFormat = "ALL"
-                                triggerSearch(1)
-                            }
-                        }
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = p.textMuted,
+                        modifier = Modifier.size(18.dp)
                     )
-                    Format2DPill(
-                        label = "Series",
-                        icon = Icons.Default.Tv,
-                        isSelected = selectedFormat == "TV",
-                        p = p,
-                        onClick = {
-                            if (selectedFormat != "TV") {
-                                selectedFormat = "TV"
-                                triggerSearch(1)
-                            }
-                        }
-                    )
-                    Format2DPill(
-                        label = "Movies",
-                        icon = Icons.Default.Movie,
-                        isSelected = selectedFormat == "MOVIE",
-                        p = p,
-                        onClick = {
-                            if (selectedFormat != "MOVIE") {
-                                selectedFormat = "MOVIE"
-                                triggerSearch(1)
-                            }
-                        }
-                    )
-                }
 
-                // Row 2: Clean Flat 2D Search Bar
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(p.chipBg)
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = "Search anime by title, studio, or character…",
+                                fontSize = 13.sp,
+                                color = p.textMuted
+                            )
+                        }
+                        BasicTextField(
+                            value = query,
+                            onValueChange = {
+                                query = it
+                                if (it.isBlank()) triggerSearch(1)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = TextStyle(
+                                color = p.text,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            singleLine = true,
+                            cursorBrush = SolidColor(p.rating),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { triggerSearch(1) })
+                        )
+                    }
+
+                    if (query.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                query = ""
+                                triggerSearch(1)
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear",
+                                tint = p.textMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    // Compact trigger icon
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(p.rating)
+                            .clickable { triggerSearch(1) },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Search,
-                            contentDescription = null,
-                            tint = p.textMuted,
-                            modifier = Modifier.size(18.dp)
+                            contentDescription = "Search",
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.White
                         )
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            if (query.isEmpty()) {
-                                Text(
-                                    text = "Search anime...",
-                                    fontSize = 13.5.sp,
-                                    color = p.textMuted
-                                )
-                            }
-                            BasicTextField(
-                                value = query,
-                                onValueChange = { query = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                textStyle = TextStyle(
-                                    color = p.text,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                singleLine = true,
-                                cursorBrush = SolidColor(p.rating),
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { triggerSearch(1) })
-                            )
-                        }
-
-                        if (query.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    query = ""
-                                    triggerSearch(1)
-                                },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Clear",
-                                    tint = p.textMuted,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        // Compact search action icon
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(p.rating)
-                                .clickable { triggerSearch(1) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Search",
-                                modifier = Modifier.size(14.dp),
-                                tint = Color.White
-                            )
-                        }
                     }
                 }
+            }
 
-                // Row 3: Flat Filter Dropdowns: [All genres ▼] [Any year ▼] [Trending ▼]
+            // ── MODERN LIQUID GLASS FILTER STRIPS ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Strip 1: Formats & Year Filter
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Genre Dropdown
-                    Box(modifier = Modifier.weight(1.1f)) {
-                        Filter2DDropdown(
-                            label = selectedGenre,
+                    BROWSE_FORMATS.forEach { (key, pair) ->
+                        val (label, icon) = pair
+                        val isSel = selectedFormat == key
+                        ModernFilterPill(
+                            label = label,
+                            icon = icon,
+                            isSelected = isSel,
                             p = p,
-                            onClick = { genreDropdownExpanded = true }
-                        )
-                        DropdownMenu(
-                            expanded = genreDropdownExpanded,
-                            onDismissRequest = { genreDropdownExpanded = false },
-                            modifier = Modifier.background(if (p.dark) Color(0xFF161A24) else p.flatFill)
-                        ) {
-                            BROWSE_ALL_GENRES.forEach { genre ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = genre,
-                                            fontSize = 12.sp,
-                                            color = if (selectedGenre == genre) p.rating else p.text,
-                                            fontWeight = if (selectedGenre == genre) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    onClick = {
-                                        selectedGenre = genre
-                                        genreDropdownExpanded = false
-                                        triggerSearch(1)
-                                    }
-                                )
+                            onClick = {
+                                if (selectedFormat != key) {
+                                    selectedFormat = key
+                                    triggerSearch(1)
+                                }
                             }
-                        }
+                        )
                     }
 
-                    // Year Dropdown
-                    Box(modifier = Modifier.weight(0.9f)) {
-                        Filter2DDropdown(
-                            label = selectedYear,
+                    // Year Picker Pill
+                    Box {
+                        ModernFilterPill(
+                            label = if (selectedYear == "Any year") "Year" else selectedYear,
+                            icon = Icons.Default.ArrowDropDown,
+                            isSelected = selectedYear != "Any year",
                             p = p,
                             onClick = { yearDropdownExpanded = true }
                         )
+
                         DropdownMenu(
                             expanded = yearDropdownExpanded,
                             onDismissRequest = { yearDropdownExpanded = false },
-                            modifier = Modifier.background(if (p.dark) Color(0xFF161A24) else p.flatFill)
+                            modifier = Modifier.background(if (p.dark) Color(0xFF161A24) else Color.White)
                         ) {
                             BROWSE_ALL_YEARS.forEach { yr ->
                                 DropdownMenuItem(
@@ -471,49 +443,85 @@ fun BrowseScreen(
                             }
                         }
                     }
+                }
 
-                    // Sort Dropdown
-                    Box(modifier = Modifier.weight(1.0f)) {
-                        Filter2DDropdown(
-                            label = selectedSort,
-                            p = p,
-                            onClick = { sortDropdownExpanded = true }
-                        )
-                        DropdownMenu(
-                            expanded = sortDropdownExpanded,
-                            onDismissRequest = { sortDropdownExpanded = false },
-                            modifier = Modifier.background(if (p.dark) Color(0xFF161A24) else p.flatFill)
-                        ) {
-                            BROWSE_ALL_SORTS.forEach { sort ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = sort,
-                                            fontSize = 12.sp,
-                                            color = if (selectedSort == sort) p.rating else p.text,
-                                            fontWeight = if (selectedSort == sort) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    onClick = {
-                                        selectedSort = sort
-                                        sortDropdownExpanded = false
+                // Strip 2: SORTS (Trending, Popular, Top Rated, Updated, Newest)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BROWSE_ALL_SORTS.forEach { (sortKey, sortLabel) ->
+                        val isSel = selectedSort == sortKey
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (isSel) p.rating else p.chipBg)
+                                .border(1.dp, if (isSel) p.rating else Color(0x18FFFFFF), RoundedCornerShape(14.dp))
+                                .clickable {
+                                    if (selectedSort != sortKey) {
+                                        selectedSort = sortKey
                                         triggerSearch(1)
                                     }
-                                )
-                            }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = sortLabel,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else p.text
+                            )
+                        }
+                    }
+                }
+
+                // Strip 3: GENRES (Horizontal scrolling glass chips with glow)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BROWSE_ALL_GENRES.forEach { genre ->
+                        val isSel = selectedGenre == genre || (genre == "All genres" && (selectedGenre == "All" || selectedGenre == "All genres"))
+                        val displayLabel = if (genre == "All genres") "All Genres" else genre
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (isSel) p.rating else p.chipBg)
+                                .border(1.dp, if (isSel) p.rating else Color(0x18FFFFFF), RoundedCornerShape(14.dp))
+                                .clickable {
+                                    if (selectedGenre != genre) {
+                                        selectedGenre = genre
+                                        triggerSearch(1)
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = displayLabel,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else p.text
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // ── CONTENT AREA (Clean 2D Poster Grid or 2D List) ──
+            // ── MAIN CONTENT (Glass Poster Grid or Sleek List) ──
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .staggeredEntrance(index = 2)
             ) {
                 when {
                     vm.browseLoading && vm.browse.isEmpty() -> {
@@ -533,8 +541,8 @@ fun BrowseScreen(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "Unable to load titles",
-                                    fontSize = 18.sp,
+                                    text = "Unable to load anime catalog",
+                                    fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = p.text
                                 )
@@ -574,19 +582,19 @@ fun BrowseScreen(
                                     Icons.Default.Search,
                                     contentDescription = null,
                                     tint = p.textMuted,
-                                    modifier = Modifier.size(54.dp)
+                                    modifier = Modifier.size(50.dp)
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Text(
                                     text = "No anime matches found",
-                                    fontSize = 18.sp,
+                                    fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = p.text
                                 )
                                 Spacer(Modifier.height(6.dp))
                                 Text(
-                                    text = "Try changing search terms or resetting filters.",
-                                    fontSize = 13.sp,
+                                    text = "Try adjusting search terms or resetting filters.",
+                                    fontSize = 12.5.sp,
                                     color = p.textMuted,
                                     textAlign = TextAlign.Center
                                 )
@@ -609,15 +617,15 @@ fun BrowseScreen(
                     }
 
                     isGridView -> {
-                        // Clean 2D Poster Grid: borderless, card-free, beautiful typography
+                        // Premium Glass Poster Grid
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 140.dp),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 120.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             itemsIndexed(vm.browse, key = { index, it -> "${it.id}_$index" }) { _, anime ->
-                                Browse2DPosterTile(
+                                BrowseModernPosterTile(
                                     anime = anime,
                                     p = p,
                                     onClick = { onAnimeClick(anime.id) },
@@ -650,13 +658,13 @@ fun BrowseScreen(
                     }
 
                     else -> {
-                        // Clean 2D List: flat rows, borderless, clean metadata
+                        // Modern Glass List View
                         LazyColumn(
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 120.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             itemsIndexed(vm.browse, key = { index, it -> "${it.id}_$index" }) { index, anime ->
-                                Browse2DListItem(
+                                BrowseModernListItem(
                                     rank = index + 1,
                                     anime = anime,
                                     p = p,
@@ -694,11 +702,53 @@ fun BrowseScreen(
 }
 
 /**
- * Clean Flat 2D Poster Tile
- * No card styling, no 3D tilt, no box shadows — just the clean artwork and typography
+ * Modern Glass Filter Pill with subtle border and smooth active state
  */
 @Composable
-internal fun Browse2DPosterTile(
+private fun ModernFilterPill(
+    label: String,
+    icon: ImageVector?,
+    isSelected: Boolean,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) p.rating else p.chipBg)
+            .border(1.dp, if (isSelected) p.rating else Color(0x18FFFFFF), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isSelected) Color.White else p.textSub,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+            Text(
+                text = label,
+                fontSize = 11.5.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) Color.White else p.textSub
+            )
+        }
+    }
+}
+
+/**
+ * Modern Anime Poster Tile (Glass accents, floating score & format badges)
+ */
+@Composable
+internal fun BrowseModernPosterTile(
     anime: Anime,
     p: HomePalette,
     onClick: () -> Unit,
@@ -706,15 +756,16 @@ internal fun Browse2DPosterTile(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.70f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(p.chipBg)
+                .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(14.dp))
         ) {
             AsyncImage(
                 model = anime.cover,
@@ -723,15 +774,27 @@ internal fun Browse2DPosterTile(
                 contentScale = ContentScale.Crop
             )
 
-            // Format Badge (Top Left, flat 2D)
+            // Bottom Gradient Scrim
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.6f to Color.Transparent,
+                            1.0f to Color.Black.copy(alpha = 0.8f)
+                        )
+                    )
+            )
+
+            // Format Badge (Top Left Glass Capsule)
             if (anime.displayFormat.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(5.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = anime.displayFormat,
@@ -742,21 +805,21 @@ internal fun Browse2DPosterTile(
                 }
             }
 
-            // Rating Star Badge (Top Right, flat 2D)
+            // Rating Star Badge (Top Right Glass Capsule)
             anime.score?.let { score ->
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(5.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.65f))
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.75f))
                         .padding(horizontal = 5.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.Star,
                         contentDescription = null,
-                        tint = p.rating,
+                        tint = Color(0xFFFFB300),
                         modifier = Modifier.size(10.dp)
                     )
                     Spacer(Modifier.width(2.dp))
@@ -765,6 +828,25 @@ internal fun Browse2DPosterTile(
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
+                    )
+                }
+            }
+
+            // Bottom metadata tag inside poster (Episodes)
+            anime.episodes?.let { epCount ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0x88000000))
+                        .padding(horizontal = 4.dp, vertical = 1.5.dp)
+                ) {
+                    Text(
+                        text = "$epCount eps",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFDDDDDD)
                     )
                 }
             }
@@ -778,29 +860,23 @@ internal fun Browse2DPosterTile(
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = p.text,
-            maxLines = 2,
-            minLines = 2,
-            lineHeight = 16.sp,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
 
-        Spacer(Modifier.height(2.dp))
-
-        // Subtitle metadata (Year • Episodes or Genre)
+        // Subtitle metadata (Year • Genres)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(top = 1.dp)
         ) {
             val metaParts = mutableListOf<String>()
             if (anime.displayYear.isNotBlank()) metaParts.add(anime.displayYear)
-            anime.episodes?.let { metaParts.add("$it eps") }
-            if (metaParts.isEmpty() && anime.genres.isNotEmpty()) {
-                metaParts.add(anime.genres.first())
-            }
+            if (anime.genres.isNotEmpty()) metaParts.add(anime.genres.first())
 
             Text(
                 text = metaParts.joinToString(" • "),
-                fontSize = 11.sp,
+                fontSize = 10.5.sp,
                 color = p.textMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -810,10 +886,10 @@ internal fun Browse2DPosterTile(
 }
 
 /**
- * Clean Flat 2D List Item (No card box, borderless)
+ * Modern Anime List Item (Glass card with rank accent)
  */
 @Composable
-internal fun Browse2DListItem(
+internal fun BrowseModernListItem(
     rank: Int,
     anime: Anime,
     p: HomePalette,
@@ -823,17 +899,19 @@ internal fun Browse2DListItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(p.chipBg)
+            .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Flat 2D Thumbnail
+        // Thumbnail
         Box(
             modifier = Modifier
-                .size(width = 72.dp, height = 104.dp)
+                .size(width = 76.dp, height = 108.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(p.chipBg)
+                .background(Color(0xFF1E2026))
         ) {
             AsyncImage(
                 model = anime.cover,
@@ -842,17 +920,17 @@ internal fun Browse2DListItem(
                 contentScale = ContentScale.Crop
             )
 
-            // Zenkai Crimson Rank Badge Capsule
+            // Crimson Rank Capsule
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .clip(RoundedCornerShape(bottomEnd = 6.dp))
                     .background(p.rating)
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
                     text = "#$rank",
-                    fontSize = 9.5.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White
                 )
@@ -861,7 +939,7 @@ internal fun Browse2DListItem(
 
         Spacer(Modifier.width(12.dp))
 
-        // Right details
+        // Right Content
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -869,7 +947,7 @@ internal fun Browse2DListItem(
             Text(
                 text = anime.displayTitle,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = p.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -884,7 +962,7 @@ internal fun Browse2DListItem(
                         Icon(
                             Icons.Default.Star,
                             contentDescription = null,
-                            tint = p.rating,
+                            tint = Color(0xFFFFB300),
                             modifier = Modifier.size(11.dp)
                         )
                         Spacer(Modifier.width(2.dp))
@@ -892,7 +970,7 @@ internal fun Browse2DListItem(
                             text = String.format(java.util.Locale.US, "%.1f", score / 10f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = p.rating
+                            color = p.text
                         )
                     }
                     Text("•", fontSize = 10.sp, color = p.textMuted)
@@ -902,7 +980,7 @@ internal fun Browse2DListItem(
                     text = anime.displayFormat,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                    color = p.textSub
+                    color = p.rating
                 )
 
                 if (anime.displayYear.isNotBlank()) {
@@ -939,7 +1017,7 @@ internal fun Browse2DListItem(
                 Text(
                     text = anime.genres.take(3).joinToString(" • "),
                     fontSize = 10.sp,
-                    color = p.textMuted,
+                    color = p.rating,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -948,92 +1026,39 @@ internal fun Browse2DListItem(
     }
 }
 
-/**
- * Flat 2D Format Pill
- */
-@Composable
-private fun Format2DPill(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector?,
-    isSelected: Boolean,
-    p: HomePalette,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .height(32.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) p.rating else p.chipBg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isSelected) Color.White else p.textSub,
-                    modifier = Modifier.size(13.dp)
-                )
-            }
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Color.White else p.textSub
-            )
-        }
-    }
-}
-
-/**
- * Flat 2D Filter Dropdown Chip
- */
-@Composable
-private fun Filter2DDropdown(
-    label: String,
-    p: HomePalette,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(36.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(p.chipBg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = p.text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            Icon(
-                Icons.Default.ArrowDropDown,
-                contentDescription = null,
-                tint = p.textMuted,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
-
 // Backward compatibility composables
+@Composable
+internal fun Browse2DPosterTile(
+    anime: Anime,
+    p: HomePalette,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BrowseModernPosterTile(
+        anime = anime,
+        p = p,
+        onClick = onClick,
+        modifier = modifier
+    )
+}
+
+@Composable
+internal fun Browse2DListItem(
+    rank: Int,
+    anime: Anime,
+    p: HomePalette,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BrowseModernListItem(
+        rank = rank,
+        anime = anime,
+        p = p,
+        onClick = onClick,
+        modifier = modifier
+    )
+}
+
 @Composable
 fun Browse3DMediaCard(
     anime: Anime,
@@ -1041,7 +1066,7 @@ fun Browse3DMediaCard(
     modifier: Modifier = Modifier
 ) {
     val p = rememberHomePalette()
-    Browse2DPosterTile(
+    BrowseModernPosterTile(
         anime = anime,
         p = p,
         onClick = onClick,
@@ -1056,7 +1081,7 @@ fun Browse3DListItem(
     modifier: Modifier = Modifier
 ) {
     val p = rememberHomePalette()
-    Browse2DListItem(
+    BrowseModernListItem(
         rank = 1,
         anime = anime,
         p = p,
@@ -1073,7 +1098,7 @@ fun OttBrowseBackdropCard(
     modifier: Modifier = Modifier
 ) {
     val p = rememberHomePalette()
-    Browse2DListItem(
+    BrowseModernListItem(
         rank = rank,
         anime = anime,
         p = p,

@@ -85,6 +85,8 @@ import com.nyyrox.aniverse.ui.screens.AiringScreen
 import com.nyyrox.aniverse.ui.screens.AvatarPickerScreen
 import com.nyyrox.aniverse.ui.screens.BannerPickerScreen
 import com.nyyrox.aniverse.ui.screens.BrowseScreen
+import com.nyyrox.aniverse.ui.screens.MovieBrowseScreen
+import com.nyyrox.aniverse.ui.screens.MoviePlayerScreen
 import com.nyyrox.aniverse.ui.screens.SearchScreen
 import com.nyyrox.aniverse.ui.screens.DecorationClosetScreen
 import com.nyyrox.aniverse.ui.screens.DirectChatScreen
@@ -172,8 +174,8 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
 
     val isDetailOverlayOpen = vm.activeDetailAnimeId != null || vm.activeDetailMangaId != null || vm.activeDetailNovelSlug != null
     val isDetailRoute = currentRoute.startsWith("detail:") || currentRoute.startsWith("manga_detail:") || currentRoute.startsWith("novel_detail:")
-    val isPlayerRoute = currentRoute.startsWith("player:") || currentRoute.startsWith("manga_reader:") || currentRoute.startsWith("novel_reader:")
-    val isRootRoute = listOf("home", "airing", "manga", "novel", "profile").contains(currentRoute) && !isDetailOverlayOpen && !isPlayerRoute
+    val isPlayerRoute = currentRoute.startsWith("player:") || currentRoute.startsWith("movie_player:") || currentRoute.startsWith("manga_reader:") || currentRoute.startsWith("novel_reader:")
+    val isRootRoute = listOf("home", "movies", "manga", "novel", "airing", "profile").contains(currentRoute) && !isDetailOverlayOpen && !isPlayerRoute
 
     val detailId = if (currentRoute.startsWith("detail:")) {
         currentRoute.removePrefix("detail:").toIntOrNull() ?: 0
@@ -186,6 +188,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     val playerId = playerParts.getOrNull(0)?.toIntOrNull() ?: 0
     val playerEpisode = playerParts.getOrNull(1)?.toIntOrNull() ?: 1
     val playerProviderId = playerParts.getOrNull(2)
+
+    val moviePlayerParts = if (currentRoute.startsWith("movie_player:")) {
+        currentRoute.removePrefix("movie_player:").split(":")
+    } else emptyList()
+    val moviePlayerId = moviePlayerParts.getOrNull(0)?.toIntOrNull() ?: 0
+    val moviePlayerType = moviePlayerParts.getOrNull(1) ?: "movie"
+    val moviePlayerSeason = moviePlayerParts.getOrNull(2)?.toIntOrNull() ?: 1
+    val moviePlayerEpisode = moviePlayerParts.getOrNull(3)?.toIntOrNull() ?: 1
 
     val mangaReaderParts = if (currentRoute.startsWith("manga_reader:")) {
         val payload = currentRoute.removePrefix("manga_reader:")
@@ -245,6 +255,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
             navStack = listOf(tab)
             when (tab) {
                 "home" -> if (vm.trending.isEmpty()) vm.loadHome()
+                "movies" -> {}
                 "manga" -> vm.loadMangaHome()
                 "novel" -> vm.loadNovelHome()
                 "browse" -> if (vm.browse.isEmpty()) vm.loadBrowse()
@@ -535,6 +546,13 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                     )
                                 }
 
+                                screen == "movies" -> {
+                                    MovieBrowseScreen(
+                                        vm = vm,
+                                        onPlayMovie = { id, type -> push("movie_player:$id:$type:1:1") }
+                                    )
+                                }
+
                                 screen == "manga" -> {
                                     MangaHomeScreen(
                                         vm = vm,
@@ -790,6 +808,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                 }
 
                                 screen.startsWith("player:") ||
+                                screen.startsWith("movie_player:") ||
                                 screen.startsWith("manga_reader:") ||
                                 screen.startsWith("novel_reader:") -> {
                                     // Fullscreen media player and readers are rendered in the dedicated top layer above detail overlays
@@ -932,6 +951,24 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                             }
                         }
 
+                        // 1b. Movie CinePlayer Screen
+                        val isMoviePlayerActive = currentRoute.startsWith("movie_player:")
+                        AnimatedVisibility(
+                            visible = isMoviePlayerActive,
+                            enter = fadeIn(tween(220)),
+                            exit = androidx.compose.animation.ExitTransition.None
+                        ) {
+                            if (isMoviePlayerActive) {
+                                MoviePlayerScreen(
+                                    id = moviePlayerId,
+                                    type = moviePlayerType,
+                                    initialSeason = moviePlayerSeason,
+                                    initialEpisode = moviePlayerEpisode,
+                                    onBack = { pop() }
+                                )
+                            }
+                        }
+
                         // 2. Manga Reader Screen
                         val isMangaReaderActive = currentRoute.startsWith("manga_reader:")
                         AnimatedVisibility(
@@ -1002,7 +1039,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                     }
 
                     // Dedicated Circular Notification and Profile Buttons pinned at top-right
-                    if (isRootRoute && currentRoute != "profile" && currentRoute != "browse") {
+                    if (isRootRoute && currentRoute != "profile" && currentRoute != "browse" && currentRoute != "movies") {
                         Row(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
