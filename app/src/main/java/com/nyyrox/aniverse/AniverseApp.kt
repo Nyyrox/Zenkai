@@ -85,7 +85,8 @@ import com.nyyrox.aniverse.ui.screens.AiringScreen
 import com.nyyrox.aniverse.ui.screens.AvatarPickerScreen
 import com.nyyrox.aniverse.ui.screens.BannerPickerScreen
 import com.nyyrox.aniverse.ui.screens.BrowseScreen
-import com.nyyrox.aniverse.ui.screens.MovieBrowseScreen
+import com.nyyrox.aniverse.ui.screens.MovieHomeScreen
+import com.nyyrox.aniverse.ui.screens.MovieDetailsScreen
 import com.nyyrox.aniverse.ui.screens.MoviePlayerScreen
 import com.nyyrox.aniverse.ui.screens.SearchScreen
 import com.nyyrox.aniverse.ui.screens.DecorationClosetScreen
@@ -173,7 +174,7 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     val sharedPosterCoordinator = rememberSharedPosterCoordinator()
 
     val isDetailOverlayOpen = vm.activeDetailAnimeId != null || vm.activeDetailMangaId != null || vm.activeDetailNovelSlug != null
-    val isDetailRoute = currentRoute.startsWith("detail:") || currentRoute.startsWith("manga_detail:") || currentRoute.startsWith("novel_detail:")
+    val isDetailRoute = currentRoute.startsWith("detail:") || currentRoute.startsWith("manga_detail:") || currentRoute.startsWith("novel_detail:") || currentRoute.startsWith("movie_detail:")
     val isPlayerRoute = currentRoute.startsWith("player:") || currentRoute.startsWith("movie_player:") || currentRoute.startsWith("manga_reader:") || currentRoute.startsWith("novel_reader:")
     val isRootRoute = listOf("home", "movies", "manga", "novel", "airing", "profile").contains(currentRoute) && !isDetailOverlayOpen && !isPlayerRoute
 
@@ -547,9 +548,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                 }
 
                                 screen == "movies" -> {
-                                    MovieBrowseScreen(
+                                    MovieHomeScreen(
                                         vm = vm,
-                                        onPlayMovie = { id, type -> push("movie_player:$id:$type:1:1") }
+                                        onMovieClick = { id, type, title, poster ->
+                                            vm.openMovieDetail(id, type, title, poster)
+                                            push("movie_detail:$id:$type")
+                                        },
+                                        onPlayMovie = { id, type, season, episode -> push("movie_player:$id:$type:$season:$episode") },
+                                        onSearchClick = { push("search:movies") }
                                     )
                                 }
 
@@ -594,6 +600,10 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         initialTab = initialTab,
                                         onBack = { pop() },
                                         onAnimeClick = { vm.openAnimeDetail(it) },
+                                        onMovieClick = { id, type, title, poster ->
+                                            vm.openMovieDetail(id, type, title, poster)
+                                            push("movie_detail:$id:$type")
+                                        },
                                         onMangaClick = { id, title, poster -> vm.openMangaDetail(id, title, poster) },
                                         onNovelClick = { slug, title, poster -> vm.openNovelDetail(slug, title, poster) }
                                     )
@@ -805,6 +815,32 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                         val withoutDetail = navStack.filterNot { it.startsWith("novel_detail:") }
                                         navStack = if (withoutDetail.isNotEmpty()) withoutDetail else listOf("novel")
                                     }
+                                }
+
+                                screen.startsWith("movie_detail:") -> {
+                                    val payload = screen.removePrefix("movie_detail:")
+                                    val parts = payload.split(":")
+                                    val mId = parts.getOrNull(0)?.toIntOrNull() ?: 0
+                                    val mType = parts.getOrNull(1) ?: "movie"
+                                    val knownItem = vm.findKnownAnime(mId)
+                                    val knownHistory = vm.movieHistory.firstOrNull { it.id == mId && it.type.equals(mType, ignoreCase = true) }
+                                    val cachedTitle = vm.pendingMovieTitleHint ?: knownItem?.displayTitle ?: knownHistory?.title
+                                    val cachedPoster = vm.pendingMoviePosterHint ?: knownItem?.cover ?: knownHistory?.poster
+                                    MovieDetailsScreen(
+                                        id = mId,
+                                        type = mType,
+                                        onBack = {
+                                            vm.closeMovieDetail()
+                                            pop()
+                                        },
+                                        onPlay = { id, type, s, e -> push("movie_player:$id:$type:$s:$e") },
+                                        onMovieClick = { id, type, title, poster ->
+                                            vm.openMovieDetail(id, type, title, poster)
+                                            push("movie_detail:$id:$type")
+                                        },
+                                        cachedTitle = cachedTitle,
+                                        cachedPoster = cachedPoster
+                                    )
                                 }
 
                                 screen.startsWith("player:") ||

@@ -248,11 +248,11 @@ private fun GlyphIcon(icon: ImageVector, desc: String?, size: Dp, modifier: Modi
 }
 
 @Composable
-private fun Modifier.tap(onClick: () -> Unit): Modifier =
+internal fun Modifier.tap(onClick: () -> Unit): Modifier =
     this.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
 
 @Composable
-private fun Modifier.pressable(onClick: () -> Unit): Modifier {
+internal fun Modifier.pressable(onClick: () -> Unit): Modifier {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     val s by animateFloatAsState(
@@ -266,7 +266,7 @@ private fun Modifier.pressable(onClick: () -> Unit): Modifier {
 }
 
 /** 3D coverflow effect for horizontal rows: items fold away from the centre as they scroll. */
-private fun Modifier.rowTilt(state: LazyListState, index: Int): Modifier = this.graphicsLayer {
+internal fun Modifier.rowTilt(state: LazyListState, index: Int): Modifier = this.graphicsLayer {
     val info = state.layoutInfo
     val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return@graphicsLayer
     val vw = (info.viewportEndOffset - info.viewportStartOffset).toFloat().coerceAtLeast(1f)
@@ -282,7 +282,7 @@ private fun Modifier.rowTilt(state: LazyListState, index: Int): Modifier = this.
 
 /** Drag sideways (either way) and the card tilts in 3D, then springs back. */
 @Composable
-private fun Modifier.dragTilt3d(): Modifier {
+internal fun Modifier.dragTilt3d(): Modifier {
     val x = remember { Animatable(0f) }
     val w = remember { mutableFloatStateOf(1f) }
     val scope = rememberCoroutineScope()
@@ -367,7 +367,7 @@ private fun GlassPill(label: String, icon: ImageVector?, p: HomePalette, onClick
 }
 
 @Composable
-private fun SectionTitle(title: String, p: HomePalette, subtitle: String? = null, onSeeAll: (() -> Unit)? = null) {
+internal fun SectionTitle(title: String, p: HomePalette, subtitle: String? = null, onSeeAll: (() -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 2.dp),
         verticalAlignment = Alignment.Bottom
@@ -410,7 +410,7 @@ private fun pickEpisode(anime: Anime): Int =
 // ── Poster tile + rows ───────────────────────────────────────────────────────
 
 @Composable
-private fun PosterTile(
+internal fun PosterTile(
     title: String, image: String?, meta: String?, p: HomePalette,
     anime: Anime? = null, modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
@@ -436,7 +436,7 @@ private fun PosterTile(
 }
 
 @Composable
-private fun AnimeRow(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
+internal fun AnimeRow(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
     val st = rememberLazyListState()
     LazyRow(
         state = st,
@@ -450,7 +450,7 @@ private fun AnimeRow(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> U
 }
 
 @Composable
-private fun Top10Row(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
+internal fun Top10Row(list: List<Anime>, p: HomePalette, onAnimeClick: (Int) -> Unit) {
     val top = remember(list) { list.take(10) }
     val st = rememberLazyListState()
     LazyRow(
@@ -576,7 +576,7 @@ private const val TWO_PI = (2.0 * Math.PI).toFloat()
  * reset to glitch. Cards only ever show as: centre + one peeking on each side. Nothing reaches the edges.
  */
 @Composable
-private fun HomeHero(
+internal fun HomeHero(
     shows: List<Anime>,
     vm: MainViewModel,
     p: HomePalette,
@@ -1010,9 +1010,9 @@ fun YouTubeStyleEpisodeCard(
 
 // ── Continue row ─────────────────────────────────────────────────────────────
 
-private enum class ContinueKind(val label: String) { ANIME("ANIME"), MANGA("MANGA"), NOVEL("NOVEL") }
+internal enum class ContinueKind(val label: String) { ANIME("ANIME"), MANGA("MANGA"), NOVEL("NOVEL"), MOVIE("MOVIE") }
 
-private class ContinueEntry(
+internal class ContinueEntry(
     val key: String,
     val kind: ContinueKind,
     val title: String,
@@ -1029,7 +1029,7 @@ private fun firstNonBlank(vararg s: String?): String? = s.firstOrNull { !it.isNu
 private fun Number?.asLong(): Long = this?.toLong() ?: 0L
 
 @Composable
-private fun ContinueRow(
+internal fun ContinueRow(
     animeHistory: List<WatchHistoryItem>,
     mangaHistory: List<MangaHistoryItem>,
     novelHistory: List<NovelHistoryItem>,
@@ -1106,7 +1106,7 @@ private fun ContinueRow(
 }
 
 @Composable
-private fun ContinueTile(e: ContinueEntry, p: HomePalette, modifier: Modifier = Modifier) {
+internal fun ContinueTile(e: ContinueEntry, p: HomePalette, modifier: Modifier = Modifier) {
     LaunchedEffect(e.key) { e.loadStill?.invoke() }
     Column(modifier.width(250.dp).pressable(e.onOpen)) {
         Box(
@@ -1182,7 +1182,7 @@ private fun LazyListScope.episodeBreak(
 // ── Loading skeleton ─────────────────────────────────────────────────────────
 
 @Composable
-private fun HomeSkeleton(p: HomePalette) {
+internal fun HomeSkeleton(p: HomePalette) {
     LazyColumn(
         contentPadding = PaddingValues(bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp)

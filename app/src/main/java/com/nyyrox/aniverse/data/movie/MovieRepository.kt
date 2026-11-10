@@ -36,6 +36,8 @@ object MovieRepository {
         MovieGenre(37, "Western")
     )
 
+    val allGenresMap: Map<Int, String> by lazy { (MOVIE_GENRES + TV_GENRES).associate { it.id to it.name } }
+
     val TV_GENRES = listOf(
         MovieGenre(10759, "Action & Adventure"),
         MovieGenre(16, "Animation"),
@@ -299,6 +301,27 @@ object MovieRepository {
             val imdbId = extObj?.optString("imdb_id")?.takeIf { it.isNotBlank() && it != "null" }
                 ?: root.optString("imdb_id").takeIf { it.isNotBlank() && it != "null" }
 
+            // Collection / Franchise (for movies)
+            val collectionParts = mutableListOf<MovieItem>()
+            val collObj = root.optJSONObject("belongs_to_collection")
+            val collId = collObj?.optInt("id", 0) ?: 0
+            if (collId > 0) {
+                try {
+                    val collRes = TmdbRepository.executeTmdbGet("/collection/$collId", "language=en-US")
+                    if (!collRes.isNullOrBlank()) {
+                        val cJson = JSONObject(collRes)
+                        val pArr = cJson.optJSONArray("parts")
+                        if (pArr != null) {
+                            for (pIdx in 0 until pArr.length()) {
+                                val pObj = pArr.optJSONObject(pIdx) ?: continue
+                                val pItem = parseMovieItem(pObj, "movie")
+                                if (pItem != null && pItem.poster != null) collectionParts.add(pItem)
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
             val details = MovieDetails(
                 id = id,
                 type = type,
@@ -317,6 +340,7 @@ object MovieRepository {
                 seasons = seasons,
                 cast = cast,
                 similar = similar,
+                collection = collectionParts,
                 imdbId = imdbId
             )
             cache[cacheKey] = details
@@ -351,9 +375,91 @@ object MovieRepository {
         eps
     }
 
+    fun getMovieServers(id: Int, type: String, season: Int = 1, episode: Int = 1): List<MovieServerOption> {
+        val isTv = type.equals("tv", ignoreCase = true)
+        return listOf(
+            MovieServerOption(
+                id = "moviebox",
+                label = "MovieBox",
+                tags = listOf("Direct", "Multi audio"),
+                isDirect = true
+            ),
+            MovieServerOption(
+                id = "cinemaos",
+                label = "Scarlet Witch",
+                tags = listOf("Multi audio"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://cinemaos.tech/player/$id/$season/$episode?lang=en" else "https://cinemaos.tech/player/$id?lang=en"
+            ),
+            MovieServerOption(
+                id = "vidzee",
+                label = "Captain America",
+                tags = listOf("Multi audio"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://player.vidzee.wtf/embed/tv/$id/$season/$episode?lang=en" else "https://player.vidzee.wtf/embed/movie/$id?lang=en"
+            ),
+            MovieServerOption(
+                id = "videasy",
+                label = "Iron Man (4K)",
+                tags = listOf("Multi audio", "4K"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://player.videasy.to/tv/$id/$season/$episode?color=E50914&overlay=true&nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true" else "https://player.videasy.to/movie/$id?color=E50914&overlay=true&nextEpisode=true"
+            ),
+            MovieServerOption(
+                id = "vidup",
+                label = "Thor",
+                tags = listOf("1080p"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://vidup.to/tv/$id/$season/$episode?server=zenith" else "https://vidup.to/movie/$id?server=zenith"
+            ),
+            MovieServerOption(
+                id = "vidcore",
+                label = "Hulk",
+                tags = listOf("HD"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://vidcore.net/tv/$id/$season/$episode?server=Crystal&autoPlay=true" else "https://vidcore.net/movie/$id?server=Crystal&autoPlay=true"
+            ),
+            MovieServerOption(
+                id = "vidsrc-ru",
+                label = "Black Widow",
+                tags = listOf("Multi"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://vidsrcme.ru/embed/tv/$id/$season/$episode" else "https://vidsrcme.ru/embed/movie/$id"
+            ),
+            MovieServerOption(
+                id = "vidlove",
+                label = "Hawkeye",
+                tags = listOf("Fast"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://player.vidlove.cc/embed/tv/$id/$season/$episode" else "https://player.vidlove.cc/embed/movie/$id"
+            ),
+            MovieServerOption(
+                id = "1embed",
+                label = "Spider-Man",
+                tags = listOf("HD"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://1embed.cc/embed/tv/$id/$season/$episode" else "https://1embed.cc/embed/movie/$id"
+            ),
+            MovieServerOption(
+                id = "cinesrc",
+                label = "Doctor Strange",
+                tags = listOf("HD"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://cinesrc.st/embed/tv/$id/$season/$episode" else "https://cinesrc.st/embed/movie/$id"
+            ),
+            MovieServerOption(
+                id = "primesrc",
+                label = "Black Panther",
+                tags = listOf("HD"),
+                isDirect = false,
+                embedUrl = if (isTv) "https://primesrc.me/embed/tv?tmdb=$id&season=$season&episode=$episode&fallback=false&serverOrder=PrimeVid,Voe,Dood" else "https://primesrc.me/embed/movie?tmdb=$id"
+            )
+        )
+    }
+
     /**
-     * Resolves MovieBox direct stream with multi-audio dubs, qualities, and subtitles
-     * via the Zenkai Stream Proxy Worker.
+     * Resolves MovieBox direct stream with multi-audio dubs, qualities, and subtitles.
+     * Uses native on-device MovieBoxResolver first for instant playback without external proxies.
      */
     suspend fun fetchMovieStream(
         id: Int,
@@ -365,6 +471,26 @@ object MovieRepository {
         dubId: String? = null,
         imdbId: String? = null
     ): MovieStreamResult = withContext(Dispatchers.IO) {
+        // 1. Native on-device MovieBox resolver
+        try {
+            val nativeRes = MovieBoxResolver.resolveStream(
+                tmdbId = id,
+                type = type,
+                season = season,
+                episode = episode,
+                title = title,
+                year = year,
+                dubId = dubId
+            )
+            if (nativeRes.success && nativeRes.streamUrl.isNotBlank()) {
+                android.util.Log.d("MovieRepository", "Native MovieBox stream resolved successfully: ${nativeRes.quality}")
+                return@withContext nativeRes
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MovieRepository", "Native MovieBox resolve exception: ${e.message}")
+        }
+
+        // 2. Fallback to stream proxy worker if needed
         val qb = StringBuilder("id=$id&type=$type&s=$season&e=$episode")
         if (!title.isNullOrBlank()) qb.append("&title=").append(URLEncoder.encode(title, "UTF-8"))
         if (!year.isNullOrBlank()) qb.append("&year=").append(URLEncoder.encode(year, "UTF-8"))
@@ -380,7 +506,12 @@ object MovieRepository {
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Zenkai/1.0.5")
                 .build()
 
-            httpClient.newCall(req).execute().use { resp ->
+            val quickClient = httpClient.newBuilder()
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(4, TimeUnit.SECONDS)
+                .build()
+
+            quickClient.newCall(req).execute().use { resp ->
                 val bodyStr = resp.body.string()
                 if (!resp.isSuccessful) {
                     return@withContext MovieStreamResult(
@@ -389,7 +520,7 @@ object MovieRepository {
                         title = title ?: "",
                         streamUrl = "",
                         quality = "Auto",
-                        error = "HTTP error ${resp.code}: $bodyStr"
+                        error = "MovieBox stream not available for this title. Try Iron Man, Captain America, or another server."
                     )
                 }
 
@@ -504,7 +635,7 @@ object MovieRepository {
                 title = title ?: "",
                 streamUrl = "",
                 quality = "Auto",
-                error = e.message ?: "Failed to resolve stream"
+                error = "MovieBox stream not available for this title. Try Iron Man, Captain America, or another server."
             )
         }
     }

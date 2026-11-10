@@ -17,8 +17,8 @@ android {
         applicationId = "com.nyyrox.aniverse"
         minSdk = 26
         targetSdk = 36
-        versionCode = 163
-        versionName = "1.6.3"
+        versionCode = 164
+        versionName = "1.6.4"
         setProperty("archivesBaseName", "ZENKAI")
     }
 

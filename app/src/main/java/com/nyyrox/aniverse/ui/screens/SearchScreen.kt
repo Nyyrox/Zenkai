@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +59,8 @@ import coil3.compose.AsyncImage
 import com.nyyrox.aniverse.data.Anime
 import com.nyyrox.aniverse.data.manga.MangaCard
 import com.nyyrox.aniverse.data.manga.MangaRepository
+import com.nyyrox.aniverse.data.movie.MovieItem
+import com.nyyrox.aniverse.data.movie.MovieRepository
 import com.nyyrox.aniverse.data.novel.NovelItem
 import com.nyyrox.aniverse.data.novel.NovelSource
 import com.nyyrox.aniverse.ui.theme.GlassBackdropHost
@@ -69,6 +72,7 @@ import java.util.Locale
 
 enum class SearchTab(val label: String) {
     ANIME("Anime"),
+    MOVIES("Movies & TV"),
     MANGA("Manga"),
     NOVEL("Novels")
 }
@@ -79,6 +83,7 @@ fun SearchScreen(
     initialTab: String = "anime",
     onBack: () -> Unit,
     onAnimeClick: (Int) -> Unit,
+    onMovieClick: ((Int, String, String?, String?) -> Unit)? = null,
     onMangaClick: ((String, String?, String?) -> Unit)? = null,
     onNovelClick: ((String, String?, String?) -> Unit)? = null
 ) {
@@ -86,6 +91,7 @@ fun SearchScreen(
     var selectedTab by remember(initialTab) {
         mutableStateOf(
             when (initialTab.lowercase()) {
+                "movie", "movies", "tv", "series" -> SearchTab.MOVIES
                 "manga" -> SearchTab.MANGA
                 "novel", "novels" -> SearchTab.NOVEL
                 else -> SearchTab.ANIME
@@ -95,6 +101,7 @@ fun SearchScreen(
 
     var query by remember { mutableStateOf("") }
     var animeResults by remember { mutableStateOf<List<Anime>>(emptyList()) }
+    var movieResults by remember { mutableStateOf<List<MovieItem>>(emptyList()) }
     var mangaResults by remember { mutableStateOf<List<MangaCard>>(emptyList()) }
     var novelResults by remember { mutableStateOf<List<NovelItem>>(emptyList()) }
     var selectedNovelSource by remember { mutableStateOf<NovelSource?>(null) }
@@ -104,6 +111,7 @@ fun SearchScreen(
         val q = query.trim()
         if (q.isBlank()) {
             animeResults = emptyList()
+            movieResults = emptyList()
             mangaResults = emptyList()
             novelResults = emptyList()
             isSearching = false
@@ -115,6 +123,11 @@ fun SearchScreen(
             when (selectedTab) {
                 SearchTab.ANIME -> {
                     animeResults = vm.searchAniListAnime(q)
+                }
+                SearchTab.MOVIES -> {
+                    movieResults = withContext(Dispatchers.IO) {
+                        MovieRepository.search(q, "multi")
+                    }
                 }
                 SearchTab.MANGA -> {
                     mangaResults = withContext(Dispatchers.IO) {
@@ -130,6 +143,7 @@ fun SearchScreen(
         } catch (_: Exception) {
             when (selectedTab) {
                 SearchTab.ANIME -> animeResults = emptyList()
+                SearchTab.MOVIES -> movieResults = emptyList()
                 SearchTab.MANGA -> mangaResults = emptyList()
                 SearchTab.NOVEL -> novelResults = emptyList()
             }
@@ -208,6 +222,7 @@ fun SearchScreen(
                                 if (query.isEmpty()) {
                                     val hint = when (selectedTab) {
                                         SearchTab.ANIME -> "Search anime by title, genre..."
+                                        SearchTab.MOVIES -> "Search movies & TV series..."
                                         SearchTab.MANGA -> "Search manga, manhwa & comics..."
                                         SearchTab.NOVEL -> "Search web & light novels..."
                                     }
@@ -270,6 +285,7 @@ fun SearchScreen(
                         ) {
                             val icon = when (tab) {
                                 SearchTab.ANIME -> Icons.Default.Movie
+                                SearchTab.MOVIES -> Icons.Default.Tv
                                 SearchTab.MANGA -> Icons.Default.AutoStories
                                 SearchTab.NOVEL -> Icons.AutoMirrored.Filled.MenuBook
                             }
@@ -369,6 +385,7 @@ fun SearchScreen(
                             ) {
                                 val icon = when (selectedTab) {
                                     SearchTab.ANIME -> Icons.Default.Movie
+                                    SearchTab.MOVIES -> Icons.Default.Tv
                                     SearchTab.MANGA -> Icons.Default.AutoStories
                                     SearchTab.NOVEL -> Icons.AutoMirrored.Filled.MenuBook
                                 }
@@ -384,6 +401,7 @@ fun SearchScreen(
 
                             val title = when (selectedTab) {
                                 SearchTab.ANIME -> "Explore Anime"
+                                SearchTab.MOVIES -> "Explore Movies & Series"
                                 SearchTab.MANGA -> "Discover Manga & Manhwa"
                                 SearchTab.NOVEL -> "Read Web & Light Novels"
                             }
@@ -399,6 +417,7 @@ fun SearchScreen(
 
                             val subtitle = when (selectedTab) {
                                 SearchTab.ANIME -> "Search thousands of series, movies and OVAs powered by AniList."
+                                SearchTab.MOVIES -> "Search millions of films and TV series powered by TMDB."
                                 SearchTab.MANGA -> "Search across top manga, manhwa & comics from AniList and sources."
                                 SearchTab.NOVEL -> "Search thousands of web novels, light novels and translations."
                             }
@@ -437,6 +456,7 @@ fun SearchScreen(
                     }
 
                     selectedTab == SearchTab.ANIME && animeResults.isEmpty() ||
+                    selectedTab == SearchTab.MOVIES && movieResults.isEmpty() ||
                     selectedTab == SearchTab.MANGA && mangaResults.isEmpty() ||
                     selectedTab == SearchTab.NOVEL && novelResults.isEmpty() -> {
                         // No Results State
@@ -481,6 +501,21 @@ fun SearchScreen(
                                                 anime = anime,
                                                 p = p,
                                                 onClick = { onAnimeClick(anime.id) }
+                                            )
+                                        }
+                                    }
+                                }
+                                SearchTab.MOVIES -> {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        items(movieResults, key = { "movie_${it.id}_${it.type}" }) { movie ->
+                                            SearchResultMovieItem(
+                                                movie = movie,
+                                                p = p,
+                                                onClick = { onMovieClick?.invoke(movie.id, movie.type, movie.title, movie.posterUrl ?: movie.backdropUrl) }
                                             )
                                         }
                                     }
@@ -635,6 +670,126 @@ private fun SearchResultAnimeItem(
                     ) {
                         Text(
                             text = "$year",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = p.textMuted
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchResultMovieItem(
+    movie: MovieItem,
+    p: HomePalette,
+    onClick: () -> Unit
+) {
+    val isTv = movie.type.equals("tv", ignoreCase = true)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = movie.posterUrl,
+            contentDescription = movie.title,
+            modifier = Modifier
+                .size(width = 70.dp, height = 96.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(p.chipBg),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(Modifier.width(14.dp))
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = movie.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = p.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            if (movie.overview.isNotBlank()) {
+                Text(
+                    text = movie.overview,
+                    fontSize = 12.sp,
+                    color = p.textSub,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Type Pill (Film vs Series)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(p.chipBg)
+                        .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                ) {
+                    Text(
+                        text = if (isTv) "Series" else "Film",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = p.accentText
+                    )
+                }
+
+                // Rating
+                val rating = movie.rating
+                if (rating != null && rating > 0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = p.rating,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = String.format(Locale.US, "%.1f", rating),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.text
+                            )
+                        }
+                    }
+                }
+
+                // Year
+                if (!movie.year.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(p.chipBg)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                    ) {
+                        Text(
+                            text = movie.year,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = p.textMuted

@@ -527,26 +527,37 @@ object StreamProxyServer {
             conn.requestMethod = if (method == "HEAD") "HEAD" else "GET"
             conn.instanceFollowRedirects = false
 
-            // Standard browser headers
-            conn.setRequestProperty("User-Agent", headers["User-Agent"] ?: StreamSniffer.TARGET_UA)
-            conn.setRequestProperty("Accept", "*/*")
-            conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-
             val host = urlObj.host
             val isAsCdn = host.contains("as-cdn") || currentUrl.contains("as-cdn")
             val isRundownOrFlix = host.contains("rundowncdn") || currentUrl.contains("rundowncdn") || host.contains("flixcloud") || currentUrl.contains("flixcloud")
             val isMegaplayCdn = host.contains("eclipseharbor") || host.contains("nexabloom") || host.contains("megaplay") || host.contains("vidstream")
+            val isWebMb = currentUrl.contains("bcdnxw") || currentUrl.contains("hakunaymatata.com/bt/")
+            val isNativeMb = (host.contains("hakunaymatata") || host.contains("aoneroom")) && !isWebMb
+            val isMovieBoxCdn = isWebMb || isNativeMb
+
+            // Standard headers: Native MovieBox rejects browser UA with 428 and wants ExoPlayer UA without referer!
+            // Web MovieBox (series) wants standard browser UA with Referer: https://123moviesfree.club/
+            if (isNativeMb) {
+                conn.setRequestProperty("User-Agent", "ExoPlayerLib/2.19.1")
+            } else {
+                conn.setRequestProperty("User-Agent", headers["User-Agent"] ?: StreamSniffer.TARGET_UA)
+                conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+            }
+            conn.setRequestProperty("Accept", "*/*")
 
             val effReferer = when {
-                isAsCdn -> "https://$host/"
+                isNativeMb -> null
+                isWebMb -> headers["Referer"] ?: "https://123moviesfree.club/"
                 !headers["Referer"].isNullOrBlank() -> headers["Referer"]
+                isAsCdn -> "https://$host/"
                 isRundownOrFlix -> "https://flixcloud.cc/"
                 isMegaplayCdn -> "https://megaplay.buzz/"
                 else -> null
             }
             val effOrigin = when {
-                isAsCdn -> "https://$host"
                 !headers["Origin"].isNullOrBlank() -> headers["Origin"]
+                isMovieBoxCdn -> null
+                isAsCdn -> "https://$host"
                 isRundownOrFlix -> "https://flixcloud.cc"
                 isMegaplayCdn -> "https://megaplay.buzz"
                 else -> null
@@ -555,13 +566,17 @@ object StreamProxyServer {
             // Attach Referer and Origin
             effReferer?.let { conn.setRequestProperty("Referer", it) }
             effOrigin?.let { conn.setRequestProperty("Origin", it) }
-            headers["Cookie"]?.let { conn.setRequestProperty("Cookie", it) }
+            if (!isMovieBoxCdn) {
+                headers["Cookie"]?.let { conn.setRequestProperty("Cookie", it) }
+            }
 
             // Attach any other custom headers
             headers.forEach { (k, v) ->
                 val lk = k.lowercase()
                 if (lk != "referer" && lk != "origin" && lk != "cookie" && lk != "user-agent" && lk != "range") {
-                    conn.setRequestProperty(k, v)
+                    if (!isMovieBoxCdn || (!lk.startsWith("sec-") && lk != "accept-language")) {
+                        conn.setRequestProperty(k, v)
+                    }
                 }
             }
 
@@ -579,8 +594,9 @@ object StreamProxyServer {
                     continue
                 }
             }
-            if ((code == 403 || code == 404 || code == 401 || code == 503) &&
+            if ((code == 403 || code == 404 || code == 401 || code == 428 || code == 429 || code == 503) &&
                 (headers.containsKey("Referer") || headers.containsKey("Origin") ||
+                 currentUrl.contains("hakunaymatata") || currentUrl.contains("aoneroom") ||
                  currentUrl.contains("megaplay") || currentUrl.contains("vidnest") ||
                  currentUrl.contains("tryembed") || currentUrl.contains("zoko") ||
                  currentUrl.contains("4animo") || currentUrl.contains("recloud") ||
@@ -637,6 +653,16 @@ object StreamProxyServer {
                     retryStrategies.add("https://flixcloud.cc/" to "https://flixcloud.cc")
                     retryStrategies.add("https://reanime.to/" to "https://reanime.to")
                 }
+                val isWebMb = currentUrl.contains("bcdnxw") || currentUrl.contains("hakunaymatata.com/bt/")
+                val isNativeMb = (currentUrl.contains("hakunaymatata") || currentUrl.contains("aoneroom")) && !isWebMb
+                if (isNativeMb) {
+                    retryStrategies.add(null to null) // Clean: No Referer or Origin
+                    retryStrategies.add("https://123moviesfree.club/" to null)
+                } else if (isWebMb) {
+                    retryStrategies.add("https://123moviesfree.club/" to null)
+                    retryStrategies.add("https://sflix.film/" to null)
+                    retryStrategies.add(null to null)
+                }
                 retryStrategies.add("https://$host/" to "https://$host")
                 retryStrategies.add(null to null) // Neutral: no Referer/Origin
 
@@ -647,11 +673,17 @@ object StreamProxyServer {
                         retryConn.readTimeout = 20000
                         retryConn.requestMethod = if (method == "HEAD") "HEAD" else "GET"
                         retryConn.instanceFollowRedirects = true
-                        retryConn.setRequestProperty("User-Agent", headers["User-Agent"] ?: StreamSniffer.TARGET_UA)
+                        if (isNativeMb) {
+                            retryConn.setRequestProperty("User-Agent", "ExoPlayerLib/2.19.1")
+                        } else {
+                            retryConn.setRequestProperty("User-Agent", headers["User-Agent"] ?: StreamSniffer.TARGET_UA)
+                        }
                         retryConn.setRequestProperty("Accept", "*/*")
                         if (ref != null) retryConn.setRequestProperty("Referer", ref)
-                        if (orig != null) retryConn.setRequestProperty("Origin", orig)
-                        headers["Cookie"]?.let { retryConn.setRequestProperty("Cookie", it) }
+                        if (orig != null && !isNativeMb) retryConn.setRequestProperty("Origin", orig)
+                        if (!isNativeMb && !isWebMb) {
+                            headers["Cookie"]?.let { retryConn.setRequestProperty("Cookie", it) }
+                        }
                         if (!rangeHeader.isNullOrEmpty()) {
                             retryConn.setRequestProperty("Range", rangeHeader)
                         }

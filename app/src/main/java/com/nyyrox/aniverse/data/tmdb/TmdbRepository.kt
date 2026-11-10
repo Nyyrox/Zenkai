@@ -230,6 +230,86 @@ object TmdbRepository {
      * Fetches high-res TMDB artwork (backdrop & transparent title logo PNG)
      * using the Vercel TMDB proxy.
      */
+    /**
+     * Directly fetches high-res TMDB artwork (backdrop & transparent title logo PNG) by TMDB ID
+     */
+    suspend fun getArtworkDirect(
+        tmdbId: Int,
+        type: String = "movie"
+    ): TmdbArtwork? = withContext(Dispatchers.IO) {
+        val cacheKey = "direct::$type::$tmdbId"
+        if (artworkCache.containsKey(cacheKey)) return@withContext artworkCache[cacheKey]
+
+        try {
+            val raw = executeTmdbGet("/$type/$tmdbId", "append_to_response=images&include_image_language=en,null")
+            if (raw.isNullOrBlank()) {
+                artworkCache[cacheKey] = null
+                return@withContext null
+            }
+            val json = JSONObject(raw)
+
+            val backdropPath = json.optString("backdrop_path").takeIf { it.isNotBlank() }
+            val imagesObj = json.optJSONObject("images")
+            var selectedBackdrop = backdropPath
+
+            val backdropsArr = imagesObj?.optJSONArray("backdrops")
+            if (backdropsArr != null && backdropsArr.length() > 0) {
+                for (i in 0 until backdropsArr.length()) {
+                    val b = backdropsArr.optJSONObject(i) ?: continue
+                    val path = b.optString("file_path")
+                    val width = b.optInt("width", 0)
+                    if (path.isNotBlank() && width >= 1280) {
+                        selectedBackdrop = path
+                        break
+                    }
+                }
+            }
+
+            val backdropUrl = selectedBackdrop?.let { "$TMDB_IMAGE_BASE/w1280$it" }
+
+            var selectedLogoPath: String? = null
+            val logosArr = imagesObj?.optJSONArray("logos")
+            if (logosArr != null && logosArr.length() > 0) {
+                var bestScore = -1
+                for (i in 0 until logosArr.length()) {
+                    val l = logosArr.optJSONObject(i) ?: continue
+                    val path = l.optString("file_path")
+                    if (path.isBlank() || path.endsWith(".svg", ignoreCase = true)) continue
+
+                    val lang = l.optString("iso_639_1")
+                    var score = 0
+                    if (lang == "en") score = 10
+                    else if (lang.isBlank() || lang == "null") score = 5
+                    else score = 1
+
+                    val votes = l.optDouble("vote_average", 0.0)
+                    score += votes.toInt()
+
+                    if (score > bestScore) {
+                        bestScore = score
+                        selectedLogoPath = path
+                    }
+                }
+            }
+
+            val logoUrl = selectedLogoPath?.let { "$TMDB_IMAGE_BASE/w500$it" }
+            val tmdbTitle = json.optString("name").ifBlank { json.optString("title") }.takeIf { it.isNotBlank() }
+
+            val artwork = TmdbArtwork(
+                tmdbId = tmdbId,
+                tmdbType = type,
+                backdropUrl = backdropUrl,
+                logoUrl = logoUrl,
+                title = tmdbTitle
+            )
+
+            artworkCache[cacheKey] = artwork
+            return@withContext artwork
+        } catch (e: Exception) {
+            return@withContext null
+        }
+    }
+
     suspend fun getArtwork(
         anilistId: Int,
         title: String,

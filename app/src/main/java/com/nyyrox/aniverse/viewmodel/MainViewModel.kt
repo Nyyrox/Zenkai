@@ -356,6 +356,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     var pendingNovelPosterHint: String? = null
 
+    var pendingMovieTitleHint: String? = null
+
+    var pendingMoviePosterHint: String? = null
+
+    fun openMovieDetail(id: Int, type: String, titleHint: String? = null, posterHint: String? = null) {
+        com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
+        pendingMovieTitleHint = titleHint
+        pendingMoviePosterHint = posterHint
+    }
+
+    fun closeMovieDetail() {
+        pendingMovieTitleHint = null
+        pendingMoviePosterHint = null
+    }
+
     fun openAnimeDetail(id: Int) {
 
         com.nyyrox.aniverse.util.AppHaptics.tick(getApplication())
@@ -431,6 +446,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var mangaBookmarks by mutableStateOf<List<MangaBookmarkItem>>(emptyList()); private set
 
     var mangaHistory by mutableStateOf<List<MangaHistoryItem>>(emptyList()); private set
+
+    var movieHistory by mutableStateOf<List<com.nyyrox.aniverse.data.movie.MovieHistoryItem>>(emptyList()); private set
 
     private var mangaSearchJob: Job? = null
 
@@ -840,39 +857,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var isInitialLoaded = false
 
     fun loadTmdbArtwork(anime: Anime) {
-
         if (tmdbArtworks.containsKey(anime.id)) return
-
         viewModelScope.launch {
-
             try {
-
                 val artwork = withContext(Dispatchers.IO) {
-
-                    com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtwork(
-
-                        anilistId = anime.id,
-
-                        title = anime.title,
-
-                        year = anime.seasonYear,
-
-                        format = anime.format
-
-                    )
-
+                    if (anime.format.equals("MOVIE", ignoreCase = true) || anime.format.equals("TV", ignoreCase = true)) {
+                        val t = if (anime.format.equals("TV", ignoreCase = true)) "tv" else "movie"
+                        com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtworkDirect(anime.id, t)
+                    } else {
+                        com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtwork(
+                            anilistId = anime.id,
+                            title = anime.title,
+                            year = anime.seasonYear,
+                            format = anime.format
+                        )
+                    }
                 }
-
                 tmdbArtworks = tmdbArtworks + (anime.id to (artwork ?: com.nyyrox.aniverse.data.tmdb.TmdbArtwork(0, "", null, null)))
-
             } catch (_: Exception) {
-
-                tmdbArtworks = tmdbArtworks + (anime.id to com.nyyrox.aniverse.data.tmdb.TmdbArtwork(0, "", null, null))
-
             }
-
         }
+    }
 
+    fun loadMovieArtwork(tmdbId: Int, type: String = "movie") {
+        if (tmdbArtworks.containsKey(tmdbId)) return
+        viewModelScope.launch {
+            try {
+                val artwork = withContext(Dispatchers.IO) {
+                    com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtworkDirect(tmdbId, type)
+                }
+                artwork?.let {
+                    tmdbArtworks = tmdbArtworks + (tmdbId to it)
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     fun loadTmdbEpisodeStill(anime: Anime, episodeNumber: Int) {
@@ -980,6 +999,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         mangaBookmarks = storage.getMangaBookmarks()
 
         mangaHistory = storage.getMangaHistory()
+
+        movieHistory = storage.getMovieHistory()
 
         novelHistoryList = storage.getNovelHistory()
 
@@ -2707,6 +2728,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         syncTimeSpentAndReadingToCloud()
 
+    }
+
+    fun loadMovieHistory() {
+        movieHistory = storage.getMovieHistory()
+    }
+
+    fun saveMovieProgress(
+        id: Int,
+        type: String,
+        title: String,
+        poster: String?,
+        backdrop: String?,
+        season: Int = 1,
+        episode: Int = 1,
+        positionMs: Long,
+        durationMs: Long
+    ) {
+        storage.saveMovieProgress(id, type, title, poster, backdrop, season, episode, positionMs, durationMs)
+        loadMovieHistory()
+    }
+
+    fun removeMovieHistory(id: Int, type: String) {
+        storage.removeMovieHistory(id, type)
+        loadMovieHistory()
     }
 
     fun getNovelHistoryItem(slug: String): com.nyyrox.aniverse.data.novel.NovelHistoryItem? {

@@ -18,6 +18,62 @@ data class MovieItem(
         get() = backdrop?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w1280$it" }
 }
 
+fun MovieItem.toAnime(): com.nyyrox.aniverse.data.Anime {
+    val yearInt = year?.take(4)?.toIntOrNull()
+    val scoreInt = rating?.let { (it * 10).toInt() }
+    val formatStr = if (type.equals("tv", ignoreCase = true)) "TV" else "MOVIE"
+    val genreNames = genreIds.mapNotNull { MovieRepository.allGenresMap[it] }
+    return com.nyyrox.aniverse.data.Anime(
+        id = id,
+        title = title,
+        cover = posterUrl ?: "",
+        banner = backdropUrl,
+        score = scoreInt,
+        description = overview,
+        seasonYear = yearInt,
+        format = formatStr,
+        status = "RELEASED",
+        genres = genreNames
+    )
+}
+
+fun MovieDetails.toAnime(): com.nyyrox.aniverse.data.Anime {
+    val yearInt = year?.take(4)?.toIntOrNull()
+    val scoreInt = rating?.let { (it * 10).toInt() }
+    val formatStr = if (type.equals("tv", ignoreCase = true)) "TV" else "MOVIE"
+    return com.nyyrox.aniverse.data.Anime(
+        id = id,
+        title = title,
+        cover = posterUrl ?: "",
+        banner = backdropUrl,
+        score = scoreInt,
+        description = overview,
+        seasonYear = yearInt,
+        format = formatStr,
+        duration = runtime,
+        status = status ?: "FINISHED",
+        genres = genres.map { it.name },
+        characters = cast.map { c ->
+            com.nyyrox.aniverse.data.AnimeCharacter(
+                id = c.id,
+                name = c.name,
+                image = c.photoUrl,
+                role = c.character
+            )
+        },
+        recommendations = similar.map { s ->
+            com.nyyrox.aniverse.data.AnimeRecommendation(
+                id = s.id,
+                title = s.title,
+                cover = s.posterUrl ?: "",
+                banner = s.backdropUrl,
+                score = s.rating?.let { (it * 10).toInt() },
+                format = if (s.type.equals("tv", ignoreCase = true)) "TV" else "MOVIE"
+            )
+        }
+    )
+}
+
 data class MovieGenre(
     val id: Int,
     val name: String
@@ -69,6 +125,7 @@ data class MovieDetails(
     val seasons: List<MovieSeason> = emptyList(),
     val cast: List<MovieCast> = emptyList(),
     val similar: List<MovieItem> = emptyList(),
+    val collection: List<MovieItem> = emptyList(),
     val imdbId: String? = null
 ) {
     val posterUrl: String?
@@ -120,3 +177,30 @@ data class MovieStreamResult(
     val subtitles: List<MovieSubtitle> = emptyList(),
     val error: String? = null
 )
+
+data class MovieServerOption(
+    val id: String,
+    val label: String,
+    val tags: List<String> = emptyList(),
+    val isDirect: Boolean = false,
+    val embedUrl: String = ""
+)
+
+data class MovieHistoryItem(
+    val id: Int,
+    val type: String = "movie", // "movie" or "tv"
+    val title: String,
+    val poster: String? = null,
+    val backdrop: String? = null,
+    val season: Int = 1,
+    val episode: Int = 1,
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+    val timestamp: Long = System.currentTimeMillis()
+) {
+    val posterUrl: String?
+        get() = poster?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w500$it" }
+
+    val backdropUrl: String?
+        get() = backdrop?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w1280$it" }
+}

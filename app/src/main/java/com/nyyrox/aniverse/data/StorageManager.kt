@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.nyyrox.aniverse.data.manga.MangaBookmarkItem
 import com.nyyrox.aniverse.data.manga.MangaHistoryItem
+import com.nyyrox.aniverse.data.movie.MovieHistoryItem
 import com.nyyrox.aniverse.data.novel.NovelHistoryItem
 import com.nyyrox.aniverse.data.discord.DiscordAccount
 import com.nyyrox.aniverse.data.tracker.AniListAccount
@@ -23,6 +24,7 @@ class StorageManager(context: Context) {
         private const val KEY_MANGA_BOOKMARKS = "key_manga_bookmarks"
         private const val KEY_MANGA_HISTORY = "key_manga_history"
         private const val KEY_NOVEL_HISTORY = "key_novel_history"
+        private const val KEY_MOVIE_HISTORY = "key_movie_history"
         private const val KEY_USER_PROFILE = "key_user_profile"
         private const val KEY_THEME_SETTINGS = "key_theme_settings"
         private const val KEY_PREFERRED_SERVER = "key_preferred_server"
@@ -1038,6 +1040,127 @@ class StorageManager(context: Context) {
             array.put(obj)
         }
         prefs.edit().putString(KEY_NOVEL_HISTORY, array.toString()).apply()
+    }
+
+    // --- Movie & TV History / Continue Watching ---
+    fun getMovieHistory(): List<MovieHistoryItem> {
+        val raw = prefs.getString(KEY_MOVIE_HISTORY, null) ?: return emptyList()
+        return try {
+            val array = JSONArray(raw)
+            val list = mutableListOf<MovieHistoryItem>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    MovieHistoryItem(
+                        id = obj.getInt("id"),
+                        type = obj.optString("type", "movie"),
+                        title = obj.getString("title"),
+                        poster = obj.optString("poster").takeIf { it.isNotBlank() },
+                        backdrop = obj.optString("backdrop").takeIf { it.isNotBlank() },
+                        season = obj.optInt("season", 1),
+                        episode = obj.optInt("episode", 1),
+                        positionMs = obj.optLong("positionMs", 0L),
+                        durationMs = obj.optLong("durationMs", 0L),
+                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                    )
+                )
+            }
+            list.sortedByDescending { it.timestamp }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getMoviePosition(id: Int, season: Int = 1, episode: Int = 1): Long {
+        val keyPos = "pos_movie_${id}_${season}_$episode"
+        val keyDur = "dur_movie_${id}_${season}_$episode"
+        val pos = prefs.getLong(keyPos, 0L)
+        val dur = prefs.getLong(keyDur, 0L)
+        if (pos <= 0L) return 0L
+        if (dur > 0L && (pos >= dur - 25_000L || pos >= (dur * 0.90f).toLong())) {
+            return 0L
+        }
+        return pos
+    }
+
+    fun saveMovieProgress(
+        id: Int,
+        type: String,
+        title: String,
+        poster: String?,
+        backdrop: String?,
+        season: Int = 1,
+        episode: Int = 1,
+        positionMs: Long,
+        durationMs: Long
+    ) {
+        if (id <= 0) return
+        val keyPos = "pos_movie_${id}_${season}_$episode"
+        val keyDur = "dur_movie_${id}_${season}_$episode"
+        prefs.edit().putLong(keyPos, positionMs).putLong(keyDur, durationMs).apply()
+
+        val history = getMovieHistory().toMutableList()
+        val existingIndex = history.indexOfFirst { it.id == id && it.type == type }
+        val prevItem = if (existingIndex >= 0) history.removeAt(existingIndex) else null
+
+        val effectivePoster = poster ?: prevItem?.poster
+        val effectiveBackdrop = backdrop ?: prevItem?.backdrop
+
+        history.add(
+            0,
+            MovieHistoryItem(
+                id = id,
+                type = type,
+                title = title,
+                poster = effectivePoster,
+                backdrop = effectiveBackdrop,
+                season = season,
+                episode = episode,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                timestamp = System.currentTimeMillis()
+            )
+        )
+
+        val capped = history.take(30)
+        val array = JSONArray()
+        for (item in capped) {
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("type", item.type)
+                put("title", item.title)
+                put("poster", item.poster.orEmpty())
+                put("backdrop", item.backdrop.orEmpty())
+                put("season", item.season)
+                put("episode", item.episode)
+                put("positionMs", item.positionMs)
+                put("durationMs", item.durationMs)
+                put("timestamp", item.timestamp)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString(KEY_MOVIE_HISTORY, array.toString()).apply()
+    }
+
+    fun removeMovieHistory(id: Int, type: String) {
+        val history = getMovieHistory().filterNot { it.id == id && it.type == type }
+        val array = JSONArray()
+        for (item in history) {
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("type", item.type)
+                put("title", item.title)
+                put("poster", item.poster.orEmpty())
+                put("backdrop", item.backdrop.orEmpty())
+                put("season", item.season)
+                put("episode", item.episode)
+                put("positionMs", item.positionMs)
+                put("durationMs", item.durationMs)
+                put("timestamp", item.timestamp)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString(KEY_MOVIE_HISTORY, array.toString()).apply()
     }
 
     // --- User Profile ---

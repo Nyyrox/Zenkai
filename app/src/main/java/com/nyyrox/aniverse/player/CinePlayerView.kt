@@ -388,6 +388,19 @@ data class SubtitleTrackInfo(
     val isSelected: Boolean
 )
 
+data class CinePlayerAudioOption(
+    val id: String,
+    val label: String,
+    val isSelected: Boolean = false
+)
+
+data class CinePlayerQualityOption(
+    val id: String,
+    val label: String,
+    val isSelected: Boolean = false,
+    val streamUrl: String? = null
+)
+
 data class CaptionCustomization(
     val fontSizeSp: Float = 18f,
     val sizeScale: Float = 1.0f,
@@ -593,6 +606,10 @@ data class CinePlayerProps(
     val serverName: String = "",
     val hasDubAvailable: Boolean = true,
     val onSwitchAudioStream: ((Boolean) -> Unit)? = null,
+    val externalAudioTracks: List<CinePlayerAudioOption> = emptyList(),
+    val onSelectAudioTrack: ((CinePlayerAudioOption) -> Unit)? = null,
+    val externalQualityTracks: List<CinePlayerQualityOption> = emptyList(),
+    val onSelectQualityTrack: ((CinePlayerQualityOption) -> Unit)? = null,
     val serverSkipIntervals: List<SkipInterval> = emptyList()
 )
 
@@ -640,6 +657,10 @@ fun CinePlayerView(
     val serverName = props.serverName
     val hasDubAvailable = props.hasDubAvailable
     val onSwitchAudioStream = props.onSwitchAudioStream
+    val externalAudioTracks = props.externalAudioTracks
+    val onSelectAudioTrack = props.onSelectAudioTrack
+    val externalQualityTracks = props.externalQualityTracks
+    val onSelectQualityTrack = props.onSelectQualityTrack
     val serverSkipIntervals = props.serverSkipIntervals
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -764,6 +785,7 @@ fun CinePlayerView(
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubPositionMs by remember { mutableLongStateOf(0L) }
     var showTimeRemaining by remember { mutableStateOf(false) }
+    var streamChangeResumeMs by remember { mutableStateOf<Long?>(null) }
     var hasAppliedInitialSeek by remember(episode, streamUrl) { mutableStateOf(false) }
     var resumeToastText by remember(episode, streamUrl) { mutableStateOf<String?>(null) }
     var playbackErrorCode by remember(streamUrl) { mutableStateOf<String?>(null) }
@@ -1307,6 +1329,9 @@ fun CinePlayerView(
 
     // Stream Sniffer for Embed URLs
     LaunchedEffect(streamUrl) {
+        if (currentPositionMs > 1000L && streamChangeResumeMs == null) {
+            streamChangeResumeMs = currentPositionMs
+        }
         // Mini player handoff: same episode/stream already playing -> adopt it, skip sniffing
         MiniPlayerManager.peek(anilistId, episode, streamUrl)?.let { reuse ->
             engineMode = PlayerEngineMode.NATIVE_EXO
@@ -1368,11 +1393,19 @@ fun CinePlayerView(
             val embedHost = embedUri?.host.orEmpty()
             val isVidnestStream = embedHost.contains("vidnest") || streamHost.contains("vidnest") || stream.streamUrl.contains("vidnest") || streamUrl.contains("vidnest")
             val isMegaplayStream = embedHost.contains("megaplay") || streamHost.contains("megaplay") || stream.streamUrl.contains("megaplay") || streamUrl.contains("megaplay")
+            val isLocalProxy = streamHost == "127.0.0.1" || streamHost == "localhost"
+            val isMovieBoxStream = streamHost.contains("hakunaymatata") || streamHost.contains("aoneroom") ||
+                    streamUrl.contains("hakunaymatata") || streamUrl.contains("aoneroom")
 
             val effectiveHeaders = stream.headers.toMutableMap()
             effectiveHeaders.putAll(headers)
             effectiveHeaders["User-Agent"] = headers["User-Agent"] ?: stream.headers["User-Agent"] ?: StreamSniffer.TARGET_UA
-            if (isVidnestStream) {
+            if (isLocalProxy || isMovieBoxStream) {
+                // Local proxy or direct MovieBox: do NOT inject arbitrary referer/origin that causes 429
+                if (isMovieBoxStream && !effectiveHeaders.containsKey("User-Agent")) {
+                    effectiveHeaders["User-Agent"] = "ExoPlayerLib/2.19.1"
+                }
+            } else if (isVidnestStream) {
                 if (!effectiveHeaders.containsKey("Referer")) effectiveHeaders["Referer"] = "https://vidnest.fun/"
                 if (!effectiveHeaders.containsKey("Origin")) effectiveHeaders["Origin"] = "https://vidnest.fun"
             } else if (isMegaplayStream) {
@@ -1500,14 +1533,14 @@ fun CinePlayerView(
                     if (state == Player.STATE_READY) {
                         hasStartedPlayback = true
                         durationMs = player.duration.coerceAtLeast(0L)
-                        if (!hasAppliedInitialSeek) {
-                            hasAppliedInitialSeek = true
-                            val isNearEnd = durationMs > 0L && (initialTimeMs >= durationMs - 25_000L || initialTimeMs >= (durationMs * 0.90f).toLong())
-                            if (initialTimeMs > 2000L && !isNearEnd) {
-                                PlayerPlaybackPlugin.seekTo(player, initialTimeMs)
-                                val sec = (initialTimeMs / 1000) % 60
-                                val min = (initialTimeMs / (1000 * 60)) % 60
-                                val hr = initialTimeMs / (1000 * 60 * 60)
+                        val targetResume = streamChangeResumeMs ?: if (!hasAppliedInitialSeek) initialTimeMs else null
+                        if (targetResume != null && targetResume > 1000L) {
+                            val isNearEnd = durationMs > 0L && (targetResume >= durationMs - 25_000L || targetResume >= (durationMs * 0.90f).toLong())
+                            if (!isNearEnd) {
+                                PlayerPlaybackPlugin.seekTo(player, targetResume)
+                                val sec = (targetResume / 1000) % 60
+                                val min = (targetResume / (1000 * 60)) % 60
+                                val hr = targetResume / (1000 * 60 * 60)
                                 val timeStr = if (hr > 0) String.format(Locale.US, "%d:%02d:%02d", hr, min, sec) else String.format(Locale.US, "%d:%02d", min, sec)
                                 resumeToastText = "Resumed from $timeStr"
                                 scope.launch {
@@ -1515,6 +1548,8 @@ fun CinePlayerView(
                                     resumeToastText = null
                                 }
                             }
+                            streamChangeResumeMs = null
+                            hasAppliedInitialSeek = true
                         }
                     } else if (state == Player.STATE_ENDED) {
                         isPlaying = false
@@ -3782,6 +3817,16 @@ CxPillIcon(
             isDub = isDub,
             hasDubAvailable = hasDubAvailable,
             onSwitchAudioStream = onSwitchAudioStream,
+            externalAudioTracks = externalAudioTracks,
+            onSelectAudioTrack = { opt ->
+                if (currentPositionMs > 1000L) streamChangeResumeMs = currentPositionMs
+                onSelectAudioTrack?.invoke(opt)
+            },
+            externalQualityTracks = externalQualityTracks,
+            onSelectQualityTrack = { opt ->
+                if (currentPositionMs > 1000L) streamChangeResumeMs = currentPositionMs
+                onSelectQualityTrack?.invoke(opt)
+            },
             videoFilters = videoFilters,
             onVideoFiltersChange = { newFilters ->
                 videoFilters = newFilters
@@ -4476,6 +4521,10 @@ private fun PlayerSettingsModal(
     isDub: Boolean = false,
     hasDubAvailable: Boolean = true,
     onSwitchAudioStream: ((Boolean) -> Unit)? = null,
+    externalAudioTracks: List<CinePlayerAudioOption> = emptyList(),
+    onSelectAudioTrack: ((CinePlayerAudioOption) -> Unit)? = null,
+    externalQualityTracks: List<CinePlayerQualityOption> = emptyList(),
+    onSelectQualityTrack: ((CinePlayerQualityOption) -> Unit)? = null,
     videoFilters: VideoFiltersState = VideoFiltersState(),
     onVideoFiltersChange: (VideoFiltersState) -> Unit = {},
     upscaleLevel: UpscaleLevel = UpscaleLevel.OFF,
@@ -4701,7 +4750,35 @@ private fun PlayerSettingsModal(
                         SubHeader(title = "Quality", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
                         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
-                        if (qualityTracks.isEmpty()) {
+                        if (externalQualityTracks.isNotEmpty()) {
+                            // MP4 & external direct stream qualities (switches stream URL)
+                            externalQualityTracks.forEach { track ->
+                                val isSelected = track.isSelected
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
+                                        .clickable {
+                                            onSelectQualityTrack?.invoke(track)
+                                            onDismiss()
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = track.label,
+                                        color = if (isSelected) OttPrimary else Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        } else if (qualityTracks.isEmpty()) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -5051,6 +5128,35 @@ private fun PlayerSettingsModal(
                         SubHeader(title = "Audio Track", onBack = { onTabChange(PlayerSettingsTab.MAIN) }, onClose = onDismiss)
                         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
 
+                        if (externalAudioTracks.isNotEmpty()) {
+                            // External audio tracks (MovieBox dubs, multi-audio streams - switches stream on selection)
+                            externalAudioTracks.forEach { track ->
+                                val isSelected = track.isSelected
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
+                                        .clickable {
+                                            onSelectAudioTrack?.invoke(track)
+                                            onDismiss()
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = track.label,
+                                        color = if (isSelected) OttPrimary else Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        } else {
                         val isSingleAudioServer = serverName.contains("megaplay", ignoreCase = true) ||
                                 serverName.contains("vidstream", ignoreCase = true)
 
@@ -5192,6 +5298,7 @@ private fun PlayerSettingsModal(
                                     }
                                 }
                             }
+                        }
                         }
                         Spacer(Modifier.height(4.dp))
                     }
