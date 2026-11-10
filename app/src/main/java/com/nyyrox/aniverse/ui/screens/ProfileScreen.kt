@@ -346,6 +346,7 @@ fun ProfileScreen(
     var initialEditTab by remember { mutableIntStateOf(0) }
     var showDownloadSheet by remember { mutableStateOf(false) }
     var showDiscordSheet by remember { mutableStateOf(false) }
+    var showAniListSheet by remember { mutableStateOf(false) }
 
     val formatLastSync: (Long?) -> String = { timestamp ->
         if (timestamp == null || timestamp == 0L) {
@@ -1393,38 +1394,58 @@ fun ProfileScreen(
 
                             if (aniList != null) {
                                 Row(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(cardElevated)
-                                        .border(1.dp, borderColor, CircleShape)
-                                        .clickable {
-                                            vm.syncTrackers { res ->
-                                                Toast.makeText(context, "AniList synced (${res.totalPulled} items)", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Default.Sync,
-                                        contentDescription = null,
-                                        tint = textPrimary,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(Modifier.width(5.dp))
-                                    Text(
-                                        text = "Sync Now",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = textPrimary
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(cardElevated)
+                                            .border(1.dp, borderColor, CircleShape)
+                                            .clickable {
+                                                vm.syncTrackers { res ->
+                                                    Toast.makeText(context, "AniList synced (${res.totalPulled} items)", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Sync,
+                                            contentDescription = null,
+                                            tint = textPrimary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(Modifier.width(5.dp))
+                                        Text(
+                                            text = "Sync Now",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = textPrimary
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(cardElevated)
+                                            .border(1.dp, borderColor, CircleShape)
+                                            .clickable { showAniListSheet = true }
+                                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Manage",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = textMuted
+                                        )
+                                    }
                                 }
                             } else {
                                 Button(
                                     onClick = {
-                                        val url = "https://anilist.co/api/v2/oauth/authorize?client_id=18497&response_type=token"
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                        context.startActivity(intent)
+                                        showAniListSheet = true
                                     },
                                     shape = CircleShape,
                                     colors = ButtonDefaults.buttonColors(
@@ -1434,6 +1455,59 @@ fun ProfileScreen(
                                 ) {
                                     Text("Connect", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
+                            }
+                        }
+
+                        if (aniList != null) {
+                            HorizontalDivider(color = borderColor, thickness = 1.dp)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(cardElevated)
+                                    .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                                    .clickable { showAniListSheet = true }
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!aniList.avatarUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = aniList.avatarUrl,
+                                        contentDescription = aniList.username,
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = aniList.username,
+                                        color = textPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        text = if (aniList.accessToken.isNotBlank()) "Linked (Full Two-Way Sync)" else "Linked (Public Sync)",
+                                        color = Color(0xFF02A9FF),
+                                        fontSize = 12.sp
+                                    )
+                                    if (aniList.lastSyncedAt > 0) {
+                                        Text(
+                                            text = "Last synced: ${formatLastSync(aniList.lastSyncedAt)}",
+                                            color = textMuted,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = textMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }
@@ -2256,6 +2330,15 @@ fun ProfileScreen(
         if (showDiscordSheet) {
             com.nyyrox.aniverse.ui.components.DiscordIntegrationSheet(
                 onDismiss = { showDiscordSheet = false }
+            )
+        }
+
+        // AniList Sync Sheet
+        if (showAniListSheet) {
+            com.nyyrox.aniverse.ui.components.AniListSyncModalSheet(
+                vm = vm,
+                account = vm.aniListAccount,
+                onDismiss = { showAniListSheet = false }
             )
         }
     }

@@ -64,6 +64,15 @@
                 <data android:scheme="aniverse" android:host="discord" />
             </intent-filter>
 
+            <!-- AniList OAuth2 Deep Link Redirect -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="zenkai.cfd" android:pathPrefix="/auth/anilist" />
+                <data android:scheme="zenkai" android:host="auth" android:pathPrefix="/anilist" />
+            </intent-filter>
+
             <!-- Universal App Opener Links: https://aniverse-kt.vercel.app, https://aniverse.app -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />

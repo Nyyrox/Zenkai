@@ -13,7 +13,9 @@ import java.util.concurrent.TimeUnit
 
 object AniListTrackerClient {
     private const val TAG = "AniListTrackerClient"
-    const val CLIENT_ID = "36109"
+    const val CLIENT_ID = "53784"
+    const val CLIENT_SECRET = "xoPBUv82QMZooAv1k5jR1PjigVplPG0ZJWt9Fmgf"
+    const val REDIRECT_URI = "https://zenkai.cfd/auth/anilist"
     // Clean AniList authorization URL with pin/token redirect
     const val AUTH_URL = "https://anilist.co/api/v2/oauth/authorize?client_id=$CLIENT_ID&response_type=token"
     private const val GRAPHQL_URL = "https://graphql.anilist.co"

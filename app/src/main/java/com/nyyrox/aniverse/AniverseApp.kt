@@ -317,6 +317,14 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
     LaunchedEffect(deepLinkUri) {
         if (!deepLinkUri.isNullOrBlank()) {
             try {
+                if (deepLinkUri.contains("access_token=") && (deepLinkUri.contains("anilist") || deepLinkUri.contains("zenkai.cfd"))) {
+                    val token = deepLinkUri.substringAfter("access_token=").substringBefore("&").substringBefore("#")
+                    if (token.isNotBlank()) {
+                        vm.handleAniListAuthToken(token)
+                        switchTab("profile")
+                        return@LaunchedEffect
+                    }
+                }
                 // If URL contains login-callback, let existing auth handler own it and resume pending share
                 if (deepLinkUri.contains("login-callback")) {
                     vm.checkExistingSession()

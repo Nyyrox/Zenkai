@@ -205,7 +205,7 @@ fun AniListSyncModalSheet(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Access Token", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text("In-App Login", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     )
                     Tab(
                         selected = selectedTab == 1,
@@ -215,63 +215,28 @@ fun AniListSyncModalSheet(
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text("In-App Login", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text("Access Token", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     )
                 }
 
                 when (selectedTab) {
                     0 -> {
-                        Text(
-                            text = "Paste your AniList Personal Access Token for full two-way sync (reading & updating watch progress, scores, and status).",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 12.5.sp
-                        )
-
-                        OutlinedTextField(
-                            value = tokenInput,
-                            onValueChange = { tokenInput = it },
-                            placeholder = { Text("Paste AniList Token here", color = Color(0xFF64748B), fontSize = 13.sp) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF02A9FF),
-                                unfocusedBorderColor = Color(0x22FFFFFF),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            )
-                        )
-
-                        if (!statusMsg.isNullOrBlank()) {
-                            Text(text = statusMsg.orEmpty(), color = Color(0xFF02A9FF), fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                if (tokenInput.isNotBlank()) {
-                                    isConnecting = true
-                                    statusMsg = "Verifying token with AniList..."
-                                    vm.handleAniListAuthToken(tokenInput) { success, msg ->
-                                        isConnecting = false
-                                        statusMsg = msg
-                                        if (success) {
-                                            onDismiss()
-                                        }
-                                    }
-                                }
-                            },
-                            enabled = tokenInput.isNotBlank() && !isConnecting,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF02A9FF)),
-                            shape = RoundedCornerShape(12.dp),
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp)
+                                .height(480.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
                         ) {
-                            if (isConnecting) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
-                            } else {
-                                Text("Connect & Sync AniList", fontWeight = FontWeight.Bold)
-                            }
+                            InAppTrackerWebView(
+                                url = AniListTrackerClient.AUTH_URL,
+                                onTokenIntercepted = { token ->
+                                    vm.handleAniListAuthToken(token) { success, _ ->
+                                        if (success) onDismiss()
+                                    }
+                                },
+                                onCodeIntercepted = null
+                            )
                         }
                     }
                     1 -> {
@@ -329,22 +294,57 @@ fun AniListSyncModalSheet(
                         }
                     }
                     2 -> {
-                        Box(
+                        Text(
+                            text = "Paste your AniList Personal Access Token for full two-way sync (reading & updating watch progress, scores, and status).",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.5.sp
+                        )
+
+                        OutlinedTextField(
+                            value = tokenInput,
+                            onValueChange = { tokenInput = it },
+                            placeholder = { Text("Paste AniList Token here", color = Color(0xFF64748B), fontSize = 13.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF02A9FF),
+                                unfocusedBorderColor = Color(0x22FFFFFF),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+
+                        if (!statusMsg.isNullOrBlank()) {
+                            Text(text = statusMsg.orEmpty(), color = Color(0xFF02A9FF), fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                if (tokenInput.isNotBlank()) {
+                                    isConnecting = true
+                                    statusMsg = "Verifying token with AniList..."
+                                    vm.handleAniListAuthToken(tokenInput) { success, msg ->
+                                        isConnecting = false
+                                        statusMsg = msg
+                                        if (success) {
+                                            onDismiss()
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = tokenInput.isNotBlank() && !isConnecting,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF02A9FF)),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(460.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White)
+                                .height(46.dp)
                         ) {
-                            InAppTrackerWebView(
-                                url = AniListTrackerClient.AUTH_URL,
-                                onTokenIntercepted = { token ->
-                                    vm.handleAniListAuthToken(token) { success, _ ->
-                                        if (success) onDismiss()
-                                    }
-                                },
-                                onCodeIntercepted = null
-                            )
+                            if (isConnecting) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
+                            } else {
+                                Text("Connect & Sync AniList", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -680,6 +680,8 @@ fun InAppTrackerWebView(
                 }
 
                 webViewClient = object : WebViewClient() {
+                    private var intercepted = false
+
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                         val reqUrl = request?.url?.toString().orEmpty()
                         return handleIntercept(reqUrl)
@@ -690,10 +692,30 @@ fun InAppTrackerWebView(
                         url?.let { handleIntercept(it) }
                     }
 
+                    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                        super.doUpdateVisitedHistory(view, url, isReload)
+                        url?.let { handleIntercept(it) }
+                    }
+
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        url?.let { handleIntercept(it) }
+                        if (url?.contains("zenkai.cfd") == true || url?.contains("anilist") == true) {
+                            view?.evaluateJavascript("window.location.href") { currentUrl ->
+                                val cleanUrl = currentUrl?.replace("\"", "")?.replace("'", "")
+                                if (!cleanUrl.isNullOrBlank()) {
+                                    handleIntercept(cleanUrl)
+                                }
+                            }
+                        }
+                    }
+
                     private fun handleIntercept(checkUrl: String): Boolean {
+                        if (intercepted) return true
                         if (checkUrl.contains("access_token=") && onTokenIntercepted != null) {
                             val token = checkUrl.substringAfter("access_token=").substringBefore("&").substringBefore("#")
                             if (token.isNotBlank()) {
+                                intercepted = true
                                 onTokenIntercepted.invoke(token)
                                 return true
                             }
@@ -701,6 +723,7 @@ fun InAppTrackerWebView(
                         if (checkUrl.contains("code=") && onCodeIntercepted != null) {
                             val code = checkUrl.substringAfter("code=").substringBefore("&").substringBefore("#")
                             if (code.isNotBlank()) {
+                                intercepted = true
                                 onCodeIntercepted.invoke(code)
                                 return true
                             }
