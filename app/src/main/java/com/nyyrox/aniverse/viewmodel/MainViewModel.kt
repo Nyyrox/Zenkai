@@ -861,17 +861,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val artwork = withContext(Dispatchers.IO) {
-                    if (anime.format.equals("MOVIE", ignoreCase = true) || anime.format.equals("TV", ignoreCase = true)) {
-                        val t = if (anime.format.equals("TV", ignoreCase = true)) "tv" else "movie"
-                        com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtworkDirect(anime.id, t)
-                    } else {
-                        com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtwork(
-                            anilistId = anime.id,
-                            title = anime.title,
-                            year = anime.seasonYear,
-                            format = anime.format
-                        )
-                    }
+                    com.nyyrox.aniverse.data.tmdb.TmdbRepository.getArtwork(
+                        anilistId = anime.id,
+                        title = anime.title,
+                        year = anime.seasonYear,
+                        format = anime.format
+                    )
                 }
                 tmdbArtworks = tmdbArtworks + (anime.id to (artwork ?: com.nyyrox.aniverse.data.tmdb.TmdbArtwork(0, "", null, null)))
             } catch (_: Exception) {
@@ -1083,6 +1078,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         homeError = null
 
         var usedTmdbFallback = false
+        var usedKitsuFallback = false
 
         val currentUid = (authState as? AuthState.LoggedIn)?.userId
 
@@ -1192,56 +1188,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 // ── Tier 2: TMDB fallback via aniversee.vercel.app ──
 
+                // ── Tier 2: Kitsu anime fallback (pure anime with AniList & TMDB mappings) ──
                 if (trending.isEmpty() && popular.isEmpty()) {
+                    usedKitsuFallback = true
+                    val kitsuTrendingDeferred = async(Dispatchers.IO) {
+                        try { com.nyyrox.aniverse.data.kitsu.KitsuRepository.getTrending(15) } catch (_: Exception) { emptyList() }
+                    }
+                    val kitsuPopularDeferred = async(Dispatchers.IO) {
+                        try { com.nyyrox.aniverse.data.kitsu.KitsuRepository.getPopular(15) } catch (_: Exception) { emptyList() }
+                    }
+                    val kitsuTopRatedDeferred = async(Dispatchers.IO) {
+                        try { com.nyyrox.aniverse.data.kitsu.KitsuRepository.getTopRated(15) } catch (_: Exception) { emptyList() }
+                    }
 
+                    val kt = kitsuTrendingDeferred.await()
+                    val kp = kitsuPopularDeferred.await()
+                    val ktr = kitsuTopRatedDeferred.await()
+
+                    if (kt.isNotEmpty()) trending = kt
+                    if (kp.isNotEmpty()) popular = kp
+                    if (ktr.isNotEmpty()) topRated = ktr
+                }
+
+                // ── Tier 3: TMDB fallback ──
+                if (trending.isEmpty() && popular.isEmpty()) {
                     usedTmdbFallback = true
-
                     val tmdbTrendingDeferred = async(Dispatchers.IO) {
-
                         try { repo.listFromTmdb("TRENDING_DESC", perPage = 15) } catch (_: Exception) { emptyList() }
-
                     }
-
                     val tmdbPopularDeferred = async(Dispatchers.IO) {
-
                         try { repo.listFromTmdb("POPULARITY_DESC", perPage = 15) } catch (_: Exception) { emptyList() }
-
                     }
-
                     val tmdbTopRatedDeferred = async(Dispatchers.IO) {
-
                         try { repo.listFromTmdb("SCORE_DESC", perPage = 15) } catch (_: Exception) { emptyList() }
-
                     }
 
                     val tt  = tmdbTrendingDeferred.await()
-
                     val tp  = tmdbPopularDeferred.await()
-
                     val ttr = tmdbTopRatedDeferred.await()
 
                     if (tt.isNotEmpty())  trending  = tt
-
                     if (tp.isNotEmpty())  popular   = tp
-
                     if (ttr.isNotEmpty()) topRated  = ttr
-
                 }
 
             }
 
             when {
-
                 trending.isEmpty() && popular.isEmpty() ->
-
                     homeError = "No internet connection. Check your network and retry."
-
+                usedKitsuFallback ->
+                    homeError = null // Kitsu seamlessly provided full anime data
                 usedTmdbFallback ->
-
-                    homeError = "AniList is unavailable — showing backup data via TMDB"
-
+                    homeError = "AniList is unavailable — showing backup data"
                 else -> homeError = null
-
             }
 
             trending.take(6).forEach { loadTmdbArtwork(it) }
