@@ -12,6 +12,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.graphics.Bitmap
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.view.TextureView
@@ -694,11 +695,9 @@ fun CinePlayerView(
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     val upscalePrefs = remember { context.getSharedPreferences("cine_upscaler", Context.MODE_PRIVATE) }
     var upscaleLevel by remember { mutableStateOf(UpscaleLevel.from(upscalePrefs.getString("level", null))) }
-    LaunchedEffect(upscaleLevel, playerViewRef) { playerViewRef?.let { applyUpscaler(it, upscaleLevel) } }
-
-    LaunchedEffect(videoFilters, playerViewRef) {
+    LaunchedEffect(videoFilters, upscaleLevel, playerViewRef) {
         playerViewRef?.let { pv ->
-            applyVideoEffects(pv, videoFilters)
+            applyCombinedVideoEffects(pv, videoFilters, upscaleLevel)
         }
     }
 
@@ -2346,7 +2345,7 @@ fun CinePlayerView(
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
                                 post {
-                                    applyVideoEffects(this, videoFilters)
+                                    applyCombinedVideoEffects(this, videoFilters, upscaleLevel)
                                 }
                             }
                         },
@@ -2356,7 +2355,7 @@ fun CinePlayerView(
                                 view.player = exoPlayer
                             }
                             view.resizeMode = resizeMode
-                            applyVideoEffects(view, videoFilters)
+                            applyCombinedVideoEffects(view, videoFilters, upscaleLevel)
                             // Hide basic Android SubtitleView whenever player UI caption is shown
                             if (isCaptionsEnabled && activeCuesText != null) {
                                 view.subtitleView?.visibility = View.GONE
@@ -6513,55 +6512,111 @@ enum class UpscaleLevel(
     val dn: Float, val sh: Float, val ln: Float
 ) {
     OFF("off", "Normal", "Original video, no processing", 0f, 0f, 0f),
-    DENOISE("denoise", "Denoise", "Removes compression noise and blocking", .70f, .15f, 0f),
-    MEDIUM("medium", "Medium", "Balanced clean-up and sharpening", .35f, .45f, 0f),
-    HIGH("high", "High", "Crisper edges, stronger clean-up", .40f, .70f, .15f),
-    ULTRA("ultra", "Ultra", "Max sharpness + line-art boost (heaviest)", .45f, 1f, .35f);
+    DENOISE("denoise", "Denoise", "Removes compression noise & blocking", 0.65f, 0.25f, 0.10f),
+    MEDIUM("medium", "Medium", "Balanced crisp edges & clean textures", 0.35f, 0.65f, 0.25f),
+    HIGH("high", "High", "Noticeably sharp anime line-art & clarity", 0.40f, 0.95f, 0.45f),
+    ULTRA("ultra", "Ultra", "Max sharpness & remastered dark lines", 0.45f, 1.25f, 0.65f);
 
     companion object { fun from(id: String?) = entries.firstOrNull { it.id == id } ?: OFF }
 }
 
-// Edge-aware denoise (8-tap bilateral) -> AMD CAS sharpen -> anime line darken. Runs on GPU at screen res.
+// Edge-aware denoise -> Adaptive Edge & Detail Enhancement -> Anime Line Darkener. Runs on GPU at screen resolution.
 private const val AGSL = """
 uniform shader src;
 uniform float dn;
 uniform float sh;
 uniform float ln;
-float3 T(float2 p){ return src.eval(p).rgb; }
-float W(float3 a, float3 b){ float3 d=a-b; return 1.0/(1.0+dot(d,d)*90.0); }
-half4 main(float2 p){
-  float3 c=T(p);
-  float3 n=T(p+float2(0,-1)), s=T(p+float2(0,1)), w=T(p+float2(-1,0)), e=T(p+float2(1,0));
-  if(dn>0.0){
-    float3 a=T(p+float2(-1,-1)), b=T(p+float2(1,-1)), d=T(p+float2(-1,1)), f=T(p+float2(1,1));
-    float wn=W(n,c), ws=W(s,c), ww=W(w,c), we=W(e,c);
-    float wa=W(a,c)*.7, wb=W(b,c)*.7, wd=W(d,c)*.7, wf=W(f,c)*.7;
-    float3 acc=c+n*wn+s*ws+w*ww+e*we+a*wa+b*wb+d*wd+f*wf;
-    c=mix(c, acc/(1.0+wn+ws+ww+we+wa+wb+wd+wf), dn);
-    float k=dn*.5; n=mix(n,c,k); s=mix(s,c,k); w=mix(w,c,k); e=mix(e,c,k);
-  }
-  if(sh>0.0){
-    float3 mn=min(min(min(n,s),min(w,e)),c);
-    float3 mx=max(max(max(n,s),max(w,e)),c);
-    float3 amp=sqrt(clamp(min(mn,1.0-mx)/(mx+0.0001),0.0,1.0));
-    float3 wt=amp*(-1.0/mix(8.0,5.0,sh));
-    c=(c+(n+s+w+e)*wt)/(1.0+4.0*wt);
-  }
-  if(ln>0.0){
-    float3 L=float3(.299,.587,.114);
-    c*=1.0-ln*clamp((dot((n+s+w+e)*.25,L)-dot(c,L))*4.0,0.0,0.5);
-  }
-  return half4(half3(clamp(c,0.0,1.0)),1.0);
+
+float3 T(float2 p) { return src.eval(p).rgb; }
+float W(float3 a, float3 b) { float3 d = a - b; return 1.0 / (1.0 + dot(d, d) * 140.0); }
+
+half4 main(float2 p) {
+    float3 c = T(p);
+    float st = 1.5;
+    float3 n = T(p + float2(0.0, -st));
+    float3 s = T(p + float2(0.0, st));
+    float3 w = T(p + float2(-st, 0.0));
+    float3 e = T(p + float2(st, 0.0));
+
+    // 1. Bilateral Denoise (smooth flat anime areas, gradients, skies)
+    if (dn > 0.0) {
+        float3 a = T(p + float2(-st, -st));
+        float3 b = T(p + float2(st, -st));
+        float3 d = T(p + float2(-st, st));
+        float3 f = T(p + float2(st, st));
+        float wn = W(n, c), ws = W(s, c), ww = W(w, c), we = W(e, c);
+        float wa = W(a, c) * 0.7, wb = W(b, c) * 0.7, wd = W(d, c) * 0.7, wf = W(f, c) * 0.7;
+        float3 acc = c + n * wn + s * ws + w * ww + e * we + a * wa + b * wb + d * wd + f * wf;
+        c = mix(c, acc / (1.0 + wn + ws + ww + we + wa + wb + wd + wf), dn);
+    }
+
+    // 2. Anime Edge & Detail Enhancement (High-pass + Contrast-Adaptive)
+    if (sh > 0.0) {
+        float3 mn = min(min(min(n, s), min(w, e)), c);
+        float3 mx = max(max(max(n, s), max(w, e)), c);
+        float3 amp = sqrt(clamp(min(mn, 1.0 - mx) / (mx + 0.0001), 0.0, 1.0));
+        float3 wt = amp * (-1.0 / mix(6.0, 3.2, clamp(sh, 0.0, 1.0)));
+        float3 cas = (c + (n + s + w + e) * wt) / (1.0 + 4.0 * wt);
+        float3 edge = c * 4.0 - (n + s + w + e);
+        c = mix(cas, cas + edge * 0.25, clamp(sh * 0.8, 0.0, 1.0));
+    }
+
+    // 3. Anime Line-Art Darkener (crisp remastered black/dark contours)
+    if (ln > 0.0) {
+        float lumC = dot(c, float3(0.299, 0.587, 0.114));
+        float lumN = dot((n + s + w + e) * 0.25, float3(0.299, 0.587, 0.114));
+        float lineDiff = clamp((lumN - lumC) * 6.0, 0.0, 1.0);
+        c = mix(c, c * (1.0 - ln * 0.45), lineDiff);
+    }
+
+    return half4(clamp(c, 0.0, 1.0), 1.0);
 }
 """
 
 @OptIn(UnstableApi::class)
-fun applyUpscaler(pv: PlayerView, level: UpscaleLevel) {
-    if (Build.VERSION.SDK_INT < 33) return
-    val v = pv.videoSurfaceView as? TextureView ?: return
-    if (level == UpscaleLevel.OFF) { v.setRenderEffect(null); return }
-    val s = RuntimeShader(AGSL).apply {
-        setFloatUniform("dn", level.dn); setFloatUniform("sh", level.sh); setFloatUniform("ln", level.ln)
+fun applyCombinedVideoEffects(
+    pv: PlayerView?,
+    vfx: VideoFiltersState,
+    level: UpscaleLevel
+) {
+    if (pv == null) return
+    val tv = (pv.videoSurfaceView as? TextureView) ?: findTextureView(pv) ?: return
+    tv.isOpaque = true
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        var effect: RenderEffect? = null
+
+        // 1. Color filter / video adjustments (brightness, contrast, saturation)
+        val matrix = computeVideoFilterColorMatrix(vfx)
+        if (matrix != null && !vfx.isDefault) {
+            effect = RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(matrix))
+        }
+
+        // 2. AGSL Upscaler effect (API 33+)
+        if (Build.VERSION.SDK_INT >= 33 && level != UpscaleLevel.OFF) {
+            try {
+                val s = RuntimeShader(AGSL).apply {
+                    setFloatUniform("dn", level.dn)
+                    setFloatUniform("sh", level.sh)
+                    setFloatUniform("ln", level.ln)
+                }
+                val shaderEffect = RenderEffect.createRuntimeShaderEffect(s, "src")
+                effect = if (effect != null) {
+                    RenderEffect.createChainEffect(shaderEffect, effect)
+                } else {
+                    shaderEffect
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("Upscaler", "Failed to compile/apply AGSL upscaler", e)
+            }
+        }
+
+        tv.setRenderEffect(effect)
+        tv.invalidate()
     }
-    v.setRenderEffect(RenderEffect.createRuntimeShaderEffect(s, "src"))
+}
+
+@OptIn(UnstableApi::class)
+fun applyUpscaler(pv: PlayerView, level: UpscaleLevel) {
+    applyCombinedVideoEffects(pv, VideoFiltersState(), level)
 }
