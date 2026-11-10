@@ -12,6 +12,9 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.graphics.Bitmap
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.view.TextureView
 import android.os.Build
 import androidx.compose.material.icons.filled.Add
 
@@ -689,6 +692,9 @@ fun CinePlayerView(
     var activeSettingsTab by remember { mutableStateOf(PlayerSettingsTab.MAIN) }
     var videoFilters by remember { mutableStateOf(storageManager.getVideoFilters()) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    val upscalePrefs = remember { context.getSharedPreferences("cine_upscaler", Context.MODE_PRIVATE) }
+    var upscaleLevel by remember { mutableStateOf(UpscaleLevel.from(upscalePrefs.getString("level", null))) }
+    LaunchedEffect(upscaleLevel, playerViewRef) { playerViewRef?.let { applyUpscaler(it, upscaleLevel) } }
 
     LaunchedEffect(videoFilters, playerViewRef) {
         playerViewRef?.let { pv ->
@@ -3769,7 +3775,9 @@ CxPillIcon(
             onVideoFiltersChange = { newFilters ->
                 videoFilters = newFilters
                 storageManager.saveVideoFilters(newFilters)
-            }
+            },
+            upscaleLevel = upscaleLevel,
+            onUpscaleChange = { upscaleLevel = it; upscalePrefs.edit().putString("level", it.id).apply() }
         )
     }
 
@@ -4459,6 +4467,8 @@ private fun PlayerSettingsModal(
     onSwitchAudioStream: ((Boolean) -> Unit)? = null,
     videoFilters: VideoFiltersState = VideoFiltersState(),
     onVideoFiltersChange: (VideoFiltersState) -> Unit = {},
+    upscaleLevel: UpscaleLevel = UpscaleLevel.OFF,
+    onUpscaleChange: (UpscaleLevel) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -5533,6 +5543,33 @@ PlayerSettingsTab.PICTURE -> {
                         )
 
                         Text(
+                            text = "UPSCALER" + if (Build.VERSION.SDK_INT < 33) "  (needs Android 13+)" else "",
+                            color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                        UpscaleLevel.entries.forEach { l ->
+                            val sel = upscaleLevel == l
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (sel) Color(0x1FFFFFFF) else Color.Transparent)
+                                    .clickable { onUpscaleChange(l) }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                    Text(l.label, color = if (sel) OttPrimary else Color.White, fontSize = 14.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
+                                    Text(l.desc, color = OttSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                                }
+                                if (sel) Icon(Icons.Default.Check, null, tint = OttPrimary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(Color(0x14FFFFFF)))
+
+                        Text(
                             text = "COLOR & CONTRAST PRESETS",
                             color = Color(0xFF94A3B8),
                             fontSize = 11.sp,
@@ -6468,4 +6505,63 @@ private fun YtBottomProgressBar(
             )
         }
     }
+}
+
+// ── Upscaler ──
+enum class UpscaleLevel(
+    val id: String, val label: String, val desc: String,
+    val dn: Float, val sh: Float, val ln: Float
+) {
+    OFF("off", "Normal", "Original video, no processing", 0f, 0f, 0f),
+    DENOISE("denoise", "Denoise", "Removes compression noise and blocking", .70f, .15f, 0f),
+    MEDIUM("medium", "Medium", "Balanced clean-up and sharpening", .35f, .45f, 0f),
+    HIGH("high", "High", "Crisper edges, stronger clean-up", .40f, .70f, .15f),
+    ULTRA("ultra", "Ultra", "Max sharpness + line-art boost (heaviest)", .45f, 1f, .35f);
+
+    companion object { fun from(id: String?) = entries.firstOrNull { it.id == id } ?: OFF }
+}
+
+// Edge-aware denoise (8-tap bilateral) -> AMD CAS sharpen -> anime line darken. Runs on GPU at screen res.
+private const val AGSL = """
+uniform shader src;
+uniform float dn;
+uniform float sh;
+uniform float ln;
+float3 T(float2 p){ return src.eval(p).rgb; }
+float W(float3 a, float3 b){ float3 d=a-b; return 1.0/(1.0+dot(d,d)*90.0); }
+half4 main(float2 p){
+  float3 c=T(p);
+  float3 n=T(p+float2(0,-1)), s=T(p+float2(0,1)), w=T(p+float2(-1,0)), e=T(p+float2(1,0));
+  if(dn>0.0){
+    float3 a=T(p+float2(-1,-1)), b=T(p+float2(1,-1)), d=T(p+float2(-1,1)), f=T(p+float2(1,1));
+    float wn=W(n,c), ws=W(s,c), ww=W(w,c), we=W(e,c);
+    float wa=W(a,c)*.7, wb=W(b,c)*.7, wd=W(d,c)*.7, wf=W(f,c)*.7;
+    float3 acc=c+n*wn+s*ws+w*ww+e*we+a*wa+b*wb+d*wd+f*wf;
+    c=mix(c, acc/(1.0+wn+ws+ww+we+wa+wb+wd+wf), dn);
+    float k=dn*.5; n=mix(n,c,k); s=mix(s,c,k); w=mix(w,c,k); e=mix(e,c,k);
+  }
+  if(sh>0.0){
+    float3 mn=min(min(min(n,s),min(w,e)),c);
+    float3 mx=max(max(max(n,s),max(w,e)),c);
+    float3 amp=sqrt(clamp(min(mn,1.0-mx)/(mx+0.0001),0.0,1.0));
+    float3 wt=amp*(-1.0/mix(8.0,5.0,sh));
+    c=(c+(n+s+w+e)*wt)/(1.0+4.0*wt);
+  }
+  if(ln>0.0){
+    float3 L=float3(.299,.587,.114);
+    c*=1.0-ln*clamp((dot((n+s+w+e)*.25,L)-dot(c,L))*4.0,0.0,0.5);
+  }
+  return half4(half3(clamp(c,0.0,1.0)),1.0);
+}
+"""
+
+@OptIn(UnstableApi::class)
+fun applyUpscaler(pv: PlayerView, level: UpscaleLevel) {
+    if (Build.VERSION.SDK_INT < 33) return
+    val v = pv.videoSurfaceView as? TextureView ?: return
+    if (level == UpscaleLevel.OFF) { v.setRenderEffect(null); return }
+    val s = RuntimeShader(AGSL).apply {
+        setFloatUniform("dn", level.dn); setFloatUniform("sh", level.sh); setFloatUniform("ln", level.ln)
+    }
+    v.setRenderEffect(RenderEffect.createRuntimeShaderEffect(s, "src"))
 }
