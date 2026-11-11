@@ -1226,10 +1226,35 @@ class SupabaseRepository {
 
     }
 
-    suspend fun deleteWatchlistItem(userId: String, animeId: Int) {
+    suspend fun deleteWatchlistItem(userId: String, animeId: Int) = withContext(Dispatchers.IO) {
+        val cleanId = userId.trim()
+        if (cleanId.isBlank() || cleanId == "guest") return@withContext
+        try {
+            try {
+                client.postgrest.from("watchlist").delete {
+                    filter {
+                        eq("user_id", cleanId)
+                        eq("anime_id", animeId)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SupabaseRepo", "Failed to delete from watchlist table", e)
+            }
 
-        // user_sync handles watchlist storage
-
+            val currentSync = fetchUserSync(cleanId)
+            if (currentSync != null && currentSync.watchlist != null) {
+                val updatedWatchlist = currentSync.watchlist.filterNot { it.id == animeId }
+                val nowIso = java.time.Instant.now().toString()
+                client.postgrest.from("user_sync").update(buildJsonObject {
+                    put("watchlist", SupabaseManager.json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(WebWatchlistItem.serializer()), updatedWatchlist))
+                    put("updated_at", nowIso)
+                }) {
+                    filter { eq("user_id", cleanId) }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SupabaseRepo", "Failed to deleteWatchlistItem for $cleanId, animeId=$animeId", e)
+        }
     }
 
     suspend fun syncWatchlist(userId: String, localItems: List<CloudWatchlistItem>) {
@@ -1288,10 +1313,35 @@ class SupabaseRepository {
 
     }
 
-    suspend fun deleteWatchHistory(userId: String, animeId: Int) {
+    suspend fun deleteWatchHistory(userId: String, animeId: Int) = withContext(Dispatchers.IO) {
+        val cleanId = userId.trim()
+        if (cleanId.isBlank() || cleanId == "guest") return@withContext
+        try {
+            try {
+                client.postgrest.from("watch_history").delete {
+                    filter {
+                        eq("user_id", cleanId)
+                        eq("anime_id", animeId)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SupabaseRepo", "Failed to delete from watch_history table", e)
+            }
 
-        // user_sync handles watch history storage
-
+            val currentSync = fetchUserSync(cleanId)
+            if (currentSync != null && currentSync.history != null) {
+                val updatedHistory = currentSync.history.filterNot { it.id == animeId }
+                val nowIso = java.time.Instant.now().toString()
+                client.postgrest.from("user_sync").update(buildJsonObject {
+                    put("history", SupabaseManager.json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(WebHistoryItem.serializer()), updatedHistory))
+                    put("updated_at", nowIso)
+                }) {
+                    filter { eq("user_id", cleanId) }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SupabaseRepo", "Failed to deleteWatchHistory for $cleanId, animeId=$animeId", e)
+        }
     }
 
     suspend fun syncWatchHistory(userId: String, localItems: List<CloudHistoryItem>) {

@@ -236,6 +236,9 @@ object AnimeSaltResolver {
 
         try {
             if (anilistId > 0 && !AnimeMappingRepository.isMapped(anilistId)) {
+                AnimeMappingRepository.ensureMapped(anilistId)
+            }
+            if (anilistId > 0 && !AnimeMappingRepository.isMapped(anilistId)) {
                 // Unmapped in anime-mapping.json -> Not available on AnimeSalt / ACDN
                 return@withContext null
             }
@@ -617,11 +620,14 @@ object AnimeSaltResolver {
                 "$BASE_URL/episode/$slug/"
             ).distinct()
         } else {
+            val unpriv = slug.removePrefix("private-")
             listOf(
                 "$BASE_URL/episode/$slug/",
+                "$BASE_URL/episode/private-$unpriv/",
+                "$BASE_URL/episode/$unpriv/",
                 "$BASE_URL/movies/$slug/",
                 "$BASE_URL/anime/$slug/"
-            )
+            ).distinct()
         }
 
         var myStream: String? = null

@@ -461,7 +461,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val novelRepo = com.nyyrox.aniverse.data.novel.UnifiedNovelRepository()
 
-    val downloadManager = com.nyyrox.aniverse.data.download.DownloadManager(application)
+    val downloadManager = com.nyyrox.aniverse.data.download.DownloadManager.getInstance(application)
 
     var activeNovelSource by mutableStateOf(com.nyyrox.aniverse.data.novel.NovelSource.NOVEL_FULL); private set
 
@@ -3630,6 +3630,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         )
 
+    }
+
+    val downloadedMovies = downloadManager.downloadedMovies
+
+    fun downloadMovie(
+        id: Int,
+        title: String,
+        poster: String? = null,
+        backdrop: String? = null,
+        overview: String? = null,
+        year: String? = null,
+        type: String = "movie",
+        season: Int = 1,
+        episode: Int = 1,
+        episodeTitle: String? = null,
+        quality: String = "Auto HD",
+        dubId: String? = null
+    ) {
+        downloadManager.downloadMovie(
+            id = id,
+            title = title,
+            poster = poster,
+            backdrop = backdrop,
+            overview = overview,
+            year = year,
+            type = type,
+            season = season,
+            episode = episode,
+            episodeTitle = episodeTitle,
+            quality = quality,
+            dubId = dubId
+        )
+    }
+
+    fun isMovieEpisodeDownloaded(movieId: Int, season: Int = 1, episode: Int = 1): Boolean {
+        return downloadManager.isMovieEpisodeDownloaded(movieId, season, episode)
+    }
+
+    fun getDownloadedMovieEpisode(movieId: Int, season: Int = 1, episode: Int = 1): com.nyyrox.aniverse.data.download.DownloadedMovieEpisode? {
+        return downloadManager.getDownloadedMovieEpisode(movieId, season, episode)
+    }
+
+    fun deleteDownloadedMovie(movieId: Int) {
+        downloadManager.deleteDownloadedMovie(movieId)
+    }
+
+    fun deleteDownloadedMovieEpisode(movieId: Int, season: Int, episode: Int) {
+        downloadManager.deleteDownloadedMovieEpisode(movieId, season, episode)
     }
 
     fun updateNovelReaderSettings(settings: com.nyyrox.aniverse.data.novel.NovelReaderSettings) {
@@ -6896,6 +6944,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         // Watchlist
 
                         row.watchlist?.forEach { item ->
+                            if (!storage.isWatchlistDeleted(item.id)) {
 
                             storage.addToWatchlistFromCloud(
 
@@ -6922,6 +6971,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 customTags = emptyList()
 
                             )
+                            }
 
                         }
 
@@ -6931,31 +6981,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                         cloudHistory.reversed().forEach { item ->
 
-                            storage.unmarkHistoryDeleted(item.id)
+                            if (!storage.isHistoryDeleted(item.id)) {
 
-                            val local = storage.getHistory().firstOrNull { it.animeId == item.id }
+                                val local = storage.getHistory().firstOrNull { it.animeId == item.id }
 
-                            if (local == null || item.ep >= local.lastEpisode) {
+                                if (local == null || item.ep >= local.lastEpisode) {
 
-                                storage.addToHistoryFromCloud(
+                                    storage.addToHistoryFromCloud(
 
-                                    animeId = item.id,
+                                        animeId = item.id,
 
-                                    title = item.title,
+                                        title = item.title,
 
-                                    cover = item.image ?: "",
+                                        cover = item.image ?: "",
 
-                                    banner = item.banner,
+                                        banner = item.banner,
 
-                                    lastEpisode = item.ep,
+                                        lastEpisode = item.ep,
 
-                                    totalEpisodes = item.episodes,
+                                        totalEpisodes = item.episodes,
 
-                                    positionMs = item.pos * 1000L,
+                                        positionMs = item.pos * 1000L,
 
-                                    durationMs = item.dur * 1000L
+                                        durationMs = item.dur * 1000L
 
-                                )
+                                    )
+
+                                }
 
                             }
 
@@ -7114,6 +7166,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
 
                 supabaseRepo.deleteWatchHistory(currentUserId, animeId)
+                pushToCloud()
 
             } catch (e: Exception) {
 
@@ -7140,6 +7193,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
 
                 supabaseRepo.deleteWatchlistItem(currentUserId, animeId)
+                pushToCloud()
 
             } catch (e: Exception) {
 

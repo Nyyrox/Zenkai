@@ -13,7 +13,8 @@ import java.util.concurrent.TimeUnit
 
 object MovieRepository {
 
-    private const val STREAM_WORKER_BASE = "https://zenkai-stream-proxy.ammhfoo.workers.dev"
+    private const val STREAM_WORKER_BASE = "https://zenkaii.pages.dev"
+    private const val BARRIER_TOKEN = "zenkai-barrier-apk-2026-v1"
 
     val MOVIE_GENRES = listOf(
         MovieGenre(28, "Action"),
@@ -504,6 +505,7 @@ object MovieRepository {
                 .url(url)
                 .addHeader("Accept", "application/json")
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Zenkai/1.0.5")
+                .addHeader("X-Zenkai-Barrier", BARRIER_TOKEN)
                 .build()
 
             val quickClient = httpClient.newBuilder()

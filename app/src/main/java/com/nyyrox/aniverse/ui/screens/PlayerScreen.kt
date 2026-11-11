@@ -308,8 +308,8 @@ fun PlayerScreen(
             targetId = anime.id.toString()
         )
     }
-    val isAcdnMapped = remember(anime.id) {
-        com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id)
+    var isAcdnMapped by remember(anime.id) {
+        mutableStateOf(com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id))
     }
     val initialIsDub = remember {
         val prefs = context.getSharedPreferences("playback_settings", android.content.Context.MODE_PRIVATE)
@@ -465,6 +465,10 @@ fun PlayerScreen(
     var animeSaltRelChecked by remember(anime.id) { mutableStateOf(false) }
     LaunchedEffect(anime.id) {
         animeSaltRelChecked = false
+        if (!isAcdnMapped) {
+            com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.ensureMapped(anime.id)
+            isAcdnMapped = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id)
+        }
         animeSaltRel = com.nyyrox.aniverse.data.animesalt.AnimeSaltResolver.getOrBuildRelationship(
             anilistId = anime.id,
             title = anime.title,
@@ -473,6 +477,7 @@ fun PlayerScreen(
             format = anime.format,
             totalEpisodes = maxEpisode
         )
+        isAcdnMapped = com.nyyrox.aniverse.data.mapping.AnimeMappingRepository.isMapped(anime.id)
         animeSaltRelChecked = true
     }
 

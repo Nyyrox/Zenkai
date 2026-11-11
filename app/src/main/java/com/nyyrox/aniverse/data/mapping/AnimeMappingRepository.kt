@@ -38,7 +38,11 @@ object AnimeMappingRepository {
     private const val TAG = "AnimeMappingRepo"
 
     // Primary: Zenkai Web GitHub anime-mapping.json
+    // Primary: Zenkai Web GitHub anime-mapping.json (and high-speed edge mirrors)
     private const val GITHUB_MAPPING_URL = "https://raw.githubusercontent.com/nyyrox2/Zenkai/main/public/anime-mapping.json"
+    private const val JSDELIVR_MAPPING_URL = "https://cdn.jsdelivr.net/gh/nyyrox2/Zenkai@main/public/anime-mapping.json"
+    private const val PAGES_MAPPING_URL = "https://zenkaii.pages.dev/anime-mapping.json"
+    private const val CFD_MAPPING_URL = "https://zenkai.cfd/anime-mapping.json"
     private const val GITHUB_MAPPING_FALLBACK_URL = "https://raw.githubusercontent.com/nyyrox2/Zenkai/master/public/anime-mapping.json"
     private const val VERCEL_MAPPING_URL = "https://aniversee.vercel.app/anime-mapping.json"
     private const val CACHE_FILE_NAME = "anime-mapping-cache.json"
@@ -225,6 +229,8 @@ object AnimeMappingRepository {
         val list = linkedSetOf<String>()
         list.add(clean)
         if (normalized != clean) list.add(normalized)
+        list.add("private-$clean")
+        if (normalized != clean) list.add("private-$normalized")
         if (clean.contains("gintama")) {
             list.add("gintama")
             list.add("gintama-season-3")
@@ -261,6 +267,16 @@ object AnimeMappingRepository {
     fun isMapped(anilistId: Int): Boolean {
         if (anilistId <= 0) return false
         return mappingCache.containsKey(anilistId.toString())
+    }
+
+    /**
+     * Ensures an AniList show ID is mapped, fetching from GitHub/edge if not yet in cache.
+     */
+    suspend fun ensureMapped(anilistId: Int): Boolean = withContext(Dispatchers.IO) {
+        if (anilistId <= 0) return@withContext false
+        if (isMapped(anilistId)) return@withContext true
+        syncRemoteMappings()
+        return@withContext isMapped(anilistId)
     }
 
     /**
@@ -326,7 +342,7 @@ object AnimeMappingRepository {
      * Asynchronously syncs latest mappings from Zenkai Web GitHub repository in background.
      */
     suspend fun syncRemoteMappings(): Boolean = withContext(Dispatchers.IO) {
-        val urls = listOf(GITHUB_MAPPING_URL, GITHUB_MAPPING_FALLBACK_URL, VERCEL_MAPPING_URL)
+        val urls = listOf(GITHUB_MAPPING_URL, JSDELIVR_MAPPING_URL, PAGES_MAPPING_URL, CFD_MAPPING_URL, GITHUB_MAPPING_FALLBACK_URL, VERCEL_MAPPING_URL)
         for (u in urls) {
             try {
                 val req = Request.Builder()

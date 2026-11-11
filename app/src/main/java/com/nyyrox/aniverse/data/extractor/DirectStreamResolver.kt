@@ -104,6 +104,9 @@ object DirectStreamResolver {
         val cacheKey = "$anilistId:$episode"
         audioAvailabilityCache[cacheKey]?.let { return@withContext it }
 
+        if (anilistId > 0 && !AnimeMappingRepository.isMapped(anilistId)) {
+            AnimeMappingRepository.ensureMapped(anilistId)
+        }
         val isAcdnMapped = anilistId > 0 && AnimeMappingRepository.isMapped(anilistId)
         var hasSub = true
         var hasDub = isAcdnMapped // If in anime-mapping.json, ACDN provides multi-audio / dub

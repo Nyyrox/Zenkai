@@ -29,8 +29,57 @@ data class SubtitleTrack(
 )
 
 object SubtitleRepository {
-    private const val TMDB_VERCEL_BASE = "https://aniversee.vercel.app/api/tmdb"
+    private const val TMDB_VERCEL_BASE = "https://zenkaii.pages.dev/api/tmdb"
+    private const val BARRIER_TOKEN = "zenkai-barrier-apk-2026-v1"
     private const val OPENSUBTITLES_BASE = "https://opensubtitles-v3.strem.io/subtitles"
+
+    fun extractSubtitlesFromPlayer(html: String, domain: String = "ravok.buzz"): List<SubtitleTrack> {
+        val list = mutableListOf<SubtitleTrack>()
+        val pjsRegex = Regex("""(?:playerjsSubtitle|Subtitle)s*=s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+        val pjsMatch = pjsRegex.find(html)
+        if (pjsMatch != null) {
+            val raw = pjsMatch.groupValues[1]
+            val chunks = raw.split(",")
+            for (chunk in chunks) {
+                val m = Regex("""^[(.*?)]s*(https?://.+)""", RegexOption.IGNORE_CASE).find(chunk.trim())
+                if (m != null) {
+                    val label = m.groupValues[1].trim()
+                    val url = m.groupValues[2].trim()
+                    list.add(
+                        SubtitleTrack(
+                            id = "acdn_${list.size}",
+                            label = label,
+                            language = normalizeLanguage(label),
+                            url = url,
+                            source = "ACDN"
+                        )
+                    )
+                }
+            }
+        }
+
+        val trackRegex = Regex("""<track[^>]+>""", RegexOption.IGNORE_CASE)
+        for (m in trackRegex.findAll(html)) {
+            val tag = m.value
+            val srcMatch = Regex("""src=["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(tag)
+            val labelMatch = Regex("""label=["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(tag)
+            val src = srcMatch?.groupValues?.get(1)
+            val label = labelMatch?.groupValues?.get(1) ?: "English"
+            if (!src.isNullOrBlank() && list.none { it.url == src }) {
+                val fullUrl = if (src.startsWith("http")) src else "https://$domain${if (src.startsWith("/")) "" else "/"}$src"
+                list.add(
+                    SubtitleTrack(
+                        id = "acdn_${list.size}",
+                        label = label,
+                        language = normalizeLanguage(label),
+                        url = fullUrl,
+                        source = "ACDN"
+                    )
+                )
+            }
+        }
+        return list
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -98,6 +147,7 @@ object SubtitleRepository {
                 .url(url)
                 .addHeader("Accept", "application/json")
                 .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
+                .addHeader("X-Zenkai-Barrier", BARRIER_TOKEN)
                 .build()
 
             client.newCall(req).execute().use { res ->
@@ -751,9 +801,9 @@ object SubtitleRepository {
             try {
                 val req = Request.Builder()
                     .url(targetUrl)
-                    .addHeader("User-Agent", "Zenkai/1.6.4 (Android; Mobile)")
+                    .addHeader("User-Agent", "Zenkai/1.6.5 (Android; Mobile)")
                     .addHeader("X-Zenkai-Barrier", "zenkai-barrier-apk-2026-v1")
-                    .addHeader("X-Zenkai-Client", "Zenkai-Android-v1.6.4")
+                    .addHeader("X-Zenkai-Client", "Zenkai-Android-v1.6.5")
                     .addHeader("X-Aniverse-Client", "true")
                     .addHeader("Referer", defaultReferer)
                     .addHeader("Accept", "text/vtt,text/plain,text/x-ssa,application/x-subrip,*/*")

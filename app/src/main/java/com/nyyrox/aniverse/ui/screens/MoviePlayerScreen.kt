@@ -48,6 +48,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Downloading
+import androidx.compose.runtime.collectAsState
+import com.nyyrox.aniverse.data.download.DownloadStatus
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -113,7 +118,12 @@ fun MoviePlayerScreen(
     var currentEpisode by remember { mutableIntStateOf(initialEpisode) }
     var selectedDub by remember { mutableStateOf<String?>(null) }
     var selectedQuality by remember { mutableStateOf<String?>(null) }
+    var showDownloadOptionsSheet by remember { mutableStateOf(false) }
+    var downloadTargetSeason by remember { mutableIntStateOf(1) }
+    var downloadTargetEpisode by remember { mutableIntStateOf(1) }
+    var downloadTargetEpTitle by remember { mutableStateOf<String?>(null) }
     val storage = remember { com.nyyrox.aniverse.data.StorageManager(context) }
+    val downloadManager = remember { com.nyyrox.aniverse.data.download.DownloadManager.getInstance(context) }
     val initialSavedPosition = remember(id, currentSeason, currentEpisode) {
         storage.getMoviePosition(id, currentSeason, currentEpisode)
     }
@@ -199,6 +209,36 @@ fun MoviePlayerScreen(
             isLoadingStream = true
             streamError = null
             try {
+                if (selectedDub == null && downloadManager.isMovieEpisodeDownloaded(id, currentSeason, currentEpisode)) {
+                    val downloadedEp = downloadManager.getDownloadedMovieEpisode(id, currentSeason, currentEpisode)
+                    if (downloadedEp != null && java.io.File(downloadedEp.filePath).exists()) {
+                        streamResult = MovieStreamResult(
+                            success = true,
+                            server = "Offline Download",
+                            title = downloadedEp.movieTitle,
+                            streamUrl = downloadedEp.filePath,
+                            downloadUrl = downloadedEp.filePath,
+                            quality = downloadedEp.quality,
+                            format = "mp4",
+                            dubs = emptyList(),
+                            streams = listOf(
+                                MovieStream(
+                                    quality = downloadedEp.quality,
+                                    resolutionNum = 1080,
+                                    format = "mp4",
+                                    size = downloadedEp.sizeBytes,
+                                    streamUrl = downloadedEp.filePath,
+                                    downloadUrl = downloadedEp.filePath,
+                                    downloadFileName = "video.mp4"
+                                )
+                            ),
+                            subtitles = emptyList()
+                        )
+                        selectedQuality = downloadedEp.quality
+                        isLoadingStream = false
+                        return@launch
+                    }
+                }
                 val res = MovieRepository.fetchMovieStream(
                     id = id,
                     type = type,
@@ -214,6 +254,11 @@ fun MoviePlayerScreen(
                     if (selectedQuality == null) {
                         selectedQuality = res.quality
                     }
+                } else if (selectedDub != null) {
+                    Toast.makeText(context, "Dub unavailable, playing original audio", Toast.LENGTH_SHORT).show()
+                    selectedDub = null
+                    loadMovieBoxStream()
+                    return@launch
                 } else {
                     val fallback = allServers.find { !it.isDirect && it.embedUrl.isNotBlank() }
                     if (fallback != null) {
@@ -314,6 +359,35 @@ fun MoviePlayerScreen(
     val similarAnime = remember(details?.similar) { details?.similar?.map { it.toAnime() } ?: emptyList() }
     val collectionAnime = remember(details?.collection) { details?.collection?.map { it.toAnime() } ?: emptyList() }
 
+    val movieTasks by downloadManager.movieTasks.collectAsState()
+    val downloadedMovies by downloadManager.downloadedMovies.collectAsState()
+
+    val currentTaskKey = if (isTv) "$id:s${currentSeason}_e$currentEpisode" else "$id:movie"
+    val currentMovieTask = movieTasks[currentTaskKey]
+    val isCurrentDownloading = currentMovieTask != null && (currentMovieTask.status == DownloadStatus.DOWNLOADING || currentMovieTask.status == DownloadStatus.QUEUED)
+    val isCurrentDownloaded = remember(downloadedMovies, id, currentSeason, currentEpisode) {
+        downloadManager.isMovieEpisodeDownloaded(id, currentSeason, currentEpisode)
+    }
+
+    fun downloadCurrentEpisodeOrMovie() {
+        if (isCurrentDownloaded) {
+            Toast.makeText(context, "Already downloaded (Available for offline playback)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (isCurrentDownloading) {
+            val rawP = currentMovieTask?.progress ?: 0f
+            val safeP = if (rawP.isNaN() || !rawP.isFinite()) 0f else rawP
+            val pct = (safeP * 100f).toInt()
+            Toast.makeText(context, "Download in progress: $pct%", Toast.LENGTH_SHORT).show()
+            return
+        }
+        downloadTargetSeason = currentSeason
+        downloadTargetEpisode = currentEpisode
+        val epDot = epName?.let { " · $it" } ?: ""
+        downloadTargetEpTitle = if (isTv) "S$currentSeason E$currentEpisode$epDot" else details?.title
+        showDownloadOptionsSheet = true
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -391,7 +465,7 @@ fun MoviePlayerScreen(
                             }
                         }
                     } else {
-                        key(currentSeason, currentEpisode, selectedServerId) {
+                        key(currentSeason, currentEpisode, selectedServerId, selectedDub) {
                             CinePlayerView(
                                 props = CinePlayerProps(
                                     title = details?.title ?: "Playing",
@@ -424,6 +498,9 @@ fun MoviePlayerScreen(
                                         switchToServer(opt.serverId)
                                     },
                                     serverName = currentServer.label,
+                                    onDownload = { downloadCurrentEpisodeOrMovie() },
+                                    isDownloaded = isCurrentDownloaded,
+                                    isDownloading = isCurrentDownloading,
                                     onProgressUpdate = { currentMs, durationMs ->
                                         if (currentMs > 1000L) {
                                             storage.saveMovieProgress(
@@ -507,6 +584,83 @@ fun MoviePlayerScreen(
                                 fontSize = 12.5.sp,
                                 color = p.textMuted
                             )
+
+                            Spacer(Modifier.height(14.dp))
+
+                            // Download Action Pill
+                            val rawCurP = currentMovieTask?.progress ?: 0f
+                            val safeCurP = if (rawCurP.isNaN() || !rawCurP.isFinite()) 0f else rawCurP
+                            val dlBtnText = when {
+                                isCurrentDownloading -> "Downloading (${(safeCurP * 100f).toInt()}%)"
+                                isCurrentDownloaded -> "Downloaded (Available Offline)"
+                                isTv -> "Download Episode $currentEpisode"
+                                else -> "Download Movie"
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .then(if (isCurrentDownloaded) Modifier.background(p.chipBg) else Modifier.background(p.accentBrush))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isCurrentDownloaded) p.accentA else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { downloadCurrentEpisodeOrMovie() }
+                                    .padding(vertical = 12.dp, horizontal = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    when {
+                                        isCurrentDownloading -> {
+                                            CircularProgressIndicator(
+                                                progress = { val rawP = currentMovieTask?.progress ?: 0f; if (rawP.isNaN() || !rawP.isFinite()) 0.05f else rawP.coerceIn(0.05f, 1f) },
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.dp,
+                                                color = p.onAccent,
+                                                trackColor = p.onAccent.copy(alpha = 0.3f)
+                                            )
+                                            Text(
+                                                text = dlBtnText,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = p.onAccent
+                                            )
+                                        }
+                                        isCurrentDownloaded -> {
+                                            Icon(
+                                                imageVector = Icons.Default.DownloadDone,
+                                                contentDescription = "Downloaded",
+                                                tint = p.accentA,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                            Text(
+                                                text = dlBtnText,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = p.accentA
+                                            )
+                                        }
+                                        else -> {
+                                            Icon(
+                                                imageVector = Icons.Default.FileDownload,
+                                                contentDescription = "Download",
+                                                tint = p.onAccent,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                            Text(
+                                                text = dlBtnText,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = p.onAccent
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -614,6 +768,12 @@ fun MoviePlayerScreen(
 
                             itemsIndexed(episodes, key = { _, ep -> "p_ep_${ep.episodeNumber}" }) { _, ep ->
                                 val isPlayingThis = (ep.episodeNumber == currentEpisode)
+                                val epKey = "$id:s${currentSeason}_e${ep.episodeNumber}"
+                                val epTask = movieTasks[epKey]
+                                val isEpDownloading = epTask != null && (epTask.status == DownloadStatus.DOWNLOADING || epTask.status == DownloadStatus.QUEUED)
+                                val isEpDownloaded = remember(downloadedMovies, id, currentSeason, ep.episodeNumber) {
+                                    downloadManager.isMovieEpisodeDownloaded(id, currentSeason, ep.episodeNumber)
+                                }
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -677,6 +837,57 @@ fun MoviePlayerScreen(
                                                 maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis
                                             )
+                                        }
+                                    }
+
+                                    // Episode Download Button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isEpDownloaded) p.accentA.copy(alpha = 0.15f) else p.chipBg)
+                                            .clickable {
+                                                if (isEpDownloaded) {
+                                                    Toast.makeText(context, "Ep ${ep.episodeNumber} is already downloaded", Toast.LENGTH_SHORT).show()
+                                                } else if (isEpDownloading) {
+                                                    val epPct = ((epTask?.progress ?: 0f) * 100f).toInt()
+                                                    Toast.makeText(context, "Ep ${ep.episodeNumber} download in progress ($epPct%)", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    downloadTargetSeason = currentSeason
+                                                    downloadTargetEpisode = ep.episodeNumber
+                                                    val epDot = if (ep.name.isNotBlank()) " · ${ep.name}" else ""
+                                                    downloadTargetEpTitle = "S${currentSeason} E${ep.episodeNumber}$epDot"
+                                                    showDownloadOptionsSheet = true
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        when {
+                                            isEpDownloading -> {
+                                                CircularProgressIndicator(
+                                                    progress = { val rawEpP = epTask?.progress ?: 0f; if (rawEpP.isNaN() || !rawEpP.isFinite()) 0.05f else rawEpP.coerceIn(0.05f, 1f) },
+                                                    modifier = Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = p.accentA,
+                                                    trackColor = p.glassBorder
+                                                )
+                                            }
+                                            isEpDownloaded -> {
+                                                Icon(
+                                                    imageVector = Icons.Default.DownloadDone,
+                                                    contentDescription = "Downloaded",
+                                                    tint = p.accentA,
+                                                    modifier = Modifier.size(19.dp)
+                                                )
+                                            }
+                                            else -> {
+                                                Icon(
+                                                    imageVector = Icons.Default.FileDownload,
+                                                    contentDescription = "Download Episode",
+                                                    tint = p.textMuted,
+                                                    modifier = Modifier.size(19.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -814,5 +1025,46 @@ fun MoviePlayerScreen(
                 }
             }
         }
+    }
+
+    if (showDownloadOptionsSheet) {
+        com.nyyrox.aniverse.ui.components.DownloadMovieOptionsSheet(
+            movieId = id,
+            title = details?.title ?: "Movie",
+            type = type,
+            season = downloadTargetSeason,
+            episode = downloadTargetEpisode,
+            episodeTitle = downloadTargetEpTitle ?: if (isTv) "S$downloadTargetSeason E$downloadTargetEpisode" else null,
+            poster = details?.poster,
+            backdrop = details?.backdrop,
+            overview = details?.overview,
+            year = details?.year,
+            initialQuality = selectedQuality,
+            initialDubId = selectedDub,
+            availableDubs = streamResult?.dubs,
+            availableStreams = streamResult?.streams,
+            onDismiss = { showDownloadOptionsSheet = false },
+            onStartDownload = { quality, dubId ->
+                downloadManager.downloadMovie(
+                    id = id,
+                    title = details?.title ?: "Movie",
+                    poster = details?.poster,
+                    backdrop = details?.backdrop,
+                    overview = details?.overview,
+                    year = details?.year,
+                    type = type,
+                    season = downloadTargetSeason,
+                    episode = downloadTargetEpisode,
+                    episodeTitle = downloadTargetEpTitle ?: if (isTv) "S$downloadTargetSeason E$downloadTargetEpisode" else null,
+                    quality = quality,
+                    dubId = dubId
+                )
+                Toast.makeText(
+                    context,
+                    "Download queued: ${downloadTargetEpTitle ?: (details?.title ?: "Movie")} ($quality)",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        )
     }
 }

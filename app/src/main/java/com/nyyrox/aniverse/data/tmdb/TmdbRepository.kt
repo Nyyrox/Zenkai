@@ -84,8 +84,8 @@ object TmdbRepository {
     private const val TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
 
     private const val BARRIER_TOKEN = "zenkai-barrier-apk-2026-v1"
-    private const val CLIENT_ID = "Zenkai-Android-v1.6.4"
-    private const val APP_USER_AGENT = "Zenkai/1.6.4 (Android; Mobile)"
+    private const val CLIENT_ID = "Zenkai-Android-v1.6.5"
+    private const val APP_USER_AGENT = "Zenkai/1.6.5 (Android; Mobile)"
 
     private const val TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjN2RiNjE2OWJmZGQzZmM5ZjdkZDZjNDRlYThhZDEwMCIsIm5iZiI6MTc5NDM3NjY0MC40MDYwMDAxLCJzdWIiOiI2YWY0MDNjOWI4YTRlMzU1YjYzNGVkOTciLCJzY29wZXMiOlsicmVhZCJdLCJ2ZXJzaW9uIjoxfQ.ww3C_pAWxT63xXVM90Akq8aSEyFhmyA5VaobbE-E0y4"
     private const val TMDB_API_KEY = "c7db6169bfdd3fc9f7dd6c44ea8ad100"

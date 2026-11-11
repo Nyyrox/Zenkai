@@ -1043,6 +1043,8 @@ internal fun ContinueRow(
     onRemoveManga: (String) -> Unit,
     onRemoveNovel: (String) -> Unit
 ) {
+    var pendingRemoveEntry by remember { mutableStateOf<ContinueEntry?>(null) }
+
     val entries = remember(animeHistory, mangaHistory, novelHistory) {
         val out = ArrayList<ContinueEntry>()
         animeHistory.forEach { h ->
@@ -1058,7 +1060,18 @@ internal fun ContinueRow(
                 progress = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f,
                 image = { firstNonBlank(stillFor(h.animeId, ep), h.banner, h.cover) },
                 onOpen = { onPlayAnime(h.animeId, ep) },
-                onRemove = { onRemoveAnime(h.animeId) },
+                onRemove = {
+                    pendingRemoveEntry = ContinueEntry(
+                        key = "a_${h.animeId}",
+                        kind = ContinueKind.ANIME,
+                        title = h.title,
+                        subtitle = "EP $ep",
+                        progress = 0f,
+                        image = { "" },
+                        onOpen = {},
+                        onRemove = { onRemoveAnime(h.animeId) }
+                    )
+                },
                 loadStill = { onLoadEpisodeStill(h.animeId, ep) }
             )
         }
@@ -1072,7 +1085,18 @@ internal fun ContinueRow(
                 progress = if (total > 0) ((m.pageIndex + 1).toFloat() / total).coerceIn(0f, 1f) else 0f,
                 image = { m.poster },
                 onOpen = { onReadManga(m.mangaId, m.chapterId) },
-                onRemove = { onRemoveManga(m.mangaId) }
+                onRemove = {
+                    pendingRemoveEntry = ContinueEntry(
+                        key = "m_${m.mangaId}",
+                        kind = ContinueKind.MANGA,
+                        title = m.title,
+                        subtitle = "",
+                        progress = 0f,
+                        image = { "" },
+                        onOpen = {},
+                        onRemove = { onRemoveManga(m.mangaId) }
+                    )
+                }
             )
         }
         novelHistory.forEach { n ->
@@ -1085,7 +1109,18 @@ internal fun ContinueRow(
                 progress = 0f,
                 image = { n.cover },
                 onOpen = { onReadNovel(n.slug, n.lastChapterSlug ?: "") },
-                onRemove = { onRemoveNovel(n.slug) }
+                onRemove = {
+                    pendingRemoveEntry = ContinueEntry(
+                        key = "n_${n.slug}",
+                        kind = ContinueKind.NOVEL,
+                        title = n.title,
+                        subtitle = "",
+                        progress = 0f,
+                        image = { "" },
+                        onOpen = {},
+                        onRemove = { onRemoveNovel(n.slug) }
+                    )
+                }
             )
         }
         out.take(20)
@@ -1102,6 +1137,32 @@ internal fun ContinueRow(
         ) {
             itemsIndexed(entries, key = { _, e -> e.key }) { i, e -> ContinueTile(e, p, Modifier.rowTilt(st, i)) }
         }
+    }
+
+    pendingRemoveEntry?.let { entry ->
+        val (dialogTitle, dialogMsg) = when (entry.kind) {
+            ContinueKind.ANIME -> "Remove from History?" to "Remove \"${entry.title}\" from continue watching?"
+            ContinueKind.MANGA -> "Remove Reading History?" to "Remove \"${entry.title}\" from manga reading history?"
+            ContinueKind.NOVEL -> "Remove Reading History?" to "Remove \"${entry.title}\" from novel reading history?"
+            ContinueKind.MOVIE -> "Remove from History?" to "Remove \"${entry.title}\" from continue watching?"
+        }
+        com.nyyrox.aniverse.ui.components.RemoveConfirmDialog(
+            title = dialogTitle,
+            message = dialogMsg,
+            confirmText = "Remove",
+            cancelText = "Cancel",
+            onConfirm = {
+                val key = entry.key
+                if (key.startsWith("a_")) {
+                    key.removePrefix("a_").toIntOrNull()?.let(onRemoveAnime)
+                } else if (key.startsWith("m_")) {
+                    onRemoveManga(key.removePrefix("m_"))
+                } else if (key.startsWith("n_")) {
+                    onRemoveNovel(key.removePrefix("n_"))
+                }
+            },
+            onDismiss = { pendingRemoveEntry = null }
+        )
     }
 }
 

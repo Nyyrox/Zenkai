@@ -2,6 +2,7 @@ package com.nyyrox.aniverse.data.download
 
 enum class DownloadType {
     ANIME,
+    MOVIE,
     NOVEL,
     MANGA
 }
@@ -25,6 +26,28 @@ data class AnimeDownloadTask(
     val providerName: String,
     val quality: String = "Auto HD",
     val audio: String = "SUB",
+    val totalSegments: Int = 0,
+    val downloadedSegments: Int = 0,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
+    val speedFormatted: String = "",
+    val status: DownloadStatus = DownloadStatus.IDLE,
+    val progress: Float = 0f,
+    val error: String? = null,
+    val localFilePath: String? = null
+)
+
+data class MovieDownloadTask(
+    val movieId: Int,
+    val title: String,
+    val poster: String? = null,
+    val backdrop: String? = null,
+    val type: String = "movie", // "movie" or "tv"
+    val season: Int = 1,
+    val episode: Int = 1,
+    val episodeTitle: String? = null,
+    val quality: String = "Auto HD",
+    val dubId: String? = null,
     val totalSegments: Int = 0,
     val downloadedSegments: Int = 0,
     val downloadedBytes: Long = 0L,
@@ -97,6 +120,35 @@ data class DownloadedAnimeEpisode(
     val subtitles: List<com.nyyrox.aniverse.data.subtitles.SubtitleTrack> = emptyList()
 )
 
+data class DownloadedMovie(
+    val movieId: Int,
+    val title: String,
+    val poster: String? = null,
+    val backdrop: String? = null,
+    val overview: String? = null,
+    val year: String? = null,
+    val type: String = "movie", // "movie" or "tv"
+    val episodesCount: Int = 0,
+    val totalSizeBytes: Long = 0L,
+    val lastDownloadedAt: Long = System.currentTimeMillis()
+)
+
+data class DownloadedMovieEpisode(
+    val movieId: Int,
+    val season: Int = 1,
+    val episode: Int = 1,
+    val episodeTitle: String? = null,
+    val movieTitle: String = "",
+    val poster: String? = null,
+    val backdrop: String? = null,
+    val overview: String? = null,
+    val filePath: String,
+    val localUri: String = filePath,
+    val sizeBytes: Long = 0L,
+    val downloadedAt: Long = System.currentTimeMillis(),
+    val quality: String = "Auto HD"
+)
+
 data class DownloadedNovel(
     val novelSlug: String,
     val title: String,
@@ -162,5 +214,8 @@ data class DownloadTaskInfo(
     val totalBytes: Long = 0L
 ) {
     val percentage: Int
-        get() = (progress.coerceIn(0f, 1f) * 100).toInt()
+        get() {
+            val p = if (progress.isNaN() || !progress.isFinite()) 0f else progress.coerceIn(0f, 1f)
+            return (p * 100).toInt()
+        }
 }

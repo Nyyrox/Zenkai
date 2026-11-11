@@ -1,5 +1,6 @@
 package com.nyyrox.aniverse.data.download
 
+import com.nyyrox.aniverse.data.movie.MovieRepository
 import android.content.Context
 import android.util.Log
 import com.nyyrox.aniverse.data.Anime
@@ -43,6 +44,12 @@ class DownloadManager(private val context: Context) {
     companion object {
         @Volatile
         var instance: DownloadManager? = null
+
+        fun getInstance(context: Context): DownloadManager {
+            return instance ?: synchronized(this) {
+                instance ?: DownloadManager(context.applicationContext).also { instance = it }
+            }
+        }
     }
 
     // Safety net: no background download/IO error can ever crash the app
@@ -140,6 +147,14 @@ class DownloadManager(private val context: Context) {
     private val baseMangaDir: File
         get() = File(context.filesDir, "downloads/manga").apply { if (!exists()) mkdirs() }
 
+    private val baseMovieDir: File
+        get() = File(context.filesDir, "downloads/movies").apply { if (!exists()) mkdirs() }
+
+    private val _movieTasks = MutableStateFlow<Map<String, MovieDownloadTask>>(emptyMap())
+    val movieTasks: StateFlow<Map<String, MovieDownloadTask>> = _movieTasks.asStateFlow()
+
+    private val movieCancellationTokens = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
+
     private val _animeTasks = MutableStateFlow<Map<String, AnimeDownloadTask>>(emptyMap())
     val animeTasks: StateFlow<Map<String, AnimeDownloadTask>> = _animeTasks.asStateFlow()
 
@@ -149,7 +164,7 @@ class DownloadManager(private val context: Context) {
     private val _mangaTasks = MutableStateFlow<Map<String, MangaDownloadTask>>(emptyMap())
     val mangaTasks: StateFlow<Map<String, MangaDownloadTask>> = _mangaTasks.asStateFlow()
 
-    val tasks: StateFlow<List<DownloadTaskInfo>> = combine(_animeTasks, _novelTasks, _mangaTasks) { aMap, nMap, mMap ->
+    val tasks: StateFlow<List<DownloadTaskInfo>> = combine(_animeTasks, _movieTasks, _novelTasks, _mangaTasks) { aMap, mvMap, nMap, mMap ->
         val list = mutableListOf<DownloadTaskInfo>()
         aMap.values.forEach {
             list.add(
@@ -209,6 +224,29 @@ class DownloadManager(private val context: Context) {
                 )
             )
         }
+        mvMap.values.forEach {
+            list.add(
+                DownloadTaskInfo(
+                    type = DownloadType.MOVIE,
+                    itemId = it.movieId.toString(),
+                    chapterId = if (it.type == "tv") "s${it.season}_e${it.episode}" else "movie",
+                    title = it.episodeTitle ?: if (it.type == "tv") "S${it.season} E${it.episode}" else it.title,
+                    itemTitle = it.title,
+                    cover = it.poster ?: it.backdrop,
+                    status = it.status,
+                    progress = it.progress,
+                    downloadedCount = it.downloadedSegments,
+                    totalCount = it.totalSegments,
+                    speed = it.speedFormatted,
+                    error = it.error,
+                    providerId = "moviebox",
+                    providerName = "MovieBox",
+                    quality = it.quality,
+                    downloadedBytes = it.downloadedBytes,
+                    totalBytes = it.totalBytes
+                )
+            )
+        }
         list
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -228,6 +266,12 @@ class DownloadManager(private val context: Context) {
             DownloadType.MANGA -> {
                 _mangaTasks.value = _mangaTasks.value - taskKey
             }
+            DownloadType.MOVIE -> {
+                movieCancellationTokens[taskKey]?.set(true)
+                movieCancellationTokens.remove(taskKey)
+                _movieTasks.value = _movieTasks.value - taskKey
+                DownloadNotificationHelper.cancelNotification(context, taskKey)
+            }
         }
     }
 
@@ -238,6 +282,9 @@ class DownloadManager(private val context: Context) {
         _animeTasks.value = emptyMap()
         _novelTasks.value = emptyMap()
         _mangaTasks.value = emptyMap()
+        movieCancellationTokens.forEach { (_, token) -> token.set(true) }
+        movieCancellationTokens.clear()
+        _movieTasks.value = emptyMap()
         ZenkaiDownloadService.stop(context)
     }
 
@@ -263,6 +310,15 @@ class DownloadManager(private val context: Context) {
                 val current = _mangaTasks.value[taskKey] ?: return
                 _mangaTasks.value = _mangaTasks.value + (taskKey to current.copy(
                     status = DownloadStatus.PAUSED
+                ))
+            }
+            DownloadType.MOVIE -> {
+                movieCancellationTokens[taskKey]?.set(true)
+                movieCancellationTokens.remove(taskKey)
+                val current = _movieTasks.value[taskKey] ?: return
+                _movieTasks.value = _movieTasks.value + (taskKey to current.copy(
+                    status = DownloadStatus.PAUSED,
+                    speedFormatted = "Paused"
                 ))
             }
         }
@@ -323,6 +379,21 @@ class DownloadManager(private val context: Context) {
                     mangaTitle = current.mangaTitle,
                     mangaPoster = current.mangaPoster,
                     chapter = chapter
+                )
+            }
+            DownloadType.MOVIE -> {
+                val current = _movieTasks.value[taskKey] ?: return
+                downloadMovie(
+                    id = current.movieId,
+                    title = current.title,
+                    poster = current.poster,
+                    backdrop = current.backdrop,
+                    type = current.type,
+                    season = current.season,
+                    episode = current.episode,
+                    episodeTitle = current.episodeTitle,
+                    quality = current.quality,
+                    dubId = current.dubId
                 )
             }
         }
@@ -391,6 +462,21 @@ class DownloadManager(private val context: Context) {
                     chapter = chapter
                 )
             }
+            DownloadType.MOVIE -> {
+                val existing = _movieTasks.value[taskKey] ?: return
+                downloadMovie(
+                    id = existing.movieId,
+                    title = existing.title,
+                    poster = existing.poster,
+                    backdrop = existing.backdrop,
+                    type = existing.type,
+                    season = existing.season,
+                    episode = existing.episode,
+                    episodeTitle = existing.episodeTitle,
+                    quality = existing.quality,
+                    dubId = existing.dubId
+                )
+            }
         }
     }
 
@@ -409,6 +495,9 @@ class DownloadManager(private val context: Context) {
     private val _downloadedManga = MutableStateFlow<List<DownloadedManga>>(emptyList())
     val downloadedManga: StateFlow<List<DownloadedManga>> = _downloadedManga.asStateFlow()
 
+    private val _downloadedMovies = MutableStateFlow<List<DownloadedMovie>>(emptyList())
+    val downloadedMovies: StateFlow<List<DownloadedMovie>> = _downloadedMovies.asStateFlow()
+
     init {
         instance = this
         DownloadPreferences.init(context)
@@ -420,6 +509,7 @@ class DownloadManager(private val context: Context) {
             _downloadedAnime.value = loadDownloadedAnimeFromDisk()
             _downloadedNovels.value = loadDownloadedNovelsFromDisk()
             _downloadedManga.value = loadDownloadedMangaFromDisk()
+            _downloadedMovies.value = loadDownloadedMoviesFromDisk()
         }
     }
 
@@ -1917,4 +2007,447 @@ class DownloadManager(private val context: Context) {
             word.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
         }
     }
+
+    // ========================================================================
+    // 4. MOVIE & TV SERIES DOWNLOADS
+    // ========================================================================
+
+    fun isMovieEpisodeDownloaded(movieId: Int, season: Int = 1, episode: Int = 1): Boolean {
+        val movieFolder = File(baseMovieDir, movieId.toString())
+        if (!movieFolder.exists()) return false
+        val candidateDirs = listOf(
+            File(movieFolder, "s${season}_e$episode"),
+            File(movieFolder, "item"),
+            movieFolder
+        )
+        for (dir in candidateDirs) {
+            if (!dir.exists()) continue
+            val videoFile = File(dir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                ?: File(dir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                ?: File(dir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+            if (videoFile != null) return true
+        }
+        return false
+    }
+
+    fun getDownloadedMovieEpisode(movieId: Int, season: Int = 1, episode: Int = 1): DownloadedMovieEpisode? {
+        val movieFolder = File(baseMovieDir, movieId.toString())
+        if (!movieFolder.exists()) return false.let { null }
+
+        val candidateDirs = listOf(
+            File(movieFolder, "s${season}_e$episode"),
+            File(movieFolder, "item"),
+            movieFolder
+        )
+
+        for (dir in candidateDirs) {
+            if (!dir.exists() || !dir.isDirectory) continue
+            val videoFile = File(dir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                ?: File(dir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                ?: File(dir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+                ?: continue
+
+            val metaFile = File(dir, "meta.json").takeIf { it.exists() } ?: File(movieFolder, "meta.json")
+            var title = "Movie #$movieId"
+            var poster: String? = File(movieFolder, "poster.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+            var backdrop: String? = File(movieFolder, "backdrop.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+            var overview: String? = null
+            var epTitle: String? = null
+            var quality = "Auto HD"
+
+            if (metaFile.exists()) {
+                try {
+                    val j = JSONObject(metaFile.readText())
+                    title = j.optString("movieTitle", j.optString("title", title))
+                    if (poster == null) poster = j.optString("poster").takeIf { it.isNotBlank() }
+                    if (backdrop == null) backdrop = j.optString("backdrop").takeIf { it.isNotBlank() }
+                    overview = j.optString("overview").takeIf { it.isNotBlank() }
+                    epTitle = j.optString("title").takeIf { it.isNotBlank() }
+                    quality = j.optString("quality", quality)
+                } catch (_: Exception) {}
+            }
+
+            return DownloadedMovieEpisode(
+                movieId = movieId,
+                season = season,
+                episode = episode,
+                episodeTitle = epTitle ?: "Episode $episode",
+                movieTitle = title,
+                poster = poster,
+                backdrop = backdrop,
+                overview = overview,
+                filePath = videoFile.absolutePath,
+                localUri = videoFile.absolutePath,
+                sizeBytes = videoFile.length(),
+                downloadedAt = videoFile.lastModified(),
+                quality = quality
+            )
+        }
+        return null
+    }
+
+    fun getDownloadedEpisodesForMovie(movieId: Int): List<DownloadedMovieEpisode> {
+        val list = mutableListOf<DownloadedMovieEpisode>()
+        val movieFolder = File(baseMovieDir, movieId.toString())
+        if (!movieFolder.exists() || !movieFolder.isDirectory) return list
+
+        val subDirs = movieFolder.listFiles { f -> f.isDirectory } ?: return list
+        val epPattern = Regex("""^s(\d+)_e(\d+)$""")
+
+        for (dir in subDirs) {
+            val videoFile = File(dir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                ?: File(dir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                ?: File(dir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+                ?: continue
+
+            val match = epPattern.matchEntire(dir.name)
+            val sNum = match?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            val eNum = match?.groupValues?.get(2)?.toIntOrNull() ?: 1
+
+            val metaFile = File(dir, "meta.json").takeIf { it.exists() } ?: File(movieFolder, "meta.json")
+            var epTitle = "Season $sNum Episode $eNum"
+            var movieTitle = "Title"
+            var poster: String? = File(movieFolder, "poster.jpg").takeIf { it.exists() }?.absolutePath
+            var backdrop: String? = File(movieFolder, "backdrop.jpg").takeIf { it.exists() }?.absolutePath
+            var overview: String? = null
+            var quality = "Auto HD"
+
+            if (metaFile.exists()) {
+                try {
+                    val j = JSONObject(metaFile.readText())
+                    epTitle = j.optString("title", epTitle)
+                    movieTitle = j.optString("movieTitle", movieTitle)
+                    if (poster == null) poster = j.optString("poster").takeIf { it.isNotBlank() }
+                    if (backdrop == null) backdrop = j.optString("backdrop").takeIf { it.isNotBlank() }
+                    overview = j.optString("overview").takeIf { it.isNotBlank() }
+                    quality = j.optString("quality", quality)
+                } catch (_: Exception) {}
+            }
+
+            list.add(
+                DownloadedMovieEpisode(
+                    movieId = movieId,
+                    season = sNum,
+                    episode = eNum,
+                    episodeTitle = epTitle,
+                    movieTitle = movieTitle,
+                    poster = poster,
+                    backdrop = backdrop,
+                    overview = overview,
+                    filePath = videoFile.absolutePath,
+                    localUri = videoFile.absolutePath,
+                    sizeBytes = videoFile.length(),
+                    downloadedAt = videoFile.lastModified(),
+                    quality = quality
+                )
+            )
+        }
+
+        // If single movie in "item" folder
+        val itemDir = File(movieFolder, "item")
+        if (itemDir.exists()) {
+            val itemFile = File(itemDir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                ?: File(itemDir, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                ?: File(itemDir, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+            if (itemFile != null && list.isEmpty()) {
+                val ep = getDownloadedMovieEpisode(movieId, 1, 1)
+                if (ep != null) list.add(ep)
+            }
+        }
+
+        return list.sortedWith(compareBy({ it.season }, { it.episode }))
+    }
+
+    fun deleteDownloadedMovie(movieId: Int) {
+        scope.launch {
+            cancelTask(DownloadType.MOVIE, movieId.toString(), "movie")
+            val movieFolder = File(baseMovieDir, movieId.toString())
+            if (movieFolder.exists()) {
+                movieFolder.deleteRecursively()
+            }
+            refreshDownloadedLists()
+        }
+    }
+
+    fun deleteDownloadedMovieEpisode(movieId: Int, season: Int, episode: Int) {
+        scope.launch {
+            val taskKey = "$movieId:s${season}_e$episode"
+            cancelTask(DownloadType.MOVIE, movieId.toString(), "s${season}_e$episode")
+            val epFolder = File(baseMovieDir, "$movieId/s${season}_e$episode")
+            if (epFolder.exists()) epFolder.deleteRecursively()
+
+            // If movie folder is now empty or has no video subfolders, clean it up
+            val movieFolder = File(baseMovieDir, movieId.toString())
+            val remaining = getDownloadedEpisodesForMovie(movieId)
+            if (remaining.isEmpty()) {
+                movieFolder.deleteRecursively()
+            }
+            refreshDownloadedLists()
+        }
+    }
+
+    private fun loadDownloadedMoviesFromDisk(): List<DownloadedMovie> {
+        val list = mutableListOf<DownloadedMovie>()
+        val dirs = baseMovieDir.listFiles { f -> f.isDirectory } ?: return list
+
+        for (dir in dirs) {
+            val mId = dir.name.toIntOrNull() ?: continue
+            val metaFile = File(dir, "meta.json")
+            var title = "Movie #$mId"
+            var poster: String? = File(dir, "poster.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+            var backdrop: String? = File(dir, "backdrop.jpg").takeIf { it.exists() && it.length() > 0 }?.absolutePath
+            var overview: String? = null
+            var year: String? = null
+            var type = "movie"
+            var lastDownloaded = dir.lastModified()
+
+            if (metaFile.exists()) {
+                try {
+                    val j = JSONObject(metaFile.readText())
+                    title = j.optString("title", title)
+                    if (poster == null) poster = j.optString("poster").takeIf { it.isNotBlank() }
+                    if (backdrop == null) backdrop = j.optString("backdrop").takeIf { it.isNotBlank() }
+                    overview = j.optString("overview").takeIf { it.isNotBlank() }
+                    year = j.optString("year").takeIf { it.isNotBlank() }
+                    type = j.optString("type", type)
+                } catch (_: Exception) {}
+            }
+
+            // Calculate size and count
+            var totalBytes = 0L
+            var epCount = 0
+
+            val subDirs = dir.listFiles { f -> f.isDirectory } ?: emptyArray()
+            for (sub in subDirs) {
+                val vf = File(sub, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+                    ?: File(sub, "playlist.m3u8").takeIf { it.exists() && it.length() > 0 }
+                    ?: File(sub, "video.ts").takeIf { it.exists() && it.length() > 1024 }
+                if (vf != null) {
+                    epCount++
+                    totalBytes += vf.length()
+                    lastDownloaded = maxOf(lastDownloaded, vf.lastModified())
+                }
+            }
+
+            // Also check direct item in dir
+            val directVf = File(dir, "video.mp4").takeIf { it.exists() && it.length() > 1024 }
+            if (directVf != null) {
+                if (epCount == 0) epCount = 1
+                totalBytes += directVf.length()
+                lastDownloaded = maxOf(lastDownloaded, directVf.lastModified())
+            }
+
+            if (epCount > 0) {
+                list.add(
+                    DownloadedMovie(
+                        movieId = mId,
+                        title = title,
+                        poster = poster,
+                        backdrop = backdrop,
+                        overview = overview,
+                        year = year,
+                        type = type,
+                        episodesCount = epCount,
+                        totalSizeBytes = totalBytes,
+                        lastDownloadedAt = lastDownloaded
+                    )
+                )
+            }
+        }
+        return list.sortedByDescending { it.lastDownloadedAt }
+    }
+
+    fun downloadMovie(
+        id: Int,
+        title: String,
+        poster: String? = null,
+        backdrop: String? = null,
+        overview: String? = null,
+        year: String? = null,
+        type: String = "movie",
+        season: Int = 1,
+        episode: Int = 1,
+        episodeTitle: String? = null,
+        quality: String = "Auto HD",
+        dubId: String? = null
+    ) {
+        val taskKey = if (type == "tv") "$id:s${season}_e$episode" else "$id:movie"
+        if (isMovieEpisodeDownloaded(id, season, episode)) return
+
+        val existing = _movieTasks.value[taskKey]
+        if (existing != null && (existing.status == DownloadStatus.DOWNLOADING || existing.status == DownloadStatus.QUEUED || existing.status == DownloadStatus.COMPLETED)) {
+            return
+        }
+
+        val cancelToken = java.util.concurrent.atomic.AtomicBoolean(false)
+        movieCancellationTokens[taskKey] = cancelToken
+
+        val initialTask = MovieDownloadTask(
+            movieId = id,
+            title = title,
+            poster = poster,
+            backdrop = backdrop,
+            type = type,
+            season = season,
+            episode = episode,
+            episodeTitle = episodeTitle ?: if (type == "tv") "S$season E$episode" else title,
+            quality = quality,
+            dubId = dubId,
+            status = DownloadStatus.QUEUED,
+            speedFormatted = "Queued...",
+            progress = 0f
+        )
+        _movieTasks.value = _movieTasks.value + (taskKey to initialTask)
+        ZenkaiDownloadService.start(context)
+
+        val failHandler = CoroutineExceptionHandler { _, e ->
+            Log.e("DownloadManager", "Movie download failed: ${e.message}", e)
+            movieCancellationTokens.remove(taskKey)
+            val failed = initialTask.copy(
+                status = DownloadStatus.FAILED,
+                error = "Download failed: ${e.message ?: "Error"}. Tap Retry."
+            )
+            _movieTasks.value = _movieTasks.value + (taskKey to failed)
+        }
+
+        scope.launch(failHandler) {
+            if (cancelToken.get()) return@launch
+            getDownloadSemaphore().withPermit {
+                if (cancelToken.get()) return@withPermit
+
+                val movieFolder = File(baseMovieDir, id.toString())
+                val targetFolder = if (type == "tv") File(movieFolder, "s${season}_e$episode") else File(movieFolder, "item")
+                check(targetFolder.exists() || targetFolder.mkdirs()) { "Can't create download folder" }
+
+                _movieTasks.value = _movieTasks.value + (taskKey to initialTask.copy(
+                    speedFormatted = "Resolving stream from MovieBox...",
+                    status = DownloadStatus.DOWNLOADING
+                ))
+
+                // Cache poster/backdrop
+                val localPoster = downloadImageToDisk(poster, File(movieFolder, "poster.jpg")) ?: poster
+                val localBackdrop = downloadImageToDisk(backdrop ?: poster, File(movieFolder, "backdrop.jpg")) ?: backdrop
+
+                val movieMeta = File(movieFolder, "meta.json")
+                if (!movieMeta.exists()) {
+                    val mJson = JSONObject().apply {
+                        put("movieId", id)
+                        put("title", title)
+                        put("poster", localPoster)
+                        put("backdrop", localBackdrop)
+                        put("overview", overview.orEmpty())
+                        put("year", year.orEmpty())
+                        put("type", type)
+                    }
+                    movieMeta.writeText(mJson.toString(2), Charsets.UTF_8)
+                }
+
+                val streamRes = MovieRepository.fetchMovieStream(
+                    id = id,
+                    type = type,
+                    season = season,
+                    episode = episode,
+                    title = title,
+                    year = year,
+                    dubId = dubId
+                )
+
+                val matchedStream = streamRes.streams.find {
+                    it.quality.equals(quality, ignoreCase = true) ||
+                    (quality.contains("4k", ignoreCase = true) && (it.quality.contains("4k", ignoreCase = true) || (it.resolutionNum ?: 0) >= 2160)) ||
+                    (quality.contains("2160") && ((it.resolutionNum ?: 0) >= 2160 || it.quality.contains("2160")))
+                } ?: if (quality.equals("Auto HD", ignoreCase = true)) {
+                    streamRes.streams.maxByOrNull { it.resolutionNum ?: 0 } ?: streamRes.streams.firstOrNull()
+                } else {
+                    val reqNum = quality.filter { it.isDigit() }.toIntOrNull()
+                    if (reqNum != null) {
+                        streamRes.streams.find { it.resolutionNum == reqNum || it.quality.contains("$reqNum") }
+                            ?: streamRes.streams.firstOrNull()
+                    } else {
+                        streamRes.streams.firstOrNull()
+                    }
+                }
+
+                val targetUrl = (matchedStream?.downloadUrl?.takeIf { it.isNotBlank() }
+                    ?: streamRes.downloadUrl?.takeIf { it.isNotBlank() }
+                    ?: matchedStream?.streamUrl?.takeIf { it.isNotBlank() && !it.startsWith("http://127.0.0.1") }
+                    ?: streamRes.streamUrl.takeIf { it.isNotBlank() && !it.startsWith("http://127.0.0.1") })
+                    ?: throw IllegalStateException(streamRes.error ?: "Stream not available for download")
+
+                _movieTasks.value = _movieTasks.value + (taskKey to initialTask.copy(
+                    speedFormatted = "Downloading from MovieBox...",
+                    status = DownloadStatus.DOWNLOADING
+                ))
+
+                val isWebCdn = targetUrl.contains("bcdnxw") || targetUrl.contains("hakunaymatata.com/bt/")
+                val isNativeMb = (targetUrl.contains("hakunaymatata") || targetUrl.contains("aoneroom") || targetUrl.contains("febbox")) && !isWebCdn
+
+                // Native MovieBox CDN returns HTTP 428 (Precondition Required) if a browser User-Agent or Referer is sent.
+                // It requires ExoPlayer UA and NO Referer. Web CDN (series) requires browser UA + Referer.
+                val headers = mutableMapOf<String, String>()
+                if (isNativeMb) {
+                    headers["User-Agent"] = "ExoPlayerLib/2.19.1"
+                    headers["Accept"] = "*/*"
+                } else if (isWebCdn) {
+                    headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                    headers["Referer"] = "https://123moviesfree.club/"
+                    headers["Accept"] = "*/*"
+                } else {
+                    headers["User-Agent"] = "ExoPlayerLib/2.19.1"
+                    headers["Accept"] = "*/*"
+                }
+
+                val finalFile = animeDownloader.downloadStream(
+                    streamUrl = targetUrl,
+                    outputDir = targetFolder,
+                    headers = headers,
+                    preferredQuality = quality,
+                    preferredAudio = dubId,
+                    isCancelled = { cancelToken.get() },
+                    onProgress = { prog, dlBytes, totBytes, speedStr, compSegs, totSegs ->
+                        val safeProg = if (prog.isNaN() || !prog.isFinite()) 0f else prog.coerceIn(0f, 1f)
+                        val currentTask = initialTask.copy(
+                            progress = safeProg,
+                            downloadedBytes = dlBytes,
+                            totalBytes = totBytes,
+                            speedFormatted = speedStr,
+                            downloadedSegments = compSegs,
+                            totalSegments = totSegs,
+                            status = DownloadStatus.DOWNLOADING
+                        )
+                        _movieTasks.value = _movieTasks.value + (taskKey to currentTask)
+                    }
+                )
+
+                val itemMeta = File(targetFolder, "meta.json")
+                val iJson = JSONObject().apply {
+                    put("movieId", id)
+                    put("type", type)
+                    put("season", season)
+                    put("episode", episode)
+                    put("title", episodeTitle ?: title)
+                    put("movieTitle", title)
+                    put("poster", localPoster)
+                    put("backdrop", localBackdrop)
+                    put("overview", overview.orEmpty())
+                    put("filePath", finalFile.absolutePath)
+                    put("fileSize", finalFile.length())
+                    put("downloadedAt", System.currentTimeMillis())
+                    put("quality", quality)
+                }
+                itemMeta.writeText(iJson.toString(2), Charsets.UTF_8)
+
+                movieCancellationTokens.remove(taskKey)
+                _movieTasks.value = _movieTasks.value + (taskKey to initialTask.copy(
+                    status = DownloadStatus.COMPLETED,
+                    progress = 1f,
+                    speedFormatted = "Complete",
+                    localFilePath = finalFile.absolutePath
+                ))
+
+                refreshDownloadedLists()
+            }
+        }
+    }
+
 }

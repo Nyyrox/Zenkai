@@ -530,12 +530,13 @@ object MovieBoxResolver {
         // 3. Discover Dubs
         val details = getMovieBoxDetails(matched.subjectId)
         val formattedDubs = mutableListOf<MovieDub>()
-        formattedDubs.add(MovieDub(matched.subjectId, "Original", selected = (dubId == null || dubId == matched.subjectId)))
+        formattedDubs.add(MovieDub(matched.subjectId, "Original", selected = (dubId == null || dubId == matched.subjectId), detailPath = matched.detailPath))
 
         // Dubs from subject API
         details.dubs.forEach { (dId, dLabel) ->
             if (dId != matched.subjectId && formattedDubs.none { it.id == dId }) {
-                formattedDubs.add(MovieDub(dId, dLabel, selected = (dubId == dId)))
+                val sibPath = candidates.find { it.subjectId == dId }?.detailPath
+                formattedDubs.add(MovieDub(dId, dLabel, selected = (dubId == dId), detailPath = sibPath))
             }
         }
 
@@ -557,7 +558,7 @@ object MovieBoxResolver {
                         else -> rawTag.replaceFirstChar { it.uppercase() }
                     }
                     if (formattedDubs.none { it.id == sr.subjectId || it.label.equals(cleanLabel, ignoreCase = true) }) {
-                        formattedDubs.add(MovieDub(sr.subjectId, cleanLabel, selected = (dubId == sr.subjectId)))
+                        formattedDubs.add(MovieDub(sr.subjectId, cleanLabel, selected = (dubId == sr.subjectId), detailPath = sr.detailPath))
                     }
                 }
             }
@@ -565,11 +566,11 @@ object MovieBoxResolver {
 
         // 3. Select Subject to Play (either selected dub or original matched)
         val cleanDubId = dubId?.replace(Regex("^-"), "")?.trim()
-        val playSubjectId = if (!cleanDubId.isNullOrBlank()) {
-            formattedDubs.find { it.id == cleanDubId }?.id ?: matched.subjectId
-        } else {
-            matched.subjectId
-        }
+        val targetDub = if (!cleanDubId.isNullOrBlank()) {
+            formattedDubs.find { it.id == cleanDubId }
+        } else null
+        val playSubjectId = targetDub?.id ?: matched.subjectId
+        val playDetailPath = targetDub?.detailPath?.takeIf { it.isNotBlank() } ?: matched.detailPath
 
         // Update selected flag on dubs
         val finalDubs = formattedDubs.map { it.copy(selected = (it.id == playSubjectId)) }
@@ -585,6 +586,19 @@ object MovieBoxResolver {
             val size: Long,
             val duration: Double
         )
+
+        fun parseResolution(raw: String?, fallbackInt: Int = 1080): Pair<Int, String> {
+            val s = raw?.trim().orEmpty()
+            if (s.contains("4k", ignoreCase = true) || s.contains("2160")) {
+                return Pair(2160, "4K")
+            }
+            val num = s.filter { it.isDigit() }.toIntOrNull() ?: fallbackInt
+            return if (num >= 2160 || num == 4) {
+                Pair(2160, "4K")
+            } else {
+                Pair(num, "${num}p")
+            }
+        }
 
         val rawStreams = mutableListOf<RawStream>()
         val seenUrls = mutableSetOf<String>()
@@ -609,12 +623,12 @@ object MovieBoxResolver {
                 if (isFakeStream(resLink, dur, size)) continue
 
                 seenUrls.add(resLink)
-                val resVal = r.optString("resolution").filter { it.isDigit() }.toIntOrNull() ?: 1080
+                val (resVal, qualLabel) = parseResolution(r.optString("resolution"), 1080)
                 seenQualities.add(resVal)
 
                 rawStreams.add(
                     RawStream(
-                        quality = "${resVal}p",
+                        quality = qualLabel,
                         resolutionNum = resVal,
                         url = resLink,
                         size = size,
@@ -622,21 +636,42 @@ object MovieBoxResolver {
                     )
                 )
             }
+
+            // Also check direct downloadUrl or resourceLink if resolutionList was empty
+            val directUrl = rd.optString("downloadUrl").ifBlank { rd.optString("resourceLink") }
+            if (directUrl.isNotBlank() && !seenUrls.contains(directUrl)) {
+                val rdSize = rd.optLong("firstSize", rd.optLong("totalSize", 0L))
+                val rdDur = rd.optDouble("duration", 0.0)
+                if (!isFakeStream(directUrl, rdDur, rdSize)) {
+                    seenUrls.add(directUrl)
+                    val (resVal, qualLabel) = parseResolution(rd.optString("resolution"), 1080)
+                    seenQualities.add(resVal)
+                    rawStreams.add(
+                        RawStream(
+                            quality = qualLabel,
+                            resolutionNum = resVal,
+                            url = directUrl,
+                            size = rdSize,
+                            duration = rdDur
+                        )
+                    )
+                }
+            }
         }
 
         var activeReferer = "https://123moviesfree.club/"
 
         // For TV shows (or if detectors didn't yield streams), fetch via Web CDN mirrors & play-info
+        val effectiveDetailPath = playDetailPath.ifBlank { activeDetails.detailPath }
         if (targetType == "tv" || rawStreams.isEmpty()) {
-            val detailPath = activeDetails.detailPath
-            if (detailPath.isNotBlank()) {
+            if (effectiveDetailPath.isNotBlank()) {
                 try {
                     val token = bootstrapToken()
                     for (domain in WEB_DOMAINS) {
                         try {
-                            val encPath = java.net.URLEncoder.encode(detailPath, "UTF-8")
+                            val encPath = java.net.URLEncoder.encode(effectiveDetailPath, "UTF-8")
                             val playUrl = "$domain/wefeed-h5api-bff/subject/play?subjectId=$playSubjectId&se=$season&ep=$episode&detailPath=$encPath&streamSignType=1&supportCodecs%5Bhevc%5D=1&supportCodecs%5Bh264%5D=1"
-                            val refUrl = "$domain/movies/$detailPath?id=$playSubjectId&type=/movie/detail&detailSe=&detailEp=&lang=en"
+                            val refUrl = "$domain/movies/$effectiveDetailPath?id=$playSubjectId&type=/movie/detail&detailSe=&detailEp=&lang=en"
 
                             val urlObj = URL(playUrl)
                             val conn = urlObj.openConnection() as HttpURLConnection
@@ -665,15 +700,16 @@ object MovieBoxResolver {
                                         val stDur = st.optDouble("duration", 0.0)
                                         val stSize = st.optLong("size", 0L)
                                         if (isFakeStream(stUrl, stDur, stSize) || seenUrls.contains(stUrl)) continue
-                                        val resVal = st.optString("resolutions").filter { it.isDigit() }.toIntOrNull()
-                                            ?: st.optInt("resolution", 1080)
+                                        val rawResStr = st.optString("resolutions").ifBlank { st.optString("resolution") }
+                                        val fallback = st.optInt("resolution", 1080)
+                                        val (resVal, qualLabel) = parseResolution(rawResStr, fallback)
                                         if (seenQualities.contains(resVal)) continue
 
                                         seenUrls.add(stUrl)
                                         seenQualities.add(resVal)
                                         rawStreams.add(
                                             RawStream(
-                                                quality = "${resVal}p",
+                                                quality = qualLabel,
                                                 resolutionNum = resVal,
                                                 url = stUrl,
                                                 size = stSize,
@@ -710,15 +746,16 @@ object MovieBoxResolver {
                             val stDur = st.optDouble("duration", 0.0)
                             val stSize = st.optLong("size", 0L)
                             if (isFakeStream(stUrl, stDur, stSize) || seenUrls.contains(stUrl)) continue
-                            val resVal = st.optString("resolutions").filter { it.isDigit() }.toIntOrNull()
-                                ?: st.optInt("resolution", 1080)
+                            val rawResStr = st.optString("resolutions").ifBlank { st.optString("resolution") }
+                            val fallback = st.optInt("resolution", 1080)
+                            val (resVal, qualLabel) = parseResolution(rawResStr, fallback)
                             if (seenQualities.contains(resVal)) continue
 
                             seenUrls.add(stUrl)
                             seenQualities.add(resVal)
                             rawStreams.add(
                                 RawStream(
-                                    quality = "${resVal}p",
+                                    quality = qualLabel,
                                     resolutionNum = resVal,
                                     url = stUrl,
                                     size = stSize,
@@ -737,6 +774,18 @@ object MovieBoxResolver {
         rawStreams.sortByDescending { it.resolutionNum }
 
         if (rawStreams.isEmpty()) {
+            if (playSubjectId != matched.subjectId) {
+                Log.w(TAG, "Selected dub '$playSubjectId' had no streams. Falling back to primary stream.")
+                return@withContext resolveStream(
+                    tmdbId = tmdbId,
+                    type = type,
+                    season = season,
+                    episode = episode,
+                    title = title,
+                    year = year,
+                    dubId = null
+                )
+            }
             throw IllegalStateException("No valid streams available on MovieBox for '${matched.title}'")
         }
 

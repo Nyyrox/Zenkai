@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -123,6 +124,7 @@ data class DeleteConfirmationTarget(
 )
 
 private val AnimeAccent = OttPrimary
+private val MovieAccent = Color(0xFFEC4899)
 private val MangaAccent = Color(0xFFF59E0B)
 private val NovelAccent = Color(0xFF60A5FA)
 private val DangerRed = Color(0xFFFF6B6B)
@@ -140,10 +142,12 @@ fun DownloadsScreen(
     onPlayAnimeEpisode: (animeId: Int, episode: Int) -> Unit = { _, _ -> },
     onReadNovelChapter: (novelSlug: String, chapterSlug: String) -> Unit = { _, _ -> },
     onReadMangaChapter: (mangaId: String, chapterId: String) -> Unit = { _, _ -> },
+    onPlayMovie: (movieId: Int, type: String, season: Int, episode: Int) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Anime, 1 = Manga, 2 = Novels
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Anime, 1 = Movies, 2 = Manga, 3 = Novels
     val downloadedAnime by vm.downloadManager.downloadedAnime.collectAsState()
+    val downloadedMovies by vm.downloadManager.downloadedMovies.collectAsState()
     val downloadedManga by vm.downloadManager.downloadedManga.collectAsState()
     val downloadedNovels by vm.downloadManager.downloadedNovels.collectAsState()
     val allTasks by vm.downloadManager.tasks.collectAsState()
@@ -159,9 +163,10 @@ fun DownloadsScreen(
     var showDownloadSettingsSheet by remember { mutableStateOf(false) }
 
     val animeBytes = remember(downloadedAnime) { downloadedAnime.sumOf { it.totalSizeBytes } }
+    val movieBytes = remember(downloadedMovies) { downloadedMovies.sumOf { it.totalSizeBytes } }
     val mangaBytes = remember(downloadedManga) { downloadedManga.sumOf { it.totalSizeBytes } }
     val novelBytes = remember(downloadedNovels) { downloadedNovels.sumOf { it.totalSizeBytes } }
-    val totalItems = downloadedAnime.size + downloadedManga.size + downloadedNovels.size
+    val totalItems = downloadedAnime.size + downloadedMovies.size + downloadedManga.size + downloadedNovels.size
 
     val glassOn = LocalThemeSettings.current.isGlassmorphismEnabled && Build.VERSION.SDK_INT >= 33
     val glassLayer = rememberPrismalGlassLayer()
@@ -186,7 +191,8 @@ fun DownloadsScreen(
     }
     val ambient = when (selectedTab) {
         0 -> downloadedAnime.firstOrNull()?.cover
-        1 -> downloadedManga.firstOrNull()?.poster
+        1 -> downloadedMovies.firstOrNull()?.let { it.poster ?: it.backdrop }
+        2 -> downloadedManga.firstOrNull()?.poster
         else -> downloadedNovels.firstOrNull()?.cover
     }
 
@@ -265,7 +271,7 @@ fun DownloadsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item(key = "storage") {
-                    StorageCard(glassOn, animeBytes, mangaBytes, novelBytes, ItemPad)
+                    StorageCard(glassOn, animeBytes, movieBytes, mangaBytes, novelBytes, ItemPad)
                 }
 
                 if (!isIgnoringBattery && !dismissedBatteryBanner) {
@@ -287,7 +293,10 @@ fun DownloadsScreen(
                 if (activeTasks.isNotEmpty()) {
                     val anyDownloading = activeTasks.any { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
                     item(key = "active") {
-                        val avg = activeTasks.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
+                        val avg = activeTasks.map {
+                            val p = it.progress
+                            if (p.isNaN() || !p.isFinite()) 0f else p.coerceIn(0f, 1f)
+                        }.average().toFloat().takeIf { !it.isNaN() && it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
                         TaskGroupCard(
                             glass = glassOn,
                             title = if (anyDownloading) "Downloading (${activeTasks.size})" else "Paused (${activeTasks.size})",
@@ -414,7 +423,8 @@ fun DownloadsScreen(
                             glass = glassOn,
                             selected = selectedTab,
                             tabs = listOf(
-                                Triple(Icons.Default.Movie, "Anime", downloadedAnime.size),
+                                Triple(Icons.Default.Tv, "Anime", downloadedAnime.size),
+                                Triple(Icons.Default.Movie, "Movies", downloadedMovies.size),
                                 Triple(Icons.Default.Book, "Manga", downloadedManga.size),
                                 Triple(Icons.Default.MenuBook, "Novels", downloadedNovels.size)
                             ),
@@ -442,7 +452,21 @@ fun DownloadsScreen(
                             )
                         }
                     }
-                    1 -> if (downloadedManga.isEmpty()) {
+                    1 -> if (downloadedMovies.isEmpty()) {
+                        item(key = "empty_movies") { EmptyDownloadsView("movies", glassOn) }
+                    } else {
+                        items(downloadedMovies, key = { "movie_${it.movieId}" }) { movie ->
+                            DownloadedMovieCard(
+                                movie = movie,
+                                vm = vm,
+                                glass = glassOn,
+                                onPlayMovie = onPlayMovie,
+                                onDeleteRequest = { deleteConfirmation = it },
+                                modifier = ItemPad
+                            )
+                        }
+                    }
+                    2 -> if (downloadedManga.isEmpty()) {
                         item(key = "empty_manga") { EmptyDownloadsView("manga", glassOn) }
                     } else {
                         items(downloadedManga, key = { "manga_${it.mangaId}" }) { manga ->
@@ -502,11 +526,12 @@ private fun Modifier.surface(glass: Boolean, shape: Shape = OttCardShape, tint: 
 
 @Composable
 private fun ProgressBar(progress: Float, modifier: Modifier = Modifier) {
+    val safeP = if (progress.isNaN() || !progress.isFinite()) 0f else progress.coerceIn(0f, 1f)
     Box(modifier.height(5.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
         Box(
             Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .fillMaxWidth(safeP)
                 .background(Brush.horizontalGradient(listOf(OttPrimary, Color.White)))
         )
     }
@@ -593,10 +618,11 @@ private fun BatteryOptimizationBanner(
 }
 
 @Composable
-private fun StorageCard(glass: Boolean, anime: Long, manga: Long, novels: Long, modifier: Modifier = Modifier) {
-    val total = anime + manga + novels
+private fun StorageCard(glass: Boolean, anime: Long, movies: Long, manga: Long, novels: Long, modifier: Modifier = Modifier) {
+    val total = anime + movies + manga + novels
     val parts = listOf(
         Triple("Anime", anime, AnimeAccent),
+        Triple("Movies", movies, MovieAccent),
         Triple("Manga", manga, MangaAccent),
         Triple("Novels", novels, NovelAccent)
     )
@@ -713,9 +739,17 @@ private fun DownloadTabs(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("$label ($count)", color = tint, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(17.dp))
+                if (count > 0) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "$count",
+                        color = tint,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
@@ -1036,7 +1070,9 @@ private fun ActiveDownloadTaskRow(
     onResume: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val progress by animateFloatAsState(task.progress.coerceIn(0f, 1f), tween(400), label = "dlProgress")
+    val rawP = task.progress
+    val safeProg = if (rawP.isNaN() || !rawP.isFinite()) 0f else rawP.coerceIn(0f, 1f)
+    val progress by animateFloatAsState(safeProg, tween(400), label = "dlProgress")
     val isPaused = task.status == DownloadStatus.PAUSED
 
     Column(
@@ -1069,7 +1105,7 @@ private fun ActiveDownloadTaskRow(
                 Spacer(Modifier.height(2.dp))
                 val statusText = if (isPaused) {
                     "Download paused"
-                } else if (task.type == DownloadType.ANIME) {
+                } else if (task.type == DownloadType.ANIME || task.type == DownloadType.MOVIE) {
                     val sizeInfo = if (task.totalBytes > 0L) " • ${formatBytes(task.downloadedBytes)} / ${formatBytes(task.totalBytes)}" else if (task.downloadedBytes > 0L) " • ${formatBytes(task.downloadedBytes)}" else ""
                     if (task.speed.isNotBlank()) "${task.speed}$sizeInfo" else "Downloading...$sizeInfo"
                 } else if (task.type == DownloadType.MANGA && task.totalCount > 0) {
@@ -1180,6 +1216,7 @@ private fun FailedDownloadTaskRow(
 private fun EmptyDownloadsView(type: String, glass: Boolean) {
     val (icon, accent, hint) = when (type) {
         "anime" -> Triple(Icons.Default.Movie, AnimeAccent, "Episodes you save offline will appear here and play without an internet connection.")
+        "movies" -> Triple(Icons.Default.Movie, MovieAccent, "Movies and series you save offline will appear here and play without an internet connection.")
         "manga" -> Triple(Icons.Default.Book, MangaAccent, "Chapters you save offline will appear here and open without an internet connection.")
         else -> Triple(Icons.Default.MenuBook, NovelAccent, "Chapters you save offline will appear here and read without an internet connection.")
     }
@@ -1376,6 +1413,70 @@ fun IosDeleteConfirmationDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+
+
+@Composable
+private fun DownloadedMovieCard(
+    movie: com.nyyrox.aniverse.data.download.DownloadedMovie,
+    vm: MainViewModel,
+    glass: Boolean,
+    onPlayMovie: (movieId: Int, type: String, season: Int, episode: Int) -> Unit,
+    onDeleteRequest: (DeleteConfirmationTarget) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val isTv = movie.type.equals("tv", ignoreCase = true)
+    LibraryItemCard(
+        glass = glass,
+        cover = movie.poster ?: movie.backdrop,
+        title = movie.title,
+        meta = "${movie.episodesCount} ${if (isTv) "episode(s)" else "video"} • ${formatBytes(movie.totalSizeBytes)}",
+        badge = if (isTv) "Offline Series" else "Offline Movie",
+        accent = MovieAccent,
+        modifier = modifier,
+        onDelete = {
+            onDeleteRequest(
+                DeleteConfirmationTarget(
+                    title = "Delete ${movie.title}?",
+                    subtitle = "This will permanently delete the downloaded video and free up storage on your device.",
+                    itemType = if (isTv) "Series" else "Movie",
+                    sizeFormatted = formatBytes(movie.totalSizeBytes),
+                    onConfirm = {
+                        vm.deleteDownloadedMovie(movie.movieId)
+                        android.widget.Toast.makeText(context, "Deleting ${movie.title}...", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                )
+            )
+        }
+    ) {
+        val episodes = remember(movie.movieId, movie.episodesCount, movie.totalSizeBytes) {
+            vm.downloadManager.getDownloadedEpisodesForMovie(movie.movieId)
+        }
+        episodes.forEach { ep ->
+            ChildRow(
+                title = if (isTv) "S${ep.season} E${ep.episode}: ${ep.episodeTitle}" else (ep.episodeTitle ?: movie.title),
+                subtitle = "${formatBytes(ep.sizeBytes)} • ${ep.quality}",
+                action = "Play",
+                actionIcon = Icons.Default.PlayArrow,
+                onOpen = { onPlayMovie(movie.movieId, movie.type, ep.season, ep.episode) },
+                onDelete = {
+                    onDeleteRequest(
+                        DeleteConfirmationTarget(
+                            title = "Delete ${ep.episodeTitle}?",
+                            subtitle = "This will remove this downloaded file from your device.",
+                            itemType = "Episode",
+                            sizeFormatted = formatBytes(ep.sizeBytes),
+                            onConfirm = {
+                                vm.deleteDownloadedMovieEpisode(movie.movieId, ep.season, ep.episode)
+                            }
+                        )
+                    )
+                }
+            )
         }
     }
 }

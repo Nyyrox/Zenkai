@@ -141,7 +141,8 @@ data class MovieDetails(
 data class MovieDub(
     val id: String,
     val label: String,
-    val selected: Boolean = false
+    val selected: Boolean = false,
+    val detailPath: String? = null
 )
 
 data class MovieStream(

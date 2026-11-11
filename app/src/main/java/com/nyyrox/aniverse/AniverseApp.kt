@@ -674,6 +674,9 @@ fun App(vm: MainViewModel = viewModel(), deepLinkUri: String? = null) {
                                             val cm = com.nyyrox.aniverse.data.manga.MangaRepository.cleanWeebId(mangaId)
                                             val cc = com.nyyrox.aniverse.data.manga.MangaRepository.cleanChapterId(chapterId)
                                             push("manga_reader:$cm:$cc")
+                                        },
+                                        onPlayMovie = { movieId, type, season, episode ->
+                                            push("movie_player:$movieId:$type:$season:$episode")
                                         }
                                     )
                                 }
@@ -1214,11 +1217,12 @@ private fun OttDownloadBubble(
         if (activeTasks.isEmpty()) 0f
         else {
             val downloading = activeTasks.filter { it.status == com.nyyrox.aniverse.data.download.DownloadStatus.DOWNLOADING }
-            if (downloading.isNotEmpty()) {
-                downloading.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
-            } else {
-                activeTasks.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
-            }
+            val list = if (downloading.isNotEmpty()) downloading else activeTasks
+            val avg = list.map {
+                val p = it.progress
+                if (p.isNaN() || !p.isFinite()) 0f else p.coerceIn(0f, 1f)
+            }.average().toFloat()
+            if (avg.isNaN() || !avg.isFinite()) 0f else avg.coerceIn(0f, 1f)
         }
     }
 

@@ -160,25 +160,37 @@ class AnimeStreamDownloader(
 
         // 3. Download Init Segment(s) (if Fragmented MP4 / EXT-X-MAP)
         var initSegmentBytes: ByteArray? = null
+        val videoInitFile = File(segmentsDir, "video_init.mp4")
         if (!mediaInfo.initSegmentUri.isNullOrBlank()) {
-            try {
-                initSegmentBytes = downloadBytes(mediaInfo.initSegmentUri, headers)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to download video init segment: ${e.message}")
+            if (videoInitFile.exists() && videoInitFile.length() >= 8L) {
+                initSegmentBytes = videoInitFile.readBytes()
+            } else {
+                try {
+                    val bytes = downloadBytes(mediaInfo.initSegmentUri, headers)
+                    initSegmentBytes = bytes
+                    videoInitFile.writeBytes(bytes)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to download video init segment: ${e.message}")
+                }
             }
         }
 
         // Save each audio track's init segment (fMP4 audio can't be decoded without it, needed for export/mux)
         audioTracks.forEach { track ->
             val initUri = track.mediaInfo.initSegmentUri
+            val initFile = File(segmentsDir, "audio_${track.index}_init.mp4")
             if (!initUri.isNullOrBlank()) {
-                val initFile = File(segmentsDir, "audio_${track.index}_init.mp4")
                 if (!initFile.exists() || initFile.length() < 8L) {
                     try {
                         initFile.writeBytes(downloadBytes(initUri, headers))
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to download audio init segment: ${e.message}")
                     }
+                }
+            } else if ((track.mediaInfo.isFragmentedMp4 || isFmp4) && !initFile.exists()) {
+                // If audio playlist didn't specify distinct init segment, copy video init as fallback
+                if (initSegmentBytes != null && initSegmentBytes.isNotEmpty()) {
+                    initFile.writeBytes(initSegmentBytes)
                 }
             }
         }
@@ -250,7 +262,8 @@ class AnimeStreamDownloader(
                             val networkBytes = currentBytes - preExistingBytes.get()
                             val speedBytesPerSec = if (elapsedSec > 0.5) (maxOf(0L, networkBytes) / elapsedSec).toLong() else 0L
                             val speedFormatted = formatSpeed(speedBytesPerSec)
-                            val progress = (currentCount.toFloat() / totalSegments).coerceIn(0f, 0.98f)
+                            val rawProg1 = if (totalSegments > 0) (currentCount.toFloat() / totalSegments).coerceIn(0f, 0.98f) else 0f
+                            val progress = if (rawProg1.isNaN() || !rawProg1.isFinite()) 0f else rawProg1
                             onProgress(progress, currentBytes, currentBytes * totalSegments / maxOf(currentCount, 1), speedFormatted, currentCount, totalSegments)
                         }
                     }
@@ -292,7 +305,8 @@ class AnimeStreamDownloader(
                                 val networkBytes = currentBytes - preExistingBytes.get()
                                 val speedBytesPerSec = if (elapsedSec > 0.5) (maxOf(0L, networkBytes) / elapsedSec).toLong() else 0L
                                 val speedFormatted = formatSpeed(speedBytesPerSec)
-                                val progress = (currentCount.toFloat() / totalSegments).coerceIn(0f, 0.98f)
+                                val rawProg1 = if (totalSegments > 0) (currentCount.toFloat() / totalSegments).coerceIn(0f, 0.98f) else 0f
+                            val progress = if (rawProg1.isNaN() || !rawProg1.isFinite()) 0f else rawProg1
                                 onProgress(progress, currentBytes, currentBytes * totalSegments / maxOf(currentCount, 1), speedFormatted, currentCount, totalSegments)
                             }
                         }
@@ -461,8 +475,8 @@ class AnimeStreamDownloader(
                 val effectiveTracks = if (groupTracks.isNotEmpty()) groupTracks else audioTracks
 
                 val isMultiRequested = preferredAudio?.contains("MULTI", ignoreCase = true) == true
-                if (isMultiRequested || effectiveTracks.size > 1) {
-                    // Include all distinct audio tracks for full offline multi-audio support
+                if (isMultiRequested) {
+                    // Include all distinct audio tracks ONLY when Multi is explicitly requested
                     val distinctTracks = effectiveTracks.distinctBy { it.uri }
                     tracksToDownload.addAll(distinctTracks)
                 } else {
@@ -684,53 +698,110 @@ class AnimeStreamDownloader(
         isCancelled: () -> Boolean,
         onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long, speedFormatted: String, completedSegments: Int, totalSegments: Int) -> Unit
     ) = withContext(Dispatchers.IO) {
+        destFile.parentFile?.mkdirs()
         val tempFile = File(destFile.parentFile, "${destFile.name}.tmp")
-        val reqBuilder = Request.Builder()
-            .url(url)
-            .header("User-Agent", headers["User-Agent"] ?: DEFAULT_UA)
+        if (tempFile.exists()) tempFile.delete()
 
-        headers.forEach { (k, v) ->
-            if (!k.equals("User-Agent", ignoreCase = true)) {
+        // Build header strategies:
+        // Native MovieBox requires ExoPlayer UA and NO Referer/Origin (browser UA gets 428 Precondition Required).
+        // Web MovieBox requires browser UA with Referer: https://123moviesfree.club/
+        val host = try { URI(url).host ?: "" } catch (_: Exception) { "" }
+        val isWebMb = url.contains("bcdnxw") || url.contains("hakunaymatata.com/bt/")
+        val isNativeMb = (host.contains("hakunaymatata") || host.contains("aoneroom") || host.contains("febbox") || url.contains("hakunaymatata") || url.contains("aoneroom")) && !isWebMb
+
+        val strategies = mutableListOf<Map<String, String>>()
+        if (isNativeMb) {
+            strategies.add(mapOf("User-Agent" to "ExoPlayerLib/2.19.1", "Accept" to "*/*"))
+            strategies.add(mapOf("User-Agent" to "ExoPlayerLib/2.18.5", "Accept" to "*/*"))
+            strategies.add(mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", "Referer" to "https://123moviesfree.club/", "Accept" to "*/*"))
+        } else if (isWebMb) {
+            strategies.add(mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", "Referer" to "https://123moviesfree.club/", "Accept" to "*/*"))
+            strategies.add(mapOf("User-Agent" to "ExoPlayerLib/2.19.1", "Accept" to "*/*"))
+        } else {
+            if (headers.isNotEmpty()) {
+                strategies.add(headers)
+            }
+            strategies.add(mapOf("User-Agent" to "ExoPlayerLib/2.19.1", "Accept" to "*/*"))
+            strategies.add(mapOf("User-Agent" to DEFAULT_UA, "Accept" to "*/*"))
+        }
+
+        var lastException: Exception? = null
+        for (strategyHeaders in strategies) {
+            if (isCancelled()) throw CancellationException("Download cancelled")
+            if (tempFile.exists()) tempFile.delete()
+
+            val reqBuilder = Request.Builder().url(url)
+            strategyHeaders.forEach { (k, v) ->
                 reqBuilder.header(k, v)
             }
-        }
 
-        client.newCall(reqBuilder.build()).execute().use { response ->
-            if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code} downloading video")
-            val body = response.body ?: throw IllegalStateException("Empty body")
-            val totalBytes = body.contentLength().coerceAtLeast(1L)
+            var successful = false
+            try {
+                client.newCall(reqBuilder.build()).execute().use { response ->
+                    if (response.code == 428 || response.code == 429 || response.code == 403 || response.code == 401) {
+                        Log.w(TAG, "Direct download got HTTP ${response.code} with UA '${strategyHeaders["User-Agent"]}', trying next strategy...")
+                        lastException = IllegalStateException("HTTP ${response.code} downloading video")
+                        return@use
+                    }
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException("HTTP ${response.code} downloading video")
+                    }
 
-            var downloadedBytes = 0L
-            val startTime = System.currentTimeMillis()
-            var lastReportTime = 0L
-            val buffer = ByteArray(32 * 1024)
+                    val body = response.body ?: throw IllegalStateException("Empty body")
+                    val rawContentLength = body.contentLength()
+                    val totalBytes = if (rawContentLength > 0L) rawContentLength else -1L
 
-            FileOutputStream(tempFile).use { fos ->
-                body.byteStream().use { input ->
-                    while (true) {
-                        if (isCancelled()) throw CancellationException("Download cancelled")
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        fos.write(buffer, 0, read)
-                        downloadedBytes += read
+                    var downloadedBytes = 0L
+                    val startTime = System.currentTimeMillis()
+                    var lastReportTime = 0L
+                    val buffer = ByteArray(64 * 1024)
 
-                        val now = System.currentTimeMillis()
-                        if (now - lastReportTime > 150) {
-                            lastReportTime = now
-                            val elapsedSec = (now - startTime) / 1000.0
-                            val speed = if (elapsedSec > 0.5) (downloadedBytes / elapsedSec).toLong() else 0L
-                            val progress = (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 0.99f)
-                            onProgress(progress, downloadedBytes, totalBytes, formatSpeed(speed), 1, 1)
+                    FileOutputStream(tempFile).use { fos ->
+                        body.byteStream().use { input ->
+                            while (true) {
+                                if (isCancelled()) throw CancellationException("Download cancelled")
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                fos.write(buffer, 0, read)
+                                downloadedBytes += read
+
+                                val now = System.currentTimeMillis()
+                                if (now - lastReportTime > 200) {
+                                    lastReportTime = now
+                                    val elapsedSec = (now - startTime) / 1000.0
+                                    val speed = if (elapsedSec > 0.5) (downloadedBytes / elapsedSec).toLong() else 0L
+                                    val rawProg2 = if (totalBytes > 0L) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 0.99f) else 0.05f
+                                    val progress = if (rawProg2.isNaN() || !rawProg2.isFinite()) 0.05f else rawProg2
+                                    onProgress(progress, downloadedBytes, if (totalBytes > 0L) totalBytes else 0L, formatSpeed(speed), 1, 1)
+                                }
+                            }
+                            fos.flush()
                         }
                     }
-                    fos.flush()
+
+                    successful = true
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lastException = e
+                Log.w(TAG, "Direct download attempt failed: ${e.message}")
+            }
+
+            if (successful && tempFile.exists() && tempFile.length() > 0L) {
+                if (destFile.exists()) destFile.delete()
+                val renamed = tempFile.renameTo(destFile)
+                if (!renamed) {
+                    tempFile.copyTo(destFile, overwrite = true)
+                    tempFile.delete()
+                }
+                val finalLen = destFile.length()
+                onProgress(1.0f, finalLen, finalLen, "Completed", 1, 1)
+                return@withContext
             }
         }
 
-        if (destFile.exists()) destFile.delete()
-        tempFile.renameTo(destFile)
-        onProgress(1.0f, destFile.length(), destFile.length(), "Completed", 1, 1)
+        throw lastException ?: IllegalStateException("Failed to download video file")
     }
 
     private fun decryptAes128(
@@ -830,14 +901,22 @@ class AnimeStreamDownloader(
 
     private fun generateOfflineM3u8(outputDir: File, mediaInfo: HlsMediaInfo, isFmp4: Boolean) {
         try {
+            val segmentsDir = File(outputDir, "segments")
             val audioTracks = mediaInfo.audioTracks
             val ext = if (isFmp4) "m4s" else "ts"
+            val hlsVersion = if (isFmp4) 7 else 3
+
+            val videoInitFile = File(segmentsDir, "video_init.mp4")
+            val hasVideoInit = isFmp4 && videoInitFile.exists() && videoInitFile.length() > 0
 
             if (audioTracks.isNotEmpty()) {
                 // 1. Write video_playlist.m3u8
                 val videoPlFile = File(outputDir, "video_playlist.m3u8")
                 val vSb = StringBuilder()
-                vSb.append("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:15\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n")
+                vSb.append("#EXTM3U\n#EXT-X-VERSION:$hlsVersion\n#EXT-X-TARGETDURATION:15\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n")
+                if (hasVideoInit) {
+                    vSb.append("#EXT-X-MAP:URI=\"segments/video_init.mp4\"\n")
+                }
                 for (seg in mediaInfo.segments) {
                     vSb.append("#EXTINF:${seg.durationSec},\nsegments/video_seg_${String.format("%05d", seg.index)}.$ext\n")
                 }
@@ -847,11 +926,19 @@ class AnimeStreamDownloader(
                 // 2. Write audio_playlist_${trackIdx}.m3u8 for each track
                 for (track in audioTracks) {
                     val trackIdx = track.index
-                    val isTrackFmp4 = track.mediaInfo.isFragmentedMp4 || track.mediaInfo.initSegmentUri != null
+                    val isTrackFmp4 = track.mediaInfo.isFragmentedMp4 || track.mediaInfo.initSegmentUri != null || isFmp4
                     val audioExt = if (isTrackFmp4) "m4s" else "aac"
+                    val audioInitFile = File(segmentsDir, "audio_${trackIdx}_init.mp4")
+                    val hasAudioInit = isTrackFmp4 && audioInitFile.exists() && audioInitFile.length() > 0
+
                     val audioPlFile = File(outputDir, "audio_playlist_${trackIdx}.m3u8")
                     val aSb = StringBuilder()
-                    aSb.append("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:15\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n")
+                    aSb.append("#EXTM3U\n#EXT-X-VERSION:${if (isTrackFmp4) 7 else 3}\n#EXT-X-TARGETDURATION:15\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n")
+                    if (hasAudioInit) {
+                        aSb.append("#EXT-X-MAP:URI=\"segments/audio_${trackIdx}_init.mp4\"\n")
+                    } else if (isTrackFmp4 && hasVideoInit) {
+                        aSb.append("#EXT-X-MAP:URI=\"segments/video_init.mp4\"\n")
+                    }
                     for (seg in track.mediaInfo.segments) {
                         aSb.append("#EXTINF:${seg.durationSec},\nsegments/audio_${trackIdx}_seg_${String.format("%05d", seg.index)}.$audioExt\n")
                     }
@@ -862,10 +949,10 @@ class AnimeStreamDownloader(
                 // 3. Write master playlist.m3u8 linking video and all audio tracks
                 val masterPlFile = File(outputDir, "playlist.m3u8")
                 val mSb = StringBuilder()
-                mSb.append("#EXTM3U\n#EXT-X-VERSION:3\n")
+                mSb.append("#EXTM3U\n#EXT-X-VERSION:$hlsVersion\n")
                 for (track in audioTracks) {
                     val trackIdx = track.index
-                    val defStr = if (track.isDefault) "YES" else "NO"
+                    val defStr = if (audioTracks.size == 1 || track.isDefault) "YES" else "NO"
                     val langStr = if (!track.language.isNullOrBlank()) "LANGUAGE=\"${track.language}\"," else ""
                     val safeName = track.name.replace("\"", "")
                     mSb.append("#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"$safeName\",DEFAULT=$defStr,AUTOSELECT=YES,${langStr}URI=\"audio_playlist_${trackIdx}.m3u8\"\n")
@@ -877,10 +964,13 @@ class AnimeStreamDownloader(
                 val playlistFile = File(outputDir, "playlist.m3u8")
                 val sb = StringBuilder()
                 sb.append("#EXTM3U\n")
-                sb.append("#EXT-X-VERSION:3\n")
+                sb.append("#EXT-X-VERSION:$hlsVersion\n")
                 sb.append("#EXT-X-TARGETDURATION:15\n")
                 sb.append("#EXT-X-MEDIA-SEQUENCE:0\n")
                 sb.append("#EXT-X-PLAYLIST-TYPE:VOD\n")
+                if (hasVideoInit) {
+                    sb.append("#EXT-X-MAP:URI=\"segments/video_init.mp4\"\n")
+                }
 
                 for (seg in mediaInfo.segments) {
                     sb.append("#EXTINF:${seg.durationSec},\n")

@@ -4854,5 +4854,27 @@
       "season": 1,
       "startEpisode": 1
     }
+  ],
+  "207329": [
+    {
+      "saltId": "the-laid-off-cheat-granting-mage-enjoys-a-second-lease-on-life",
+      "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "900001": [
+    {
+      "saltId": "oggy-and-the-cockroaches",
+      "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "900002": [
+    {
+      "saltId": "oggy-and-the-cockroaches-the-movie",
+      "season": null,
+      "startEpisode": 1,
+      "isMovie": true
+    }
   ]
 }

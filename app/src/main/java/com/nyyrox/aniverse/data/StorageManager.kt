@@ -41,6 +41,7 @@ class StorageManager(context: Context) {
         private const val KEY_LAST_DOWNLOAD_AUDIO = "key_last_download_audio"
         private const val KEY_LAST_DOWNLOAD_QUALITY = "key_last_download_quality"
         private const val KEY_LAST_DOWNLOAD_SERVER = "key_last_download_server"
+        private const val KEY_DELETED_WATCHLIST_IDS = "key_deleted_watchlist_ids"
         private const val KEY_DELETED_HISTORY_IDS = "key_deleted_history_ids"
         private const val KEY_DELETED_MANGA_IDS = "key_deleted_manga_ids"
         private const val KEY_DELETED_NOVEL_SLUGS = "key_deleted_novel_slugs"
@@ -266,7 +267,26 @@ class StorageManager(context: Context) {
         return 0
     }
 
+    fun isWatchlistDeleted(animeId: Int): Boolean {
+        val raw = prefs.getStringSet(KEY_DELETED_WATCHLIST_IDS, null) ?: return false
+        return raw.contains(animeId.toString())
+    }
+
+    fun markWatchlistDeleted(animeId: Int) {
+        val current = prefs.getStringSet(KEY_DELETED_WATCHLIST_IDS, null)?.toMutableSet() ?: mutableSetOf()
+        current.add(animeId.toString())
+        prefs.edit().putStringSet(KEY_DELETED_WATCHLIST_IDS, current).apply()
+    }
+
+    fun unmarkWatchlistDeleted(animeId: Int) {
+        val current = prefs.getStringSet(KEY_DELETED_WATCHLIST_IDS, null)?.toMutableSet() ?: return
+        if (current.remove(animeId.toString())) {
+            prefs.edit().putStringSet(KEY_DELETED_WATCHLIST_IDS, current).apply()
+        }
+    }
+
     fun removeFromWatchlist(animeId: Int) {
+        markWatchlistDeleted(animeId)
         val list = getWatchlist().filterNot { it.animeId == animeId }
         saveWatchlist(list)
     }

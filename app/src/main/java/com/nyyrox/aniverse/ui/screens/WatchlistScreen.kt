@@ -181,6 +181,13 @@ enum class MediaTab(val label: String) {
 
 }
 
+private data class PendingDeleteTarget(
+    val title: String,
+    val dialogTitle: String,
+    val dialogMessage: String,
+    val onConfirm: () -> Unit
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
@@ -232,6 +239,7 @@ fun WatchlistScreen(
     // Status change dialog state
 
     var statusDialogAnimeItem by remember { mutableStateOf<WatchlistItem?>(null) }
+    var pendingDeleteTarget by remember { mutableStateOf<PendingDeleteTarget?>(null) }
 
     val aniListAccount = vm.aniListAccount
 
@@ -526,11 +534,15 @@ fun WatchlistScreen(
                                     onPlay = { onPlay(h.animeId, h.lastEpisode) },
 
                                     onRemove = {
-
-                                        vm.removeHistory(h.animeId)
-
-                                        Toast.makeText(context, "Removed from continue watching", Toast.LENGTH_SHORT).show()
-
+                                        pendingDeleteTarget = PendingDeleteTarget(
+                                            title = h.title,
+                                            dialogTitle = "Remove from History?",
+                                            dialogMessage = "Remove \"${h.title}\" from continue watching?",
+                                            onConfirm = {
+                                                vm.removeHistory(h.animeId)
+                                                Toast.makeText(context, "Removed from continue watching", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
                                     }
 
                                 )
@@ -600,11 +612,15 @@ fun WatchlistScreen(
                                     onRead = { onReadManga(m.mangaId, m.chapterId) },
 
                                     onRemove = {
-
-                                        vm.removeMangaHistory(m.mangaId)
-
-                                        Toast.makeText(context, "Removed from reading history", Toast.LENGTH_SHORT).show()
-
+                                        pendingDeleteTarget = PendingDeleteTarget(
+                                            title = m.title,
+                                            dialogTitle = "Remove Reading History?",
+                                            dialogMessage = "Remove \"${m.title}\" from reading history?",
+                                            onConfirm = {
+                                                vm.removeMangaHistory(m.mangaId)
+                                                Toast.makeText(context, "Removed from reading history", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
                                     }
 
                                 )
@@ -620,11 +636,15 @@ fun WatchlistScreen(
                                     onRead = { onReadNovel(n.slug, n.lastChapterSlug) },
 
                                     onRemove = {
-
-                                        vm.removeNovelHistory(n.slug)
-
-                                        Toast.makeText(context, "Removed from reading history", Toast.LENGTH_SHORT).show()
-
+                                        pendingDeleteTarget = PendingDeleteTarget(
+                                            title = n.title,
+                                            dialogTitle = "Remove Reading History?",
+                                            dialogMessage = "Remove \"${n.title}\" from reading history?",
+                                            onConfirm = {
+                                                vm.removeNovelHistory(n.slug)
+                                                Toast.makeText(context, "Removed from reading history", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
                                     }
 
                                 )
@@ -873,11 +893,15 @@ fun WatchlistScreen(
                                                     },
 
                                                     onRemove = {
-
-                                                        vm.removeFromWatchlist(item.animeId)
-
-                                                        Toast.makeText(context, "Removed from library", Toast.LENGTH_SHORT).show()
-
+                                                        pendingDeleteTarget = PendingDeleteTarget(
+                                                            title = item.title,
+                                                            dialogTitle = "Remove from Watchlist?",
+                                                            dialogMessage = "Are you sure you want to remove \"${item.title}\" from your watchlist?",
+                                                            onConfirm = {
+                                                                vm.removeFromWatchlist(item.animeId)
+                                                                Toast.makeText(context, "Removed from library", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        )
                                                     }
 
                                                 )
@@ -952,11 +976,15 @@ fun WatchlistScreen(
                                                     onClick = { onMangaClick(m.mangaId) },
 
                                                     onRemove = {
-
-                                                        vm.toggleMangaBookmark(m.mangaId, m.title, m.poster, m.type, m.latestChapter)
-
-                                                        Toast.makeText(context, "Removed bookmark", Toast.LENGTH_SHORT).show()
-
+                                                        pendingDeleteTarget = PendingDeleteTarget(
+                                                            title = m.title,
+                                                            dialogTitle = "Remove Bookmark?",
+                                                            dialogMessage = "Remove \"${m.title}\" from saved bookmarks?",
+                                                            onConfirm = {
+                                                                vm.toggleMangaBookmark(m.mangaId, m.title, m.poster, m.type, m.latestChapter)
+                                                                Toast.makeText(context, "Removed bookmark", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        )
                                                     }
 
                                                 )
@@ -1033,11 +1061,15 @@ fun WatchlistScreen(
                                                     onRead = { onReadNovel(n.slug, n.lastChapterSlug) },
 
                                                     onRemove = {
-
-                                                        vm.removeNovelHistory(n.slug)
-
-                                                        Toast.makeText(context, "Removed history", Toast.LENGTH_SHORT).show()
-
+                                                        pendingDeleteTarget = PendingDeleteTarget(
+                                                            title = n.title,
+                                                            dialogTitle = "Remove Reading History?",
+                                                            dialogMessage = "Remove \"${n.title}\" from novel reading history?",
+                                                            onConfirm = {
+                                                                vm.removeNovelHistory(n.slug)
+                                                                Toast.makeText(context, "Removed history", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        )
                                                     }
 
                                                 )
@@ -1205,6 +1237,17 @@ fun WatchlistScreen(
 
         }
 
+    }
+
+    pendingDeleteTarget?.let { target ->
+        com.nyyrox.aniverse.ui.components.RemoveConfirmDialog(
+            title = target.dialogTitle,
+            message = target.dialogMessage,
+            confirmText = "Remove",
+            cancelText = "Cancel",
+            onConfirm = target.onConfirm,
+            onDismiss = { pendingDeleteTarget = null }
+        )
     }
 
 }

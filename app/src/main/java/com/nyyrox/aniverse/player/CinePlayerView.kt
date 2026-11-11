@@ -145,6 +145,8 @@ import androidx.compose.material.icons.filled.Dns
 import com.nyyrox.aniverse.data.extractor.StreamServerOption
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DashboardCustomize
 import androidx.compose.material.icons.filled.FastForward
@@ -610,7 +612,10 @@ data class CinePlayerProps(
     val onSelectAudioTrack: ((CinePlayerAudioOption) -> Unit)? = null,
     val externalQualityTracks: List<CinePlayerQualityOption> = emptyList(),
     val onSelectQualityTrack: ((CinePlayerQualityOption) -> Unit)? = null,
-    val serverSkipIntervals: List<SkipInterval> = emptyList()
+    val serverSkipIntervals: List<SkipInterval> = emptyList(),
+    val onDownload: (() -> Unit)? = null,
+    val isDownloaded: Boolean = false,
+    val isDownloading: Boolean = false
 )
 
 @OptIn(UnstableApi::class)
@@ -1494,7 +1499,7 @@ fun CinePlayerView(
             }
 
             val mediaItemBuilder = MediaItem.Builder().setUri(mediaUri)
-            val isHlsStream = !isLocalFile && (stream.isHls || playUrl.contains(".m3u8", ignoreCase = true))
+            val isHlsStream = stream.isHls || playUrl.contains(".m3u8", ignoreCase = true)
             if (playUrl.endsWith(".ts", ignoreCase = true)) {
                 mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
             } else if (playUrl.endsWith(".mp4", ignoreCase = true)) {
@@ -1517,7 +1522,7 @@ fun CinePlayerView(
             if (isHlsStream) {
                 // Chunkless preparation for instant start matching Hls.js in test_shaka_player.html
                 val hlsSource = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
-                    .setAllowChunklessPreparation(true)
+                    .setAllowChunklessPreparation(!isLocalFile)
                     .createMediaSource(mediaItem)
                 player.setMediaSource(hlsSource)
             } else {
@@ -3184,6 +3189,18 @@ fun CinePlayerView(
                                             icon = Icons.Default.ArrowBack,
                                             contentDescription = "Exit Fullscreen",
                                             onClick = { onToggleFullscreen() }
+                                        )
+                                    }
+                                    if (props.onDownload != null) {
+                                        CxPillIcon(
+                                            icon = when {
+                                                props.isDownloaded -> Icons.Default.DownloadDone
+                                                props.isDownloading -> Icons.Default.Downloading
+                                                else -> Icons.Default.Download
+                                            },
+                                            contentDescription = if (props.isDownloaded) "Downloaded" else if (props.isDownloading) "Downloading" else "Download",
+                                            tint = if (props.isDownloaded) Color(0xFF4CAF50) else if (props.isDownloading) Color(0xFFFFB300) else Color.White,
+                                            onClick = { props.onDownload.invoke() }
                                         )
                                     }
                                     CxPillIcon(
@@ -5156,67 +5173,8 @@ private fun PlayerSettingsModal(
                                     }
                                 }
                             }
-                        } else {
-                        val isSingleAudioServer = serverName.contains("megaplay", ignoreCase = true) ||
-                                serverName.contains("vidstream", ignoreCase = true)
-
-                        if (isSingleAudioServer) {
-                            // MegaPlay & Vidstream: single audio stream output (separate Sub and Dub streams)
-                            val options = listOf(
-                                Triple(false, "Japanese (Sub)", true),
-                                Triple(true, "English (Dub)", hasDubAvailable)
-                            )
-                            options.forEach { (targetDub, label, isAvailable) ->
-                                val isSelected = (isDub == targetDub)
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
-                                        .clickable {
-                                            if (!isAvailable) {
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "Dub is not available for this episode",
-                                                    android.widget.Toast.LENGTH_SHORT
-                                                ).show()
-                                            } else {
-                                                if (isDub != targetDub) {
-                                                    onSwitchAudioStream?.invoke(targetDub)
-                                                }
-                                                onDismiss()
-                                            }
-                                        }
-                                        .padding(vertical = 10.dp, horizontal = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = label,
-                                            color = when {
-                                                !isAvailable -> Color.White.copy(alpha = 0.38f)
-                                                isSelected -> OttPrimary
-                                                else -> Color.White
-                                            },
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                        if (!isAvailable) {
-                                            Text(
-                                                text = "Unavailable on this server for this episode",
-                                                color = Color.White.copy(alpha = 0.30f),
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = OttPrimary, modifier = Modifier.size(18.dp))
-                                    }
-                                }
-                            }
                         } else if (audioTracks.size > 1) {
-                            // ACDN & FlixCloud: multi-audio HLS streams, list all available audio tracks
+                            // Multi-audio HLS tracks from ExoPlayer (Japanese, English, Hindi, Tamil, Telugu, etc.)
                             audioTracks.forEach { track ->
                                 val isSelected = track.isSelected
                                 Row(
@@ -5244,9 +5202,9 @@ private fun PlayerSettingsModal(
                                 }
                             }
                         } else {
-                            // Single track / fallback for ACDN/FlixCloud
+                            // Sub vs Dub stream switching
                             val options = listOf(
-                                Triple(false, "Japanese (Native)", true),
+                                Triple(false, "Japanese (Sub)", true),
                                 Triple(true, "English (Dub)", hasDubAvailable)
                             )
                             options.forEach { (targetDub, label, isAvailable) ->
@@ -5257,18 +5215,10 @@ private fun PlayerSettingsModal(
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(if (isSelected) Color(0x1FFFFFFF) else Color.Transparent)
                                         .clickable {
-                                            if (!isAvailable) {
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "Dub is not available for this episode",
-                                                    android.widget.Toast.LENGTH_SHORT
-                                                ).show()
-                                            } else {
-                                                if (isDub != targetDub) {
-                                                    onSwitchAudioStream?.invoke(targetDub)
-                                                }
-                                                onDismiss()
+                                            if (isDub != targetDub) {
+                                                onSwitchAudioStream?.invoke(targetDub)
                                             }
+                                            onDismiss()
                                         }
                                         .padding(vertical = 10.dp, horizontal = 10.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -5298,7 +5248,6 @@ private fun PlayerSettingsModal(
                                     }
                                 }
                             }
-                        }
                         }
                         Spacer(Modifier.height(4.dp))
                     }
@@ -5969,7 +5918,8 @@ private fun CxPillIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String?,
     onClick: (Rect) -> Unit,
-    iconSize: androidx.compose.ui.unit.Dp = 19.dp
+    iconSize: androidx.compose.ui.unit.Dp = 19.dp,
+    tint: Color = Color.White
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
     Box(
@@ -5980,7 +5930,7 @@ private fun CxPillIcon(
             .clickable { onClick(bounds) },
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = Color.White, modifier = Modifier.size(iconSize))
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(iconSize))
     }
 }
 

@@ -65,6 +65,7 @@ fun MovieHomeScreen(
 
     var mediaType by remember { mutableStateOf("all") } // "all", "movie", "tv"
     var selectedGenre by remember { mutableStateOf<MovieGenre?>(null) }
+    var pendingRemoveMovie by remember { mutableStateOf<com.nyyrox.aniverse.data.movie.MovieHistoryItem?>(null) }
 
     // Shelves raw items & mapped to Anime
     var heroItems by remember { mutableStateOf<List<MovieItem>>(emptyList()) }
@@ -252,7 +253,7 @@ fun MovieHomeScreen(
                                             progress = if (dur > 0L) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f,
                                             image = { h.backdropUrl ?: h.posterUrl },
                                             onOpen = { onPlayMovie(h.id, h.type, h.season, h.episode) },
-                                            onRemove = { vm.removeMovieHistory(h.id, h.type) }
+                                            onRemove = { pendingRemoveMovie = h }
                                         )
                                         ContinueTile(entry, p, Modifier.rowTilt(continueRowState, i))
                                     }
@@ -402,6 +403,17 @@ fun MovieHomeScreen(
                         }
                     }
             }
+        }
+
+        pendingRemoveMovie?.let { h ->
+            com.nyyrox.aniverse.ui.components.RemoveConfirmDialog(
+                title = "Remove from History?",
+                message = "Remove \"${h.title}\" from continue watching?",
+                confirmText = "Remove",
+                cancelText = "Cancel",
+                onConfirm = { vm.removeMovieHistory(h.id, h.type) },
+                onDismiss = { pendingRemoveMovie = null }
+            )
         }
     }
 }
