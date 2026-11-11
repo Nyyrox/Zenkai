@@ -77,11 +77,18 @@ data class TmdbSeasonInfo(
 )
 
 object TmdbRepository {
+    private const val ZENKAI_WEB_PRIMARY = "https://zenkai.cfd/api/movies"
+    private const val ZENKAI_WEB_PAGES = "https://zenkaii.pages.dev/api/movies"
     private const val TMDB_VERCEL_BASE = "https://aniversee.vercel.app/api/tmdb"
     private const val TMDB_DIRECT_API_BASE = "https://api.themoviedb.org/3"
     private const val TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
-    private const val TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlYjdkMWM0ZTgwMGUzM2FiMmE3Y2I3NDA5YmM4NjQ2YSIsIm5iZiI6MTc3OTUzMDcxOS40MzIsInN1YiI6IjZhMTE3YmRmYTlhNjNlYmFiOWUzYjc4YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Z9pa96oJEyicf6wAoaKGKJd9ldapeiOdktoJd4xcgLo"
-    private const val TMDB_API_KEY = "eb7d1c4e800e33ab2a7cb7409bc8646a"
+
+    private const val BARRIER_TOKEN = "zenkai-barrier-apk-2026-v1"
+    private const val CLIENT_ID = "Zenkai-Android-v1.6.4"
+    private const val APP_USER_AGENT = "Zenkai/1.6.4 (Android; Mobile)"
+
+    private const val TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjN2RiNjE2OWJmZGQzZmM5ZjdkZDZjNDRlYThhZDEwMCIsIm5iZiI6MTc5NDM3NjY0MC40MDYwMDAxLCJzdWIiOiI2YWY0MDNjOWI4YTRlMzU1YjYzNGVkOTciLCJzY29wZXMiOlsicmVhZCJdLCJ2ZXJzaW9uIjoxfQ.ww3C_pAWxT63xXVM90Akq8aSEyFhmyA5VaobbE-E0y4"
+    private const val TMDB_API_KEY = "c7db6169bfdd3fc9f7dd6c44ea8ad100"
 
     private val client = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
@@ -102,14 +109,17 @@ object TmdbRepository {
      */
     suspend fun executeTmdbGet(endpointPath: String, queryParams: String = ""): String? = withContext(Dispatchers.IO) {
         val cleanPath = if (endpointPath.startsWith("/")) endpointPath else "/$endpointPath"
+        val querySuffix = if (queryParams.isBlank()) "" else "?$queryParams"
 
-        // Tier 1: Vercel Proxy
+        // Tier 1: Zenkai Web CF Gateway (Primary: https://zenkai.cfd/api/movies) with Barrier Auth
         try {
-            val vercelUrl = if (queryParams.isBlank()) "$TMDB_VERCEL_BASE$cleanPath" else "$TMDB_VERCEL_BASE$cleanPath?$queryParams"
+            val url = "$ZENKAI_WEB_PRIMARY$cleanPath$querySuffix"
             val req = Request.Builder()
-                .url(vercelUrl)
+                .url(url)
                 .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) ZENKAI/v3")
+                .addHeader("X-Zenkai-Barrier", BARRIER_TOKEN)
+                .addHeader("X-Zenkai-Client", CLIENT_ID)
+                .addHeader("User-Agent", APP_USER_AGENT)
                 .build()
 
             client.newCall(req).execute().use { resp ->
@@ -122,7 +132,47 @@ object TmdbRepository {
             }
         } catch (_: Exception) {}
 
-        // Tier 2: Direct TMDB API fallback
+        // Tier 2: Zenkai Web CF Pages (Fallback: https://zenkaii.pages.dev/api/movies) with Barrier Auth
+        try {
+            val url = "$ZENKAI_WEB_PAGES$cleanPath$querySuffix"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("Accept", "application/json")
+                .addHeader("X-Zenkai-Barrier", BARRIER_TOKEN)
+                .addHeader("X-Zenkai-Client", CLIENT_ID)
+                .addHeader("User-Agent", APP_USER_AGENT)
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body.string()
+                    if (body.isNotBlank() && (body.startsWith("{") || body.startsWith("["))) {
+                        return@withContext body
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Tier 3: Vercel Proxy Fallback
+        try {
+            val vercelUrl = "$TMDB_VERCEL_BASE$cleanPath$querySuffix"
+            val req = Request.Builder()
+                .url(vercelUrl)
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", APP_USER_AGENT)
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body.string()
+                    if (body.isNotBlank() && (body.startsWith("{") || body.startsWith("["))) {
+                        return@withContext body
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Tier 4: Direct TMDB API fallback (using user's API key & bearer token)
         try {
             val sep = if (queryParams.isBlank()) "?" else "?$queryParams&"
             val directUrl = "$TMDB_DIRECT_API_BASE$cleanPath${sep}api_key=$TMDB_API_KEY"
@@ -130,7 +180,7 @@ object TmdbRepository {
                 .url(directUrl)
                 .addHeader("Accept", "application/json")
                 .addHeader("Authorization", "Bearer $TMDB_BEARER_TOKEN")
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .addHeader("User-Agent", APP_USER_AGENT)
                 .build()
 
             client.newCall(req).execute().use { resp ->

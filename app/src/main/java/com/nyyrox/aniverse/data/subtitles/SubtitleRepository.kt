@@ -751,8 +751,9 @@ object SubtitleRepository {
             try {
                 val req = Request.Builder()
                     .url(targetUrl)
-                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) Aniverse/3.0")
-                    .addHeader("X-Zenkai-Client", "true")
+                    .addHeader("User-Agent", "Zenkai/1.6.4 (Android; Mobile)")
+                    .addHeader("X-Zenkai-Barrier", "zenkai-barrier-apk-2026-v1")
+                    .addHeader("X-Zenkai-Client", "Zenkai-Android-v1.6.4")
                     .addHeader("X-Aniverse-Client", "true")
                     .addHeader("Referer", defaultReferer)
                     .addHeader("Accept", "text/vtt,text/plain,text/x-ssa,application/x-subrip,*/*")
