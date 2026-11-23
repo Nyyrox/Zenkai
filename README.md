@@ -6,7 +6,7 @@
 
 **WATCH · READ · DISCOVER**
 
-Anime, manga & novels — one focused Android experience.
+Anime, Movies, Manga & Novels — one focused Android experience.
 
 <br/>
 
@@ -35,92 +35,135 @@ Anime, manga & novels — one focused Android experience.
 
 ---
 
-## ✦ The Zenkai experience
+## ✦ The Zenkai Experience
 
-Zenkai brings **anime streaming, manga reading and novel reading** together in one Android app, with a clean interface focused on watching and reading.
+Zenkai unifies **Anime streaming, Movies & TV Shows, Manga reading, and Light Novels** into a single, high-performance Android application crafted with Jetpack Compose.
 
-| 🎬 Anime | 📖 Manga | 📚 Novels |
-|:---:|:---:|:---:|
-| Stream with multiple servers, PiP and downloads | Track progress, download chapters and read comfortably | Distraction-free reading for long-form stories |
+| 🍿 Movies & TV | 🎬 Anime | 📖 Manga | 📚 Novels |
+|:---:|:---:|:---:|:---:|
+| Direct HD streams, 4K metadata & multi-source playback | Multi-server streaming, Dub/Sub audio selector & PiP | Multi-provider reader, chapter downloads & sync | Minimal, distraction-free reader for long-form stories |
+
+---
+
+## 📱 Screenshots
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="20%">
+        <b>Movies & TV Shows</b><br/><br/>
+        <img src="screenshots/screenshot_01.png" width="100%" alt="Movies & TV Shows"/>
+      </td>
+      <td align="center" width="20%">
+        <b>Light Novels</b><br/><br/>
+        <img src="screenshots/screenshot_02.png" width="100%" alt="Light Novels"/>
+      </td>
+      <td align="center" width="20%">
+        <b>Anime Details & Airing</b><br/><br/>
+        <img src="screenshots/screenshot_03.png" width="100%" alt="Anime Details"/>
+      </td>
+      <td align="center" width="20%">
+        <b>Direct HD Player</b><br/><br/>
+        <img src="screenshots/screenshot_04.png" width="100%" alt="Video Player"/>
+      </td>
+      <td align="center" width="20%">
+        <b>Manga Reader & Chapters</b><br/><br/>
+        <img src="screenshots/screenshot_05.png" width="100%" alt="Manga Reader"/>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ---
 
 ## 🌐 Zenkai Web
 
-The Zenkai experience is also available on the web.
+The Zenkai experience is also available directly in your browser.
 
 **[Open Zenkai Web →](https://zenkaii.pages.dev/)**
 
 ---
 
+## 🍿 Movies & TV Series
+
+- **TMDB Integration**: Enriched metadata, artwork, and trending lists routed through Cloudflare Gateway.
+- **Direct HD Streaming**: MovieBox resolvers with multi-source fallback for smooth, reliable playback.
+- **Episode & Season Browsing**: Clean episode lists with thumbnails, air dates, and overview summaries.
+- **Offline Downloads**: High-speed downloads for movies and episodes with resilient background service.
+
 ## 🎬 Anime
 
-- Multiple streaming servers
-- Direct playback for supported streams
-- Picture-in-Picture
-- Caption translation for supported subtitles
-- Offline episode downloads
-- Smart automatic pause handling
-- Optimized playback and smoother animations
+- **Unified OTT Interface**: Modern, clutter-free home layout harmonized with Movies, Manga, and Novels.
+- **CinePlayer Engine**: High-performance video player with auto-hiding controls and smooth scrubbing.
+- **Instant Dub / Sub Audio**: Automatic audio stream detection and seamless switching between Sub and Dub tracks.
+- **Picture-in-Picture (PiP)**: Keep watching while navigating across other apps.
+- **AniSkip Support**: Smart automated intro and outro skipping.
+- **Offline Downloads**: Background download service with storage tracking and notification controls.
 
 ## 📖 Manga
 
-- Reading progress synchronization
-- Chapter downloads for offline reading
-- Story-focused reader
-- Multiple viewer modes and reading directions
+- **Multi-Source Aggregation**: Seamless reading across WeebCentral, Demonic Scans, Comick, and MangaDex.
+- **Fast Reader Engine**: Flexible viewer modes (webtoon vertical scroll, right-to-left, left-to-right).
+- **Chapter Downloads**: Download entire chapters for completely offline reading.
+- **Progress Tracking**: Automatic synchronization with your AniList and Zenkai profiles.
 
-## 📚 Novels
+## 📚 Light Novels & Web Novels
 
-- Clean light-novel reader
-- Minimal, distraction-free interface
-- Built for comfortable long-form reading
+- **Clean Typography**: Distraction-free, responsive reading interface designed for long sessions.
+- **Diverse Sources**: Direct catalog integration with Lnori, NovelFull, and NovelFire.
+- **Bookmark & Chapter Cache**: Pick up exactly where you left off, online or offline.
 
-## 🗂️ Library & Account
+## ⚡ Ascension & Gamification
 
-- Watchlist and personal library
-- Download manager with storage tracking
-- Login and account support
-- Customizable app experience
-- Community integrated into the app
+- **Leveling Engine**: Unified progression tracking combining your watched anime hours, read manga chapters, and novel pages.
+- **Quests & Milestones**: Daily and weekly challenges to unlock exclusive ranks, titles, and decorations.
+- **Community Leaderboard**: Compare ranks and achievements with fellow Zenkai members.
 
-## 🔗 Community
+## 💬 Community & Direct Messaging
 
-Stay connected with Zenkai through the official communities.
+- **Real-Time Channels**: Engage in discussions across dedicated channels (`#general`, `#episode-talk`, `#recommendations`).
+- **Monochrome Dark Bubbles**: Clean, distraction-free chat UI with optimistic instant message delivery.
+- **Direct Messaging**: 1-on-1 private messaging with instant profile caching and no loading delays.
+- **Messages Inbox**: Convenient inbox accessible right from your personal profile.
+- **Media Tagging**: Tag anime, movie, manga, or novel titles directly into the chat conversation.
 
-**Discord** — community, support and discussion  
-**Telegram** — updates and announcements
+## 🎨 Profile & Personalization
+
+- **Profile Customization**: Webapp-aligned banner, custom avatar frames, and animated borders.
+- **Typography Effects**: Dynamic custom fonts including Syne, JetBrains Mono, Nosifer, and more.
+- **Personal Library**: Centralized watchlist, favorites, continue-watching history, and download manager.
 
 ---
 
-## 🆕 Latest release · v1.5.3
+## 🆕 Latest Release · v1.6.9
 
-| Update | Details |
+| Feature | Highlight |
 |---|---|
-| 🔔 | Fixed notification display and interaction |
-| ⏸️ | Improved automatic pause on app close and PiP |
-| 🎮 | Fixed Discord Rich Presence |
-| 📥 | Improved download visibility and list handling |
-| 📜 | Fixed download-page scrolling |
-| ⚡ | Improved playback, downloads and stability |
+| 🎬 **Movies & Series** | Full TMDB catalog integration with MovieBox Direct HD streams |
+| 📺 **OTT Anime Redesign** | Modernized OTT home screen matching Movies, Manga, and Novels |
+| 💬 **Direct Messaging & Inbox** | Private 1-on-1 messaging with instant profile cache and dedicated inbox |
+| 🫧 **Monochrome Chat** | Refined group chat bubbles, optimistic sending, and auto-scroll to latest |
+| ⚡ **Ascension System** | Unified level calculation, quest progression, and profile hero alignment |
+| 📥 **Enhanced Downloads** | Resilient background downloading, storage tracking, and fast single-track audio |
+| 🚀 **Performance** | Zero frame lag, instant startup, and streamlined memory consumption |
 
-**[View v1.5.3 release →](https://github.com/Nyyrox/Zenkai/releases/tag/v1.5.3)**
+**[View v1.6.9 Release & Download APK →](https://github.com/Nyyrox/Zenkai/releases/latest)**
 
 ---
 
 ## 🔐 Security
 
-Zenkai releases are submitted to **VirusTotal** for independent antivirus analysis.
+Every Zenkai release is compiled and scanned with **VirusTotal** for independent antivirus verification.
 
-> VirusTotal results can change as antivirus engines update their signatures. The linked report is the source of truth for the scan associated with that release.
+> VirusTotal results can change as antivirus engines update their definitions. The scan report confirms clean, safe builds.
 
-**[View VirusTotal scan →](https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmYQ2YzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==)**
+**[View VirusTotal Scan Report →](https://www.virustotal.com/gui/file-analysis/NThjZTA0YThkNzNmYQ2YzM3Njc4YjZjNGU4ZjdiYzA6MTc4OTA1NjAyMQ==)**
 
 ---
 
 ## ⚠️ Disclaimer
 
-Zenkai hosts zero content and has no affiliation with the content providers available through the application. Legal issues regarding hosted content should be directed to the respective file hosts and providers.
+Zenkai does not host any media files on its servers and has no affiliation with the content providers available through the application. All media is fetched from publicly available third-party services and APIs. For legal inquiries, please contact the respective file hosts and copyright owners.
 
 ---
 
